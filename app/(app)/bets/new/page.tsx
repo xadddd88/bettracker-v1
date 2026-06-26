@@ -169,13 +169,14 @@ export default function NewBetPage() {
         p_notes:        parsed.data.notes ?? null,
       })
 
-      if (rpcErr) throw rpcErr
+      if (rpcErr) throw new Error(rpcErr.message || rpcErr.details || JSON.stringify(rpcErr))
 
       router.push('/bets')
       router.refresh()
 
     } catch (err: unknown) {
-      setErrors({ _root: err instanceof Error ? err.message : 'Something went wrong' })
+      const msg = err instanceof Error ? err.message : String(err)
+      setErrors({ _root: msg })
     } finally {
       setLoading(false)
     }

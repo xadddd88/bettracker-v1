@@ -71,8 +71,8 @@ No new product features until foundation is solid.
 - [x] Fix bankroll null handling in RPC — auto-create or resolve default
 - [x] Harden scanner: media_type whitelist, size limit, Zod output validation
 - [x] TypeScript: BankrollTransaction.balance_after made required
-- [ ] CEO: re-run migration 001 v1.2 in Supabase SQL Editor
-- [ ] Smoke test: register → dashboard → add bet → scanner → verify balance
+- [x] CEO: re-run migration 001 v1.2 in Supabase SQL Editor
+- [x] Smoke test: register → dashboard → add bet → scanner → verify balance ✅ 2026-06-26
 
 ---
 
@@ -235,6 +235,12 @@ bankroll_transactions
 ---
 
 ## Changelog
+
+### 2026-06-26 — Sprint 1 closed ✅
+
+- Smoke test passed end-to-end: login → scanner → save bet → bets list
+- Fixed "No default bankroll found" by restoring missing profile/bankroll via SQL for existing auth user
+- Error messages now surface real DB error instead of generic "Something went wrong"
 
 ### 2026-06-26 — Sprint 1 security hardening (commit after d14d620)
 
