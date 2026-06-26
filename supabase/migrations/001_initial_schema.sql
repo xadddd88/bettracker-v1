@@ -7,23 +7,10 @@
 -- ============================================================
 
 -- RESET (destroys all data -- dev only)
-DROP TRIGGER IF EXISTS on_auth_user_created          ON auth.users;
-DROP TRIGGER IF EXISTS trg_profiles_updated_at       ON profiles;
-DROP TRIGGER IF EXISTS trg_bankrolls_updated_at      ON bankrolls;
-DROP TRIGGER IF EXISTS trg_decisions_updated_at      ON decisions;
-DROP TRIGGER IF EXISTS trg_bets_updated_at           ON bets;
-DROP TRIGGER IF EXISTS trg_bet_legs_updated_at       ON bet_legs;
-DROP TRIGGER IF EXISTS trg_validate_bet_bankroll     ON bets;
-DROP TRIGGER IF EXISTS trg_validate_txn_references   ON bankroll_transactions;
-DROP TRIGGER IF EXISTS trg_validate_bet_leg_decision ON bet_legs;
+-- Drop auth.users trigger first (table always exists in Supabase)
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 
-DROP FUNCTION IF EXISTS handle_new_user()            CASCADE;
-DROP FUNCTION IF EXISTS set_updated_at()             CASCADE;
-DROP FUNCTION IF EXISTS create_quick_bet             CASCADE;
-DROP FUNCTION IF EXISTS validate_bet_bankroll()      CASCADE;
-DROP FUNCTION IF EXISTS validate_txn_references()    CASCADE;
-DROP FUNCTION IF EXISTS validate_bet_leg_decision()  CASCADE;
-
+-- Drop tables CASCADE -- this also drops all table-owned triggers and constraints
 DROP TABLE IF EXISTS bankroll_transactions CASCADE;
 DROP TABLE IF EXISTS bet_legs              CASCADE;
 DROP TABLE IF EXISTS ai_analysis_runs      CASCADE;
@@ -32,6 +19,14 @@ DROP TABLE IF EXISTS decisions             CASCADE;
 DROP TABLE IF EXISTS bankrolls             CASCADE;
 DROP TABLE IF EXISTS global_config         CASCADE;
 DROP TABLE IF EXISTS profiles              CASCADE;
+
+-- Drop functions after tables
+DROP FUNCTION IF EXISTS handle_new_user()         CASCADE;
+DROP FUNCTION IF EXISTS set_updated_at()          CASCADE;
+DROP FUNCTION IF EXISTS create_quick_bet          CASCADE;
+DROP FUNCTION IF EXISTS validate_bet_bankroll()   CASCADE;
+DROP FUNCTION IF EXISTS validate_txn_references() CASCADE;
+DROP FUNCTION IF EXISTS validate_bet_leg_decision() CASCADE;
 
 -- EXTENSIONS
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -175,6 +170,10 @@ CREATE INDEX idx_decisions_user_id    ON decisions(user_id);
 CREATE INDEX idx_decisions_created_at ON decisions(created_at DESC);
 CREATE INDEX idx_decisions_sport      ON decisions(sport);
 CREATE INDEX idx_decisions_status     ON decisions(final_action);
+-- Prevent multiple default bankrolls per user
+CREATE UNIQUE INDEX idx_bankrolls_one_default_per_user
+  ON bankrolls(user_id) WHERE is_default = true;
+
 CREATE INDEX idx_bets_user_id         ON bets(user_id);
 CREATE INDEX idx_bets_status          ON bets(status);
 CREATE INDEX idx_bets_placed_at       ON bets(placed_at DESC);
