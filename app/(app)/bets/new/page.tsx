@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -14,7 +14,7 @@ const quickBetSchema = z.object({
   event_name:  z.string().min(1, 'Event name is required'),
   market_type: z.string().min(1, 'Market is required'),
   selection:   z.string().optional(),
-  odds:        z.number({ invalid_type_error: 'Odds must be a number' }).min(1.01, 'Odds must be greater than 1.00'),
+  odds:        z.number({ invalid_type_error: 'Odds must be a number' }).min(1.01, 'Odds must be > 1.00'),
   stake:       z.number({ invalid_type_error: 'Stake must be a number' }).positive('Stake must be positive'),
   sport:       z.enum(['football', 'tennis', 'basketball', 'hockey', 'other']),
   bookmaker:   z.string().nullable().optional(),
@@ -23,11 +23,30 @@ const quickBetSchema = z.object({
 
 type FormErrors = Partial<Record<keyof z.infer<typeof quickBetSchema> | '_root', string>>
 
+// ─── Image helpers ───────────────────────────────────────────
+function fileToBase64(file: File): Promise<{ data: string; media_type: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      const [header, data] = result.split(',')
+      const media_type = header.match(/data:(.*);base64/)?.[1] ?? 'image/jpeg'
+      resolve({ data, media_type })
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 export default function NewBetPage() {
-  const router  = useRouter()
+  const router   = useRouter()
   const supabase = createClient()
-  const [loading, setLoading] = useState(false)
-  const [errors,  setErrors]  = useState<FormErrors>({})
+  const fileRef  = useRef<HTMLInputElement>(null)
+
+  const [loading,  setLoading]  = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [scanMsg,  setScanMsg]  = useState('')
+  const [errors,   setErrors]   = useState<FormErrors>({})
 
   const [form, setForm] = useState({
     event_name:  '',
@@ -45,15 +64,72 @@ export default function NewBetPage() {
     setErrors(e => ({ ...e, [field]: undefined }))
   }
 
+  // ── Scanner ────────────────────────────────────────────────
+  const runScanner = useCallback(async (file: File) => {
+    setScanning(true)
+    setScanMsg('Scanning coupon...')
+
+    try {
+      const { data, media_type } = await fileToBase64(file)
+
+      const res = await fetch('/api/ai/scanner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: data, media_type }),
+      })
+
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        setScanMsg(json.error ?? 'Scan failed')
+        return
+      }
+
+      const d = json.data
+      setForm(prev => ({
+        ...prev,
+        event_name:  d.event_name  ?? prev.event_name,
+        market_type: d.market_type ?? prev.market_type,
+        selection:   d.selection   ?? prev.selection,
+        odds:        d.odds != null ? String(d.odds) : prev.odds,
+        stake:       d.stake != null ? String(d.stake) : prev.stake,
+        sport:       (SPORTS.includes(d.sport) ? d.sport : prev.sport) as Sport,
+        bookmaker:   d.bookmaker   ?? prev.bookmaker,
+      }))
+      setScanMsg('✅ Coupon scanned — review and save')
+
+    } catch {
+      setScanMsg('Scan error — try again')
+    } finally {
+      setScanning(false)
+    }
+  }, [])
+
+  // Ctrl+V paste
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData.items)
+    const imageItem = items.find(i => i.type.startsWith('image/'))
+    if (imageItem) {
+      const file = imageItem.getAsFile()
+      if (file) runScanner(file)
+    }
+  }, [runScanner])
+
+  // File picker
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) runScanner(file)
+    e.target.value = ''
+  }, [runScanner])
+
+  // ── Submit ─────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setErrors({})
 
-    // ── Client-side validation ─────────────────────────────
     const parsed = quickBetSchema.safeParse({
       ...form,
-      odds:  form.odds  ? parseFloat(form.odds)  : undefined,
-      stake: form.stake ? parseFloat(form.stake) : undefined,
+      odds:      form.odds  ? parseFloat(form.odds)  : undefined,
+      stake:     form.stake ? parseFloat(form.stake) : undefined,
       bookmaker: form.bookmaker || null,
       notes:     form.notes     || null,
     })
@@ -74,7 +150,6 @@ export default function NewBetPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
-      // Get default bankroll
       const { data: bankroll } = await supabase
         .from('bankrolls')
         .select('id')
@@ -82,7 +157,6 @@ export default function NewBetPage() {
         .eq('is_default', true)
         .single()
 
-      // ── Single atomic RPC — all 4 inserts + balance update ─
       const { error: rpcErr } = await supabase.rpc('create_quick_bet', {
         p_user_id:      user.id,
         p_bankroll_id:  bankroll?.id ?? null,
@@ -113,20 +187,47 @@ export default function NewBetPage() {
   const showPreview = !isNaN(oddsNum) && !isNaN(stakeNum) && oddsNum > 1 && stakeNum > 0
 
   return (
-    <div className="max-w-xl">
+    <div className="max-w-xl" onPaste={handlePaste}>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Add Bet</h1>
-        <p className="text-sm text-gray-500 mt-1">Quick entry — a Decision is created automatically</p>
+        <p className="text-sm text-gray-500 mt-1">Paste a screenshot or fill in manually</p>
       </div>
 
-      {/* Parlay is Sprint 2 — single only for now */}
+      {/* ── Scanner zone ──────────────────────────────────── */}
+      <div
+        className={`mb-4 border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition-colors ${
+          scanning
+            ? 'border-indigo-500 bg-indigo-950/30'
+            : 'border-gray-700 hover:border-indigo-600 hover:bg-gray-800/40'
+        }`}
+        onClick={() => !scanning && fileRef.current?.click()}
+      >
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        {scanning ? (
+          <div className="flex items-center justify-center gap-2 text-indigo-400 text-sm">
+            <span className="animate-spin">⏳</span> {scanMsg}
+          </div>
+        ) : scanMsg ? (
+          <div className="text-sm text-gray-300">{scanMsg}</div>
+        ) : (
+          <div>
+            <div className="text-2xl mb-1">📸</div>
+            <p className="text-sm text-gray-400 font-medium">Paste screenshot (Ctrl+V) or click to upload</p>
+            <p className="text-xs text-gray-600 mt-0.5">Coupon will be scanned automatically</p>
+          </div>
+        )}
+      </div>
+
+      {/* Bet type */}
       <div className="flex gap-1 bg-gray-800 rounded-lg p-1 mb-4 w-fit">
-        <div className="px-4 py-1.5 text-sm rounded-md font-medium bg-indigo-600 text-white capitalize">
-          Single
-        </div>
-        <div className="px-4 py-1.5 text-sm rounded-md text-gray-600 cursor-not-allowed capitalize" title="Coming in Sprint 2">
-          Parlay
-        </div>
+        <div className="px-4 py-1.5 text-sm rounded-md font-medium bg-indigo-600 text-white">Single</div>
+        <div className="px-4 py-1.5 text-sm rounded-md text-gray-600 cursor-not-allowed" title="Coming in Sprint 2">Parlay</div>
       </div>
 
       <form onSubmit={handleSubmit} className="card flex flex-col gap-4">
@@ -212,14 +313,11 @@ export default function NewBetPage() {
           </div>
         </div>
 
-        {/* Payout preview */}
         {showPreview && (
           <div className="bg-gray-800 rounded-lg px-4 py-3 flex justify-between text-sm">
             <span className="text-gray-400">Potential payout</span>
-            {/* TODO: Currency should come from bankroll.currency */}
-            <span className="text-white font-semibold">
-              ${(stakeNum * oddsNum).toFixed(2)}
-            </span>
+            {/* TODO: currency from bankroll.currency */}
+            <span className="text-white font-semibold">${(stakeNum * oddsNum).toFixed(2)}</span>
           </div>
         )}
 
@@ -233,9 +331,7 @@ export default function NewBetPage() {
           <button type="submit" className="btn-primary flex-1" disabled={loading}>
             {loading ? 'Saving...' : 'Save Bet'}
           </button>
-          <button type="button" className="btn-ghost" onClick={() => router.back()}>
-            Cancel
-          </button>
+          <button type="button" className="btn-ghost" onClick={() => router.back()}>Cancel</button>
         </div>
       </form>
     </div>
