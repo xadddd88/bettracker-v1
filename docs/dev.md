@@ -20,19 +20,54 @@ A task is done when:
 
 ---
 
-## Current Sprint: Sprint 0 — Product Audit
+## ✅ Sprint 0 — Product Audit (COMPLETED 2026-06-26)
 
 **Goal:** Full audit of current prototype. Create documentation foundation.  
 **Definition of Success:** Team has complete picture of what exists, what works, what to carry forward, and what to discard.
 
 ### Tasks
-
 - [x] Create /docs structure (strategy.md, product.md, dev.md, decisions.md)
-- [ ] Technical audit of bettracker.html — inventory all features
-- [ ] Database audit — document current Supabase schema
-- [ ] UX audit — document all screens and user flows
-- [ ] Feature matrix — what to migrate vs discard vs rebuild
-- [ ] Sprint 1 kickoff — set up Next.js project
+- [x] Scaffold Next.js 15 + TypeScript project
+- [x] Push to GitHub (xadddd88/bettracker-v1)
+- [x] Decision-first architecture defined (ADR-005)
+- [x] Write full SQL migration (001_initial_schema.sql)
+- [ ] Run migration in Supabase SQL Editor ← **CEO pending**
+- [ ] Register account + smoke test login/dashboard
+
+---
+
+## 🔄 Sprint 1 — Foundation Stabilization
+
+**Goal:** Close all architecture blockers identified in CPO review (commit dae1013).  
+No new product features until foundation is solid.
+
+**Definition of Success:** `npm run build` passes, migration runs clean, quick bet is atomic, one test account with one bet works end-to-end.
+
+### Definition of Done — Sprint 1
+1. `package-lock.json` committed (reproducible installs)
+2. `dev.md` reflects Decision-first architecture (this file)
+3. Quick bet creation atomic via `create_quick_bet()` RPC ✅
+4. Bankroll balance consistent: `balance_after` mandatory, updated inside RPC ✅
+5. `bet_legs` / `legs` data shape mismatch fixed (Supabase aliasing `legs:bet_legs(*)`) ✅
+6. DB CHECK constraints protect all enum-like fields ✅
+7. `pgcrypto` extension added to migration ✅
+8. RLS or RPC prevents cross-user references ✅
+9. Migration runs successfully on clean Supabase project
+10. `npm run build` passes with no TypeScript errors
+11. Parlay hidden (Sprint 1 = single only) ✅
+12. Zod validation on quick bet form ✅
+13. Mobile nav plan documented
+
+### Tasks
+- [x] Fix .gitignore — remove package-lock.json exclusion
+- [x] Rewrite migration 001 with constraints, pgcrypto, atomic RPC
+- [x] Fix `legs:bet_legs(*)` aliasing in Dashboard + Bets pages
+- [x] Rewrite new bet page: Zod, RPC, hide parlay, fix stake bug
+- [x] Update dev.md (this file)
+- [ ] Add mobile bottom nav (MobileNav component)
+- [ ] CEO: run `npm install` → commit package-lock.json
+- [ ] CEO: run migration 001 in Supabase SQL Editor
+- [ ] Smoke test: register → dashboard → add bet → verify balance
 
 ---
 
@@ -40,7 +75,7 @@ A task is done when:
 
 | Layer | Technology | Decision |
 |-------|------------|----------|
-| Framework | Next.js 14+ (App Router) | Approved 2026-06-26 |
+| Framework | Next.js 15 (App Router) | Approved 2026-06-26 |
 | Language | TypeScript | Approved 2026-06-26 |
 | Styling | Tailwind CSS | Approved 2026-06-26 |
 | UI Components | Tailwind only (Sprint 1), shadcn/ui TBD (Sprint 2+) | Approved 2026-06-26 |
@@ -55,7 +90,7 @@ A task is done when:
 
 ---
 
-## Project Structure (Planned)
+## Project Structure
 
 ```
 bettracker/
@@ -63,8 +98,11 @@ bettracker/
 │   ├── (auth)/
 │   │   └── login/
 │   ├── (app)/
+│   │   ├── layout.tsx         (Sidebar + MobileNav)
 │   │   ├── dashboard/
 │   │   ├── bets/
+│   │   │   ├── page.tsx
+│   │   │   └── new/page.tsx
 │   │   ├── analytics/
 │   │   ├── bankroll/
 │   │   ├── ai/
@@ -77,98 +115,113 @@ bettracker/
 │   │   └── bets/
 │   └── layout.tsx
 ├── components/
-│   ├── ui/           (base components)
-│   ├── bets/         (bet-specific)
-│   ├── analytics/    (charts, stats)
-│   └── ai/           (agent UIs)
+│   ├── ui/
+│   │   ├── Sidebar.tsx        (desktop)
+│   │   └── MobileNav.tsx      (mobile bottom bar)
+│   ├── bets/
+│   ├── analytics/
+│   └── ai/
 ├── lib/
-│   ├── supabase/     (client, server, types)
-│   ├── ai/           (agent logic)
-│   └── utils/        (formatting, calculations)
+│   ├── supabase/
+│   ├── ai/
+│   └── utils/
 ├── types/
-│   └── index.ts      (all shared types)
+│   └── index.ts
 ├── hooks/
-└── docs/             (this folder)
+└── supabase/
+    └── migrations/
+        └── 001_initial_schema.sql
 ```
 
 ---
 
-## Database Schema (Planned — New Supabase Project)
+## Database Schema (Decision-first — ADR-005)
 
-```sql
--- Users are managed by Supabase Auth
+Migration file: `supabase/migrations/001_initial_schema.sql`
 
--- Bets
-CREATE TABLE bets (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES auth.users NOT NULL,
-  created_at timestamptz DEFAULT now(),
-  event text NOT NULL,
-  market text NOT NULL,
-  odds numeric NOT NULL,
-  stake numeric NOT NULL,
-  sport text DEFAULT 'football',
-  bookmaker text,
-  bet_type text DEFAULT 'single', -- single | express
-  is_live boolean DEFAULT false,
-  status text DEFAULT 'pending', -- pending | won | lost | void | partial
-  profit numeric,
-  notes text,
-  ai_analysis jsonb,
-  metadata jsonb
-);
+```
+profiles
+  ├── id (→ auth.users)
+  ├── currency, default_stake, kelly_fraction, web_search_enabled
 
--- Bankroll transactions
-CREATE TABLE bankroll (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES auth.users NOT NULL,
-  created_at timestamptz DEFAULT now(),
-  type text NOT NULL, -- deposit | withdrawal | bet_result
-  amount numeric NOT NULL,
-  balance_after numeric NOT NULL,
-  reference_bet_id uuid REFERENCES bets(id)
-);
+bankrolls
+  ├── user_id, name, balance (authoritative — updated by RPC)
+  └── is_default
 
--- User settings
-CREATE TABLE user_settings (
-  user_id uuid PRIMARY KEY REFERENCES auth.users,
-  currency text DEFAULT 'USD',
-  default_stake numeric DEFAULT 10,
-  kelly_fraction numeric DEFAULT 0.5,
-  web_search_enabled boolean DEFAULT true,
-  metadata jsonb
-);
+decisions                         ← PRIMARY OBJECT
+  ├── user_id
+  ├── event_name, sport, league, market_type, selection
+  ├── offered_odds, bookmaker
+  ├── model_probability, implied_probability, edge_percent
+  ├── confidence_score, risk_level, recommendation
+  ├── final_action (pending/placed/skipped/watchlisted/ignored)
+  ├── source (ai_analyst/scanner/scout/quick_entry/manual/import)
+  └── reasoning, factors (jsonb)
 
--- Global config (admin only)
-CREATE TABLE global_config (
-  key text PRIMARY KEY,
-  value text
-);
+ai_analysis_runs
+  ├── decision_id (→ decisions, nullable)
+  ├── agent_type (analyst/scout/scanner/risk_manager/coach/portfolio)
+  └── input_snapshot, output_json, confidence_score
+
+bets                              ← FINANCIAL EXECUTION
+  ├── user_id, bankroll_id
+  ├── bet_type (single only in Sprint 1)
+  ├── stake, total_odds, potential_payout
+  └── status (pending/won/lost/void/push/cashed_out/partial)
+
+bet_legs                          ← INDIVIDUAL EVENT WITHIN A BET
+  ├── bet_id (→ bets, CASCADE)
+  ├── decision_id (→ decisions, NULLABLE)
+  └── odds, leg_status
+
+bankroll_transactions
+  ├── bankroll_id, bet_id
+  ├── type (deposit/withdrawal/stake/payout/adjustment/bonus)
+  ├── amount, balance_after (NOT NULL — always snapshot balance)
 ```
 
----
-
-## Technical Debt (from Prototype)
-
-| Item | Severity | Notes |
-|------|----------|-------|
-| Single 4900-line HTML file | Critical | Entire reason for Controlled Rebuild |
-| State in localStorage | High | Not synced, unreliable on mobile |
-| No TypeScript | High | No type safety |
-| One giant AI prompt | Medium | Needs refactoring into agent architecture |
-| No routing | High | Everything on one page |
-| No tests | Medium | Sprint 2+ |
-| RLS not properly configured | High | global_config bypassed via service_role workaround |
+### Key architectural rules
+- `decision_id` on `bet_legs` is nullable — allows quick_entry and imports
+- Always create a Decision, even for quick_entry (`source = 'quick_entry'`)
+- `bankrolls.balance` is authoritative (Option B). Updated only via `create_quick_bet()` RPC or equivalent DB functions — never from frontend
+- `bankroll_transactions.balance_after` is NOT NULL — every transaction records running balance
+- Parlay/system supported by schema; single only in Sprint 1 UI
 
 ---
 
-## Bugs (Known — Prototype)
+## Mobile Navigation
+
+**Sprint 1:** Add `MobileNav` component — bottom bar with 5 primary links. Hide desktop Sidebar on `md:` breakpoint and below. No hamburger menu needed for Sprint 1.
+
+**Sprint 2+:** Evaluate drawer/sheet component when shadcn/ui is adopted.
+
+---
+
+## Technical Debt
+
+| Item | Severity | Sprint | Notes |
+|------|----------|--------|-------|
+| Single 4900-line HTML file (legacy) | Critical | 0 → done | Controlled Rebuild in progress |
+| State in localStorage (legacy) | High | 0 → done | Supabase replaces |
+| No TypeScript (legacy) | High | 0 → done | Full TS from day 1 |
+| One giant AI prompt (legacy) | Medium | Sprint 2 | Needs agent architecture |
+| No routing (legacy) | High | 0 → done | Next.js App Router |
+| RLS not properly configured (legacy) | High | 1 | Fixed via CHECK constraints + RPC |
+| Currency hardcoded to `$` in UI | Low | Sprint 2 | Should use `bankroll.currency` from profile |
+| Handwritten TypeScript DB types | Medium | Sprint 2 | Generate from Supabase schema: `supabase gen types typescript` |
+| No normalized sports/bookmakers tables | Medium | Sprint 2 | Currently free-text. Blocks Match Intelligence. |
+| No tests | Medium | Sprint 3 | Vitest + Playwright |
+| No error boundary components | Low | Sprint 2 | Next.js error.tsx pages |
+
+---
+
+## Bugs (Known — Prototype in `legacy/`)
 
 | Bug | Status | Notes |
 |-----|--------|-------|
 | Haiku misreads team names (OCR) | Fixed | Switched to claude-sonnet-4-6 for Scanner |
 | Handicap shown as П1 instead of Ф1 | Fixed | Updated scan prompt rules |
-| API key not syncing across devices | Fixed | getApiKey() chain: localStorage → user_metadata → global_config |
+| API key not syncing across devices | Fixed | getApiKey() chain |
 | Analysis shows only 1 factor | Fixed | Rewrote prompt with mandatory 10-factor template |
 | HEIC images fail on mobile | Fixed | compressImage() canvas resize |
 | Logout button silent fail | Fixed | Explicit showAuth() call |
@@ -176,15 +229,17 @@ CREATE TABLE global_config (
 
 ---
 
-## Decisions Log
-See `decisions.md`
-
----
-
 ## Changelog
 
-### 2026-06-26
-- Created /docs structure (Sprint 0 kickoff)
+### 2026-06-26 — Sprint 1 foundation stabilization
+
+- `.gitignore`: removed `package-lock.json` exclusion
+- `001_initial_schema.sql` v1.1: added pgcrypto extension, CHECK constraints on all enum fields, `create_quick_bet()` atomic RPC, mandatory `balance_after` on transactions
+- Dashboard + Bets pages: fixed `legs:bet_legs(*)` aliasing (Supabase nested select)
+- `bets/new/page.tsx`: removed wrong `stake = parseFloat(form.odds)` variable, added Zod validation, switched to `create_quick_bet()` RPC, hid parlay toggle (Sprint 2)
+
+### 2026-06-26 — Sprint 0 kickoff
+- Created /docs structure (strategy.md, product.md, dev.md, decisions.md)
 - Upgraded Scanner from claude-haiku to claude-sonnet-4-6
 - Added team1_form, team2_form, group_context to AI analysis output
 - Added group standings search query to web-search prompt

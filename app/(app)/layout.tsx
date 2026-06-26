@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/ui/Sidebar'
+import MobileNav from '@/components/ui/MobileNav'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -9,12 +10,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-950">
-      <Sidebar user={user} />
+      {/* Desktop sidebar — hidden on mobile */}
+      <div className="hidden md:flex">
+        <Sidebar user={user} />
+      </div>
+
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto p-6">
+        {/* Extra bottom padding on mobile so content clears the bottom nav */}
+        <div className="max-w-6xl mx-auto p-4 md:p-6 pb-20 md:pb-6">
           {children}
         </div>
       </main>
+
+      {/* Mobile bottom nav — hidden on desktop */}
+      <MobileNav />
     </div>
   )
 }

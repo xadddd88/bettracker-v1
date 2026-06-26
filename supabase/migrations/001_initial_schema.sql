@@ -1,11 +1,37 @@
 -- ============================================================
--- BetTracker AI — Schema v1.0
+-- BetTracker AI — Schema v1.1
 -- Decision-first architecture
 -- Apply in Supabase SQL Editor (new project, clean slate)
+-- Safe to re-run: drops everything first, then recreates clean.
 -- ============================================================
+
+-- ─── RESET (safe to re-run) ──────────────────────────────────
+-- Drop triggers first
+DROP TRIGGER IF EXISTS on_auth_user_created    ON auth.users;
+DROP TRIGGER IF EXISTS trg_profiles_updated_at ON profiles;
+DROP TRIGGER IF EXISTS trg_bankrolls_updated_at ON bankrolls;
+DROP TRIGGER IF EXISTS trg_decisions_updated_at ON decisions;
+DROP TRIGGER IF EXISTS trg_bets_updated_at      ON bets;
+DROP TRIGGER IF EXISTS trg_bet_legs_updated_at  ON bet_legs;
+
+-- Drop functions
+DROP FUNCTION IF EXISTS handle_new_user()    CASCADE;
+DROP FUNCTION IF EXISTS set_updated_at()     CASCADE;
+DROP FUNCTION IF EXISTS create_quick_bet     CASCADE;
+
+-- Drop tables in reverse-dependency order
+DROP TABLE IF EXISTS bankroll_transactions CASCADE;
+DROP TABLE IF EXISTS bet_legs              CASCADE;
+DROP TABLE IF EXISTS ai_analysis_runs      CASCADE;
+DROP TABLE IF EXISTS bets                  CASCADE;
+DROP TABLE IF EXISTS decisions             CASCADE;
+DROP TABLE IF EXISTS bankrolls             CASCADE;
+DROP TABLE IF EXISTS global_config         CASCADE;
+DROP TABLE IF EXISTS profiles              CASCADE;
 
 -- ─── EXTENSIONS ─────────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ─── PROFILES ───────────────────────────────────────────────
 CREATE TABLE profiles (
@@ -52,22 +78,22 @@ CREATE TABLE decisions (
   -- Odds & value
   offered_odds        numeric,
   bookmaker           text,
-  model_probability   numeric,  -- our estimate 0-100
+  model_probability   numeric,  -- our estimate 0–100
   implied_probability numeric,  -- 1/odds * 100
   edge_percent        numeric,  -- model_prob - implied_prob
 
   -- Assessment
-  confidence_score    numeric,  -- 0-100
-  risk_level          text,     -- low / medium / high
-  recommendation      text,     -- bet / skip / watch / no_value
+  confidence_score    numeric   CHECK (confidence_score IS NULL OR (confidence_score >= 0 AND confidence_score <= 100)),
+  risk_level          text      CHECK (risk_level IS NULL OR risk_level IN ('low', 'medium', 'high')),
+  recommendation      text      CHECK (recommendation IS NULL OR recommendation IN ('bet', 'skip', 'watch', 'no_value')),
 
   -- Outcome
-  final_action        text      DEFAULT 'pending',
-  -- pending / placed / skipped / watchlisted / ignored
+  final_action        text      NOT NULL DEFAULT 'pending'
+                                CHECK (final_action IN ('pending', 'placed', 'skipped', 'watchlisted', 'ignored')),
 
   -- Source
-  source              text      DEFAULT 'manual',
-  -- ai_analyst / scanner / scout / quick_entry / manual / import
+  source              text      NOT NULL DEFAULT 'manual'
+                                CHECK (source IN ('ai_analyst', 'scanner', 'scout', 'quick_entry', 'manual', 'import')),
 
   -- AI output
   reasoning           text,
@@ -84,14 +110,14 @@ CREATE TABLE ai_analysis_runs (
   user_id          uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
   decision_id      uuid REFERENCES decisions(id) ON DELETE SET NULL,
 
-  agent_type       text NOT NULL,
-  -- analyst / scout / scanner / risk_manager / coach / portfolio
+  agent_type       text NOT NULL
+                   CHECK (agent_type IN ('analyst', 'scout', 'scanner', 'risk_manager', 'coach', 'portfolio')),
 
   model_name       text,
   input_snapshot   jsonb,
   output_summary   text,
   output_json      jsonb,
-  confidence_score numeric,
+  confidence_score numeric CHECK (confidence_score IS NULL OR (confidence_score >= 0 AND confidence_score <= 100)),
   web_search_used  boolean DEFAULT false,
 
   created_at       timestamptz DEFAULT now()
@@ -104,15 +130,15 @@ CREATE TABLE bets (
   user_id          uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
   bankroll_id      uuid REFERENCES bankrolls(id) ON DELETE SET NULL,
 
-  bet_type         text NOT NULL DEFAULT 'single',
-  -- single / parlay / system
+  bet_type         text NOT NULL DEFAULT 'single'
+                   CHECK (bet_type IN ('single', 'parlay', 'system')),
 
-  stake            numeric NOT NULL,
-  total_odds       numeric,
+  stake            numeric NOT NULL CHECK (stake > 0),
+  total_odds       numeric         CHECK (total_odds IS NULL OR total_odds > 0),
   potential_payout numeric,
 
-  status           text NOT NULL DEFAULT 'pending',
-  -- pending / won / lost / void / push / cashed_out / partial
+  status           text NOT NULL DEFAULT 'pending'
+                   CHECK (status IN ('pending', 'won', 'lost', 'void', 'push', 'cashed_out', 'partial')),
 
   pnl              numeric,      -- settled profit/loss
 
@@ -120,8 +146,8 @@ CREATE TABLE bets (
   settled_at       timestamptz,
 
   bookmaker        text,
-  source           text DEFAULT 'manual',
-  -- manual / scanner / import / quick_entry
+  source           text DEFAULT 'manual'
+                   CHECK (source IS NULL OR source IN ('manual', 'scanner', 'import', 'quick_entry')),
 
   notes            text,
   created_at       timestamptz DEFAULT now(),
@@ -141,10 +167,10 @@ CREATE TABLE bet_legs (
   market_type  text,
   selection    text,
   line         numeric,
-  odds         numeric NOT NULL,
+  odds         numeric NOT NULL CHECK (odds > 0),
 
-  leg_status   text NOT NULL DEFAULT 'pending',
-  -- pending / won / lost / void / push
+  leg_status   text NOT NULL DEFAULT 'pending'
+               CHECK (leg_status IN ('pending', 'won', 'lost', 'void', 'push')),
 
   result_notes text,
   created_at   timestamptz DEFAULT now(),
@@ -158,11 +184,11 @@ CREATE TABLE bankroll_transactions (
   bankroll_id   uuid REFERENCES bankrolls(id) ON DELETE SET NULL,
   bet_id        uuid REFERENCES bets(id) ON DELETE SET NULL,
 
-  type          text NOT NULL,
-  -- deposit / withdrawal / stake / payout / adjustment / bonus
+  type          text NOT NULL
+                CHECK (type IN ('deposit', 'withdrawal', 'stake', 'payout', 'adjustment', 'bonus')),
 
   amount        numeric NOT NULL,
-  balance_after numeric,
+  balance_after numeric NOT NULL, -- mandatory: always track running balance
   metadata      jsonb,
 
   created_at    timestamptz DEFAULT now()
@@ -240,6 +266,106 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
+-- ─── ATOMIC QUICK BET RPC ───────────────────────────────────
+-- All four inserts (decision, bet, bet_leg, bankroll_transaction) + balance
+-- update happen in one DB transaction. Partial failure = full rollback.
+CREATE OR REPLACE FUNCTION create_quick_bet(
+  p_user_id       uuid,
+  p_bankroll_id   uuid,
+  p_event_name    text,
+  p_sport         text,
+  p_market_type   text,
+  p_selection     text,
+  p_offered_odds  numeric,
+  p_stake         numeric,
+  p_bookmaker     text DEFAULT NULL,
+  p_notes         text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_decision_id uuid;
+  v_bet_id      uuid;
+  v_new_balance numeric;
+BEGIN
+  -- Validate ownership: bankroll must belong to this user
+  IF p_bankroll_id IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM bankrolls
+      WHERE id = p_bankroll_id AND user_id = p_user_id
+    ) THEN
+      RAISE EXCEPTION 'Bankroll not found or does not belong to user';
+    END IF;
+  END IF;
+
+  -- Validate inputs
+  IF p_stake <= 0 THEN
+    RAISE EXCEPTION 'Stake must be positive';
+  END IF;
+  IF p_offered_odds <= 1 THEN
+    RAISE EXCEPTION 'Odds must be greater than 1';
+  END IF;
+
+  -- 1. Create Decision
+  INSERT INTO decisions (
+    user_id, event_name, sport, market_type, selection,
+    offered_odds, bookmaker, source, final_action
+  )
+  VALUES (
+    p_user_id, p_event_name, p_sport, p_market_type, p_selection,
+    p_offered_odds, p_bookmaker, 'quick_entry', 'placed'
+  )
+  RETURNING id INTO v_decision_id;
+
+  -- 2. Create Bet
+  INSERT INTO bets (
+    user_id, bankroll_id, bet_type, stake, total_odds,
+    potential_payout, status, bookmaker, source, notes
+  )
+  VALUES (
+    p_user_id, p_bankroll_id, 'single', p_stake, p_offered_odds,
+    p_stake * p_offered_odds, 'pending', p_bookmaker, 'quick_entry', p_notes
+  )
+  RETURNING id INTO v_bet_id;
+
+  -- 3. Create BetLeg (linked to decision)
+  INSERT INTO bet_legs (
+    bet_id, decision_id, sport, event_name, market_type, selection, odds, leg_status
+  )
+  VALUES (
+    v_bet_id, v_decision_id, p_sport, p_event_name, p_market_type, p_selection, p_offered_odds, 'pending'
+  );
+
+  -- 4. Deduct stake from bankroll balance (cached, authoritative)
+  IF p_bankroll_id IS NOT NULL THEN
+    UPDATE bankrolls
+    SET balance = balance - p_stake
+    WHERE id = p_bankroll_id AND user_id = p_user_id
+    RETURNING balance INTO v_new_balance;
+  ELSE
+    v_new_balance := 0;
+  END IF;
+
+  -- 5. Record transaction with running balance snapshot
+  INSERT INTO bankroll_transactions (
+    user_id, bankroll_id, bet_id, type, amount, balance_after
+  )
+  VALUES (
+    p_user_id, p_bankroll_id, v_bet_id, 'stake', -p_stake, v_new_balance
+  );
+
+  RETURN jsonb_build_object(
+    'decision_id', v_decision_id,
+    'bet_id',      v_bet_id
+  );
+END;
+$$;
+
+-- Grant RPC access to authenticated users
+GRANT EXECUTE ON FUNCTION create_quick_bet TO authenticated;
+
 -- ─── ROW LEVEL SECURITY ─────────────────────────────────────
 ALTER TABLE profiles              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bankrolls             ENABLE ROW LEVEL SECURITY;
@@ -260,6 +386,7 @@ CREATE POLICY "own bets"       ON bets                  FOR ALL TO authenticated
 CREATE POLICY "read global"    ON global_config         FOR SELECT TO authenticated USING (true);
 
 -- bet_legs: user owns via parent bet
+-- Cross-user protection: bet must belong to same user. Enforced here + via create_quick_bet RPC.
 CREATE POLICY "own bet_legs" ON bet_legs FOR ALL TO authenticated
   USING (
     EXISTS (SELECT 1 FROM bets WHERE bets.id = bet_legs.bet_id AND bets.user_id = auth.uid())

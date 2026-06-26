@@ -26,4 +26,4 @@ next-env.d.ts
 legacy/
 debug-screenshot-*.png
 debug-search-result.json
-package-lock.json
+# package-lock.json is intentionally committed for reproducible installs

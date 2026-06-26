@@ -16,7 +16,7 @@ export default async function BetsPage() {
 
   const { data } = await supabase
     .from('bets')
-    .select('*, bet_legs(*)')
+    .select('*, legs:bet_legs(*)')
     .eq('user_id', user!.id)
     .order('placed_at', { ascending: false })
 
