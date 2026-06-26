@@ -126,7 +126,7 @@ export interface BankrollTransaction {
   bet_id?: string
   type: TxnType
   amount: number
-  balance_after?: number
+  balance_after: number
   metadata?: Record<string, unknown>
   created_at: string
 }

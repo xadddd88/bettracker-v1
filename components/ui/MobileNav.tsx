@@ -8,7 +8,7 @@ const NAV = [
   { href: '/bets',      icon: '🎯', label: 'Bets' },
   { href: '/analytics', icon: '📈', label: 'Stats' },
   { href: '/ai',        icon: '🤖', label: 'AI' },
-  { href: '/settings',  icon: '⚙️',  label: 'More' },
+  { href: '/settings',  icon: '⚙️', label: 'More' },
 ]
 
 export default function MobileNav() {

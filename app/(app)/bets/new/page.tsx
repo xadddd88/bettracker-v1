@@ -158,7 +158,6 @@ export default function NewBetPage() {
         .single()
 
       const { error: rpcErr } = await supabase.rpc('create_quick_bet', {
-        p_user_id:      user.id,
         p_bankroll_id:  bankroll?.id ?? null,
         p_event_name:   parsed.data.event_name,
         p_sport:        parsed.data.sport,

@@ -60,14 +60,19 @@ No new product features until foundation is solid.
 
 ### Tasks
 - [x] Fix .gitignore — remove package-lock.json exclusion
+- [x] CEO: run `npm install` → commit package-lock.json
 - [x] Rewrite migration 001 with constraints, pgcrypto, atomic RPC
 - [x] Fix `legs:bet_legs(*)` aliasing in Dashboard + Bets pages
 - [x] Rewrite new bet page: Zod, RPC, hide parlay, fix stake bug
 - [x] Update dev.md (this file)
-- [ ] Add mobile bottom nav (MobileNav component)
-- [ ] CEO: run `npm install` → commit package-lock.json
-- [ ] CEO: run migration 001 in Supabase SQL Editor
-- [ ] Smoke test: register → dashboard → add bet → verify balance
+- [x] Add mobile bottom nav (MobileNav component)
+- [x] Fix create_quick_bet: use auth.uid(), SET search_path, no p_user_id
+- [x] Add cross-user validation triggers (bet_bankroll, txn_references, bet_leg_decision)
+- [x] Fix bankroll null handling in RPC — auto-create or resolve default
+- [x] Harden scanner: media_type whitelist, size limit, Zod output validation
+- [x] TypeScript: BankrollTransaction.balance_after made required
+- [ ] CEO: re-run migration 001 v1.2 in Supabase SQL Editor
+- [ ] Smoke test: register → dashboard → add bet → scanner → verify balance
 
 ---
 
@@ -230,6 +235,14 @@ bankroll_transactions
 ---
 
 ## Changelog
+
+### 2026-06-26 — Sprint 1 security hardening (commit after d14d620)
+
+- `001_initial_schema.sql` v1.2: `create_quick_bet` uses `auth.uid()` — `p_user_id` removed; `SET search_path = public` on all SECURITY DEFINER functions; cross-user validation triggers added; bankroll null auto-resolve
+- `app/api/ai/scanner`: media_type whitelist, 7.5 MB size guard, Zod output schema validation
+- `types/index.ts`: `BankrollTransaction.balance_after` made required
+- `bets/new/page.tsx`: removed `p_user_id` from RPC call
+- `docs/dev.md`: Sprint 1 tasks synced
 
 ### 2026-06-26 — Sprint 1 foundation stabilization
 
