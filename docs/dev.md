@@ -261,6 +261,15 @@ bankroll_transactions
 
 ## Changelog
 
+### 2026-06-26 — Sprint 2 Core implementation
+
+- `supabase/migrations/002_sprint2_schema.sql`: locale fields on decisions + ai_analysis_runs; `create_decision_with_analysis()` RPC; `place_bet_from_decision()` RPC; `update_decision_action()` RPC
+- `app/api/ai/analyst/route.ts`: Analyst API — auth, rate limit (10/min 50/day), sport module injection (tennis/soccer/cs2), honesty rule, responsible betting guardrails, Zod input + output validation, canonical JSON values, model from `ANTHROPIC_MODEL_ANALYST` env
+- `app/(app)/ai/page.tsx`: AI Analyst page — sport selector, language selector (8 locales), analysis form, result card (probabilities, edge, confidence, factors), Place/Skip/Watch actions
+- `app/(app)/decisions/[id]/page.tsx`: Decision detail page — full analysis display, linked bet, conditional actions
+- `app/(app)/decisions/[id]/DecisionActions.tsx`: client component — Place Bet (with stake input), Skip, Watch
+- `types/index.ts`: Decision locale fields, AnalystRequest, AnalystResponse types
+
 ### 2026-06-26 — Sprint 2 docs patch (pre-implementation)
 
 - `docs/decisions.md`: ADR-006 Multi-Sport Foundation, ADR-007 Multilingual Foundation, ADR-008 Market Scout, ADR-009 LineHunter AI brand direction

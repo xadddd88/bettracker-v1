@@ -58,8 +58,39 @@ export interface Decision {
   reasoning?: string
   factors?: AnalysisFactor[]
   metadata?: Record<string, unknown>
+  // Sprint 2: multilingual + raw text
+  input_language?: string
+  output_language?: string
+  raw_event_text?: string
+  raw_market_text?: string
+  participants?: Record<string, unknown>
   created_at: string
   updated_at: string
+}
+
+// Sprint 2: Analyst API types
+export interface AnalystRequest {
+  sport: string
+  event_name: string
+  market_type: string
+  selection?: string
+  line?: number
+  offered_odds: number
+  bookmaker?: string
+  notes?: string
+  output_language?: string
+}
+
+export interface AnalystResponse {
+  model_probability:   number
+  implied_probability: number
+  edge_percent:        number
+  confidence_score:    number
+  risk_level:          RiskLevel
+  recommendation:      Recommendation
+  reasoning:           string
+  factors:             AnalysisFactor[]
+  disclaimer?:         string
 }
 
 export interface AnalysisFactor {
