@@ -137,12 +137,23 @@ BEGIN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
 
-  -- Load and validate decision
+  -- Load and lock decision row — prevents concurrent double-bet
   SELECT * INTO v_decision FROM decisions
-  WHERE id = p_decision_id AND user_id = v_user_id;
+  WHERE id = p_decision_id AND user_id = v_user_id
+  FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Decision not found or does not belong to user';
+  END IF;
+
+  -- Reject if already placed
+  IF v_decision.final_action = 'placed' THEN
+    RAISE EXCEPTION 'Decision already placed — duplicate bet rejected';
+  END IF;
+
+  -- Reject if a bet_leg already links to this decision (belt-and-suspenders)
+  IF EXISTS (SELECT 1 FROM bet_legs WHERE decision_id = p_decision_id) THEN
+    RAISE EXCEPTION 'A bet already exists for this decision';
   END IF;
 
   IF v_decision.offered_odds IS NULL OR v_decision.offered_odds <= 1 THEN
@@ -176,7 +187,7 @@ BEGIN
     v_user_id, v_bankroll_id, 'single', v_stake, v_decision.offered_odds,
     v_stake * v_decision.offered_odds, 'pending',
     COALESCE(p_bookmaker, v_decision.bookmaker),
-    'quick_entry', p_notes
+    'ai_analyst', p_notes
   )
   RETURNING id INTO v_bet_id;
 
@@ -213,14 +224,16 @@ $$;
 GRANT EXECUTE ON FUNCTION place_bet_from_decision TO authenticated;
 
 -- ── RPC: update_decision_action() ───────────────────────────
--- Marks a decision as skipped or watchlisted.
+-- Marks a decision as skipped, watchlisted, ignored, or pending.
+-- Rejects if already placed.
 CREATE OR REPLACE FUNCTION update_decision_action(
   p_decision_id  uuid,
   p_final_action text
 )
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  v_user_id uuid := auth.uid();
+  v_user_id      uuid := auth.uid();
+  v_current_action text;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
@@ -230,14 +243,30 @@ BEGIN
     RAISE EXCEPTION 'Invalid final_action value: %', p_final_action;
   END IF;
 
-  UPDATE decisions
-  SET final_action = p_final_action, updated_at = now()
+  -- Read current action — reject if already placed
+  SELECT final_action INTO v_current_action FROM decisions
   WHERE id = p_decision_id AND user_id = v_user_id;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Decision not found or does not belong to user';
   END IF;
+
+  IF v_current_action = 'placed' THEN
+    RAISE EXCEPTION 'Cannot change action on a placed decision';
+  END IF;
+
+  UPDATE decisions
+  SET final_action = p_final_action, updated_at = now()
+  WHERE id = p_decision_id AND user_id = v_user_id;
 END;
 $$;
 
 GRANT EXECUTE ON FUNCTION update_decision_action TO authenticated;
+
+-- ── Fix bets.source CHECK constraint (add ai_analyst) ────────
+DO $$
+BEGIN
+  ALTER TABLE bets DROP CONSTRAINT IF EXISTS bets_source_check;
+  ALTER TABLE bets ADD CONSTRAINT bets_source_check
+    CHECK (source IS NULL OR source IN ('manual','scanner','import','quick_entry','ai_analyst'));
+END $$;

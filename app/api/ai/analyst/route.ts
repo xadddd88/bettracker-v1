@@ -50,13 +50,13 @@ const LOCALES = ['auto', 'uk', 'ru', 'en', 'es', 'fr', 'de', 'ar'] as const
 
 const requestSchema = z.object({
   sport:           z.enum(SPORTS),
-  event_name:      z.string().min(1).max(200),
-  market_type:     z.string().min(1).max(100),
-  selection:       z.string().max(100).optional(),
+  event_name:      z.string().min(1).max(500),
+  market_type:     z.string().min(1).max(500),
+  selection:       z.string().max(200).optional(),
   line:            z.number().optional(),
   offered_odds:    z.number().min(1.01).max(1000),
-  bookmaker:       z.string().max(50).optional(),
-  notes:           z.string().max(500).optional(),
+  bookmaker:       z.string().max(100).optional(),
+  notes:           z.string().max(1000).optional(),
   output_language: z.enum(LOCALES).default('auto'),
 })
 
@@ -220,13 +220,8 @@ export async function POST(req: NextRequest) {
     }
     const input = parsed.data
 
-    // 4. Load profile (web search setting)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('web_search_enabled')
-      .eq('id', user.id)
-      .single()
-    const webSearchEnabled = profile?.web_search_enabled ?? false
+    // 4. Sprint 2: real web search not implemented — always false
+    const webSearchEnabled = false
 
     // 5. Build prompt
     const systemPrompt = buildSystemPrompt(input.sport, input.output_language, webSearchEnabled)
@@ -279,25 +274,102 @@ Return structured JSON analysis only.`
 
     const analysis = validated.data
 
+    // 8. Server owns implied_probability and edge_percent — override AI values
+    const serverImplied = parseFloat(((1 / input.offered_odds) * 100).toFixed(2))
+    const serverEdge    = parseFloat((analysis.model_probability - serverImplied).toFixed(2))
+    analysis.implied_probability = serverImplied
+    analysis.edge_percent        = serverEdge
+
+    // 9. Sprint 2: always include honesty disclaimer
+    const honestDisclaimer = 'This analysis is based only on the information provided and does not include live injuries, team news, recent form updates, or current line movement.'
+    if (!analysis.disclaimer) analysis.disclaimer = honestDisclaimer
+
+    // 10. Persist decision immediately — every Analyst call creates a decision + ai_analysis_run
+    const inputSnapshot = {
+      sport:        input.sport,
+      event_name:   input.event_name,
+      market_type:  input.market_type,
+      selection:    input.selection ?? null,
+      line:         input.line ?? null,
+      offered_odds: input.offered_odds,
+      bookmaker:    input.bookmaker ?? null,
+    }
+    const outputJson = {
+      model_probability:   analysis.model_probability,
+      implied_probability: serverImplied,
+      edge_percent:        serverEdge,
+      confidence_score:    analysis.confidence_score,
+      risk_level:          analysis.risk_level,
+      recommendation:      analysis.recommendation,
+      reasoning:           analysis.reasoning,
+      factors:             analysis.factors,
+      disclaimer:          analysis.disclaimer,
+    }
+
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('create_decision_with_analysis', {
+      p_sport:               input.sport,
+      p_event_name:          input.event_name,
+      p_market_type:         input.market_type,
+      p_selection:           input.selection ?? null,
+      p_line:                input.line ?? null,
+      p_offered_odds:        input.offered_odds,
+      p_bookmaker:           input.bookmaker ?? null,
+      p_output_language:     input.output_language === 'auto' ? null : input.output_language,
+      p_model_probability:   analysis.model_probability,
+      p_implied_probability: serverImplied,
+      p_edge_percent:        serverEdge,
+      p_confidence_score:    analysis.confidence_score,
+      p_risk_level:          analysis.risk_level,
+      p_recommendation:      analysis.recommendation,
+      p_reasoning:           analysis.reasoning,
+      p_factors:             analysis.factors,
+      p_model_name:          model,
+      p_input_snapshot:      inputSnapshot,
+      p_output_json:         outputJson,
+      p_web_search_used:     false,
+      p_input_chars:         inputChars,
+      p_output_chars:        outputChars,
+    })
+
+    if (rpcErr) {
+      console.error('[analyst] persist error:', rpcErr)
+      return NextResponse.json(
+        { success: false, error: `Analysis succeeded but failed to persist: ${rpcErr.message}` },
+        { status: 500 }
+      )
+    }
+
+    const decisionId = (rpcData as { decision_id?: string })?.decision_id
+    if (!decisionId) {
+      return NextResponse.json(
+        { success: false, error: 'Decision persisted but returned no ID' },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json({
       success: true,
       data: {
-        ...analysis,
-        // Pass back input context for RPC call
-        _meta: {
-          sport:           input.sport,
-          event_name:      input.event_name,
-          market_type:     input.market_type,
-          selection:       input.selection ?? null,
-          line:            input.line ?? null,
-          offered_odds:    input.offered_odds,
-          bookmaker:       input.bookmaker ?? null,
-          output_language: input.output_language,
-          model_name:      model,
-          web_search_used: webSearchEnabled,
-          input_chars:     inputChars,
-          output_chars:    outputChars,
-        },
+        decision_id:         decisionId,
+        // AI output (server-corrected implied + edge)
+        model_probability:   analysis.model_probability,
+        implied_probability: serverImplied,
+        edge_percent:        serverEdge,
+        confidence_score:    analysis.confidence_score,
+        risk_level:          analysis.risk_level,
+        recommendation:      analysis.recommendation,
+        reasoning:           analysis.reasoning,
+        factors:             analysis.factors,
+        disclaimer:          analysis.disclaimer,
+        // Input context echoed back (for UI display, PDF, share)
+        sport:           input.sport,
+        event_name:      input.event_name,
+        market_type:     input.market_type,
+        selection:       input.selection ?? null,
+        line:            input.line ?? null,
+        offered_odds:    input.offered_odds,
+        bookmaker:       input.bookmaker ?? null,
+        output_language: input.output_language,
       },
     })
 

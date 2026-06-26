@@ -1,5 +1,9 @@
 // ─── ENUMS ──────────────────────────────────────────────────
-export type Sport = 'football' | 'tennis' | 'basketball' | 'hockey' | 'other'
+// Canonical sport codes — never localized labels in the data layer
+export type SportCode = 'soccer' | 'tennis' | 'cs2' | 'basketball' | 'ice_hockey' | 'mma' | 'other'
+/** @deprecated Use SportCode */
+export type Sport = SportCode
+
 export type BetType = 'single' | 'parlay' | 'system'
 export type BetStatus = 'pending' | 'won' | 'lost' | 'void' | 'push' | 'cashed_out' | 'partial'
 export type LegStatus = 'pending' | 'won' | 'lost' | 'void' | 'push'
@@ -7,7 +11,7 @@ export type FinalAction = 'pending' | 'placed' | 'skipped' | 'watchlisted' | 'ig
 export type Recommendation = 'bet' | 'skip' | 'watch' | 'no_value'
 export type RiskLevel = 'low' | 'medium' | 'high'
 export type DecisionSource = 'ai_analyst' | 'scanner' | 'scout' | 'quick_entry' | 'manual' | 'import'
-export type BetSource = 'manual' | 'scanner' | 'import' | 'quick_entry'
+export type BetSource = 'manual' | 'scanner' | 'import' | 'quick_entry' | 'ai_analyst'
 export type AgentType = 'analyst' | 'scout' | 'scanner' | 'risk_manager' | 'coach' | 'portfolio'
 export type TxnType = 'deposit' | 'withdrawal' | 'stake' | 'payout' | 'adjustment' | 'bonus'
 

@@ -1,8 +1,23 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+
+// ─── Image helper ─────────────────────────────────────────────
+function fileToBase64(file: File): Promise<{ data: string; media_type: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      const [header, data] = result.split(',')
+      const media_type = header.match(/data:(.*);base64/)?.[1] ?? 'image/jpeg'
+      resolve({ data, media_type })
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
 
 // ─── Types ────────────────────────────────────────────────────
 type Sport = 'tennis' | 'soccer' | 'cs2' | 'basketball' | 'ice_hockey' | 'mma' | 'other'
@@ -12,6 +27,8 @@ type RiskLevel = 'low' | 'medium' | 'high'
 
 interface Factor { name: string; score: number; detail: string }
 interface Analysis {
+  decision_id:         string
+  // AI output (server-corrected)
   model_probability:   number
   implied_probability: number
   edge_percent:        number
@@ -20,14 +37,16 @@ interface Analysis {
   recommendation:      Recommendation
   reasoning:           string
   factors:             Factor[]
-  disclaimer?:         string
-  _meta: {
-    sport: string; event_name: string; market_type: string
-    selection: string | null; line: number | null; offered_odds: number
-    bookmaker: string | null; output_language: string
-    model_name: string; web_search_used: boolean
-    input_chars: number; output_chars: number
-  }
+  disclaimer:          string
+  // Input echoed back from server
+  sport:           string
+  event_name:      string
+  market_type:     string
+  selection:       string | null
+  line:            number | null
+  offered_odds:    number
+  bookmaker:       string | null
+  output_language: string
 }
 
 // ─── Constants ────────────────────────────────────────────────
@@ -89,6 +108,8 @@ export default function AIAnalystPage() {
   const router   = useRouter()
   const supabase = createClient()
 
+  const fileRef = useRef<HTMLInputElement>(null)
+
   const [sport,      setSport]      = useState<Sport>('soccer')
   const [locale,     setLocale]     = useState<Locale>('auto')
   const [form,       setForm]       = useState({ event_name: '', market_type: '', selection: '', line: '', odds: '', bookmaker: '', notes: '' })
@@ -97,11 +118,56 @@ export default function AIAnalystPage() {
   const [analyzing,  setAnalyzing]  = useState(false)
   const [saving,     setSaving]     = useState(false)
   const [rootErr,    setRootErr]    = useState('')
+  const [scanning,   setScanning]   = useState(false)
+  const [scanMsg,    setScanMsg]    = useState('')
+  const [stakeStr,   setStakeStr]   = useState('')
+  const [showStake,  setShowStake]  = useState(false)
 
   function setField(k: string, v: string) {
     setForm(f => ({ ...f, [k]: v }))
     setErrors(e => ({ ...e, [k]: '' }))
   }
+
+  // ── Scanner ────────────────────────────────────────────────
+  const runScanner = useCallback(async (file: File) => {
+    setScanning(true)
+    setScanMsg('Scanning coupon...')
+    try {
+      const { data, media_type } = await fileToBase64(file)
+      const res = await fetch('/api/ai/scanner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: data, media_type }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) { setScanMsg(json.error ?? 'Scan failed'); return }
+      const d = json.data
+      const SPORTS: Sport[] = ['tennis', 'soccer', 'cs2', 'basketball', 'ice_hockey', 'mma', 'other']
+      setForm(prev => ({
+        ...prev,
+        event_name:  d.event_name  ?? prev.event_name,
+        market_type: d.market_type ?? prev.market_type,
+        selection:   d.selection   ?? prev.selection,
+        odds:        d.odds != null ? String(d.odds) : prev.odds,
+        bookmaker:   d.bookmaker   ?? prev.bookmaker,
+      }))
+      if (SPORTS.includes(d.sport)) setSport(d.sport as Sport)
+      setScanMsg('✅ Coupon scanned — review and analyze')
+    } catch {
+      setScanMsg('Scan error — try again')
+    } finally {
+      setScanning(false)
+    }
+  }, [])
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const imageItem = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'))
+    if (imageItem) { const f = imageItem.getAsFile(); if (f) runScanner(f) }
+  }, [runScanner])
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (f) runScanner(f); e.target.value = ''
+  }, [runScanner])
 
   // ── Analyze ────────────────────────────────────────────────
   const handleAnalyze = useCallback(async () => {
@@ -117,6 +183,8 @@ export default function AIAnalystPage() {
     if (Object.keys(newErrors).length) { setErrors(newErrors); return }
 
     setAnalyzing(true)
+    setShowStake(false)
+    setStakeStr('')
     try {
       const res = await fetch('/api/ai/analyst', {
         method: 'POST',
@@ -146,98 +214,159 @@ export default function AIAnalystPage() {
     }
   }, [sport, locale, form])
 
-  // ── Save decision (+ optional bet) ────────────────────────
+  // ── Act on already-persisted decision ─────────────────────
+  // Decision is created immediately by /api/ai/analyst.
+  // handleAction only calls the 2nd RPC (place or mark).
   const handleAction = useCallback(async (action: 'placed' | 'skipped' | 'watchlisted') => {
     if (!analysis) return
-    setSaving(true)
-    setRootErr('')
+    if (!analysis.decision_id) {
+      setRootErr('Decision ID missing — please re-analyze (restart dev server if in development)')
+      return
+    }
 
-    try {
-      const m = analysis._meta
-      const outputJson = {
-        model_probability:   analysis.model_probability,
-        implied_probability: analysis.implied_probability,
-        edge_percent:        analysis.edge_percent,
-        confidence_score:    analysis.confidence_score,
-        risk_level:          analysis.risk_level,
-        recommendation:      analysis.recommendation,
-        reasoning:           analysis.reasoning,
-        factors:             analysis.factors,
-        disclaimer:          analysis.disclaimer,
+    if (action === 'placed') {
+      const stake = parseFloat(stakeStr)
+      if (!stakeStr || isNaN(stake) || stake <= 0) {
+        setRootErr('Enter a valid stake amount')
+        return
       }
-
-      // For 'placed', we need a stake — use a prompt for now
-      let stake: number | null = null
-      if (action === 'placed') {
-        const raw = window.prompt('Stake amount:')
-        if (!raw) { setSaving(false); return }
-        stake = parseFloat(raw)
-        if (!stake || stake <= 0) { setRootErr('Invalid stake'); setSaving(false); return }
-      }
-
-      // 1. Create decision + analysis run atomically
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('create_decision_with_analysis', {
-        p_sport:               m.sport,
-        p_event_name:          m.event_name,
-        p_market_type:         m.market_type,
-        p_selection:           m.selection,
-        p_line:                m.line,
-        p_offered_odds:        m.offered_odds,
-        p_bookmaker:           m.bookmaker,
-        p_output_language:     m.output_language === 'auto' ? null : m.output_language,
-        p_model_probability:   analysis.model_probability,
-        p_implied_probability: analysis.implied_probability,
-        p_edge_percent:        analysis.edge_percent,
-        p_confidence_score:    analysis.confidence_score,
-        p_risk_level:          analysis.risk_level,
-        p_recommendation:      analysis.recommendation,
-        p_reasoning:           analysis.reasoning,
-        p_factors:             JSON.stringify(analysis.factors),
-        p_model_name:          m.model_name,
-        p_output_json:         JSON.stringify(outputJson),
-        p_web_search_used:     m.web_search_used,
-        p_input_chars:         m.input_chars,
-        p_output_chars:        m.output_chars,
-      })
-
-      if (rpcErr) throw new Error(rpcErr.message || rpcErr.details || JSON.stringify(rpcErr))
-
-      const decisionId = (rpcData as { decision_id: string }).decision_id
-
-      // 2. If placing bet, call place_bet_from_decision
-      if (action === 'placed' && stake) {
+      setSaving(true)
+      setRootErr('')
+      try {
         const { error: betErr } = await supabase.rpc('place_bet_from_decision', {
-          p_decision_id: decisionId,
+          p_decision_id: analysis.decision_id,
           p_stake:       stake,
-          p_bookmaker:   m.bookmaker,
+          p_bookmaker:   analysis.bookmaker,
         })
         if (betErr) throw new Error(betErr.message || betErr.details || JSON.stringify(betErr))
-      } else if (action !== 'placed') {
-        // Mark skip or watch
-        const { error: actionErr } = await supabase.rpc('update_decision_action', {
-          p_decision_id:  decisionId,
-          p_final_action: action,
-        })
-        if (actionErr) throw new Error(actionErr.message || actionErr.details || JSON.stringify(actionErr))
+        router.push(`/decisions/${analysis.decision_id}`)
+      } catch (err: unknown) {
+        setRootErr(err instanceof Error ? err.message : String(err))
+      } finally {
+        setSaving(false)
       }
+      return
+    }
 
-      router.push(`/decisions/${decisionId}`)
-      router.refresh()
-
+    // Watch or Skip
+    setSaving(true)
+    setRootErr('')
+    try {
+      const { error: actionErr } = await supabase.rpc('update_decision_action', {
+        p_decision_id:  analysis.decision_id,
+        p_final_action: action,
+      })
+      if (actionErr) throw new Error(actionErr.message || actionErr.details || JSON.stringify(actionErr))
+      router.push(`/decisions/${analysis.decision_id}`)
     } catch (err: unknown) {
       setRootErr(err instanceof Error ? err.message : String(err))
     } finally {
       setSaving(false)
     }
-  }, [analysis, supabase, router])
+  }, [analysis, stakeStr, supabase, router])
+
+  // ── PDF download ───────────────────────────────────────────
+  const downloadPDF = useCallback(() => {
+    if (!analysis) return
+    const a = analysis
+    const recLabels: Record<string, string> = { bet: 'BET', skip: 'SKIP', watch: 'WATCH', no_value: 'NO VALUE' }
+    const factorsHtml = a.factors.map(f =>
+      `<tr><td>${f.name}</td><td style="text-align:center;font-weight:bold;color:${f.score>0?'#22c55e':f.score<0?'#ef4444':'#9ca3af'}">${f.score>0?'+':''}${f.score}</td><td style="color:#9ca3af;font-size:12px">${f.detail}</td></tr>`
+    ).join('')
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>AI Analysis — ${a.event_name}</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:20px;color:#111;background:#fff}
+  h1{font-size:22px;margin-bottom:4px}
+  .meta{color:#666;font-size:13px;margin-bottom:20px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
+  .stat{background:#f8f8f8;padding:12px;border-radius:8px;text-align:center}
+  .stat-label{font-size:11px;color:#888;margin-bottom:4px}
+  .stat-value{font-size:22px;font-weight:700}
+  .rec{display:inline-block;padding:4px 12px;border-radius:6px;font-weight:700;font-size:14px;background:#f0f0f0;margin-bottom:12px}
+  .reasoning{background:#f8f8f8;padding:14px;border-radius:8px;margin:12px 0;line-height:1.6}
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th{text-align:left;font-size:12px;color:#888;padding:6px 8px;border-bottom:1px solid #eee}
+  td{padding:7px 8px;border-bottom:1px solid #f0f0f0;font-size:13px;vertical-align:top}
+  .disclaimer{font-size:11px;color:#999;margin-top:16px;padding-top:12px;border-top:1px solid #eee}
+  .footer{margin-top:24px;font-size:11px;color:#bbb;text-align:center}
+  @media print{body{margin:20px}}
+</style></head><body>
+<h1>${a.event_name}</h1>
+<div class="meta">${a.sport.toUpperCase()} · ${a.market_type}${a.selection?' · '+a.selection:''} · @${a.offered_odds}${a.bookmaker?' · '+a.bookmaker:''}</div>
+<div class="rec">${recLabels[a.recommendation]??a.recommendation}</div>
+<div class="grid">
+  <div class="stat"><div class="stat-label">Model probability</div><div class="stat-value">${a.model_probability.toFixed(1)}%</div></div>
+  <div class="stat"><div class="stat-label">Implied probability</div><div class="stat-value">${a.implied_probability.toFixed(1)}%</div></div>
+  <div class="stat"><div class="stat-label">Edge</div><div class="stat-value" style="color:${a.edge_percent>=0?'#16a34a':'#dc2626'}">${a.edge_percent>=0?'+':''}${a.edge_percent.toFixed(1)}%</div></div>
+</div>
+<div class="reasoning">${a.reasoning}</div>
+${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
+<h3 style="margin-top:20px;font-size:14px">Factor Analysis</h3>
+<table><thead><tr><th>Factor</th><th>Score</th><th>Detail</th></tr></thead><tbody>${factorsHtml}</tbody></table>
+<div class="footer">BetTracker AI · Generated ${new Date().toLocaleDateString()} · Analysis is for informational purposes only</div>
+</body></html>`
+    const win = window.open('', '_blank')
+    if (!win) return
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 300)
+  }, [analysis])
+
+  // ── Share (copy to clipboard) ──────────────────────────────
+  const [copied, setCopied] = useState(false)
+  const handleShare = useCallback(async () => {
+    if (!analysis) return
+    const a = analysis
+    const recLabels: Record<string, string> = { bet: '✅ BET', skip: '✕ SKIP', watch: '👁 WATCH', no_value: '❌ NO VALUE' }
+    const text = [
+      `📊 AI Analysis — ${a.event_name}`,
+      `${a.sport.toUpperCase()} · ${a.market_type}${a.selection?' · '+a.selection:''} · @${a.offered_odds}`,
+      ``,
+      `Recommendation: ${recLabels[a.recommendation]??a.recommendation}`,
+      `Model prob: ${a.model_probability.toFixed(1)}% | Implied: ${a.implied_probability.toFixed(1)}% | Edge: ${a.edge_percent>=0?'+':''}${a.edge_percent.toFixed(1)}%`,
+      `Confidence: ${a.confidence_score}/100 | Risk: ${a.risk_level}`,
+      ``,
+      a.reasoning,
+      a.disclaimer?`\n⚠️ ${a.disclaimer}`:'',
+      ``,
+      `via BetTracker AI`,
+    ].filter(Boolean).join('\n')
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }, [analysis])
 
   const a = analysis
 
   return (
-    <div className="max-w-2xl flex flex-col gap-6">
+    <div className="max-w-2xl flex flex-col gap-6" onPaste={handlePaste}>
       <div>
         <h1 className="text-2xl font-bold text-white">AI Analyst</h1>
-        <p className="text-sm text-gray-500 mt-1">Get a structured analysis before you decide</p>
+        <p className="text-sm text-gray-500 mt-1">Paste a coupon screenshot or fill in manually</p>
+      </div>
+
+      {/* ── Scanner zone ────────────────────────────────────── */}
+      <div
+        className={`border-2 border-dashed rounded-xl px-4 py-4 text-center cursor-pointer transition-colors ${
+          scanning ? 'border-indigo-500 bg-indigo-950/30' : 'border-gray-700 hover:border-indigo-600 hover:bg-gray-800/40'
+        }`}
+        onClick={() => !scanning && fileRef.current?.click()}
+      >
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+        {scanning ? (
+          <div className="flex items-center justify-center gap-2 text-indigo-400 text-sm">
+            <span className="animate-spin">⏳</span> {scanMsg}
+          </div>
+        ) : scanMsg ? (
+          <div className="text-sm text-gray-300">{scanMsg}</div>
+        ) : (
+          <div>
+            <div className="text-2xl mb-1">📸</div>
+            <p className="text-sm text-gray-400 font-medium">Paste screenshot (Ctrl+V) or click to upload</p>
+            <p className="text-xs text-gray-600 mt-0.5">Auto-fills event, market, odds, sport</p>
+          </div>
+        )}
       </div>
 
       {/* ── Sport selector ──────────────────────────────────── */}
@@ -434,6 +563,23 @@ export default function AIAnalystPage() {
             ))}
           </div>
 
+          {/* PDF + Share */}
+          <div className="flex gap-2">
+            <button
+              onClick={downloadPDF}
+              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 flex items-center justify-center gap-1.5"
+            >
+              📄 Download PDF
+            </button>
+            <button
+              onClick={handleShare}
+              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm font-medium transition-colors border border-gray-700 flex items-center justify-center gap-1.5"
+              style={{ color: copied ? '#4ade80' : '#9ca3af' }}
+            >
+              {copied ? '✅ Copied!' : '🔗 Copy to share'}
+            </button>
+          </div>
+
           {/* Actions */}
           {rootErr && (
             <div className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
@@ -441,14 +587,45 @@ export default function AIAnalystPage() {
             </div>
           )}
 
+          {/* Stake input — shown when Place Bet is clicked */}
+          {showStake && (
+            <div className="flex gap-2 items-center">
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                placeholder="Stake amount"
+                className="input flex-1"
+                value={stakeStr}
+                onChange={e => { setStakeStr(e.target.value); setRootErr('') }}
+                autoFocus
+              />
+              <button
+                className="btn-primary px-5"
+                onClick={() => handleAction('placed')}
+                disabled={saving}
+              >
+                {saving ? '…' : 'Confirm'}
+              </button>
+              <button
+                className="px-3 py-2 rounded-lg bg-gray-800 text-gray-500 text-sm border border-gray-700"
+                onClick={() => { setShowStake(false); setStakeStr(''); setRootErr('') }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           <div className="flex gap-3">
-            <button
-              className="btn-primary flex-1"
-              onClick={() => handleAction('placed')}
-              disabled={saving}
-            >
-              {saving ? 'Saving…' : '✅ Place Bet'}
-            </button>
+            {!showStake && (
+              <button
+                className="btn-primary flex-1"
+                onClick={() => { setShowStake(true); setRootErr('') }}
+                disabled={saving}
+              >
+                ✅ Place Bet
+              </button>
+            )}
             <button
               className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50"
               onClick={() => handleAction('watchlisted')}

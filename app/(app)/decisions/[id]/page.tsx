@@ -26,7 +26,7 @@ interface DecisionRow {
   factors: Factor[] | null
   output_language: string | null
   created_at: string
-  bets: { id: string; stake: number; status: string; total_odds: number | null }[]
+  bet_legs: { bet_id: string; bets: { id: string; stake: number; status: string; total_odds: number | null } | null }[]
 }
 
 const REC_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -95,7 +95,7 @@ export default async function DecisionDetailPage({
       recommendation, risk_level, model_probability, implied_probability,
       edge_percent, confidence_score, reasoning, factors,
       output_language, created_at,
-      bets(id, stake, status, total_odds)
+      bet_legs(bet_id, bets(id, stake, status, total_odds))
     `)
     .eq('id', id)
     .eq('user_id', user.id)
@@ -108,7 +108,7 @@ export default async function DecisionDetailPage({
   const risk   = d.risk_level     ? RISK_CONFIG[d.risk_level]      : null
   const action = ACTION_CONFIG[d.final_action] ?? ACTION_CONFIG.pending
   const sportIcon = SPORT_ICONS[d.sport ?? ''] ?? '🏅'
-  const linkedBet = d.bets?.[0] ?? null
+  const linkedBet = d.bet_legs?.[0]?.bets ?? null
 
   const date = new Date(d.created_at).toLocaleDateString('en-GB', {
     day: '2-digit', month: 'short', year: 'numeric',
