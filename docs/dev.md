@@ -36,7 +36,32 @@ A task is done when:
 
 ---
 
-## 🔄 Sprint 1 — Foundation Stabilization
+## 🔄 Sprint 2 — Decision Intelligence MVP
+
+**Goal:** Prove BetTracker AI is a decision-making system, not a bet diary.  
+**Status:** Approved. Docs patch complete. Implementation may begin.
+
+### Key engineering rules for Sprint 2
+
+**Canonical codes — never localized labels in data layer:**
+```
+Bad:  sport = "Футбол", recommendation = "Ставить"
+Good: sport_code = "soccer", recommendation = "bet"
+```
+
+**No hardcoded user-facing strings where avoidable.** Prepare i18n-ready structure in all new screens.
+
+**No hardcoded model names in product logic.** Use `process.env.ANTHROPIC_MODEL_ANALYST`.
+
+**Entitlement-ready design.** AI endpoints must have a clear place for future entitlement checks. No hardcoded "all users have all AI features forever" assumptions.
+
+**Sport-aware analyst.** Prompt = base system prompt + injected sport module (tennis / soccer / cs2). Fallback: `generic_sport_analyst`.
+
+**Rate limit before launch.** `POST /api/ai/analyst` must enforce 10 req/min + 50 req/day per user (in-memory for Sprint 2).
+
+---
+
+## ✅ Sprint 1 — Foundation Stabilization
 
 **Goal:** Close all architecture blockers identified in CPO review (commit dae1013).  
 No new product features until foundation is solid.
@@ -235,6 +260,15 @@ bankroll_transactions
 ---
 
 ## Changelog
+
+### 2026-06-26 — Sprint 2 docs patch (pre-implementation)
+
+- `docs/decisions.md`: ADR-006 Multi-Sport Foundation, ADR-007 Multilingual Foundation, ADR-008 Market Scout, ADR-009 LineHunter AI brand direction
+- `docs/product.md`: full 8-sprint roadmap, core sports (soccer/tennis/cs2), North Star Metric, Scout/Coach architecture, monetization direction, product language rules
+- `docs/sprint-2-plan.md`: Round 2 patch — sport-aware (sport modules), locale-aware (output language selector), updated DoD (27 points), entitlement-ready design, rate limit spec, two RPCs
+- `docs/dev.md`: Sprint 2 engineering rules added (canonical codes, no hardcoded model, i18n-ready structure, entitlement-ready design)
+- `lib/supabase/server.ts` + `middleware.ts`: TypeScript fix — `cookiesToSet` parameter typed
+- `app/(app)/dashboard/page.tsx`: removed unused `Stats` import
 
 ### 2026-06-26 — Sprint 1 closed ✅
 
