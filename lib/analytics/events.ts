@@ -38,6 +38,7 @@ export const EVENTS = {
   BET_DETAIL_VIEWED:      'bet_detail_viewed',
   BETS_LIST_VIEWED:       'bets_list_viewed',
   DECISION_DETAIL_VIEWED: 'decision_detail_viewed',
+  ANALYTICS_VIEWED:       'analytics_viewed',
 } as const
 
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS]
