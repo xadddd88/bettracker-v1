@@ -27,7 +27,8 @@ type RiskLevel = 'low' | 'medium' | 'high'
 
 interface Factor { name: string; score: number; detail: string }
 interface Analysis {
-  decision_id:         string
+  decision_id:      string
+  analysis_run_id?: string | null
   // AI output (server-corrected)
   model_probability:   number
   implied_probability: number
@@ -51,24 +52,24 @@ interface Analysis {
 
 // ─── Constants ────────────────────────────────────────────────
 const SPORTS: { value: Sport; label: string; icon: string }[] = [
-  { value: 'soccer',     label: 'Soccer',      icon: '⚽' },
-  { value: 'tennis',     label: 'Tennis',       icon: '🎾' },
-  { value: 'cs2',        label: 'CS2',          icon: '🎯' },
-  { value: 'basketball', label: 'Basketball',   icon: '🏀' },
-  { value: 'ice_hockey', label: 'Ice Hockey',   icon: '🏒' },
-  { value: 'mma',        label: 'MMA',          icon: '🥊' },
-  { value: 'other',      label: 'Other',        icon: '🏅' },
+  { value: 'soccer',     label: 'Football',     icon: '\u26BD' },
+  { value: 'tennis',     label: 'Tennis',       icon: '\uD83C\uDFBE' },
+  { value: 'cs2',        label: 'CS2',          icon: '\uD83C\uDFAF' },
+  { value: 'basketball', label: 'Basketball',   icon: '\uD83C\uDFC0' },
+  { value: 'ice_hockey', label: 'Ice Hockey',   icon: '\uD83C\uDFD2' },
+  { value: 'mma',        label: 'MMA',          icon: '\uD83E\uDD4A' },
+  { value: 'other',      label: 'Other',        icon: '\uD83C\uDFC5' },
 ]
 
 const LOCALES: { value: Locale; label: string }[] = [
   { value: 'auto', label: 'Auto (detect)' },
   { value: 'en',   label: 'English' },
-  { value: 'uk',   label: 'Українська' },
-  { value: 'ru',   label: 'Русский' },
-  { value: 'es',   label: 'Español' },
-  { value: 'fr',   label: 'Français' },
+  { value: 'uk',   label: '\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430' },
+  { value: 'ru',   label: '\u0420\u0443\u0441\u0441\u043A\u0438\u0439' },
+  { value: 'es',   label: 'Espa\u00F1ol' },
+  { value: 'fr',   label: 'Fran\u00E7ais' },
   { value: 'de',   label: 'Deutsch' },
-  { value: 'ar',   label: 'العربية' },
+  { value: 'ar',   label: '\u0627\u0644\u0639\u0631\u0628\u064A\u0629' },
 ]
 
 const REC_CONFIG: Record<Recommendation, { label: string; color: string; bg: string }> = {
@@ -142,7 +143,7 @@ export default function AIAnalystPage() {
       const json = await res.json()
       if (!res.ok || !json.success) { setScanMsg(json.error ?? 'Scan failed'); return }
       const d = json.data
-      const SPORTS: Sport[] = ['tennis', 'soccer', 'cs2', 'basketball', 'ice_hockey', 'mma', 'other']
+      const SPORTS_LIST: Sport[] = ['tennis', 'soccer', 'cs2', 'basketball', 'ice_hockey', 'mma', 'other']
       setForm(prev => ({
         ...prev,
         event_name:  d.event_name  ?? prev.event_name,
@@ -151,10 +152,10 @@ export default function AIAnalystPage() {
         odds:        d.odds != null ? String(d.odds) : prev.odds,
         bookmaker:   d.bookmaker   ?? prev.bookmaker,
       }))
-      if (SPORTS.includes(d.sport)) setSport(d.sport as Sport)
-      setScanMsg('✅ Coupon scanned — review and analyze')
+      if (SPORTS_LIST.includes(d.sport)) setSport(d.sport as Sport)
+      setScanMsg('\u2705 Coupon scanned \u2014 review and analyze')
     } catch {
-      setScanMsg('Scan error — try again')
+      setScanMsg('Scan error \u2014 try again')
     } finally {
       setScanning(false)
     }
@@ -208,7 +209,7 @@ export default function AIAnalystPage() {
       }
       setAnalysis(json.data)
     } catch {
-      setRootErr('Network error — please try again.')
+      setRootErr('Network error \u2014 please try again.')
     } finally {
       setAnalyzing(false)
     }
@@ -220,7 +221,7 @@ export default function AIAnalystPage() {
   const handleAction = useCallback(async (action: 'placed' | 'skipped' | 'watchlisted') => {
     if (!analysis) return
     if (!analysis.decision_id) {
-      setRootErr('Decision ID missing — please re-analyze (restart dev server if in development)')
+      setRootErr('Decision ID missing \u2014 please re-analyze (restart dev server if in development)')
       return
     }
 
@@ -273,7 +274,7 @@ export default function AIAnalystPage() {
     const factorsHtml = a.factors.map(f =>
       `<tr><td>${f.name}</td><td style="text-align:center;font-weight:bold;color:${f.score>0?'#22c55e':f.score<0?'#ef4444':'#9ca3af'}">${f.score>0?'+':''}${f.score}</td><td style="color:#9ca3af;font-size:12px">${f.detail}</td></tr>`
     ).join('')
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>AI Analysis — ${a.event_name}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>AI Analysis \u2014 ${a.event_name}</title>
 <style>
   body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:20px;color:#111;background:#fff}
   h1{font-size:22px;margin-bottom:4px}
@@ -292,7 +293,7 @@ export default function AIAnalystPage() {
   @media print{body{margin:20px}}
 </style></head><body>
 <h1>${a.event_name}</h1>
-<div class="meta">${a.sport.toUpperCase()} · ${a.market_type}${a.selection?' · '+a.selection:''} · @${a.offered_odds}${a.bookmaker?' · '+a.bookmaker:''}</div>
+<div class="meta">${a.sport.toUpperCase()} \u00B7 ${a.market_type}${a.selection?' \u00B7 '+a.selection:''} \u00B7 @${a.offered_odds}${a.bookmaker?' \u00B7 '+a.bookmaker:''}</div>
 <div class="rec">${recLabels[a.recommendation]??a.recommendation}</div>
 <div class="grid">
   <div class="stat"><div class="stat-label">Model probability</div><div class="stat-value">${a.model_probability.toFixed(1)}%</div></div>
@@ -303,7 +304,7 @@ export default function AIAnalystPage() {
 ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
 <h3 style="margin-top:20px;font-size:14px">Factor Analysis</h3>
 <table><thead><tr><th>Factor</th><th>Score</th><th>Detail</th></tr></thead><tbody>${factorsHtml}</tbody></table>
-<div class="footer">BetTracker AI · Generated ${new Date().toLocaleDateString()} · Analysis is for informational purposes only</div>
+<div class="footer">BetTracker AI \u00B7 Generated ${new Date().toLocaleDateString()} \u00B7 Analysis is for informational purposes only</div>
 </body></html>`
     const win = window.open('', '_blank')
     if (!win) return
@@ -318,17 +319,17 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
   const handleShare = useCallback(async () => {
     if (!analysis) return
     const a = analysis
-    const recLabels: Record<string, string> = { bet: '✅ BET', skip: '✕ SKIP', watch: '👁 WATCH', no_value: '❌ NO VALUE' }
+    const recLabels: Record<string, string> = { bet: '\u2705 BET', skip: '\u2715 SKIP', watch: '\uD83D\uDC41 WATCH', no_value: '\u274C NO VALUE' }
     const text = [
-      `📊 AI Analysis — ${a.event_name}`,
-      `${a.sport.toUpperCase()} · ${a.market_type}${a.selection?' · '+a.selection:''} · @${a.offered_odds}`,
+      `\uD83D\uDCCA AI Analysis \u2014 ${a.event_name}`,
+      `${a.sport.toUpperCase()} \u00B7 ${a.market_type}${a.selection?' \u00B7 '+a.selection:''} \u00B7 @${a.offered_odds}`,
       ``,
       `Recommendation: ${recLabels[a.recommendation]??a.recommendation}`,
       `Model prob: ${a.model_probability.toFixed(1)}% | Implied: ${a.implied_probability.toFixed(1)}% | Edge: ${a.edge_percent>=0?'+':''}${a.edge_percent.toFixed(1)}%`,
       `Confidence: ${a.confidence_score}/100 | Risk: ${a.risk_level}`,
       ``,
       a.reasoning,
-      a.disclaimer?`\n⚠️ ${a.disclaimer}`:'',
+      a.disclaimer?`\n\u26A0\uFE0F ${a.disclaimer}`:'',
       ``,
       `via BetTracker AI`,
     ].filter(Boolean).join('\n')
@@ -356,13 +357,13 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
         {scanning ? (
           <div className="flex items-center justify-center gap-2 text-indigo-400 text-sm">
-            <span className="animate-spin">⏳</span> {scanMsg}
+            <span className="animate-spin">\u23F3</span> {scanMsg}
           </div>
         ) : scanMsg ? (
           <div className="text-sm text-gray-300">{scanMsg}</div>
         ) : (
           <div>
-            <div className="text-2xl mb-1">📸</div>
+            <div className="text-2xl mb-1">\uD83D\uDCF8</div>
             <p className="text-sm text-gray-400 font-medium">Paste screenshot (Ctrl+V) or click to upload</p>
             <p className="text-xs text-gray-600 mt-0.5">Auto-fills event, market, odds, sport</p>
           </div>
@@ -449,7 +450,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
             <label className="label">Bookmaker</label>
             <input
               className="input"
-              placeholder="Bet365, Pinnacle…"
+              placeholder="Bet365, Pinnacle\u2026"
               value={form.bookmaker}
               onChange={e => setField('bookmaker', e.target.value)}
             />
@@ -466,7 +467,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
             <label className="label">Context / Notes</label>
             <textarea
               className="input resize-none" rows={2}
-              placeholder="Injuries, lineups, motivation, recent form, anything relevant…"
+              placeholder="Injuries, lineups, motivation, recent form, anything relevant\u2026"
               value={form.notes}
               onChange={e => setField('notes', e.target.value)}
             />
@@ -486,9 +487,9 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
         >
           {analyzing ? (
             <span className="flex items-center justify-center gap-2">
-              <span className="animate-spin">⏳</span> Analyzing…
+              <span className="animate-spin">\u23F3</span> Analyzing\u2026
             </span>
-          ) : '🔍 Analyze'}
+          ) : '\uD83D\uDD0D Analyze'}
         </button>
       </div>
 
@@ -569,14 +570,14 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
               onClick={downloadPDF}
               className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 flex items-center justify-center gap-1.5"
             >
-              📄 Download PDF
+              \uD83D\uDCC4 Download PDF
             </button>
             <button
               onClick={handleShare}
               className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm font-medium transition-colors border border-gray-700 flex items-center justify-center gap-1.5"
               style={{ color: copied ? '#4ade80' : '#9ca3af' }}
             >
-              {copied ? '✅ Copied!' : '🔗 Copy to share'}
+              {copied ? '\u2705 Copied!' : '\uD83D\uDD17 Copy to share'}
             </button>
           </div>
 
@@ -605,7 +606,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
                 onClick={() => handleAction('placed')}
                 disabled={saving}
               >
-                {saving ? '…' : 'Confirm'}
+                {saving ? '\u2026' : 'Confirm'}
               </button>
               <button
                 className="px-3 py-2 rounded-lg bg-gray-800 text-gray-500 text-sm border border-gray-700"

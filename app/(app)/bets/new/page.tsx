@@ -247,7 +247,7 @@ export default function NewBetPage() {
             <label className="label">Market *</label>
             <input
               className={`input ${errors.market_type ? 'border-red-600' : ''}`}
-              placeholder="П1 / ТБ 2.5 / Ф1 +1"
+              placeholder="П1 / т2.5 / Ф1 +1"
               value={form.market_type}
               onChange={e => set('market_type', e.target.value)}
             />
