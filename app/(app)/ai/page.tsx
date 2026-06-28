@@ -238,6 +238,13 @@ export default function AIAnalystPage() {
       }
       setSaving(true)
       setRootErr('')
+      trackClientEvent(EVENTS.BET_PLACE_CLICKED, {
+        decision_id:  analysis.decision_id,
+        from_page:    'ai_page',
+        stake_bucket: bucketStake(stake),
+        odds_bucket:  bucketOdds(analysis.offered_odds),
+        is_ai_linked: true,
+      })
       try {
         const { data: betData, error: betErr } = await supabase.rpc('place_bet_from_decision', {
           p_decision_id: analysis.decision_id,

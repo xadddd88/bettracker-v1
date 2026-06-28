@@ -39,6 +39,14 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
         const stake = parseFloat(stakeInput)
         if (!stake || stake <= 0) { setError('Enter a valid stake amount'); setSaving(false); return }
 
+        trackClientEvent(EVENTS.BET_PLACE_CLICKED, {
+          decision_id:  decisionId,
+          from_page:    'decision_detail',
+          stake_bucket: bucketStake(stake),
+          odds_bucket:  offeredOdds != null ? bucketOdds(offeredOdds) : null,
+          is_ai_linked: true,
+        })
+
         const { data: betData, error: betErr } = await supabase.rpc('place_bet_from_decision', {
           p_decision_id: decisionId,
           p_stake:       stake,
