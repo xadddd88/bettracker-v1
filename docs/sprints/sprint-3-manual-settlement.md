@@ -1,6 +1,6 @@
 # Sprint 3 — Bet Lifecycle & Manual Settlement MVP
 
-Status: In Progress 🔄
+Status: Accepted ✅
 
 ## Goal
 
@@ -112,6 +112,19 @@ Void excluded from ROI and Win Rate.
 - [ ] RLS/auth prevents settling another user's bet
 - [ ] `npm run build` passes
 - [ ] `npm run lint` passes
+
+## CPO Acceptance Notes
+
+- Migration 003 applied manually in Supabase SQL Editor
+- btdk.app smoke test passed: won=1, lost=1 settled bets confirmed
+- `settled_at` and `settlement_outcome` verified in live DB
+- Duplicate payout transactions: none found
+- Financially idempotent: duplicate settlement does not move bankroll twice
+
+**Known follow-up (non-blocking):**
+Duplicate settlement currently returns existing state idempotently.
+Optional hardening: return explicit `409 already_settled` error.
+Tracked as Sprint 3.1.
 
 ## Non-Scope
 
