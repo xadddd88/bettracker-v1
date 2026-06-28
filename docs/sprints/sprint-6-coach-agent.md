@@ -1,6 +1,6 @@
 # Sprint 6 — Coach Agent
 
-Status: Accepted ✅
+Status: Shipped ✅
 
 ---
 
@@ -361,6 +361,17 @@ Do not send: summary text, recommendations, strengths, weaknesses, focus notes (
 - Risk Manager (separate sprint)
 - Coach export (PDF)
 - Recommendation tracking ("did you follow this advice?")
+
+---
+
+## CPO Implementation Review (2026-06-28)
+
+**Verdict: Approved — all 18 acceptance criteria pass. No amendments needed.**
+
+Implementation notes:
+- Rate limit fires before input validation (400s consume a slot) — intentional, consistent with Scout behavior
+- `settledBetsCount` is server-rendered at page load; stale count is safe because the API re-checks at request time and returns 422 if data is insufficient
+- `bets` query has no row limit — correct for accurate statistics; addressable in a future sprint with DB-level aggregation if user history grows large
 
 ---
 
