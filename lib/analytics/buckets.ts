@@ -48,6 +48,12 @@ export function bucketScoutScore(score: number): string {
   return 'high'
 }
 
+export function bucketAmount(amount: number): 'small' | 'medium' | 'large' {
+  if (amount < 50)   return 'small'
+  if (amount <= 500) return 'medium'
+  return 'large'
+}
+
 export function bucketCount(count: number): string {
   if (count === 0)  return '0'
   if (count <= 5)   return '1-5'

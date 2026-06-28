@@ -47,6 +47,15 @@ export const EVENTS = {
   COACH_FAILED:      'coach_failed',
   COACH_PAGE_VIEWED: 'coach_page_viewed',
 
+  // Bankroll
+  BANKROLL_PAGE_VIEWED: 'bankroll_page_viewed',
+  DEPOSIT_RECORDED:     'deposit_recorded',
+  WITHDRAWAL_RECORDED:  'withdrawal_recorded',
+
+  // Settings
+  SETTINGS_PAGE_VIEWED: 'settings_page_viewed',
+  SETTINGS_SAVED:       'settings_saved',
+
   // Page views
   DASHBOARD_VIEWED:       'dashboard_viewed',
   AI_PAGE_VIEWED:         'ai_page_viewed',

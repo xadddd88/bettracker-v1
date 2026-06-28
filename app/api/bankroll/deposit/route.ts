@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { trackServerEvent } from '@/lib/analytics/server'
+import { EVENTS } from '@/lib/analytics/events'
+import { bucketAmount } from '@/lib/analytics/buckets'
 
 const schema = z.object({
   amount: z.number().positive('Amount must be positive'),
@@ -56,14 +59,21 @@ export async function POST(req: NextRequest) {
   }
 
   // Insert transaction record
-  await supabase.from('bankroll_transactions').insert({
+  const { error: txErr } = await supabase.from('bankroll_transactions').insert({
     user_id:       user.id,
     bankroll_id:   bankroll.id,
     type,
     amount:        delta,
     balance_after: newBalance,
-    ...(note ? { notes: note } : {}),
+    ...(note ? { metadata: { note } } : {}),
   })
+
+  if (txErr) {
+    console.error('[deposit] transaction insert failed:', txErr.message)
+  }
+
+  const eventName = type === 'deposit' ? EVENTS.DEPOSIT_RECORDED : EVENTS.WITHDRAWAL_RECORDED
+  await trackServerEvent(user.id, eventName, { amount_bucket: bucketAmount(amount) })
 
   return NextResponse.json({ success: true, balance: newBalance })
 }

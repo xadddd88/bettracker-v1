@@ -185,7 +185,9 @@ export async function POST(req: NextRequest) {
     }
     const input = parsed.data
 
-    const webSearchEnabled = process.env.ANTHROPIC_WEB_SEARCH_ENABLED === 'true'
+    const globalWebSearchEnabled = process.env.ANTHROPIC_WEB_SEARCH_ENABLED === 'true'
+    const profileRes = await supabase.from('profiles').select('web_search_enabled').eq('id', user.id).single()
+    const webSearchEnabled = globalWebSearchEnabled && (profileRes.data?.web_search_enabled ?? false)
 
     await trackServerEvent(user.id, EVENTS.SCOUT_STARTED, {
       sport:              input.sport,
