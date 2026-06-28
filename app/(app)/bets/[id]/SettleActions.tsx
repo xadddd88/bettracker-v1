@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { trackClientEvent } from '@/lib/analytics/client'
+import { EVENTS } from '@/lib/analytics/events'
 
 interface Props {
   betId: string
@@ -45,6 +47,8 @@ export default function SettleActions({ betId, status, pnl, settledAt, sym }: Pr
   }
 
   async function settle(outcome: 'won' | 'lost' | 'void') {
+    if (loading !== null) return
+    trackClientEvent(EVENTS.BET_SETTLE_CLICKED, { bet_id: betId, outcome })
     setLoading(outcome)
     setError('')
     try {

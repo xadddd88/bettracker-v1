@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { trackClientEvent } from '@/lib/analytics/client'
+import { EVENTS } from '@/lib/analytics/events'
+import { bucketOdds } from '@/lib/analytics/buckets'
 
 interface Props {
   decisionId: string
@@ -20,6 +23,11 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
 
   async function handleAction(action: 'placed' | 'skipped' | 'watchlisted') {
     if (action === 'placed' && !showStake) {
+      trackClientEvent(EVENTS.DECISION_ACTION_PLACE_CLICKED, {
+        decision_id: decisionId,
+        odds_bucket: offeredOdds != null ? bucketOdds(offeredOdds) : null,
+        from_page: 'decision_detail',
+      })
       setShowStake(true)
       return
     }
@@ -36,12 +44,18 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
           p_stake:       stake,
         })
         if (betErr) throw new Error(betErr.message || betErr.details || JSON.stringify(betErr))
+        trackClientEvent(EVENTS.DECISION_ACTION_PLACED, { decision_id: decisionId, from_page: 'decision_detail' })
       } else {
         const { error: actionErr } = await supabase.rpc('update_decision_action', {
           p_decision_id:  decisionId,
           p_final_action: action,
         })
         if (actionErr) throw new Error(actionErr.message || actionErr.details || JSON.stringify(actionErr))
+        if (action === 'watchlisted') {
+          trackClientEvent(EVENTS.DECISION_ACTION_WATCH, { decision_id: decisionId, from_page: 'decision_detail' })
+        } else {
+          trackClientEvent(EVENTS.DECISION_ACTION_SKIP, { decision_id: decisionId, from_page: 'decision_detail' })
+        }
       }
 
       router.refresh()

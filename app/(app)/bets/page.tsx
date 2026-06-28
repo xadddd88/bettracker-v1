@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import type { Bet } from '@/types'
+import { PageView } from '@/lib/analytics/PageView'
+import { EVENTS } from '@/lib/analytics/events'
 
 const SPORT_ICON: Record<string, string> = {
   football:   '⚽',
@@ -51,6 +53,7 @@ export default async function BetsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <PageView event={EVENTS.BETS_LIST_VIEWED} props={{ bet_count: bets.length }} />
 
       {/* Header */}
       <div className="flex items-center justify-between">

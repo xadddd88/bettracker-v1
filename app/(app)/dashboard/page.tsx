@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import type { Bet } from '@/types'
 import BankrollWidget from './BankrollWidget'
+import { PageView } from '@/lib/analytics/PageView'
+import { EVENTS } from '@/lib/analytics/events'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -73,6 +75,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <PageView event={EVENTS.DASHBOARD_VIEWED} props={{ bet_count: bets.length }} />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
