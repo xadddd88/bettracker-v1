@@ -12,9 +12,16 @@ ALTER TABLE bets
   ADD COLUMN IF NOT EXISTS settlement_outcome text
     CHECK (settlement_outcome IN ('won','lost','void'));
 
+-- ── Design note: settlement_payout ──────────────────────────
+-- No settlement_payout column is added to bets.
+-- bets.pnl is the authoritative net P&L (user-facing metric).
+-- Gross payout (stake × odds for won; stake for void) is written
+-- to bankroll_transactions with type='payout' — the canonical
+-- financial ledger. A redundant column would create a sync risk.
+
 -- ── RPC: settle_bet() ───────────────────────────────────────
 -- Atomically settles a bet: updates status/pnl, adjusts bankroll
--- for won/void. Idempotent: already-settled bets return silently.
+-- for won/void. Raises already_settled on duplicate attempts.
 CREATE OR REPLACE FUNCTION settle_bet(
   p_bet_id  uuid,
   p_outcome text
@@ -28,11 +35,11 @@ DECLARE
   v_new_balance numeric;
 BEGIN
   IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated';
+    RAISE EXCEPTION 'not_authenticated';
   END IF;
 
   IF p_outcome NOT IN ('won','lost','void') THEN
-    RAISE EXCEPTION 'Invalid outcome: must be won, lost, or void';
+    RAISE EXCEPTION 'invalid_outcome';
   END IF;
 
   -- Lock the row; verify ownership
@@ -42,17 +49,12 @@ BEGIN
   FOR UPDATE;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'Bet not found or does not belong to user';
+    RAISE EXCEPTION 'bet_not_found';
   END IF;
 
-  -- Idempotent: already settled → return existing values, no changes
+  -- Reject duplicate settlement — caller must check status first
   IF v_bet.status != 'pending' THEN
-    RETURN jsonb_build_object(
-      'bet_id',      v_bet.id,
-      'outcome',     v_bet.status,
-      'pnl',         v_bet.pnl,
-      'new_balance', NULL
-    );
+    RAISE EXCEPTION 'already_settled';
   END IF;
 
   -- Calculate pnl and bankroll payout

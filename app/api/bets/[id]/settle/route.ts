@@ -29,7 +29,13 @@ export async function POST(
     p_outcome: outcome,
   })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    if (error.message === 'already_settled')
+      return NextResponse.json({ error: 'Bet is already settled' }, { status: 409 })
+    if (error.message === 'bet_not_found')
+      return NextResponse.json({ error: 'Bet not found' }, { status: 404 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   return NextResponse.json({ success: true, data })
 }
