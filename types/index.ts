@@ -167,6 +167,41 @@ export interface BankrollTransaction {
   created_at: string
 }
 
+// ─── SCOUT ──────────────────────────────────────────────────
+export type OpportunityStatus =
+  'discovered' | 'research_needed' | 'watchlisted' |
+  'converted_to_decision' | 'dismissed' | 'expired'
+
+export type OpportunityType = 'value' | 'contrarian' | 'pattern' | 'general'
+
+export interface MarketOpportunity {
+  id: string
+  user_id: string
+  sport_code: string
+  event_name: string
+  market_type: string
+  selection?: string
+  line?: number
+  offered_odds?: number
+  bookmaker?: string
+  opportunity_type: OpportunityType
+  scout_score?: number
+  model_probability?: number
+  implied_probability?: number
+  edge_percent?: number
+  confidence_score?: number
+  data_quality_score?: number
+  risk_level?: 'low' | 'medium' | 'high'
+  status: OpportunityStatus
+  reasoning: string
+  required_checks?: string[]
+  linked_decision_id?: string
+  web_search_used: boolean
+  scout_run_input?: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
 // ─── UI HELPERS ─────────────────────────────────────────────
 export interface Stats {
   total_decisions: number

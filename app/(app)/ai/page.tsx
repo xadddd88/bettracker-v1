@@ -116,6 +116,29 @@ export default function AIAnalystPage() {
 
   useEffect(() => { trackClientEvent(EVENTS.AI_PAGE_VIEWED) }, [])
 
+  // Read Scout pre-fill params on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const sid       = params.get('scout_id')
+    const event     = params.get('event')
+    const market    = params.get('market')
+    const selection = params.get('selection')
+    const sp        = params.get('sport') as Sport | null
+
+    if (sid) setScoutId(sid)
+    if (sp && SPORTS.map(s => s.value).includes(sp)) setSport(sp)
+    if (event || market || selection) {
+      setForm(f => ({
+        ...f,
+        event_name:  event      ?? f.event_name,
+        market_type: market     ?? f.market_type,
+        selection:   selection  ?? f.selection,
+      }))
+    }
+  }, [])
+
+  const [scoutId,    setScoutId]    = useState<string | null>(null)
   const [sport,      setSport]      = useState<Sport>('soccer')
   const [locale,     setLocale]     = useState<Locale>('auto')
   const [form,       setForm]       = useState({ event_name: '', market_type: '', selection: '', line: '', odds: '', bookmaker: '', notes: '' })
@@ -213,12 +236,23 @@ export default function AIAnalystPage() {
         return
       }
       setAnalysis(json.data)
+      // If opened from Scout, update opportunity status fire-and-forget
+      if (scoutId) {
+        fetch(`/api/scout/${scoutId}`, {
+          method:  'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            status:             'converted_to_decision',
+            linked_decision_id: json.data.decision_id,
+          }),
+        }).catch(() => {})
+      }
     } catch {
       setRootErr('Network error \u2014 please try again.')
     } finally {
       setAnalyzing(false)
     }
-  }, [sport, locale, form])
+  }, [sport, locale, form, scoutId])
 
   // ── Act on already-persisted decision ─────────────────────
   // Decision is created immediately by /api/ai/analyst.
@@ -388,6 +422,13 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
         <p className="text-sm text-gray-500 mt-1">Paste a coupon screenshot or fill in manually</p>
       </div>
 
+      {/* ── Scout pre-fill indicator ───────────────────────── */}
+      {scoutId && !analysis && (
+        <div className="text-xs text-indigo-400 bg-indigo-950/30 border border-indigo-900 rounded-lg px-3 py-2 flex items-center gap-2">
+          🔍 Pre-filled from Scout — enter current odds to analyse
+        </div>
+      )}
+
       {/* ── Scanner zone ────────────────────────────────────── */}
       <div
         className={`border-2 border-dashed rounded-xl px-4 py-4 text-center cursor-pointer transition-colors ${
@@ -470,7 +511,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
             <label className="label">Odds *</label>
             <input
               className={`input ${errors.odds ? 'border-red-600' : ''}`}
-              type="number" step="0.01" min="1.01" placeholder="1.85"
+              type="number" step="0.01" min="1.01" placeholder={scoutId ? 'Enter current odds' : '1.85'}
               value={form.odds}
               onChange={e => setField('odds', e.target.value)}
             />

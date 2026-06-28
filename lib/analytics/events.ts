@@ -32,6 +32,15 @@ export const EVENTS = {
   SCANNER_FAILED:           'scanner_failed',
   SCANNER_EXPRESS_DETECTED: 'scanner_express_detected',
 
+  // Scout
+  SCOUT_STARTED:           'scout_started',
+  SCOUT_COMPLETED:         'scout_completed',
+  SCOUT_FAILED:            'scout_failed',
+  SCOUT_PAGE_VIEWED:       'scout_page_viewed',
+  OPPORTUNITY_ANALYSED:    'opportunity_analysed',
+  OPPORTUNITY_WATCHLISTED: 'opportunity_watchlisted',
+  OPPORTUNITY_DISMISSED:   'opportunity_dismissed',
+
   // Page views
   DASHBOARD_VIEWED:       'dashboard_viewed',
   AI_PAGE_VIEWED:         'ai_page_viewed',

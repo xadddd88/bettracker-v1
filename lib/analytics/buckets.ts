@@ -42,6 +42,12 @@ export function bucketConfidence(confidence: number): string {
   return 'very_high'
 }
 
+export function bucketScoutScore(score: number): string {
+  if (score < 40) return 'low'
+  if (score < 70) return 'medium'
+  return 'high'
+}
+
 export function bucketCount(count: number): string {
   if (count === 0)  return '0'
   if (count <= 5)   return '1-5'
