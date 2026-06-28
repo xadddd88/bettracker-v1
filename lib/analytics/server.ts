@@ -1,33 +1,10 @@
 import { PostHog } from 'posthog-node'
-
-const BLOCKED_KEYS = new Set([
-  'email',
-  'notes',
-  'prompt',
-  'ocr_text',
-  'event_name',
-  'selection',
-  'reasoning',
-  'disclaimer',
-  'image',
-  'raw_text',
-  'stake',
-  'pnl',
-  'balance',
-])
-
-function sanitize(props: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {}
-  for (const [key, val] of Object.entries(props)) {
-    if (!BLOCKED_KEYS.has(key)) out[key] = val
-  }
-  return out
-}
+import { sanitize } from './sanitize'
 
 function makeClient(): PostHog | null {
-  if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) return null
+  if (!process.env.NEXT_PUBLIC_POSTHOG_KEY || !process.env.NEXT_PUBLIC_POSTHOG_HOST) return null
   return new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-    host: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://eu.i.posthog.com',
+    host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
     flushAt: 1,
     flushInterval: 0,
   })

@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
-import { bucketOdds } from '@/lib/analytics/buckets'
+import { bucketOdds, bucketStake } from '@/lib/analytics/buckets'
 
 interface Props {
   decisionId: string
@@ -39,11 +39,39 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
         const stake = parseFloat(stakeInput)
         if (!stake || stake <= 0) { setError('Enter a valid stake amount'); setSaving(false); return }
 
-        const { error: betErr } = await supabase.rpc('place_bet_from_decision', {
+        trackClientEvent(EVENTS.BET_PLACE_CLICKED, {
+          decision_id:  decisionId,
+          from_page:    'decision_detail',
+          stake_bucket: bucketStake(stake),
+          odds_bucket:  offeredOdds != null ? bucketOdds(offeredOdds) : null,
+          is_ai_linked: true,
+        })
+
+        const { data: betData, error: betErr } = await supabase.rpc('place_bet_from_decision', {
           p_decision_id: decisionId,
           p_stake:       stake,
         })
-        if (betErr) throw new Error(betErr.message || betErr.details || JSON.stringify(betErr))
+        if (betErr) {
+          const isDuplicate = betErr.code === '23505' || betErr.message?.includes('duplicate') || betErr.message?.includes('already placed')
+          if (isDuplicate) {
+            trackClientEvent(EVENTS.BET_DUPLICATE_REJECTED, { decision_id: decisionId, from_page: 'decision_detail' })
+          } else {
+            trackClientEvent(EVENTS.BET_PLACE_FAILED, { decision_id: decisionId, from_page: 'decision_detail' })
+          }
+          throw new Error(betErr.message || betErr.details || JSON.stringify(betErr))
+        }
+        const betPayload = betData as { bet_id?: string } | null
+        trackClientEvent(EVENTS.BET_PLACE_SUCCEEDED, {
+          bet_id:       betPayload?.bet_id,
+          decision_id:  decisionId,
+          bet_type:     'single',
+          source:       'decision_detail',
+          stake_bucket: bucketStake(stake),
+          odds_bucket:  offeredOdds != null ? bucketOdds(offeredOdds) : null,
+          is_ai_linked: true,
+          is_parlay:    false,
+          legs_count:   1,
+        })
         trackClientEvent(EVENTS.DECISION_ACTION_PLACED, { decision_id: decisionId, from_page: 'decision_detail' })
       } else {
         const { error: actionErr } = await supabase.rpc('update_decision_action', {
@@ -60,6 +88,7 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
 
       router.refresh()
     } catch (err: unknown) {
+      trackClientEvent(EVENTS.DECISION_ACTION_FAILED, { decision_id: decisionId, action, from_page: 'decision_detail' })
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setSaving(false)

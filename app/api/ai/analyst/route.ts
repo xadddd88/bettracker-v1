@@ -226,7 +226,7 @@ export async function POST(req: NextRequest) {
     // 4. Sprint 2: real web search not implemented — always false
     const webSearchEnabled = false
 
-    void trackServerEvent(user.id, EVENTS.AI_ANALYSIS_STARTED, {
+    await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_STARTED, {
       sport:          input.sport,
       odds_bucket:    bucketOdds(input.offered_odds),
       has_bookmaker:  !!input.bookmaker,
