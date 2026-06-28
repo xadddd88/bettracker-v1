@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -439,13 +439,13 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
         {scanning ? (
           <div className="flex items-center justify-center gap-2 text-indigo-400 text-sm">
-            <span className="animate-spin">\u23F3</span> {scanMsg}
+            <span className="animate-spin">⏳</span> {scanMsg}
           </div>
         ) : scanMsg ? (
           <div className="text-sm text-gray-300">{scanMsg}</div>
         ) : (
           <div>
-            <div className="text-2xl mb-1">\uD83D\uDCF8</div>
+            <div className="text-2xl mb-1">📸</div>
             <p className="text-sm text-gray-400 font-medium">Paste screenshot (Ctrl+V) or click to upload</p>
             <p className="text-xs text-gray-600 mt-0.5">Auto-fills event, market, odds, sport</p>
           </div>
@@ -532,7 +532,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
             <label className="label">Bookmaker</label>
             <input
               className="input"
-              placeholder="Bet365, Pinnacle\u2026"
+              placeholder="Bet365, Pinnacle…"
               value={form.bookmaker}
               onChange={e => setField('bookmaker', e.target.value)}
             />
@@ -549,7 +549,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
             <label className="label">Context / Notes</label>
             <textarea
               className="input resize-none" rows={2}
-              placeholder="Injuries, lineups, motivation, recent form, anything relevant\u2026"
+              placeholder="Injuries, lineups, motivation, recent form, anything relevant…"
               value={form.notes}
               onChange={e => setField('notes', e.target.value)}
             />
@@ -569,7 +569,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
         >
           {analyzing ? (
             <span className="flex items-center justify-center gap-2">
-              <span className="animate-spin">\u23F3</span> Analyzing\u2026
+              <span className="animate-spin">⏳</span> Analyzing…
             </span>
           ) : '\uD83D\uDD0D Analyze'}
         </button>
