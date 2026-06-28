@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { trackClientEvent } from '@/lib/analytics/client'
+import { EVENTS } from '@/lib/analytics/events'
+import { bucketOdds } from '@/lib/analytics/buckets'
 
 // ─── Image helper ─────────────────────────────────────────────
 function fileToBase64(file: File): Promise<{ data: string; media_type: string }> {
@@ -110,6 +113,8 @@ export default function AIAnalystPage() {
   const supabase = createClient()
 
   const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { trackClientEvent(EVENTS.AI_PAGE_VIEWED) }, [])
 
   const [sport,      setSport]      = useState<Sport>('soccer')
   const [locale,     setLocale]     = useState<Locale>('auto')
@@ -223,6 +228,13 @@ export default function AIAnalystPage() {
     if (!analysis.decision_id) {
       setRootErr('Decision ID missing \u2014 please re-analyze (restart dev server if in development)')
       return
+    }
+
+    if (action === 'watchlisted') {
+      trackClientEvent(EVENTS.DECISION_ACTION_WATCH, { decision_id: analysis.decision_id, from_page: 'ai_page' })
+    }
+    if (action === 'skipped') {
+      trackClientEvent(EVENTS.DECISION_ACTION_SKIP, { decision_id: analysis.decision_id, from_page: 'ai_page' })
     }
 
     if (action === 'placed') {
@@ -621,7 +633,17 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
             {!showStake && (
               <button
                 className="btn-primary flex-1"
-                onClick={() => { setShowStake(true); setRootErr('') }}
+                onClick={() => {
+                  if (analysis) {
+                    trackClientEvent(EVENTS.DECISION_ACTION_PLACE_CLICKED, {
+                      decision_id: analysis.decision_id,
+                      odds_bucket: bucketOdds(analysis.offered_odds),
+                      from_page: 'ai_page',
+                    })
+                  }
+                  setShowStake(true)
+                  setRootErr('')
+                }}
                 disabled={saving}
               >
                 ✅ Place Bet

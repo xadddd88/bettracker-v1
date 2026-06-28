@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { trackServerEvent } from '@/lib/analytics/server'
+import { EVENTS } from '@/lib/analytics/events'
 
 const VALID_OUTCOMES = ['won', 'lost', 'void'] as const
 type Outcome = typeof VALID_OUTCOMES[number]
@@ -30,12 +32,22 @@ export async function POST(
   })
 
   if (error) {
+    const errorType = error.message === 'already_settled' ? 'already_settled'
+      : error.message === 'bet_not_found' ? 'not_found'
+      : 'rpc_error'
+    void trackServerEvent(user.id, EVENTS.BET_SETTLE_FAILED, { bet_id: id, error_type: errorType })
+
     if (error.message === 'already_settled')
       return NextResponse.json({ error: 'Bet is already settled' }, { status: 409 })
     if (error.message === 'bet_not_found')
       return NextResponse.json({ error: 'Bet not found' }, { status: 404 })
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  const eventName = outcome === 'won'  ? EVENTS.BET_SETTLE_WON
+    : outcome === 'lost' ? EVENTS.BET_SETTLE_LOST
+    : EVENTS.BET_SETTLE_VOID
+  void trackServerEvent(user.id, eventName, { bet_id: id, outcome })
 
   return NextResponse.json({ success: true, data })
 }

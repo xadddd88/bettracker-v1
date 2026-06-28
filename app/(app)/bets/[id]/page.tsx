@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Bet } from '@/types'
 import SettleActions from './SettleActions'
+import { PageView } from '@/lib/analytics/PageView'
+import { EVENTS } from '@/lib/analytics/events'
 
 export default async function BetDetailPage({
   params,
@@ -43,6 +45,7 @@ export default async function BetDetailPage({
 
   return (
     <div className="max-w-xl flex flex-col gap-6">
+      <PageView event={EVENTS.BET_DETAIL_VIEWED} props={{ sport: leg?.sport, status: bet.status, is_parlay: isParlay }} />
       <div className="flex items-center gap-2">
         <Link href="/bets" className="text-gray-500 hover:text-gray-300 text-sm transition-colors">
           ← Bets

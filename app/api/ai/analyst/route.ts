@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { trackServerEvent } from '@/lib/analytics/server'
+import { EVENTS } from '@/lib/analytics/events'
+import { bucketOdds, bucketEdge, bucketConfidence } from '@/lib/analytics/buckets'
 
 // ─── Rate limit store (in-memory, Sprint 2) ──────────────────
 // Sprint 3: replace with Redis
@@ -223,6 +226,14 @@ export async function POST(req: NextRequest) {
     // 4. Sprint 2: real web search not implemented — always false
     const webSearchEnabled = false
 
+    void trackServerEvent(user.id, EVENTS.AI_ANALYSIS_STARTED, {
+      sport:          input.sport,
+      odds_bucket:    bucketOdds(input.offered_odds),
+      has_bookmaker:  !!input.bookmaker,
+      has_notes:      !!input.notes,
+      language:       input.output_language,
+    })
+
     // 5. Build prompt
     const systemPrompt = buildSystemPrompt(input.sport, input.output_language, webSearchEnabled)
     const implied = parseFloat(((1 / input.offered_odds) * 100).toFixed(2))
@@ -258,6 +269,7 @@ Return structured JSON analysis only.`
       const clean = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim()
       analysisRaw = JSON.parse(clean)
     } catch {
+      void trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'ai_parse' })
       return NextResponse.json(
         { success: false, error: 'AI returned invalid JSON. Please try again.' },
         { status: 502 }
@@ -266,6 +278,7 @@ Return structured JSON analysis only.`
 
     const validated = analysisSchema.safeParse(analysisRaw)
     if (!validated.success) {
+      void trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'ai_schema' })
       return NextResponse.json(
         { success: false, error: 'AI output did not match expected schema. Please try again.' },
         { status: 502 }
@@ -333,6 +346,7 @@ Return structured JSON analysis only.`
 
     if (rpcErr) {
       console.error('[analyst] persist error:', rpcErr)
+      void trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'persist' })
       return NextResponse.json(
         { success: false, error: `Analysis succeeded but failed to persist: ${rpcErr.message}` },
         { status: 500 }
@@ -343,11 +357,28 @@ Return structured JSON analysis only.`
     const decisionId     = rpcPayload?.decision_id
     const analysisRunId  = rpcPayload?.analysis_run_id
     if (!decisionId) {
+      void trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'persist' })
       return NextResponse.json(
         { success: false, error: 'Decision persisted but returned no ID' },
         { status: 500 }
       )
     }
+
+    void trackServerEvent(user.id, EVENTS.AI_ANALYSIS_COMPLETED, {
+      sport:              input.sport,
+      recommendation:     analysis.recommendation,
+      risk_level:         analysis.risk_level,
+      edge_bucket:        bucketEdge(serverEdge),
+      confidence_bucket:  bucketConfidence(analysis.confidence_score),
+      odds_bucket:        bucketOdds(input.offered_odds),
+      decision_id:        decisionId,
+    })
+    void trackServerEvent(user.id, EVENTS.DECISION_CREATED, {
+      decision_id:    decisionId,
+      sport:          input.sport,
+      recommendation: analysis.recommendation,
+      risk_level:     analysis.risk_level,
+    })
 
     return NextResponse.json({
       success: true,
@@ -382,3 +413,4 @@ Return structured JSON analysis only.`
     return NextResponse.json({ success: false, error: msg }, { status: 500 })
   }
 }
+

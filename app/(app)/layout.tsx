@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/ui/Sidebar'
 import MobileNav from '@/components/ui/MobileNav'
+import { AnalyticsIdentify } from '@/lib/analytics/AnalyticsIdentify'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -10,6 +11,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-950">
+      <AnalyticsIdentify userId={user.id} />
+
       {/* Desktop sidebar — hidden on mobile */}
       <div className="hidden md:flex">
         <Sidebar user={user} />

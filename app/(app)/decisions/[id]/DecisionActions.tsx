@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { trackClientEvent } from '@/lib/analytics/client'
+import { EVENTS } from '@/lib/analytics/events'
+import { bucketOdds } from '@/lib/analytics/buckets'
 
 interface Props {
   decisionId: string
@@ -20,8 +23,19 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
 
   async function handleAction(action: 'placed' | 'skipped' | 'watchlisted') {
     if (action === 'placed' && !showStake) {
+      trackClientEvent(EVENTS.DECISION_ACTION_PLACE_CLICKED, {
+        decision_id: decisionId,
+        odds_bucket: offeredOdds != null ? bucketOdds(offeredOdds) : null,
+        from_page: 'decision_detail',
+      })
       setShowStake(true)
       return
+    }
+    if (action === 'watchlisted') {
+      trackClientEvent(EVENTS.DECISION_ACTION_WATCH, { decision_id: decisionId, from_page: 'decision_detail' })
+    }
+    if (action === 'skipped') {
+      trackClientEvent(EVENTS.DECISION_ACTION_SKIP, { decision_id: decisionId, from_page: 'decision_detail' })
     }
 
     setSaving(true)
