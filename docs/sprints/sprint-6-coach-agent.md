@@ -1,6 +1,6 @@
 # Sprint 6 — Coach Agent
 
-Status: Draft 🟡
+Status: Accepted ✅
 
 ---
 
@@ -100,7 +100,7 @@ Runs the Coach agent, persists the session, returns it.
 }
 ```
 
-**Rate limit:** 2 per day per user. Coach is compute-heavy — it processes history and calls Claude.
+**Rate limit:** 2 per rolling 24-hour window per user. Coach is compute-heavy — it processes history and calls Claude.
 
 **What Coach aggregates before calling Claude (server-side, no raw data sent to AI):**
 ```ts
@@ -155,7 +155,7 @@ This summary is computed server-side from Supabase queries. **No raw event names
 ```json
 {
   "summary": "2–4 sentence overall assessment of the period",
-  "calibration_grade": "excellent | good | fair | poor",
+  "calibration_grade": "excellent | good | fair | poor | null",
   "strengths": [
     "Specific thing working well — with data reference"
   ],
@@ -182,6 +182,7 @@ This summary is computed server-side from Supabase queries. **No raw event names
 `strengths` and `weaknesses`: 0–5 each. If period is too short for meaningful patterns, return 0 and explain in summary.
 `recommendations`: 1–5, ordered by priority descending.
 `patterns`: flexible object, keys are suggestive not exhaustive.
+`calibration_grade`: optional — model may return null when calibration data is insufficient (e.g., fewer than 10 bets with recorded confidence scores). Zod: `z.enum(['excellent','good','fair','poor']).optional().nullable()`. DB column is already nullable.
 
 **Zod validation:** validate entire output before persisting. On failure: return error, do not persist partial data.
 
@@ -201,7 +202,7 @@ New route: `app/(app)/coach/page.tsx` — server component for latest session, c
    - Period selector: 7 days / 30 days / 90 days / All time
    - Focus notes textarea (optional): "What do you want to focus on?"
    - "Get coaching" button with loading state
-   - Disabled if insufficient data (< 5 settled bets) — show "Add more bets first"
+   - Disabled if insufficient data (< 5 settled bets) — show "Add at least 5 settled bets first"
    - Rate limit message if 2/day exceeded
 
 3. **Latest session card** (most recent coaching session, if any)
@@ -221,7 +222,7 @@ New route: `app/(app)/coach/page.tsx` — server component for latest session, c
 **Empty state (no coaching sessions yet):**
 ```
 🧠  No coaching sessions yet
-Run Coach after you've placed at least 5 bets.
+Run Coach after you've settled at least 5 bets.
 [Get coaching]
 ```
 
@@ -302,6 +303,7 @@ Do not send: summary text, recommendations, strengths, weaknesses, focus notes (
 - Rate limit check is the first thing after auth — return 429 with `Retry-After` before any DB queries.
 - All coaching sessions are immutable — no PATCH route needed.
 - `metrics_snapshot` stores a copy of the aggregated stats at the time of coaching (for audit trail and future comparison features).
+- Output language: Coach uses `'auto'` — it infers language from the focus notes (same logic as Analyst/Scout). No user-selectable language picker in Sprint 6.
 
 ---
 
@@ -325,7 +327,7 @@ Do not send: summary text, recommendations, strengths, weaknesses, focus notes (
 
 **Database**
 - [ ] Migration 005 applied: `coaching_sessions` table with RLS
-- [ ] User can only see/modify their own sessions
+- [ ] User can only see their own sessions (RLS enforced; no PATCH/DELETE routes)
 - [ ] Sessions immutable (no UPDATE path)
 
 **UI**
@@ -359,3 +361,17 @@ Do not send: summary text, recommendations, strengths, weaknesses, focus notes (
 - Risk Manager (separate sprint)
 - Coach export (PDF)
 - Recommendation tracking ("did you follow this advice?")
+
+---
+
+## CPO Acceptance Notes (2026-06-28)
+
+Accepted with 4 amendments applied to this document:
+
+1. **`calibration_grade` nullable** — Zod output schema uses `.optional().nullable()`; model must return null when fewer than 10 bets have recorded confidence scores. DB column was already nullable. Prevents hallucinated calibration on thin data.
+
+2. **Rate limit is rolling 24-hour window** — not UTC midnight reset. Consistent with Scout (3/min, 15/day) and Analyst rate limiters throughout the codebase.
+
+3. **Output language: 'auto', not user-selectable** — Coach infers language from focus notes. Consistent with Analyst/Scout. No language picker UI needed in Sprint 6.
+
+4. **Empty state and gate copy uses "settled bets"** — pending bets contribute nothing to calibration analysis. Using "settled" is accurate and sets correct user expectations.
