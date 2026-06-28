@@ -1,33 +1,22 @@
 import posthog from 'posthog-js'
-
-const BLOCKED_KEYS = new Set([
-  'email',
-  'notes',
-  'prompt',
-  'ocr_text',
-  'event_name',
-  'selection',
-  'reasoning',
-  'disclaimer',
-  'image',
-  'raw_text',
-  'stake',
-  'pnl',
-  'balance',
-])
-
-function sanitize(props: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {}
-  for (const [key, val] of Object.entries(props)) {
-    if (!BLOCKED_KEYS.has(key)) out[key] = val
-  }
-  return out
-}
+import { sanitize } from './sanitize'
 
 export function trackClientEvent(event: string, props: Record<string, unknown> = {}): void {
-  posthog.capture(event, sanitize(props))
+  if (typeof window === 'undefined') return
+  if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) return
+  try {
+    posthog.capture(event, sanitize(props))
+  } catch (err) {
+    console.error('[analytics:client]', err)
+  }
 }
 
 export function identifyAnalyticsUser(userId: string, traits: Record<string, unknown> = {}): void {
-  posthog.identify(userId, sanitize(traits))
+  if (typeof window === 'undefined') return
+  if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) return
+  try {
+    posthog.identify(userId, sanitize(traits))
+  } catch (err) {
+    console.error('[analytics:client]', err)
+  }
 }

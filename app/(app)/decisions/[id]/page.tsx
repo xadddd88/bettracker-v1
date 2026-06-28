@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import DecisionActions from './DecisionActions'
+import { PageView } from '@/lib/analytics/PageView'
+import { EVENTS } from '@/lib/analytics/events'
 
 interface Factor { name: string; score: number; detail: string }
 
@@ -116,6 +118,7 @@ export default async function DecisionDetailPage({
 
   return (
     <div className="max-w-2xl flex flex-col gap-5">
+      <PageView event={EVENTS.DECISION_DETAIL_VIEWED} props={{ sport: d.sport, final_action: d.final_action }} />
       {/* Back */}
       <Link href="/bets" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">
         ← Back to Bets

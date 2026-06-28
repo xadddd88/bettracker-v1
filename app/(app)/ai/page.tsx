@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
-import { bucketOdds } from '@/lib/analytics/buckets'
+import { bucketOdds, bucketStake } from '@/lib/analytics/buckets'
 
 // ─── Image helper ─────────────────────────────────────────────
 function fileToBase64(file: File): Promise<{ data: string; media_type: string }> {
@@ -239,15 +239,37 @@ export default function AIAnalystPage() {
       setSaving(true)
       setRootErr('')
       try {
-        const { error: betErr } = await supabase.rpc('place_bet_from_decision', {
+        const { data: betData, error: betErr } = await supabase.rpc('place_bet_from_decision', {
           p_decision_id: analysis.decision_id,
           p_stake:       stake,
           p_bookmaker:   analysis.bookmaker,
         })
-        if (betErr) throw new Error(betErr.message || betErr.details || JSON.stringify(betErr))
+        if (betErr) {
+          const isDuplicate = betErr.code === '23505' || betErr.message?.includes('duplicate') || betErr.message?.includes('already placed')
+          if (isDuplicate) {
+            trackClientEvent(EVENTS.BET_DUPLICATE_REJECTED, { decision_id: analysis.decision_id, from_page: 'ai_page' })
+          } else {
+            trackClientEvent(EVENTS.BET_PLACE_FAILED, { decision_id: analysis.decision_id, from_page: 'ai_page' })
+          }
+          throw new Error(betErr.message || betErr.details || JSON.stringify(betErr))
+        }
+        const betPayload = betData as { bet_id?: string } | null
+        trackClientEvent(EVENTS.BET_PLACE_SUCCEEDED, {
+          bet_id:      betPayload?.bet_id,
+          decision_id: analysis.decision_id,
+          sport:       analysis.sport,
+          bet_type:    'single',
+          source:      'ai_page',
+          stake_bucket: bucketStake(stake),
+          odds_bucket:  bucketOdds(analysis.offered_odds),
+          is_ai_linked: true,
+          is_parlay:    false,
+          legs_count:   1,
+        })
         trackClientEvent(EVENTS.DECISION_ACTION_PLACED, { decision_id: analysis.decision_id, from_page: 'ai_page' })
         router.push(`/decisions/${analysis.decision_id}`)
       } catch (err: unknown) {
+        trackClientEvent(EVENTS.DECISION_ACTION_FAILED, { decision_id: analysis.decision_id, action: 'placed', from_page: 'ai_page' })
         setRootErr(err instanceof Error ? err.message : String(err))
       } finally {
         setSaving(false)
@@ -271,6 +293,7 @@ export default function AIAnalystPage() {
       }
       router.push(`/decisions/${analysis.decision_id}`)
     } catch (err: unknown) {
+      trackClientEvent(EVENTS.DECISION_ACTION_FAILED, { decision_id: analysis.decision_id, action, from_page: 'ai_page' })
       setRootErr(err instanceof Error ? err.message : String(err))
     } finally {
       setSaving(false)

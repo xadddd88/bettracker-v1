@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Image too large (max ~7.5 MB)' }, { status: 413 })
   }
 
-  void trackServerEvent(user.id, EVENTS.SCANNER_STARTED, { media_type })
+  await trackServerEvent(user.id, EVENTS.SCANNER_STARTED, { media_type })
 
   // Call Claude Vision
   let raw: string
@@ -159,12 +159,11 @@ export async function POST(req: NextRequest) {
     data.sport = SPORT_MAP[data.sport] as typeof data.sport
   }
 
-  // Use leg count from event_name split (OCR format: "Team A vs B + Team C vs D")
-  const legCount = data.event_name?.split(' + ').length ?? 1
-  const isExpress = legCount > 1 ||
-    !!(data.market_type?.toLowerCase().includes('express') ||
-       data.market_type?.toLowerCase().includes('экспресс') ||
-       data.market_type?.toLowerCase().includes('parlay'))
+  const isExpress = !!(
+    data.market_type?.toLowerCase().includes('express') ||
+    data.market_type?.toLowerCase().includes('экспресс') ||
+    data.market_type?.toLowerCase().includes('parlay')
+  )
 
   const events: Promise<void>[] = [
     trackServerEvent(user.id, EVENTS.SCANNER_COMPLETED, {
@@ -172,11 +171,10 @@ export async function POST(req: NextRequest) {
       has_odds:   data.odds != null,
       has_stake:  data.stake != null,
       is_express: isExpress,
-      leg_count:  legCount,
     }),
   ]
   if (isExpress) {
-    events.push(trackServerEvent(user.id, EVENTS.SCANNER_EXPRESS_DETECTED, { sport: data.sport ?? null, leg_count: legCount }))
+    events.push(trackServerEvent(user.id, EVENTS.SCANNER_EXPRESS_DETECTED, { sport: data.sport ?? null }))
   }
   await Promise.all(events)
 

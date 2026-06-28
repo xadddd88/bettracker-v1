@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
@@ -17,6 +17,7 @@ export default function SettleActions({ betId, status, pnl, settledAt, sym }: Pr
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError]     = useState('')
+  const settlingRef = useRef(false)
 
   if (status !== 'pending') {
     return (
@@ -47,7 +48,8 @@ export default function SettleActions({ betId, status, pnl, settledAt, sym }: Pr
   }
 
   async function settle(outcome: 'won' | 'lost' | 'void') {
-    if (loading !== null) return
+    if (settlingRef.current) return
+    settlingRef.current = true
     trackClientEvent(EVENTS.BET_SETTLE_CLICKED, { bet_id: betId, outcome })
     setLoading(outcome)
     setError('')
@@ -58,6 +60,11 @@ export default function SettleActions({ betId, status, pnl, settledAt, sym }: Pr
         body:    JSON.stringify({ outcome }),
       })
       const json = await res.json()
+      if (res.status === 409) {
+        trackClientEvent(EVENTS.BET_SETTLE_DUPLICATE_REJECTED, { bet_id: betId, outcome })
+        setError(json.error ?? 'Already settled')
+        return
+      }
       if (!res.ok || !json.success) {
         setError(json.error ?? 'Settlement failed')
         return
@@ -66,6 +73,7 @@ export default function SettleActions({ betId, status, pnl, settledAt, sym }: Pr
     } catch {
       setError('Network error')
     } finally {
+      settlingRef.current = false
       setLoading(null)
     }
   }
