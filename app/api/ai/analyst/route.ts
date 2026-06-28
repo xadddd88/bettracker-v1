@@ -269,7 +269,7 @@ Return structured JSON analysis only.`
       const clean = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim()
       analysisRaw = JSON.parse(clean)
     } catch {
-      void trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'ai_parse' })
+      await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'ai_parse' })
       return NextResponse.json(
         { success: false, error: 'AI returned invalid JSON. Please try again.' },
         { status: 502 }
@@ -278,7 +278,7 @@ Return structured JSON analysis only.`
 
     const validated = analysisSchema.safeParse(analysisRaw)
     if (!validated.success) {
-      void trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'ai_schema' })
+      await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'ai_schema' })
       return NextResponse.json(
         { success: false, error: 'AI output did not match expected schema. Please try again.' },
         { status: 502 }
@@ -346,7 +346,7 @@ Return structured JSON analysis only.`
 
     if (rpcErr) {
       console.error('[analyst] persist error:', rpcErr)
-      void trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'persist' })
+      await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'persist' })
       return NextResponse.json(
         { success: false, error: `Analysis succeeded but failed to persist: ${rpcErr.message}` },
         { status: 500 }
@@ -357,28 +357,30 @@ Return structured JSON analysis only.`
     const decisionId     = rpcPayload?.decision_id
     const analysisRunId  = rpcPayload?.analysis_run_id
     if (!decisionId) {
-      void trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'persist' })
+      await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'persist' })
       return NextResponse.json(
         { success: false, error: 'Decision persisted but returned no ID' },
         { status: 500 }
       )
     }
 
-    void trackServerEvent(user.id, EVENTS.AI_ANALYSIS_COMPLETED, {
-      sport:              input.sport,
-      recommendation:     analysis.recommendation,
-      risk_level:         analysis.risk_level,
-      edge_bucket:        bucketEdge(serverEdge),
-      confidence_bucket:  bucketConfidence(analysis.confidence_score),
-      odds_bucket:        bucketOdds(input.offered_odds),
-      decision_id:        decisionId,
-    })
-    void trackServerEvent(user.id, EVENTS.DECISION_CREATED, {
-      decision_id:    decisionId,
-      sport:          input.sport,
-      recommendation: analysis.recommendation,
-      risk_level:     analysis.risk_level,
-    })
+    await Promise.all([
+      trackServerEvent(user.id, EVENTS.AI_ANALYSIS_COMPLETED, {
+        sport:             input.sport,
+        recommendation:    analysis.recommendation,
+        risk_level:        analysis.risk_level,
+        edge_bucket:       bucketEdge(serverEdge),
+        confidence_bucket: bucketConfidence(analysis.confidence_score),
+        odds_bucket:       bucketOdds(input.offered_odds),
+        decision_id:       decisionId,
+      }),
+      trackServerEvent(user.id, EVENTS.DECISION_CREATED, {
+        decision_id:    decisionId,
+        sport:          input.sport,
+        recommendation: analysis.recommendation,
+        risk_level:     analysis.risk_level,
+      }),
+    ])
 
     return NextResponse.json({
       success: true,

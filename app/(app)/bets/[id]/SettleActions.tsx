@@ -47,6 +47,7 @@ export default function SettleActions({ betId, status, pnl, settledAt, sym }: Pr
   }
 
   async function settle(outcome: 'won' | 'lost' | 'void') {
+    if (loading !== null) return
     trackClientEvent(EVENTS.BET_SETTLE_CLICKED, { bet_id: betId, outcome })
     setLoading(outcome)
     setError('')

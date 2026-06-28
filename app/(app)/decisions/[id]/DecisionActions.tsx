@@ -31,12 +31,6 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
       setShowStake(true)
       return
     }
-    if (action === 'watchlisted') {
-      trackClientEvent(EVENTS.DECISION_ACTION_WATCH, { decision_id: decisionId, from_page: 'decision_detail' })
-    }
-    if (action === 'skipped') {
-      trackClientEvent(EVENTS.DECISION_ACTION_SKIP, { decision_id: decisionId, from_page: 'decision_detail' })
-    }
 
     setSaving(true)
     setError('')
@@ -50,12 +44,18 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
           p_stake:       stake,
         })
         if (betErr) throw new Error(betErr.message || betErr.details || JSON.stringify(betErr))
+        trackClientEvent(EVENTS.DECISION_ACTION_PLACED, { decision_id: decisionId, from_page: 'decision_detail' })
       } else {
         const { error: actionErr } = await supabase.rpc('update_decision_action', {
           p_decision_id:  decisionId,
           p_final_action: action,
         })
         if (actionErr) throw new Error(actionErr.message || actionErr.details || JSON.stringify(actionErr))
+        if (action === 'watchlisted') {
+          trackClientEvent(EVENTS.DECISION_ACTION_WATCH, { decision_id: decisionId, from_page: 'decision_detail' })
+        } else {
+          trackClientEvent(EVENTS.DECISION_ACTION_SKIP, { decision_id: decisionId, from_page: 'decision_detail' })
+        }
       }
 
       router.refresh()

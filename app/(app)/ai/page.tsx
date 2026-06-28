@@ -230,13 +230,6 @@ export default function AIAnalystPage() {
       return
     }
 
-    if (action === 'watchlisted') {
-      trackClientEvent(EVENTS.DECISION_ACTION_WATCH, { decision_id: analysis.decision_id, from_page: 'ai_page' })
-    }
-    if (action === 'skipped') {
-      trackClientEvent(EVENTS.DECISION_ACTION_SKIP, { decision_id: analysis.decision_id, from_page: 'ai_page' })
-    }
-
     if (action === 'placed') {
       const stake = parseFloat(stakeStr)
       if (!stakeStr || isNaN(stake) || stake <= 0) {
@@ -252,6 +245,7 @@ export default function AIAnalystPage() {
           p_bookmaker:   analysis.bookmaker,
         })
         if (betErr) throw new Error(betErr.message || betErr.details || JSON.stringify(betErr))
+        trackClientEvent(EVENTS.DECISION_ACTION_PLACED, { decision_id: analysis.decision_id, from_page: 'ai_page' })
         router.push(`/decisions/${analysis.decision_id}`)
       } catch (err: unknown) {
         setRootErr(err instanceof Error ? err.message : String(err))
@@ -261,7 +255,7 @@ export default function AIAnalystPage() {
       return
     }
 
-    // Watch or Skip
+    // Watch or Skip — fire event only after RPC succeeds
     setSaving(true)
     setRootErr('')
     try {
@@ -270,6 +264,11 @@ export default function AIAnalystPage() {
         p_final_action: action,
       })
       if (actionErr) throw new Error(actionErr.message || actionErr.details || JSON.stringify(actionErr))
+      if (action === 'watchlisted') {
+        trackClientEvent(EVENTS.DECISION_ACTION_WATCH, { decision_id: analysis.decision_id, from_page: 'ai_page' })
+      } else {
+        trackClientEvent(EVENTS.DECISION_ACTION_SKIP, { decision_id: analysis.decision_id, from_page: 'ai_page' })
+      }
       router.push(`/decisions/${analysis.decision_id}`)
     } catch (err: unknown) {
       setRootErr(err instanceof Error ? err.message : String(err))
@@ -634,7 +633,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
               <button
                 className="btn-primary flex-1"
                 onClick={() => {
-                  if (analysis) {
+                  if (analysis?.decision_id) {
                     trackClientEvent(EVENTS.DECISION_ACTION_PLACE_CLICKED, {
                       decision_id: analysis.decision_id,
                       odds_bucket: bucketOdds(analysis.offered_odds),

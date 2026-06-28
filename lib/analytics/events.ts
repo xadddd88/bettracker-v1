@@ -9,6 +9,7 @@ export const EVENTS = {
   DECISION_ACTION_WATCH:         'decision_action_watch',
   DECISION_ACTION_SKIP:          'decision_action_skip',
   DECISION_ACTION_PLACE_CLICKED: 'decision_action_place_clicked',
+  DECISION_ACTION_PLACED:        'decision_action_placed',
 
   // Bet settlement
   BET_SETTLE_CLICKED: 'bet_settle_clicked',

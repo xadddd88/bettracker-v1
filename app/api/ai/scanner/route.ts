@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
 
   // Size guard (~7.5MB original)
   if (image.length > MAX_BASE64_CHARS) {
-    void trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'too_large' })
+    await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'too_large' })
     return NextResponse.json({ error: 'Image too large (max ~7.5 MB)' }, { status: 413 })
   }
 
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
     if (!response.ok) {
       const err = await response.text()
       console.error('[scanner] Anthropic error:', err)
-      void trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'api_error' })
+      await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'api_error' })
       return NextResponse.json({ error: 'Scanner API error' }, { status: 502 })
     }
 
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
     raw = data.content?.[0]?.text ?? ''
   } catch (err) {
     console.error('[scanner] fetch error:', err)
-    void trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'unknown' })
+    await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'unknown' })
     return NextResponse.json({ error: 'Scanner request failed' }, { status: 500 })
   }
 
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
     jsonData = JSON.parse(cleaned)
   } catch {
     console.error('[scanner] JSON parse failed:', raw)
-    void trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'parse_failed' })
+    await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'parse_failed' })
     return NextResponse.json({ error: 'Could not parse scanner result' }, { status: 500 })
   }
 
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
   const validated = scanOutputSchema.safeParse(jsonData)
   if (!validated.success) {
     console.error('[scanner] Output schema mismatch:', jsonData)
-    void trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'schema_mismatch' })
+    await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'schema_mismatch' })
     return NextResponse.json({ error: 'Unexpected scanner output format' }, { status: 500 })
   }
 
@@ -159,22 +159,26 @@ export async function POST(req: NextRequest) {
     data.sport = SPORT_MAP[data.sport] as typeof data.sport
   }
 
-  const isExpress = !!(
-    data.event_name?.includes('+') ||
-    data.market_type?.toLowerCase().includes('express') ||
-    data.market_type?.toLowerCase().includes('экспресс') ||
-    data.market_type?.toLowerCase().includes('parlay')
-  )
+  // Use leg count from event_name split (OCR format: "Team A vs B + Team C vs D")
+  const legCount = data.event_name?.split(' + ').length ?? 1
+  const isExpress = legCount > 1 ||
+    !!(data.market_type?.toLowerCase().includes('express') ||
+       data.market_type?.toLowerCase().includes('экспресс') ||
+       data.market_type?.toLowerCase().includes('parlay'))
 
-  void trackServerEvent(user.id, EVENTS.SCANNER_COMPLETED, {
-    sport:      data.sport ?? null,
-    has_odds:   data.odds != null,
-    has_stake:  data.stake != null,
-    is_express: isExpress,
-  })
+  const events: Promise<void>[] = [
+    trackServerEvent(user.id, EVENTS.SCANNER_COMPLETED, {
+      sport:      data.sport ?? null,
+      has_odds:   data.odds != null,
+      has_stake:  data.stake != null,
+      is_express: isExpress,
+      leg_count:  legCount,
+    }),
+  ]
   if (isExpress) {
-    void trackServerEvent(user.id, EVENTS.SCANNER_EXPRESS_DETECTED, { sport: data.sport ?? null })
+    events.push(trackServerEvent(user.id, EVENTS.SCANNER_EXPRESS_DETECTED, { sport: data.sport ?? null, leg_count: legCount }))
   }
+  await Promise.all(events)
 
   return NextResponse.json({ success: true, data })
 }
