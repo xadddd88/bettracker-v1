@@ -1,7 +1,7 @@
 # Sprint: Priority 6 — PostHog Product Analytics
 
-**Status:** Complete  
-**Branch:** `chore/posthog-custom-events`
+**Status:** Accepted  
+**Branch:** `chore/posthog-custom-events` → hardened in `hotfix/posthog-analytics-hardening` (PR #5, merged 2026-06-28)
 
 ## Goal
 
@@ -66,3 +66,18 @@ reasoning, disclaimer, image, raw_text, stake, pnl, balance
 ```
 
 Financial values sent via buckets only (e.g. `odds_bucket: "2.00-3.00"`, `edge_bucket: "3% to 7%"`).
+
+## CPO hardening (hotfix/posthog-analytics-hardening — 2026-06-28)
+
+Applied post-merge after CPO review. Changes over the original implementation:
+
+- **Shared sanitizer:** `lib/analytics/sanitize.ts` — single source of truth for `BLOCKED_KEYS`; extended with `raw_prompt`, `raw_event_text`, `raw_market_text`, `ocr_image`, `coupon_text`, `team_name`, `participant`, `bankroll_balance`, `profit`, `api_key`, `token`, `authorization`
+- **PostHogProvider:** requires both `NEXT_PUBLIC_POSTHOG_KEY` and `NEXT_PUBLIC_POSTHOG_HOST`; `autocapture: false`; `disable_session_recording: true`; pageview sends `{ path }` only (no searchParams)
+- **client.ts:** `typeof window` guard, dual env guard, `try/catch`; imports shared sanitizer
+- **server.ts:** dual env guard in `makeClient`, no fallback host; imports shared sanitizer
+- **events.ts:** 7 new events: `bet_place_clicked`, `bet_place_succeeded`, `bet_place_failed`, `bet_duplicate_rejected`, `bet_settle_duplicate_rejected`, `decision_action_failed`, `decision_detail_viewed`
+- **Analyst route:** `AI_ANALYSIS_STARTED` changed from `void` to `await`
+- **Scanner route:** `SCANNER_STARTED` changed from `void` to `await`; `isExpress` now uses market_type keywords only (removed `event_name.split` which caused false positives on team names); `leg_count` removed from events
+- **SettleActions:** synchronous `useRef` double-click guard; `BET_SETTLE_DUPLICATE_REJECTED` fires on HTTP 409
+- **ai/page.tsx + DecisionActions.tsx:** `BET_PLACE_CLICKED` fires before RPC with `stake_bucket`, `odds_bucket`, `is_ai_linked`; `BET_PLACE_SUCCEEDED` fires with `bet_id` after RPC; `BET_PLACE_FAILED` / `BET_DUPLICATE_REJECTED` on error; `DECISION_ACTION_FAILED` in all catch blocks
+- **decisions/[id]/page.tsx:** `DECISION_DETAIL_VIEWED` PageView added
