@@ -11,6 +11,7 @@ const NAV = [
   { href: '/scout',      icon: '🔍', label: 'Scout' },
   { href: '/bets',       icon: '🎯', label: 'Bets' },
   { href: '/analytics',  icon: '📈', label: 'Analytics' },
+  { href: '/coach',      icon: '🧠', label: 'Coach' },
   { href: '/bankroll',   icon: '💰', label: 'Bankroll' },
   { href: '/settings',   icon: '⚙️',  label: 'Settings' },
 ]

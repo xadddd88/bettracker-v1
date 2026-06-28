@@ -202,6 +202,36 @@ export interface MarketOpportunity {
   updated_at: string
 }
 
+// ─── COACH ──────────────────────────────────────────────────
+export interface CoachRecommendation {
+  priority: 'high' | 'medium' | 'low'
+  action:   string
+  detail:   string
+}
+
+export type CalibrationGrade = 'excellent' | 'good' | 'fair' | 'poor'
+
+export interface CoachingSession {
+  id:                   string
+  user_id:              string
+  period_days:          number
+  period_start?:        string
+  period_end?:          string
+  bets_analysed:        number
+  decisions_analysed:   number
+  summary:              string
+  calibration_grade?:   CalibrationGrade
+  strengths:            string[]
+  weaknesses:           string[]
+  recommendations:      CoachRecommendation[]
+  patterns?:            Record<string, unknown>
+  metrics_snapshot?:    Record<string, unknown>
+  focus_notes?:         string
+  model_name?:          string
+  disclaimer?:          string
+  created_at:           string
+}
+
 // ─── UI HELPERS ─────────────────────────────────────────────
 export interface Stats {
   total_decisions: number

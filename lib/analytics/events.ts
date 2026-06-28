@@ -41,6 +41,12 @@ export const EVENTS = {
   OPPORTUNITY_WATCHLISTED: 'opportunity_watchlisted',
   OPPORTUNITY_DISMISSED:   'opportunity_dismissed',
 
+  // Coach
+  COACH_STARTED:     'coach_started',
+  COACH_COMPLETED:   'coach_completed',
+  COACH_FAILED:      'coach_failed',
+  COACH_PAGE_VIEWED: 'coach_page_viewed',
+
   // Page views
   DASHBOARD_VIEWED:       'dashboard_viewed',
   AI_PAGE_VIEWED:         'ai_page_viewed',
