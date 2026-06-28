@@ -107,7 +107,7 @@ export default async function BetsPage() {
             })
 
             return (
-              <div key={bet.id} className="flex items-center gap-4 px-4 py-4 hover:bg-gray-800/30 transition-colors">
+              <Link key={bet.id} href={`/bets/${bet.id}`} className="flex items-center gap-4 px-4 py-4 hover:bg-gray-800/30 transition-colors">
 
                 {/* Sport icon */}
                 <div className="text-xl flex-shrink-0 w-7 text-center">
@@ -158,7 +158,7 @@ export default async function BetsPage() {
                   )}
                 </div>
 
-              </div>
+              </Link>
             )
           })}
         </div>

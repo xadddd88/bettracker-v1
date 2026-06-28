@@ -1,19 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import type { Bet } from '@/types'
+import BankrollWidget from './BankrollWidget'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch bets with legs
   const { data: betsData } = await supabase
     .from('bets')
     .select('*, legs:bet_legs(*)')
     .eq('user_id', user!.id)
     .order('placed_at', { ascending: false })
 
-  // Fetch bankroll
   const { data: bankroll } = await supabase
     .from('bankrolls')
     .select('balance, currency')
@@ -21,7 +20,6 @@ export default async function DashboardPage() {
     .eq('is_default', true)
     .single()
 
-  // Fetch pending decisions (watchlist)
   const { count: watchlistCount } = await supabase
     .from('decisions')
     .select('*', { count: 'exact', head: true })
@@ -29,21 +27,46 @@ export default async function DashboardPage() {
     .eq('final_action', 'watchlisted')
 
   const bets: Bet[] = betsData || []
-  const settled = bets.filter(b => b.status !== 'pending')
-  const won = settled.filter(b => b.status === 'won').length
-  const totalStaked = settled.reduce((s, b) => s + b.stake, 0)
-  const totalProfit = settled.reduce((s, b) => s + (b.pnl || 0), 0)
-  const roi = totalStaked > 0 ? (totalProfit / totalStaked) * 100 : 0
-  const winRate = settled.length > 0 ? (won / settled.length) * 100 : 0
+
+  // Sprint 3 metrics
+  const wonBets     = bets.filter(b => b.status === 'won')
+  const lostBets    = bets.filter(b => b.status === 'lost')
+  const pendingBets = bets.filter(b => b.status === 'pending')
+  const settledBets = bets.filter(b => ['won', 'lost', 'void'].includes(b.status))
+
+  const netProfit    = settledBets.reduce((s, b) => s + (b.pnl ?? 0), 0)
+  const winLostCount = wonBets.length + lostBets.length
+  const winRate      = winLostCount > 0 ? (wonBets.length / winLostCount) * 100 : 0
+  const roiStake     = [...wonBets, ...lostBets].reduce((s, b) => s + b.stake, 0)
+  const roi          = roiStake > 0 ? (netProfit / roiStake) * 100 : 0
+  const pendingStake = pendingBets.reduce((s, b) => s + b.stake, 0)
 
   const currency = bankroll?.currency || 'USD'
-  const sym = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency
+  const sym = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'UAH' ? '₴' : currency
 
   const statCards = [
-    { label: 'Balance', value: `${sym}${(bankroll?.balance || 0).toFixed(2)}`, color: '' },
-    { label: 'Win Rate', value: `${winRate.toFixed(1)}%`, color: '' },
-    { label: 'ROI', value: `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%`, color: roi >= 0 ? 'text-green-400' : 'text-red-400' },
-    { label: 'Total P&L', value: `${totalProfit >= 0 ? '+' : ''}${sym}${totalProfit.toFixed(2)}`, color: totalProfit >= 0 ? 'text-green-400' : 'text-red-400' },
+    {
+      label: 'Win Rate',
+      value: winLostCount > 0 ? `${winRate.toFixed(1)}%` : '—',
+      color: '',
+    },
+    {
+      label: 'ROI',
+      value: roiStake > 0 ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—',
+      color: roiStake > 0 ? (roi >= 0 ? 'text-green-400' : 'text-red-400') : '',
+    },
+    {
+      label: 'Net Profit',
+      value: settledBets.length > 0
+        ? `${netProfit >= 0 ? '+' : ''}${sym}${netProfit.toFixed(2)}`
+        : '—',
+      color: settledBets.length > 0 ? (netProfit >= 0 ? 'text-green-400' : 'text-red-400') : '',
+    },
+    {
+      label: 'Pending Stake',
+      value: `${sym}${pendingStake.toFixed(2)}`,
+      color: '',
+    },
   ]
 
   const recent = bets.slice(0, 6)
@@ -63,7 +86,8 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <BankrollWidget balance={bankroll?.balance || 0} sym={sym} />
         {statCards.map(({ label, value, color }) => (
           <div key={label} className="stat-card">
             <div className="stat-label">{label}</div>
@@ -94,7 +118,7 @@ export default async function DashboardPage() {
               const leg = bet.legs?.[0]
               const multiLeg = (bet.legs?.length || 0) > 1
               return (
-                <div key={bet.id} className="flex items-center gap-3 py-3">
+                <Link key={bet.id} href={`/bets/${bet.id}`} className="flex items-center gap-3 py-3 hover:opacity-80 transition-opacity">
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-white truncate">
                       {multiLeg ? `Express (${bet.legs!.length} events)` : leg?.event_name || '—'}
@@ -113,7 +137,7 @@ export default async function DashboardPage() {
                       {bet.pnl >= 0 ? '+' : ''}{sym}{bet.pnl.toFixed(2)}
                     </div>
                   )}
-                </div>
+                </Link>
               )
             })}
           </div>

@@ -11,6 +11,7 @@ build/
 # env — NEVER commit keys
 .env.local
 .env.*.local
+.env.sentry-build-plugin
 
 # debug
 npm-debug.log*

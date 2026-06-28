@@ -339,7 +339,9 @@ Return structured JSON analysis only.`
       )
     }
 
-    const decisionId = (rpcData as { decision_id?: string })?.decision_id
+    const rpcPayload = rpcData as { decision_id?: string; analysis_run_id?: string } | null
+    const decisionId     = rpcPayload?.decision_id
+    const analysisRunId  = rpcPayload?.analysis_run_id
     if (!decisionId) {
       return NextResponse.json(
         { success: false, error: 'Decision persisted but returned no ID' },
@@ -350,7 +352,8 @@ Return structured JSON analysis only.`
     return NextResponse.json({
       success: true,
       data: {
-        decision_id:         decisionId,
+        decision_id:      decisionId,
+        analysis_run_id:  analysisRunId ?? null,
         // AI output (server-corrected implied + edge)
         model_probability:   analysis.model_probability,
         implied_probability: serverImplied,

@@ -10,24 +10,28 @@ const SCAN_PROMPT = `You are a betting slip OCR expert. Analyze this screenshot 
 
 Read ALL text EXACTLY character-by-character as shown in the image. Do NOT guess or correct team names.
 
-Extract the bet details and return ONLY a valid JSON object — no explanation, no markdown, no code fences.
+The coupon may be a SINGLE bet or an EXPRESS/PARLAY (multiple legs combined).
+
+Return ONLY a valid JSON object — no explanation, no markdown, no code fences.
 
 Required format:
 {
-  "event_name":  "exact team names as shown, e.g. Germany vs Netherlands",
-  "market_type": "market as shown, e.g. П1, ТБ 2.5, Ф1 +1, 1X2",
-  "selection":   "selected outcome, or null",
-  "odds":        1.85,
+  "event_name":  "For single bet: exact team names. For express/parlay: all legs joined with ' + ', e.g. 'Team A vs Team B + Team C vs Team D'",
+  "market_type": "For single bet: market as shown. For express/parlay: 'Экспресс' or 'Express' with leg count, e.g. 'Экспресс (2 ноги)'",
+  "selection":   "For single bet: selected outcome. For express: summary of all selections, e.g. 'Менше (2.5) + Більше (2.5)', or null",
+  "odds":        1.96,
   "stake":       null,
   "bookmaker":   "bookmaker name, or null",
-  "sport":       "football|tennis|basketball|hockey|other"
+  "sport":       "soccer|tennis|cs2|basketball|ice_hockey|mma|other"
 }
 
 Rules:
 - Read team names letter-by-letter exactly as shown
-- odds must be a number (e.g. 1.85), never a string
+- odds must be the FINAL/TOTAL combined odds shown on the coupon (e.g. 1.96 for express), as a number never a string
+- For express/parlay: use the total combined coefficient, not individual leg odds
 - stake is usually not printed on coupons — return null unless clearly visible
 - Return null for any field not clearly visible
+- sport should reflect the dominant sport on the coupon
 - Return ONLY the JSON object, nothing else`
 
 // ─── Schemas ─────────────────────────────────────────────────
@@ -43,7 +47,11 @@ const scanOutputSchema = z.object({
   odds:        z.number().nullable().optional(),
   stake:       z.number().nullable().optional(),
   bookmaker:   z.string().nullable().optional(),
-  sport:       z.enum(['football', 'tennis', 'basketball', 'hockey', 'other']).nullable().optional(),
+  // Accept both legacy and canonical sport values — mapped to canonical in the handler
+  sport: z.enum([
+    'soccer', 'tennis', 'cs2', 'basketball', 'ice_hockey', 'mma', 'other',
+    'football', 'hockey', // legacy — mapped below
+  ]).nullable().optional(),
 })
 
 // ─── Handler ─────────────────────────────────────────────────
@@ -135,7 +143,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unexpected scanner output format' }, { status: 500 })
   }
 
-  // TODO Sprint 2: log result to ai_analysis_runs table for audit trail
+  // Remap legacy sport values to canonical SportCode
+  const SPORT_MAP: Record<string, string> = { football: 'soccer', hockey: 'ice_hockey' }
+  const data = validated.data
+  if (data.sport && SPORT_MAP[data.sport]) {
+    data.sport = SPORT_MAP[data.sport] as typeof data.sport
+  }
 
-  return NextResponse.json({ success: true, data: validated.data })
+  return NextResponse.json({ success: true, data })
 }

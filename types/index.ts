@@ -2,7 +2,7 @@
 // Canonical sport codes — never localized labels in the data layer
 export type SportCode = 'soccer' | 'tennis' | 'cs2' | 'basketball' | 'ice_hockey' | 'mma' | 'other'
 /** @deprecated Use SportCode */
-export type Sport = SportCode
+export type Sport = 'football' | 'tennis' | 'basketball' | 'hockey' | 'other'
 
 export type BetType = 'single' | 'parlay' | 'system'
 export type BetStatus = 'pending' | 'won' | 'lost' | 'void' | 'push' | 'cashed_out' | 'partial'
@@ -129,6 +129,7 @@ export interface Bet {
   pnl?: number | null
   placed_at: string
   settled_at?: string
+  settlement_outcome?: 'won' | 'lost' | 'void'
   bookmaker?: string
   source: BetSource
   notes?: string
