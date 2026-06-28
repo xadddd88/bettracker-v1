@@ -5,10 +5,10 @@ import { usePathname } from 'next/navigation'
 
 const NAV = [
   { href: '/dashboard', icon: '📊', label: 'Home' },
+  { href: '/ai',        icon: '🤖', label: 'AI' },
+  { href: '/scout',     icon: '🔍', label: 'Scout' },
   { href: '/bets',      icon: '🎯', label: 'Bets' },
   { href: '/analytics', icon: '📈', label: 'Stats' },
-  { href: '/ai',        icon: '🤖', label: 'AI' },
-  { href: '/settings',  icon: '⚙️', label: 'More' },
 ]
 
 export default function MobileNav() {
