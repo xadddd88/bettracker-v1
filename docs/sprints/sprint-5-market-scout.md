@@ -1,6 +1,6 @@
 # Sprint 5 — Market Scout MVP
 
-Status: Draft 📝
+Status: Accepted ✅
 
 ---
 
@@ -166,7 +166,6 @@ Each `ScoutOpportunity` mirrors `market_opportunities` columns plus the `id` fro
 - If no strong candidates exist, Scout must say so — minimum 1 candidate, not forced to 5.
 - Responsible betting guardrails are non-negotiable (same as Analyst: no "guaranteed", "sure", "lock", "must bet").
 - Confidence score must honestly reflect data quality — low when web search not used.
-- `data_quality_score` reflects how much real-time data was available (0 = no live data, 100 = full current data).
 - Disclaimer must always be included.
 
 #### Sport modules
@@ -189,7 +188,6 @@ Scout uses the same sport modules as Analyst (soccer / tennis / cs2 / basketball
       "implied_probability": null,
       "edge_percent":        null,
       "confidence_score":    50,
-      "data_quality_score":  40,
       "risk_level":          "medium",
       "reasoning":           "Barcelona's away form this season is historically undervalued by markets...",
       "required_checks": [
@@ -204,6 +202,8 @@ Scout uses the same sport modules as Analyst (soccer / tennis / cs2 / basketball
 ```
 
 `offered_odds`, `implied_probability`, `edge_percent` are nullable — Scout may not have access to current odds.
+
+`data_quality_score` is **not** in the AI output schema for Sprint 5. The column exists in the DB as nullable for Sprint 5.1. Do not ask the model to self-assess data quality — it cannot do so reliably.
 
 `scout_score` = overall worthiness of researching this opportunity (0–100). Not a win probability.
 
@@ -242,10 +242,11 @@ New route: `app/(app)/scout/page.tsx` — server component wrapper, client form 
    - Actions: **[Analyse →]** (primary) · **[Watchlist]** · **[Dismiss]**
 
 4. **Saved Opportunities list** (below form, always visible)
-   - Shows all non-dismissed, non-expired opportunities for the user
+   - Shows up to 20 most recent non-dismissed, non-expired opportunities
    - Sorted: most recent first
    - Status indicator on each card: discovered / research_needed / watchlisted / converted
    - Dismissed opportunities hidden by default
+   - No pagination in Sprint 5 — cap at 20
 
 **Empty state (no opportunities yet):**
 ```
@@ -262,14 +263,21 @@ When user clicks **Analyse →** on an opportunity card:
 
 1. Navigate to `/ai` with query params:
    ```
-   /ai?scout_id=<uuid>&sport=soccer&event=Real+Madrid+vs+Barcelona&market=match_winner&selection=Barcelona&odds=
+   /ai?scout_id=<uuid>&sport=soccer&event=Real+Madrid+vs+Barcelona&market=match_winner&selection=Barcelona
    ```
-2. The `/ai` page reads these params and pre-fills the Analyst form.
-3. On successful Analyst run → Decision created.
-4. After decision creation, call `PATCH /api/scout/[id]` to set:
+   `offered_odds` is **not** passed — user must enter current odds manually (responsible betting practice; stale odds are dangerous).
+
+2. The `/ai` page reads these params on mount via `useSearchParams()` and pre-fills sport, event, market, selection. Odds field is left blank with placeholder "Enter current odds".
+
+3. The `/ai` page stores `scout_id` in component state on mount.
+
+4. On successful Analyst run → Decision created (`decision_id` returned).
+
+5. If `scout_id` is present in state, the `/ai` page immediately calls `PATCH /api/scout/[scout_id]`:
    ```json
    { "status": "converted_to_decision", "linked_decision_id": "<decision_id>" }
    ```
+   This call is fire-and-forget — do not block the Analyst result display on it.
 
 **PATCH /api/scout/[id]** — update opportunity status.
 ```ts
@@ -283,8 +291,8 @@ Auth-gated. User can only update their own opportunities.
 ### 6. Nav update
 
 Add **Scout** to:
-- `components/ui/Sidebar.tsx` — between AI and Bets (or after AI)
-- `components/ui/MobileNav.tsx` — add Scout tab with 🔍 icon
+- `components/ui/Sidebar.tsx` — **after AI, before Bets**. Order: Dashboard → AI → Scout → Bets → Analytics → Bankroll → Settings.
+- `components/ui/MobileNav.tsx` — add Scout tab with 🔍 icon (replace least-used tab if space is limited on mobile)
 
 Nav label: "Scout"
 Route: `/scout`
@@ -353,7 +361,8 @@ OPPORTUNITY_DISMISSED: 'opportunity_dismissed'
 `opportunity_watchlisted`: `{ opportunity_id, sport_code }`
 `opportunity_dismissed`: `{ opportunity_id, sport_code }`
 
-`scout_score_bucket`: use `bucketCount` or a new `bucketScore` function (0–39 / 40–69 / 70–100).
+`scout_score_bucket`: add `bucketScoutScore(score: number): string` to `lib/analytics/buckets.ts`.
+Ranges: `low` (<40) / `medium` (40–69) / `high` (70+).
 
 Do not send: event_name, reasoning, required_checks, odds, selection.
 
@@ -434,10 +443,21 @@ Do not send: event_name, reasoning, required_checks, odds, selection.
 
 ---
 
-## Open Questions for CPO
+## CPO Acceptance Notes
 
-1. **Nav placement:** Should Scout appear before or after AI in the sidebar?
-2. **Opportunity count:** Is 1–5 candidates per run the right range, or should we allow more?
-3. **Pre-fill behaviour:** When navigating Opportunity → Analyst, should we require the user to manually enter odds, or is it OK to leave odds blank (forcing them to look up the current line)?
-4. **Expiry:** Should `expired` status be set automatically after N days, or manually? (Suggested: auto after 7 days via cron — Sprint 5.1.)
-5. **Web search default:** Should `ANTHROPIC_WEB_SEARCH_ENABLED` default to `true` in production from day 1, or start `false` and enable manually after cost monitoring?
+Reviewed 2026-06-28. Four spec amendments applied before approval:
+
+1. `data_quality_score` removed from AI output schema — model cannot self-assess reliably. Column stays in DB as nullable for Sprint 5.1.
+2. Saved opportunities list capped at 20 most recent — no pagination in Sprint 5.
+3. PATCH trigger point made explicit — `/ai` page stores `scout_id` in state on mount, fires PATCH after decision creation, fire-and-forget.
+4. `bucketScoutScore` specified as a named function in `lib/analytics/buckets.ts` (low/medium/high).
+
+**Open questions resolved:**
+
+1. **Nav placement:** Scout goes after AI, before Bets. Dashboard → AI → Scout → Bets → Analytics → Bankroll → Settings.
+2. **Opportunity count:** 1–5 per run approved. No forced minimum beyond 1.
+3. **Pre-fill odds:** Odds left blank. User must enter current line before running Analyst. Intentional responsible betting practice.
+4. **Expiry:** No auto-expiry in Sprint 5. `expired` status reserved for Sprint 5.1 cron job.
+5. **Web search default:** `false` everywhere. CEO enables in production via `ANTHROPIC_WEB_SEARCH_ENABLED=true` after cost baseline is established.
+
+Sprint 5 spec approved for implementation.
