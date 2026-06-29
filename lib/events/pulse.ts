@@ -1,13 +1,14 @@
 export type PulseTheme =
-  | 'football'
-  | 'grass-tennis'
-  | 'clay-tennis'
-  | 'hard-tennis'
-  | 'basketball'
+  | 'default'
+  | 'football_global'
+  | 'grass_major'
+  | 'clay_major'
+  | 'hardcourt_major'
+  | 'carbon_race'
+  | 'hardwood_finals'
+  | 'gridiron_final'
   | 'hockey'
-  | 'american-football'
   | 'esports'
-  | 'neutral'
 
 export interface PulseEvent {
   id: string
@@ -33,8 +34,19 @@ export interface ThemeTokens {
   texture:   string | null
 }
 
+// Card-level visual tokens for EventPulseCard only.
+// Global ambient tokens live in lib/events/pulse-themes.ts.
 export const THEME_TOKENS: Record<PulseTheme, ThemeTokens> = {
-  football: {
+  default: {
+    accent:    '#334155',
+    bg:        'linear-gradient(135deg, #0a0f18 0%, #0f1629 60%)',
+    border:    'rgba(51,65,85,0.6)',
+    badgeBg:   'rgba(30,38,64,0.4)',
+    badgeText: '#94a3b8',
+    glowBg:    'radial-gradient(ellipse at 50% 0%, rgba(51,65,85,0.12) 0%, transparent 70%)',
+    texture:   null,
+  },
+  football_global: {
     accent:    '#166534',
     bg:        'linear-gradient(135deg, #091409 0%, #0f1629 60%)',
     border:    'rgba(22,101,52,0.4)',
@@ -43,7 +55,7 @@ export const THEME_TOKENS: Record<PulseTheme, ThemeTokens> = {
     glowBg:    'radial-gradient(ellipse at 50% 0%, rgba(22,101,52,0.18) 0%, transparent 70%)',
     texture:   'repeating-linear-gradient(0deg, rgba(22,101,52,0.07) 0px, rgba(22,101,52,0.07) 1px, transparent 1px, transparent 12px)',
   },
-  'grass-tennis': {
+  grass_major: {
     accent:    '#14532d',
     bg:        'linear-gradient(135deg, #06110a 0%, #0f1629 65%)',
     border:    'rgba(20,83,45,0.45)',
@@ -52,7 +64,7 @@ export const THEME_TOKENS: Record<PulseTheme, ThemeTokens> = {
     glowBg:    'radial-gradient(ellipse at 50% 0%, rgba(20,83,45,0.15) 0%, transparent 70%)',
     texture:   'repeating-linear-gradient(-45deg, rgba(20,83,45,0.06) 0px, rgba(20,83,45,0.06) 1px, transparent 1px, transparent 8px)',
   },
-  'clay-tennis': {
+  clay_major: {
     accent:    '#7c2d12',
     bg:        'linear-gradient(135deg, #150803 0%, #0f1629 65%)',
     border:    'rgba(124,45,18,0.4)',
@@ -61,7 +73,7 @@ export const THEME_TOKENS: Record<PulseTheme, ThemeTokens> = {
     glowBg:    'radial-gradient(ellipse at 50% 0%, rgba(124,45,18,0.15) 0%, transparent 70%)',
     texture:   'repeating-linear-gradient(0deg, rgba(124,45,18,0.07) 0px, rgba(124,45,18,0.07) 1px, transparent 1px, transparent 10px)',
   },
-  'hard-tennis': {
+  hardcourt_major: {
     accent:    '#1e3a5f',
     bg:        'linear-gradient(135deg, #04101a 0%, #0f1629 65%)',
     border:    'rgba(30,58,95,0.5)',
@@ -70,13 +82,31 @@ export const THEME_TOKENS: Record<PulseTheme, ThemeTokens> = {
     glowBg:    'radial-gradient(ellipse at 50% 0%, rgba(30,58,95,0.15) 0%, transparent 70%)',
     texture:   null,
   },
-  basketball: {
+  carbon_race: {
+    accent:    '#7f1d1d',
+    bg:        'linear-gradient(135deg, #140404 0%, #0f1629 65%)',
+    border:    'rgba(127,29,29,0.4)',
+    badgeBg:   'rgba(127,29,29,0.25)',
+    badgeText: '#f87171',
+    glowBg:    'radial-gradient(ellipse at 50% 0%, rgba(127,29,29,0.15) 0%, transparent 70%)',
+    texture:   null,
+  },
+  hardwood_finals: {
     accent:    '#7c2d12',
     bg:        'linear-gradient(135deg, #150500 0%, #0f1629 65%)',
     border:    'rgba(234,88,12,0.3)',
     badgeBg:   'rgba(124,45,18,0.25)',
     badgeText: '#fb923c',
     glowBg:    'radial-gradient(ellipse at 50% 0%, rgba(234,88,12,0.12) 0%, transparent 70%)',
+    texture:   null,
+  },
+  gridiron_final: {
+    accent:    '#7f1d1d',
+    bg:        'linear-gradient(135deg, #140404 0%, #0f1629 65%)',
+    border:    'rgba(127,29,29,0.4)',
+    badgeBg:   'rgba(127,29,29,0.25)',
+    badgeText: '#f87171',
+    glowBg:    'radial-gradient(ellipse at 50% 0%, rgba(127,29,29,0.15) 0%, transparent 70%)',
     texture:   null,
   },
   hockey: {
@@ -88,15 +118,6 @@ export const THEME_TOKENS: Record<PulseTheme, ThemeTokens> = {
     glowBg:    'radial-gradient(ellipse at 50% 0%, rgba(30,58,95,0.14) 0%, transparent 70%)',
     texture:   null,
   },
-  'american-football': {
-    accent:    '#7f1d1d',
-    bg:        'linear-gradient(135deg, #140404 0%, #0f1629 65%)',
-    border:    'rgba(127,29,29,0.4)',
-    badgeBg:   'rgba(127,29,29,0.25)',
-    badgeText: '#f87171',
-    glowBg:    'radial-gradient(ellipse at 50% 0%, rgba(127,29,29,0.15) 0%, transparent 70%)',
-    texture:   null,
-  },
   esports: {
     accent:    '#3730a3',
     bg:        'linear-gradient(135deg, #060510 0%, #0f1629 65%)',
@@ -106,19 +127,9 @@ export const THEME_TOKENS: Record<PulseTheme, ThemeTokens> = {
     glowBg:    'radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.12) 0%, transparent 70%)',
     texture:   null,
   },
-  neutral: {
-    accent:    '#334155',
-    bg:        'linear-gradient(135deg, #0a0f18 0%, #0f1629 60%)',
-    border:    'rgba(51,65,85,0.6)',
-    badgeBg:   'rgba(30,38,64,0.4)',
-    badgeText: '#94a3b8',
-    glowBg:    'radial-gradient(ellipse at 50% 0%, rgba(51,65,85,0.12) 0%, transparent 70%)',
-    texture:   null,
-  },
 }
 
 // ─── Static event registry ────────────────────────────────────
-// Dates are YYYY-MM-DD. Update annually; no live API needed.
 const PULSE_EVENTS: PulseEvent[] = [
   // ── Tier 1: Global Pulse ─────────────────────────────────────
   {
@@ -127,7 +138,7 @@ const PULSE_EVENTS: PulseEvent[] = [
     sublabel: 'USA · Canada · Mexico',
     icon: '🏆',
     tier: 1,
-    theme: 'football',
+    theme: 'football_global',
     sport: 'soccer',
     startDate: '2026-06-11',
     endDate:   '2026-07-19',
@@ -145,7 +156,7 @@ const PULSE_EVENTS: PulseEvent[] = [
     sublabel: 'Grass Court',
     icon: '🎾',
     tier: 2,
-    theme: 'grass-tennis',
+    theme: 'grass_major',
     sport: 'tennis',
     startDate: '2026-06-29',
     endDate:   '2026-07-12',
@@ -161,7 +172,7 @@ const PULSE_EVENTS: PulseEvent[] = [
     sublabel: 'Clay Court',
     icon: '🎾',
     tier: 2,
-    theme: 'clay-tennis',
+    theme: 'clay_major',
     sport: 'tennis',
     startDate: '2026-05-24',
     endDate:   '2026-06-07',
@@ -177,7 +188,7 @@ const PULSE_EVENTS: PulseEvent[] = [
     sublabel: 'Hard Court',
     icon: '🎾',
     tier: 2,
-    theme: 'hard-tennis',
+    theme: 'hardcourt_major',
     sport: 'tennis',
     startDate: '2026-01-19',
     endDate:   '2026-02-01',
@@ -193,7 +204,7 @@ const PULSE_EVENTS: PulseEvent[] = [
     sublabel: 'Hard Court',
     icon: '🎾',
     tier: 2,
-    theme: 'hard-tennis',
+    theme: 'hardcourt_major',
     sport: 'tennis',
     startDate: '2026-08-31',
     endDate:   '2026-09-13',
@@ -209,7 +220,7 @@ const PULSE_EVENTS: PulseEvent[] = [
     sublabel: 'Munich',
     icon: '⭐',
     tier: 2,
-    theme: 'football',
+    theme: 'football_global',
     sport: 'soccer',
     startDate: '2026-05-30',
     endDate:   '2026-05-30',
@@ -225,7 +236,7 @@ const PULSE_EVENTS: PulseEvent[] = [
     sublabel: 'New Orleans',
     icon: '🏈',
     tier: 2,
-    theme: 'american-football',
+    theme: 'gridiron_final',
     sport: 'other',
     startDate: '2026-02-01',
     endDate:   '2026-02-01',
@@ -240,7 +251,7 @@ const PULSE_EVENTS: PulseEvent[] = [
     label: 'NBA Finals 2026',
     icon: '🏀',
     tier: 2,
-    theme: 'basketball',
+    theme: 'hardwood_finals',
     sport: 'basketball',
     startDate: '2026-06-04',
     endDate:   '2026-06-21',
@@ -272,7 +283,7 @@ const PULSE_EVENTS: PulseEvent[] = [
     label: 'Copa América 2026',
     icon: '🏟️',
     tier: 3,
-    theme: 'football',
+    theme: 'football_global',
     sport: 'soccer',
     startDate: '2026-06-27',
     endDate:   '2026-07-26',
@@ -286,7 +297,7 @@ const PULSE_EVENTS: PulseEvent[] = [
     label: 'Tour de France 2026',
     icon: '🚴',
     tier: 3,
-    theme: 'neutral',
+    theme: 'default',
     sport: 'other',
     startDate: '2026-07-04',
     endDate:   '2026-07-27',
@@ -328,7 +339,7 @@ const PULSE_EVENTS: PulseEvent[] = [
     label: 'MLB World Series 2026',
     icon: '⚾',
     tier: 3,
-    theme: 'neutral',
+    theme: 'default',
     sport: 'other',
     startDate: '2026-10-20',
     endDate:   '2026-10-31',
@@ -347,7 +358,6 @@ export function getActiveEvents(today: string): PulseEvent[] {
 export function getPrimaryEvent(today: string): PulseEvent | null {
   const active = getActiveEvents(today)
   if (!active.length) return null
-  // Lowest tier wins; stable sort preserves config order within a tier
   return [...active].sort((a, b) => a.tier - b.tier)[0]
 }
 
