@@ -319,6 +319,11 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
         const firstError = classifyAnthropicError(err)
         console.warn('[scout] web-search call failed, attempting fallback without web search:', firstError.type)
 
+        await trackServerEvent(user.id, EVENTS.SCOUT_WEB_SEARCH_FALLBACK, {
+          sport:          input.sport,
+          original_error: firstError.type,
+        })
+
         try {
           message = await callClaudeWithTimeout(
             (signal) => anthropic.messages.create(buildCallParams(false), { signal }) as Promise<Anthropic.Message>,
@@ -326,17 +331,15 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
           )
           webSearchActuallyUsed = false
           fallbackUsed = true
-
-          await trackServerEvent(user.id, EVENTS.SCOUT_WEB_SEARCH_FALLBACK, {
-            sport:          input.sport,
-            original_error: firstError.type,
-          })
         } catch (fallbackErr) {
           const fallbackError = classifyAnthropicError(fallbackErr)
           console.error('[scout] fallback also failed:', fallbackError.type)
           await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, {
-            sport:      input.sport,
-            error_type: fallbackError.type,
+            sport:              input.sport,
+            error_type:         fallbackError.type,
+            fallback_attempted: true,
+            original_error:     firstError.type,
+            fallback_error:     fallbackError.type,
           })
           return NextResponse.json(
             { success: false, error: 'Scout is temporarily unavailable. Please try again.' },
@@ -345,7 +348,7 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
         }
       } else {
         const classified = classifyAnthropicError(err)
-        console.error('[scout] call failed:', classified.type, err)
+        console.error('[scout] call failed:', classified.type)
         await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, {
           sport:      input.sport,
           error_type: classified.type,
@@ -443,17 +446,18 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
       score_buckets:   rows.map(r => bucketScoutScore(r.scout_score ?? 0)),
     })
 
+    const fallbackLimitation = 'Live web-search context was unavailable, so Scout used limited-data mode. Verify current odds, injuries/news, line movement, and recent form before making any decision.'
+    const responseDisclaimer = fallbackUsed
+      ? `${validated.data.disclaimer}\n\n${fallbackLimitation}`
+      : validated.data.disclaimer
+
     return NextResponse.json({
       success: true,
       data: {
         opportunities:   inserted ?? [],
         web_search_used: webSearchActuallyUsed,
         fallback_used:   fallbackUsed,
-        disclaimer:      validated.data.disclaimer,
-        ...(fallbackUsed && {
-          limitation_disclaimer:
-            'Live web-search context was unavailable, so Scout used limited-data mode. Results are based on general knowledge only.',
-        }),
+        disclaimer:      responseDisclaimer,
       },
     })
 
