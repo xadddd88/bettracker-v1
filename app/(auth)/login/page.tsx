@@ -24,7 +24,7 @@ export default function LoginPage() {
       if (mode === 'magic') {
         const { error } = await supabase.auth.signInWithOtp({
           email,
-          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+          options: { emailRedirectTo: `${window.location.origin}/auth/callback`, shouldCreateUser: false },
         })
         if (error) throw error
         setMagicSent(true)

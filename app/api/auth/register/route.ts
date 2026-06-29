@@ -92,7 +92,23 @@ export async function POST(req: NextRequest) {
   })
 
   if (createErr || !authData?.user) {
+    const msg = createErr?.message ?? ''
+    const isDuplicate = /already|registered|exists/i.test(msg)
+    if (isDuplicate) {
+      await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_BLOCKED, {
+        source: 'login_page',
+        reason: 'revoked_or_used',
+      })
+      return NextResponse.json(
+        { success: false, error: 'Account already exists or access was already used. Try signing in.' },
+        { status: 409 },
+      )
+    }
     console.error('[register] createUser failed:', createErr?.message)
+    await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_BLOCKED, {
+      source: 'login_page',
+      reason: 'service_unavailable',
+    })
     return NextResponse.json(
       { success: false, error: 'Beta registration is temporarily unavailable. Try again later.' },
       { status: 503 },
@@ -100,7 +116,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 6. Mark beta_access entry as used (only after user is created successfully)
-  await admin
+  const { error: markUsedErr } = await admin
     .from('beta_access')
     .update({
       status:          'used',
@@ -109,6 +125,20 @@ export async function POST(req: NextRequest) {
       updated_at:      new Date().toISOString(),
     })
     .eq('id', entry.id)
+
+  if (markUsedErr) {
+    console.error('[register] failed to mark beta_access as used:', markUsedErr.message)
+    // Roll back: delete the auth user so beta_access stays approved and can be retried
+    await admin.auth.admin.deleteUser(authData.user.id).catch(() => {})
+    await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_BLOCKED, {
+      source: 'login_page',
+      reason: 'service_unavailable',
+    })
+    return NextResponse.json(
+      { success: false, error: 'Beta registration is temporarily unavailable. Try again later.' },
+      { status: 503 },
+    )
+  }
 
   // 7. Track completed (now we have the real user ID)
   await trackServerEvent(authData.user.id, EVENTS.BETA_SIGNUP_COMPLETED, {
