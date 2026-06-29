@@ -4,17 +4,34 @@
 
 /* ─── Design tokens ──────────────────────────────────────── */
 :root {
-  --bg:        #0A0C10;
-  --surface-1: #0F1218;
-  --surface-2: #151B24;
-  --border:    #1E2A38;
-  --accent:    #00C2FF;
-  --win:       #00E5A0;
-  --loss:      #FF4560;
-  --pending:   #F5A623;
-  --neutral:   #8899AA;
-  --text-1:    #E8EDF2;
-  --text-2:    #5A6A7A;
+  /* Ambient — overridden per-request by PulseThemeProvider */
+  --bg:          #0A0A0A;
+  --accent:      #F5A623;
+  --accent-soft: rgba(245,166,35,0.12);
+  --accent-glow: rgba(245,166,35,0.15);
+
+  /* Body texture — overridden by PulseThemeProvider when a themed event is active */
+  --body-texture:      linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+                       linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  --body-texture-size: 32px 32px;
+
+  /* Surfaces */
+  --surface-1: #111111;
+  --surface-2: #1A1A1A;
+
+  /* Text */
+  --text-1: #F5F5F7;
+  --text-2: #8A8A8A;
+
+  /* Semantic */
+  --win:     #00E5A0;
+  --loss:    #FF4560;
+  --pending: #F5A623;
+  --neutral: #8899AA;
+
+  /* Layout */
+  --border:        rgba(255,255,255,0.08);
+  --radius:        12px;
   --sidebar-width: 240px;
 }
 
@@ -30,16 +47,24 @@
   }
 }
 
+/* ─── Reduced motion ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation:  none !important;
+  }
+}
+
 /* ─── Base ───────────────────────────────────────────────── */
 @layer base {
   body {
-    @apply bg-night-950 text-slate-100 antialiased font-sans;
-    background-color: var(--bg);
-    background-image:
-      linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.028) 1px, transparent 1px);
-    background-size: 32px 32px;
+    @apply text-slate-100 antialiased font-sans;
+    background-color:    var(--bg);
+    background-image:    var(--body-texture);
+    background-size:     var(--body-texture-size);
     background-position: 0 0;
+    background-attachment: fixed;
+    transition: background-color 0.6s ease;
   }
 
   * {
@@ -49,14 +74,12 @@
 
 /* ─── Components ─────────────────────────────────────────── */
 @layer components {
-  /* Base card */
   .card {
     background: var(--surface-1);
     border: 1px solid var(--border);
     @apply rounded-xl p-4;
   }
 
-  /* Highlight card — accent border + faint glow */
   .card-highlight {
     background: var(--surface-1);
     border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
@@ -65,7 +88,6 @@
     @apply rounded-xl p-4;
   }
 
-  /* Status card — 3px left border signaling outcome */
   .card-status-win {
     background: var(--surface-1);
     border: 1px solid var(--border);
@@ -96,7 +118,12 @@
   }
 
   .btn-primary {
-    @apply btn bg-amber-500 text-night-950 hover:bg-amber-400 font-semibold;
+    @apply btn font-semibold;
+    background: var(--accent);
+    color: #0A0A0A;
+  }
+  .btn-primary:hover {
+    filter: brightness(1.1);
   }
 
   .btn-ghost {
