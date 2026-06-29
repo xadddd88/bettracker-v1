@@ -194,11 +194,21 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
 }
 
 // ─── Main ScoutForm ───────────────────────────────────────────
-interface ScoutFormProps {
-  initialOpportunities: MarketOpportunity[]
+interface PulsePreset {
+  id: string
+  label: string
+  icon: string
+  sport: string
+  context: string
+  tier: 1 | 2 | 3
 }
 
-export default function ScoutForm({ initialOpportunities }: ScoutFormProps) {
+interface ScoutFormProps {
+  initialOpportunities: MarketOpportunity[]
+  pulsePresets?: PulsePreset[]
+}
+
+export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutFormProps) {
   const router = useRouter()
 
   // Form state
@@ -318,6 +328,29 @@ export default function ScoutForm({ initialOpportunities }: ScoutFormProps) {
     <div className="flex flex-col gap-6">
       {/* ── Scout form ─────────────────────────────────────── */}
       <div className="card flex flex-col gap-4">
+        {/* Event Pulse quick picks */}
+        {pulsePresets && pulsePresets.length > 0 && (
+          <div>
+            <p className="label mb-2">Quick picks</p>
+            <div className="flex flex-wrap gap-2">
+              {pulsePresets.map(preset => (
+                <button
+                  key={preset.id}
+                  onClick={() => {
+                    setSport(preset.sport as Sport)
+                    setContext(preset.context)
+                    setError('')
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-night-700 bg-night-800 text-xs text-slate-300 hover:border-amber-700/40 hover:text-white transition-colors"
+                >
+                  <span>{preset.icon}</span>
+                  <span>{preset.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Sport selector */}
         <div>
           <label className="label mb-2">Sport</label>

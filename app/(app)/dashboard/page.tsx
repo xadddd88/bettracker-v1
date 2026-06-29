@@ -6,6 +6,8 @@ import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
 import OnboardingCard from '@/components/onboarding/OnboardingCard'
 import NextBestAction, { type NextAction } from '@/components/dashboard/NextBestAction'
+import EventPulseCard from '@/components/pulse/EventPulseCard'
+import { getPrimaryEvent } from '@/lib/events/pulse'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -38,6 +40,9 @@ export default async function DashboardPage() {
   ])
 
   const bets: Bet[] = betsData || []
+
+  const today        = new Date().toISOString().slice(0, 10)
+  const primaryEvent = getPrimaryEvent(today)
 
   const wonBets     = bets.filter(b => b.status === 'won')
   const lostBets    = bets.filter(b => b.status === 'lost')
@@ -143,6 +148,9 @@ export default async function DashboardPage() {
 
       {/* Balance hero */}
       <BankrollWidget balance={bankroll?.balance || 0} sym={sym} />
+
+      {/* Event Pulse */}
+      {primaryEvent && <EventPulseCard event={primaryEvent} />}
 
       {/* Next best action */}
       <NextBestAction action={nextAction} />
