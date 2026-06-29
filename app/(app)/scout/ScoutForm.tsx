@@ -6,20 +6,31 @@ import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
 import { bucketScoutScore } from '@/lib/analytics/buckets'
 import type { MarketOpportunity, OpportunityStatus } from '@/types'
+import { Search, Eye, X, Loader2, AlertTriangle } from 'lucide-react'
 
 type Sport     = 'soccer' | 'tennis' | 'cs2' | 'basketball' | 'ice_hockey' | 'mma' | 'other'
 type Locale    = 'auto' | 'uk' | 'ru' | 'en' | 'es' | 'fr' | 'de' | 'ar'
 type Timeframe = 'today' | 'tomorrow' | 'this_week'
 
-const SPORTS: { value: Sport; label: string; icon: string }[] = [
-  { value: 'soccer',     label: 'Football',   icon: '⚽' },
-  { value: 'tennis',     label: 'Tennis',     icon: '🎾' },
-  { value: 'cs2',        label: 'CS2',        icon: '🎯' },
-  { value: 'basketball', label: 'Basketball', icon: '🏀' },
-  { value: 'ice_hockey', label: 'Hockey',     icon: '🏒' },
-  { value: 'mma',        label: 'MMA',        icon: '🥊' },
-  { value: 'other',      label: 'Other',      icon: '🏅' },
+const SPORTS: { value: Sport; label: string }[] = [
+  { value: 'soccer',     label: 'Football'   },
+  { value: 'tennis',     label: 'Tennis'     },
+  { value: 'cs2',        label: 'CS2'        },
+  { value: 'basketball', label: 'Basketball' },
+  { value: 'ice_hockey', label: 'Hockey'     },
+  { value: 'mma',        label: 'MMA'        },
+  { value: 'other',      label: 'Other'      },
 ]
+
+const SPORT_ABBR: Record<Sport, string> = {
+  soccer:     'SOCC',
+  tennis:     'TEN',
+  cs2:        'CS2',
+  basketball: 'BASK',
+  ice_hockey: 'HOC',
+  mma:        'MMA',
+  other:      'OTH',
+}
 
 const LOCALES: { value: Locale; label: string }[] = [
   { value: 'auto', label: 'Auto (detect)' },
@@ -78,7 +89,7 @@ interface CardProps {
 }
 
 function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWatch, onDismiss }: CardProps) {
-  const sportIcon = SPORTS.find(s => s.value === opp.sport_code)?.icon ?? '🏅'
+  const sportAbbr = SPORT_ABBR[opp.sport_code as Sport] ?? 'OTH'
   const typeColor = TYPE_STYLE[opp.opportunity_type] ?? 'text-gray-400'
   const statusBadge = STATUS_BADGE[opp.status]
   const score = opp.scout_score ?? 0
@@ -90,7 +101,7 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span>{sportIcon}</span>
+            <span className="text-[10px] font-mono font-bold text-slate-500 bg-night-800 border border-night-700 px-1.5 py-0.5 rounded">{sportAbbr}</span>
             <span className="text-sm font-semibold text-white truncate">{opp.event_name}</span>
           </div>
           <div className="text-xs text-gray-400 mt-0.5">
@@ -180,18 +191,20 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
       {opp.status !== 'converted_to_decision' && (
         <div className="flex gap-2 pt-1 border-t border-gray-800">
           <button
-            className="btn-primary flex-1 text-sm py-1.5"
+            className="btn-primary flex-1 text-sm py-1.5 flex items-center justify-center gap-1.5"
             onClick={onAnalyse}
             disabled={actionBusy}
           >
-            🔍 Analyse →
+            <Search size={13} strokeWidth={2} />
+            Analyse
           </button>
           <button
-            className="flex-1 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-blue-400 text-sm font-medium border border-gray-700 transition-colors disabled:opacity-50"
+            className="flex-1 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-blue-400 text-sm font-medium border border-gray-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
             onClick={onWatch}
             disabled={actionBusy || opp.status === 'watchlisted'}
           >
-            {opp.status === 'watchlisted' ? '👁 Watching' : '👁 Watchlist'}
+            <Eye size={13} strokeWidth={2} />
+            {opp.status === 'watchlisted' ? 'Watching' : 'Watchlist'}
           </button>
           <button
             className="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-500 text-sm border border-gray-700 transition-colors disabled:opacity-50"
@@ -199,7 +212,7 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
             disabled={actionBusy}
             title="Dismiss"
           >
-            ✕
+            <X size={13} strokeWidth={2} />
           </button>
         </div>
       )}
@@ -357,7 +370,6 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-night-700 bg-night-800 text-xs text-slate-300 hover:border-amber-700/40 hover:text-white transition-colors"
                 >
-                  <span>{preset.icon}</span>
                   <span>{preset.label}</span>
                 </button>
               ))}
@@ -379,7 +391,7 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
                     : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
                 }`}
               >
-                {s.icon} {s.label}
+                {s.label}
               </button>
             ))}
           </div>
@@ -434,22 +446,29 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
 
         {/* Submit */}
         <button
-          className="btn-primary"
+          className="btn-primary flex items-center justify-center gap-2"
           onClick={handleScout}
           disabled={loading}
         >
           {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="animate-spin">⏳</span> Scouting…
-            </span>
-          ) : '🔍 Run Scout'}
+            <>
+              <Loader2 size={14} className="animate-spin" />
+              Scouting…
+            </>
+          ) : (
+            <>
+              <Search size={14} strokeWidth={2} />
+              Run Scout
+            </>
+          )}
         </button>
       </div>
 
       {/* ── Disclaimer ─────────────────────────────────────── */}
       {disclaimer && (
-        <p className="text-xs text-gray-500 border border-gray-800 rounded-lg px-3 py-2 leading-relaxed">
-          ⚠️ {disclaimer}
+        <p className="text-xs text-gray-500 border border-gray-800 rounded-lg px-3 py-2 leading-relaxed flex items-start gap-2">
+          <AlertTriangle size={12} className="shrink-0 mt-0.5 text-amber-500/60" />
+          {disclaimer}
         </p>
       )}
 
@@ -472,7 +491,7 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
         </div>
       ) : !loading && (
         <div className="card flex flex-col items-center gap-3 py-10 text-center">
-          <span className="text-3xl">🔍</span>
+          <Search size={28} strokeWidth={1.25} className="text-slate-600" />
           <p className="text-sm font-medium text-gray-400">No scouted opportunities yet</p>
           <p className="text-xs text-gray-600">Run Scout to find markets worth analysing.</p>
         </div>

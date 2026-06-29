@@ -217,7 +217,7 @@ export default function NewBetPage() {
           <div className="text-sm text-gray-300">{scanMsg}</div>
         ) : (
           <div>
-            <div className="text-2xl mb-1">📸</div>
+            <div className="flex justify-center mb-1 text-gray-500 text-sm uppercase tracking-widest font-mono">SCAN</div>
             <p className="text-sm text-gray-400 font-medium">Paste screenshot (Ctrl+V) or click to upload</p>
             <p className="text-xs text-gray-600 mt-0.5">Coupon will be scanned automatically</p>
           </div>

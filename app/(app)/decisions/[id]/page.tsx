@@ -52,9 +52,9 @@ const ACTION_CONFIG: Record<string, { label: string; color: string }> = {
   ignored:     { label: 'Ignored',     color: 'text-gray-600' },
 }
 
-const SPORT_ICONS: Record<string, string> = {
-  soccer: '⚽', tennis: '🎾', basketball: '🏀',
-  ice_hockey: '🏒', cs2: '🎯', mma: '🥊', other: '🏅',
+const SPORT_ABBR: Record<string, string> = {
+  soccer: 'SOCC', tennis: 'TEN', basketball: 'BASK',
+  ice_hockey: 'HOC', cs2: 'CS2', mma: 'MMA', other: 'OTH',
 }
 
 function ScoreBar({ score }: { score: number }) {
@@ -109,7 +109,7 @@ export default async function DecisionDetailPage({
   const rec    = d.recommendation ? REC_CONFIG[d.recommendation]   : null
   const risk   = d.risk_level     ? RISK_CONFIG[d.risk_level]      : null
   const action = ACTION_CONFIG[d.final_action] ?? ACTION_CONFIG.pending
-  const sportIcon = SPORT_ICONS[d.sport ?? ''] ?? '🏅'
+  const sportAbbr = SPORT_ABBR[d.sport ?? ''] ?? 'OTH'
   const linkedBet = d.bet_legs?.[0]?.bets ?? null
 
   const date = new Date(d.created_at).toLocaleDateString('en-GB', {
@@ -126,7 +126,7 @@ export default async function DecisionDetailPage({
 
       {/* Header */}
       <div className="flex items-start gap-3">
-        <span className="text-3xl">{sportIcon}</span>
+        <span className="text-[11px] font-mono font-bold text-slate-500 bg-night-800 border border-night-700 px-1.5 py-0.5 rounded self-start mt-1">{sportAbbr}</span>
         <div>
           <h1 className="text-xl font-bold text-white leading-tight">{d.event_name}</h1>
           <p className="text-sm text-gray-500 mt-0.5">

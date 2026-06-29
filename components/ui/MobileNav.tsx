@@ -2,21 +2,23 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import type { LucideIcon } from 'lucide-react'
+import { LayoutDashboard, Bot, Search, Target, TrendingUp } from 'lucide-react'
 
-const NAV = [
-  { href: '/dashboard', icon: '📊', label: 'Home' },
-  { href: '/ai',        icon: '🤖', label: 'AI' },
-  { href: '/scout',     icon: '🔍', label: 'Scout' },
-  { href: '/bets',      icon: '🎯', label: 'Bets' },
-  { href: '/analytics', icon: '📈', label: 'Stats' },
+const NAV: { href: string; Icon: LucideIcon; label: string }[] = [
+  { href: '/dashboard', Icon: LayoutDashboard, label: 'Home' },
+  { href: '/ai',        Icon: Bot,             label: 'AI' },
+  { href: '/scout',     Icon: Search,          label: 'Scout' },
+  { href: '/bets',      Icon: Target,          label: 'Bets' },
+  { href: '/analytics', Icon: TrendingUp,      label: 'Stats' },
 ]
 
 export default function MobileNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-night-900 border-t border-night-700 flex md:hidden">
-      {NAV.map(({ href, icon, label }) => {
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-night-700 flex md:hidden" style={{ background: 'var(--surface-1)' }}>
+      {NAV.map(({ href, Icon, label }) => {
         const active = pathname === href || pathname.startsWith(href + '/')
         return (
           <Link
@@ -26,7 +28,7 @@ export default function MobileNav() {
               active ? 'text-amber-400' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <span className="text-lg leading-none">{icon}</span>
+            <Icon size={20} strokeWidth={1.75} />
             <span className="text-[10px] font-medium">{label}</span>
           </Link>
         )
