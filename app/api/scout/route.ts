@@ -15,6 +15,28 @@ const RATE_LIMIT_PER_DAY    = 15
 const TIMEOUT_WITH_WEB_SEARCH_MS    = 55_000
 const TIMEOUT_WITHOUT_WEB_SEARCH_MS = 55_000
 
+function extractJsonObject(rawText: string): string {
+  const text = rawText
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim()
+
+  let i = text.indexOf('{')
+  while (i !== -1) {
+    const end = text.lastIndexOf('}')
+    if (end > i) {
+      try {
+        JSON.parse(text.slice(i, end + 1))
+        return text.slice(i, end + 1).trim()
+      } catch {}
+    }
+    i = text.indexOf('{', i + 1)
+  }
+
+  throw new Error('no_json_found')
+}
+
 function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
   const now = Date.now()
   const minuteWindow = 60_000
@@ -390,12 +412,7 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
     // 6. Parse + validate output
     let scoutRaw: unknown
     try {
-      const start = rawText.indexOf('{')
-      const end = rawText.lastIndexOf('}')
-      if (start === -1 || end === -1 || end <= start) {
-        throw new Error('no_json_found')
-      }
-      const clean = rawText.slice(start, end + 1).trim()
+      const clean = extractJsonObject(rawText)
       scoutRaw = JSON.parse(clean)
     } catch {
       await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, { sport: input.sport, error_type: 'anthropic_invalid_json', output_language: input.output_language })
