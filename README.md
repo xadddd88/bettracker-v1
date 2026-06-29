@@ -1,6 +1,6 @@
 # BetTracker v1
 
-Intelligent analytics platform for bettors. Production: https://btdk.app
+Intelligent analytics platform for bettors. Production: https://btdk.app — preview deploys active
 
 ## Stack
 - **Next.js 15** (App Router)
