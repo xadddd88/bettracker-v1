@@ -195,6 +195,7 @@ export interface MarketOpportunity {
   data_quality_score?: number
   risk_level?: 'low' | 'medium' | 'high'
   status: OpportunityStatus
+  match_date?: string
   reasoning: string
   required_checks?: string[]
   linked_decision_id?: string

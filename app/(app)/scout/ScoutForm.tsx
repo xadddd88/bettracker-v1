@@ -60,6 +60,12 @@ function scoreStyle(score: number): string {
   return 'text-gray-400 bg-gray-800/40 border-gray-700'
 }
 
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+function fmtMatchDate(d: string): string {
+  const parts = d.split('-')
+  return `${parseInt(parts[2])} ${MONTHS[parseInt(parts[1]) - 1]}`
+}
+
 // ─── Opportunity card ─────────────────────────────────────────
 interface CardProps {
   opp:        MarketOpportunity
@@ -123,6 +129,14 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
             <span className="text-gray-700">·</span>
             <span className="text-[11px] text-gray-500">
               Model {opp.model_probability.toFixed(1)}%
+            </span>
+          </>
+        )}
+        {opp.match_date && (
+          <>
+            <span className="text-gray-700">·</span>
+            <span className="text-[11px] text-gray-500">
+              {fmtMatchDate(opp.match_date)}
             </span>
           </>
         )}
