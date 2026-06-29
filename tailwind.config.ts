@@ -8,10 +8,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        brand: {
-          DEFAULT: '#6366f1',
-          dark: '#4f46e5',
+        night: {
+          950: '#070D1B',
+          900: '#0C1424',
+          800: '#132033',
+          700: '#1D2F4A',
         },
+        brand: {
+          DEFAULT: '#F59E0B',
+          dark: '#D97706',
+        },
+      },
+      fontFamily: {
+        display: ['var(--font-space-grotesk)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-jetbrains-mono)', 'Menlo', 'monospace'],
       },
     },
   },

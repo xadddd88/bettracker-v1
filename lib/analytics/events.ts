@@ -43,6 +43,12 @@ export const EVENTS = {
   OPPORTUNITY_WATCHLISTED:   'opportunity_watchlisted',
   OPPORTUNITY_DISMISSED:     'opportunity_dismissed',
 
+  // Beta signup
+  BETA_SIGNUP_ATTEMPTED: 'beta_signup_attempted',
+  BETA_SIGNUP_ALLOWED:   'beta_signup_allowed',
+  BETA_SIGNUP_BLOCKED:   'beta_signup_blocked',
+  BETA_SIGNUP_COMPLETED: 'beta_signup_completed',
+
   // Coach
   COACH_STARTED:     'coach_started',
   COACH_COMPLETED:   'coach_completed',

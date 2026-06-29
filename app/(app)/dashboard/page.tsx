@@ -30,7 +30,6 @@ export default async function DashboardPage() {
 
   const bets: Bet[] = betsData || []
 
-  // Sprint 3 metrics
   const wonBets     = bets.filter(b => b.status === 'won')
   const lostBets    = bets.filter(b => b.status === 'lost')
   const pendingBets = bets.filter(b => b.status === 'pending')
@@ -65,7 +64,7 @@ export default async function DashboardPage() {
       color: settledBets.length > 0 ? (netProfit >= 0 ? 'text-green-400' : 'text-red-400') : '',
     },
     {
-      label: 'Pending Stake',
+      label: 'Pending',
       value: `${sym}${pendingStake.toFixed(2)}`,
       color: '',
     },
@@ -74,23 +73,28 @@ export default async function DashboardPage() {
   const recent = bets.slice(0, 6)
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <PageView event={EVENTS.DASHBOARD_VIEWED} props={{ bet_count: bets.length }} />
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-1">{bets.length} bets tracked · {watchlistCount || 0} on watchlist</p>
+          <h1 className="text-2xl font-bold text-white font-display">Dashboard</h1>
+          <p className="text-xs text-slate-500 mt-1">
+            {bets.length} bets tracked · {watchlistCount || 0} on watchlist
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Link href="/ai" className="btn-ghost text-sm">🤖 Analyze</Link>
+        <div className="flex gap-2 shrink-0">
+          <Link href="/ai" className="btn-ghost text-sm">Analyze</Link>
           <Link href="/bets/new" className="btn-primary text-sm">+ Add Bet</Link>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <BankrollWidget balance={bankroll?.balance || 0} sym={sym} />
+      {/* Balance hero */}
+      <BankrollWidget balance={bankroll?.balance || 0} sym={sym} />
+
+      {/* Secondary stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {statCards.map(({ label, value, color }) => (
           <div key={label} className="stat-card">
             <div className="stat-label">{label}</div>
@@ -102,41 +106,50 @@ export default async function DashboardPage() {
       {/* Recent bets */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-white">Recent Bets</h2>
-          <Link href="/bets" className="text-xs text-indigo-400 hover:text-indigo-300">View all →</Link>
+          <h2 className="font-semibold text-white font-display">Recent Bets</h2>
+          <Link href="/bets" className="text-xs text-amber-400 hover:text-amber-300 transition-colors">
+            View all →
+          </Link>
         </div>
 
         {recent.length === 0 ? (
-          <div className="text-center py-10">
-            <div className="text-3xl mb-2">🎯</div>
-            <p className="text-gray-500 text-sm mb-4">No bets yet. Start by analyzing a match.</p>
+          <div className="text-center py-12">
+            <p className="text-slate-500 text-sm mb-4">No bets tracked yet. Start by analyzing a match.</p>
             <div className="flex gap-3 justify-center">
-              <Link href="/ai" className="btn-ghost text-sm">🤖 Analyze match</Link>
+              <Link href="/ai" className="btn-ghost text-sm">Analyze match</Link>
               <Link href="/bets/new" className="btn-primary text-sm">Quick add</Link>
             </div>
           </div>
         ) : (
-          <div className="flex flex-col divide-y divide-gray-800">
+          <div className="flex flex-col divide-y divide-night-700/60">
             {recent.map((bet) => {
               const leg = bet.legs?.[0]
               const multiLeg = (bet.legs?.length || 0) > 1
               return (
-                <Link key={bet.id} href={`/bets/${bet.id}`} className="flex items-center gap-3 py-3 hover:opacity-80 transition-opacity">
+                <Link
+                  key={bet.id}
+                  href={`/bets/${bet.id}`}
+                  className="flex items-center gap-3 py-3 hover:opacity-75 transition-opacity"
+                >
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-white truncate">
                       {multiLeg ? `Express (${bet.legs!.length} events)` : leg?.event_name || '—'}
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {multiLeg ? bet.legs!.map(l => l.selection || l.market_type).join(' · ') : (leg?.market_type || '—')}
-                      {leg && !multiLeg && ` · @${leg.odds.toFixed(2)}`}
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      {multiLeg
+                        ? bet.legs!.map(l => l.selection || l.market_type).join(' · ')
+                        : (leg?.market_type || '—')}
+                      {leg && !multiLeg && (
+                        <span className="font-mono"> @{leg.odds.toFixed(2)}</span>
+                      )}
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <div className="text-xs text-gray-400">{sym}{bet.stake}</div>
+                    <div className="text-xs text-slate-400 font-mono">{sym}{bet.stake}</div>
                     <StatusBadge status={bet.status} />
                   </div>
                   {bet.pnl != null && (
-                    <div className={`text-sm font-semibold w-16 text-right ${bet.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    <div className={`text-sm font-semibold font-mono w-16 text-right ${bet.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                       {bet.pnl >= 0 ? '+' : ''}{sym}{bet.pnl.toFixed(2)}
                     </div>
                   )}
@@ -152,11 +165,11 @@ export default async function DashboardPage() {
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    won:    'text-green-400',
-    lost:   'text-red-400',
-    pending:'text-yellow-400',
-    void:   'text-gray-500',
-    push:   'text-blue-400',
+    won:     'text-green-400',
+    lost:    'text-red-400',
+    pending: 'text-violet-400',
+    void:    'text-slate-500',
+    push:    'text-blue-400',
   }
-  return <span className={`text-xs capitalize ${styles[status] || 'text-gray-400'}`}>{status}</span>
+  return <span className={`text-xs capitalize ${styles[status] || 'text-slate-400'}`}>{status}</span>
 }
