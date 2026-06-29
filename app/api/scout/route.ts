@@ -63,7 +63,7 @@ function classifyAnthropicError(err: unknown): ClassifiedError {
       message: 'Scout is temporarily unavailable due to high demand. Please try again in a few minutes.',
     }
   }
-  if (err instanceof Anthropic.APIStatusError && err.status === 529) {
+  if (err instanceof Anthropic.InternalServerError && err.status === 529) {
     return {
       type: 'anthropic_overloaded',
       status: 503,
@@ -359,7 +359,7 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
 
     // Extract last text block (web search may produce multiple content blocks)
     const rawText = message.content
-      .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
       .map(b => b.text)
       .at(-1) ?? ''
 
