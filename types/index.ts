@@ -25,6 +25,8 @@ export interface Profile {
   kelly_fraction: number
   web_search_enabled: boolean
   timezone: string
+  onboarding_completed?: boolean
+  onboarding_stage?:     string
   created_at: string
   updated_at: string
 }
@@ -230,6 +232,18 @@ export interface CoachingSession {
   model_name?:          string
   disclaimer?:          string
   created_at:           string
+}
+
+// ─── BETA FEEDBACK ──────────────────────────────────────────
+export type FeedbackCategory = 'bug' | 'suggestion' | 'general' | 'praise'
+
+export interface BetaFeedback {
+  id:         string
+  user_id:    string
+  rating:     number
+  category:   FeedbackCategory
+  message?:   string
+  created_at: string
 }
 
 // ─── UI HELPERS ─────────────────────────────────────────────

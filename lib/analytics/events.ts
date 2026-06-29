@@ -67,6 +67,17 @@ export const EVENTS = {
   RISK_PLACE_ANYWAY_CLICKED: 'risk_place_anyway_clicked',
   RISK_STAKE_ADJUSTED:       'risk_stake_adjusted',
 
+  // Onboarding
+  ONBOARDING_VIEWED:    'onboarding_viewed',
+  ONBOARDING_COMPLETED: 'onboarding_completed',
+
+  // Dashboard next action
+  NEXT_ACTION_CLICKED:  'next_action_clicked',
+
+  // Beta feedback
+  BETA_FEEDBACK_OPENED:    'beta_feedback_opened',
+  BETA_FEEDBACK_SUBMITTED: 'beta_feedback_submitted',
+
   // Settings
   SETTINGS_PAGE_VIEWED: 'settings_page_viewed',
   SETTINGS_SAVED:       'settings_saved',
