@@ -200,7 +200,7 @@ function getScoutSportModule(sport: string): string {
 function buildScoutSystemPrompt(sport: string, outputLanguage: string, webSearchEnabled: boolean): string {
   const langInstruction = outputLanguage === 'auto'
     ? 'Respond in the same language the user writes in. If unclear, use English.'
-    : `All user-facing text (reasoning, required_checks, disclaimer) must be in: ${outputLanguage}.`
+    : `All user-facing text (reasoning, required_checks, disclaimer) must be in: ${outputLanguage}. JSON field names and enum values (opportunity_type, risk_level, and all other keys) must remain in English exactly as specified — do not translate them.`
 
   const dataDisclaimer = webSearchEnabled
     ? ''
