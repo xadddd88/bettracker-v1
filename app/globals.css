@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Design tokens ──────────────────────────────────────────── */
+:root {
+  --font-sans:  var(--font-geist), -apple-system, 'Helvetica Neue', sans-serif;
+  --font-mono:  var(--font-geist-mono), 'SF Mono', monospace;
+
+  /* Backgrounds */
+  --bg-base:     #080b12;
+  --bg-surface:  #0e1420;
+  --bg-elevated: #141c2e;
+
+  /* Borders */
+  --border:       rgba(255,255,255,0.07);
+  --border-muted: rgba(255,255,255,0.04);
+
+  /* Text */
+  --text-primary:  #edf2f7;
+  --text-muted:    #8896ae;
+  --text-faint:    #4a5568;
+
+  /* Brand */
+  --accent:      #3e7bfa;
+  --accent-glow: rgba(62,123,250,0.12);
+
+  /* Semantic */
+  --win:     #10b981;
+  --loss:    #ef4444;
+  --warning: #f59e0b;
+
+  /* Pulse — overridden per event by PulseProvider */
+  --pulse-primary:   #3e7bfa;
+  --pulse-secondary: rgba(62,123,250,0.15);
+  --pulse-gradient:  radial-gradient(ellipse 80% 60% at 50% -10%, rgba(62,123,250,0.1) 0%, transparent 70%);
+  --pulse-text:      #3e7bfa;
+}
+
+/* ─── Base ────────────────────────�
