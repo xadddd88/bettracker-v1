@@ -120,8 +120,8 @@ export default async function DecisionDetailPage({
     <div className="max-w-2xl flex flex-col gap-5">
       <PageView event={EVENTS.DECISION_DETAIL_VIEWED} props={{ sport: d.sport, final_action: d.final_action }} />
       {/* Back */}
-      <Link href="/bets" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">
-        ← Back to Bets
+      <Link href="/decisions" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">
+        ← Back to Decisions
       </Link>
 
       {/* Header */}
