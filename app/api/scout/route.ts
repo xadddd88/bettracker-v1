@@ -16,20 +16,25 @@ const TIMEOUT_WITH_WEB_SEARCH_MS    = 55_000
 const TIMEOUT_WITHOUT_WEB_SEARCH_MS = 55_000
 
 function extractJsonObject(rawText: string): string {
-  const withoutFence = rawText
+  const text = rawText
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
     .replace(/```\s*$/i, '')
     .trim()
 
-  const start = withoutFence.indexOf('{')
-  const end = withoutFence.lastIndexOf('}')
-
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error('no_json_found')
+  let i = text.indexOf('{')
+  while (i !== -1) {
+    const end = text.lastIndexOf('}')
+    if (end > i) {
+      try {
+        JSON.parse(text.slice(i, end + 1))
+        return text.slice(i, end + 1).trim()
+      } catch {}
+    }
+    i = text.indexOf('{', i + 1)
   }
 
-  return withoutFence.slice(start, end + 1).trim()
+  throw new Error('no_json_found')
 }
 
 function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
