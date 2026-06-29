@@ -18,7 +18,7 @@ interface Props {
   stake:         number
   decisionId?:   string
   fromPage:      string
-  onConfirm:     () => void
+  onConfirm:     () => Promise<void> | void
   onAdjustStake: () => void
 }
 
@@ -34,6 +34,21 @@ export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, 
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState('')
   const [confirming, setConfirming] = useState(false)
+
+  async function handleConfirm(riskLevel?: string) {
+    if (confirming) return
+    setConfirming(true)
+    trackClientEvent(EVENTS.RISK_PLACE_ANYWAY_CLICKED, {
+      risk_level:   riskLevel ?? 'unavailable',
+      from_page:    fromPage,
+      has_warnings: result ? result.warnings.length > 0 : false,
+    })
+    try {
+      await onConfirm()
+    } finally {
+      setConfirming(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -93,8 +108,8 @@ export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, 
           >
             Adjust Stake
           </button>
-          <button className="btn-primary flex-1" onClick={onConfirm} disabled={confirming}>
-            Place Bet
+          <button className="btn-primary flex-1" onClick={() => handleConfirm()} disabled={confirming}>
+            {confirming ? '…' : 'Place Bet'}
           </button>
         </div>
       </div>
@@ -174,16 +189,7 @@ export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, 
         <button
           className="flex-1 btn-primary"
           disabled={confirming}
-          onClick={() => {
-            if (confirming) return
-            setConfirming(true)
-            trackClientEvent(EVENTS.RISK_PLACE_ANYWAY_CLICKED, {
-              risk_level:   result.risk_level,
-              from_page:    fromPage,
-              has_warnings: hasWarnings,
-            })
-            onConfirm()
-          }}
+          onClick={() => handleConfirm(result.risk_level)}
         >
           {confirming ? '…' : 'Place anyway'}
         </button>

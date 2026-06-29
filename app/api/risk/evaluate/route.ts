@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     })
 
   } catch (err: unknown) {
-    console.error('[risk/evaluate] unhandled error', err)
+    console.error('[risk/evaluate] unhandled error:', err instanceof Error ? err.name : 'unknown')
     return NextResponse.json({ success: false, error: 'Internal error' }, { status: 500 })
   }
 }
