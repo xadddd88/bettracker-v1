@@ -12,8 +12,8 @@ const rateLimitStore = new Map<string, { minute: number; day: number; minuteTs: 
 const RATE_LIMIT_PER_MINUTE = 3
 const RATE_LIMIT_PER_DAY    = 15
 
-const TIMEOUT_WITH_WEB_SEARCH_MS    = 45_000
-const TIMEOUT_WITHOUT_WEB_SEARCH_MS = 25_000
+const TIMEOUT_WITH_WEB_SEARCH_MS    = 55_000
+const TIMEOUT_WITHOUT_WEB_SEARCH_MS = 55_000
 
 function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
   const now = Date.now()
@@ -87,7 +87,16 @@ function classifyAnthropicError(err: unknown): ClassifiedError {
       message: 'Unable to reach Scout provider. Please try again.',
     }
   }
+  if (err instanceof Anthropic.AuthenticationError) {
+    console.error('[scout] anthropic auth error:', err.status, err.message)
+    return {
+      type: 'anthropic_provider_error',
+      status: 502,
+      message: 'Scout is temporarily unavailable. Please try again.',
+    }
+  }
   if (err instanceof Anthropic.APIError) {
+    console.error('[scout] anthropic api error:', err.status, err.message)
     return {
       type: 'anthropic_provider_error',
       status: 502,
