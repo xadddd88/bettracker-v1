@@ -243,6 +243,8 @@ Do not write introductory sentences, summaries, or explanations.
 The first character of your response must be { and the last must be }.
 This applies regardless of the output language.
 
+CRITICAL — ENUM VALUES: opportunity_type MUST be exactly one of: "value", "contrarian", "pattern", "general". risk_level MUST be exactly one of: "low", "medium", "high". These are code values — do NOT translate them into any language.
+
 Return ONLY a valid JSON object (no markdown, no explanation outside JSON):
 {
   "candidates": [
@@ -252,13 +254,13 @@ Return ONLY a valid JSON object (no markdown, no explanation outside JSON):
       "selection": <string or null — which side/outcome>,
       "match_date": <YYYY-MM-DD string or null — the date this event takes place, if known>,
       "offered_odds": <number or null — if known>,
-      "opportunity_type": <"value" | "contrarian" | "pattern" | "general">,
+      "opportunity_type": <MUST be exactly one of: "value" | "contrarian" | "pattern" | "general" — do NOT translate>,
       "scout_score": <integer 0–100 — research worthiness, NOT win probability>,
       "model_probability": <number 0–100 — your probability estimate for this selection>,
       "implied_probability": <number or null — from offered_odds if available>,
       "edge_percent": <number or null — model_probability minus implied_probability>,
       "confidence_score": <integer 0–100 — your confidence in this analysis quality>,
-      "risk_level": <"low" | "medium" | "high">,
+      "risk_level": <MUST be exactly one of: "low" | "medium" | "high" — do NOT translate>,
       "reasoning": <string — 2–3 sentences explaining why this market is worth researching>,
       "required_checks": [<string — specific action user must take before betting>]
     }
