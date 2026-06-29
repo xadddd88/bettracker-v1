@@ -12,6 +12,9 @@ const rateLimitStore = new Map<string, { minute: number; day: number; minuteTs: 
 const RATE_LIMIT_PER_MINUTE = 3
 const RATE_LIMIT_PER_DAY    = 15
 
+const TIMEOUT_WITH_WEB_SEARCH_MS    = 45_000
+const TIMEOUT_WITHOUT_WEB_SEARCH_MS = 25_000
+
 function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
   const now = Date.now()
   const minuteWindow = 60_000
@@ -38,9 +41,79 @@ function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number
   return { allowed: true }
 }
 
+// ─── Error taxonomy ───────────────────────────────────────────
+type ScoutErrorType =
+  | 'anthropic_rate_limited'
+  | 'anthropic_overloaded'
+  | 'anthropic_timeout'
+  | 'anthropic_network'
+  | 'anthropic_invalid_json'
+  | 'anthropic_schema_mismatch'
+  | 'anthropic_provider_error'
+  | 'persist'
+  | 'unknown'
+
+type ClassifiedError = { type: ScoutErrorType; status: number; message: string }
+
+function classifyAnthropicError(err: unknown): ClassifiedError {
+  if (err instanceof Anthropic.RateLimitError) {
+    return {
+      type: 'anthropic_rate_limited',
+      status: 429,
+      message: 'Scout is temporarily unavailable due to high demand. Please try again in a few minutes.',
+    }
+  }
+  if (err instanceof Anthropic.InternalServerError && err.status === 529) {
+    return {
+      type: 'anthropic_overloaded',
+      status: 503,
+      message: 'Scout is temporarily unavailable. Please try again shortly.',
+    }
+  }
+  if (
+    err instanceof Anthropic.APIConnectionTimeoutError ||
+    (err instanceof Error && err.name === 'AbortError')
+  ) {
+    return {
+      type: 'anthropic_timeout',
+      status: 504,
+      message: 'Scout took too long to respond. Please try again.',
+    }
+  }
+  if (err instanceof Anthropic.APIConnectionError) {
+    return {
+      type: 'anthropic_network',
+      status: 503,
+      message: 'Unable to reach Scout provider. Please try again.',
+    }
+  }
+  if (err instanceof Anthropic.APIError) {
+    return {
+      type: 'anthropic_provider_error',
+      status: 502,
+      message: 'Scout is temporarily unavailable. Please try again.',
+    }
+  }
+  return { type: 'unknown', status: 500, message: 'Internal error' }
+}
+
+// ─── Claude call with AbortController timeout ─────────────────
+async function callClaudeWithTimeout(
+  fn: (signal: AbortSignal) => Promise<Anthropic.Message>,
+  timeoutMs: number,
+): Promise<Anthropic.Message> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fn(controller.signal)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 // ─── Zod schemas ─────────────────────────────────────────────
-const SPORTS   = ['tennis', 'soccer', 'cs2', 'basketball', 'ice_hockey', 'mma', 'other'] as const
-const LOCALES  = ['auto', 'uk', 'ru', 'en', 'es', 'fr', 'de', 'ar'] as const
+const SPORTS     = ['tennis', 'soccer', 'cs2', 'basketball', 'ice_hockey', 'mma', 'other'] as const
+const LOCALES    = ['auto', 'uk', 'ru', 'en', 'es', 'fr', 'de', 'ar'] as const
 const TIMEFRAMES = ['today', 'tomorrow', 'this_week', 'custom'] as const
 
 const requestSchema = z.object({
@@ -71,7 +144,7 @@ const scoutOutputSchema = z.object({
   disclaimer:  z.string().min(10),
 })
 
-// ─── Sport module (concise — Scout needs discovery context, not deep eval) ──
+// ─── Sport module ─────────────────────────────────────────────
 function getScoutSportModule(sport: string): string {
   switch (sport) {
     case 'tennis':
@@ -165,25 +238,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 2. Rate limit
-    const rl = checkRateLimit(user.id)
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { success: false, error: 'Rate limit exceeded. Try again later.' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
-      )
-    }
-
-    // 3. Parse + validate input
+    // 2. Parse + validate input (before rate-limit so sport is available for analytics)
     const body = await req.json()
     const parsed = requestSchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json(
         { success: false, error: 'Invalid input', details: parsed.error.flatten() },
-        { status: 400 }
+        { status: 400 },
       )
     }
     const input = parsed.data
+
+    // 3. Rate limit
+    const rl = checkRateLimit(user.id)
+    if (!rl.allowed) {
+      await trackServerEvent(user.id, EVENTS.SCOUT_RATE_LIMITED, {
+        sport:       input.sport,
+        retry_after: rl.retryAfter,
+      })
+      return NextResponse.json(
+        { success: false, error: 'Rate limit exceeded. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
+      )
+    }
 
     const globalWebSearchEnabled = process.env.ANTHROPIC_WEB_SEARCH_ENABLED === 'true'
     const profileRes = await supabase.from('profiles').select('web_search_enabled').eq('id', user.id).single()
@@ -197,8 +274,6 @@ export async function POST(req: NextRequest) {
     })
 
     // 4. Build prompt
-    const systemPrompt = buildScoutSystemPrompt(input.sport, input.output_language, webSearchEnabled)
-
     const TIMEFRAME_LABEL: Record<string, string> = {
       today:     'today',
       tomorrow:  'tomorrow',
@@ -212,30 +287,84 @@ Context: ${input.context}
 
 Return 1–5 research candidates as JSON only. No markdown, no explanation outside the JSON.`
 
-    // 5. Claude call
+    // 5. Claude call with timeout and optional web search fallback
     const model = process.env.ANTHROPIC_MODEL_SCOUT ?? process.env.ANTHROPIC_MODEL_ANALYST ?? 'claude-sonnet-4-6'
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const createParams: any = {
-      model,
-      max_tokens: 2000,
-      messages: [{ role: 'user', content: userMessage }],
-      system: systemPrompt,
-    }
-    if (webSearchEnabled) {
-      createParams.tools = [{ type: 'web_search_20250305', name: 'web_search' }]
+    const buildCallParams = (withWebSearch: boolean) => {
+      const tools = withWebSearch
+        ? ([{ type: 'web_search_20250305', name: 'web_search' }] as unknown as Anthropic.Tool[])
+        : []
+      return {
+        model,
+        max_tokens: 2_000,
+        system: buildScoutSystemPrompt(input.sport, input.output_language, withWebSearch),
+        messages: [{ role: 'user' as const, content: userMessage }],
+        ...(tools.length > 0 && { tools }),
+      }
     }
 
-    const message = await anthropic.messages.create(createParams)
+    let message!: Anthropic.Message
+    let webSearchActuallyUsed = false
+    let fallbackUsed = false
+
+    try {
+      message = await callClaudeWithTimeout(
+        (signal) => anthropic.messages.create(buildCallParams(webSearchEnabled), { signal }) as Promise<Anthropic.Message>,
+        webSearchEnabled ? TIMEOUT_WITH_WEB_SEARCH_MS : TIMEOUT_WITHOUT_WEB_SEARCH_MS,
+      )
+      webSearchActuallyUsed = webSearchEnabled && message.content.some(b => b.type !== 'text')
+    } catch (err) {
+      if (webSearchEnabled) {
+        const firstError = classifyAnthropicError(err)
+        console.warn('[scout] web-search call failed, attempting fallback without web search:', firstError.type)
+
+        await trackServerEvent(user.id, EVENTS.SCOUT_WEB_SEARCH_FALLBACK, {
+          sport:          input.sport,
+          original_error: firstError.type,
+        })
+
+        try {
+          message = await callClaudeWithTimeout(
+            (signal) => anthropic.messages.create(buildCallParams(false), { signal }) as Promise<Anthropic.Message>,
+            TIMEOUT_WITHOUT_WEB_SEARCH_MS,
+          )
+          webSearchActuallyUsed = false
+          fallbackUsed = true
+        } catch (fallbackErr) {
+          const fallbackError = classifyAnthropicError(fallbackErr)
+          console.error('[scout] fallback also failed:', fallbackError.type)
+          await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, {
+            sport:              input.sport,
+            error_type:         fallbackError.type,
+            fallback_attempted: true,
+            original_error:     firstError.type,
+            fallback_error:     fallbackError.type,
+          })
+          return NextResponse.json(
+            { success: false, error: 'Scout is temporarily unavailable. Please try again.' },
+            { status: fallbackError.status },
+          )
+        }
+      } else {
+        const classified = classifyAnthropicError(err)
+        console.error('[scout] call failed:', classified.type)
+        await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, {
+          sport:      input.sport,
+          error_type: classified.type,
+        })
+        return NextResponse.json(
+          { success: false, error: classified.message },
+          { status: classified.status },
+        )
+      }
+    }
 
     // Extract last text block (web search may produce multiple content blocks)
     const rawText = message.content
-      .filter(b => b.type === 'text')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map(b => (b as any).text as string)
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map(b => b.text)
       .at(-1) ?? ''
-    const webSearchActuallyUsed = webSearchEnabled && message.content.some(b => b.type !== 'text')
 
     // 6. Parse + validate output
     let scoutRaw: unknown
@@ -243,19 +372,19 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
       const clean = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim()
       scoutRaw = JSON.parse(clean)
     } catch {
-      await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, { sport: input.sport, error_type: 'ai_parse' })
+      await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, { sport: input.sport, error_type: 'anthropic_invalid_json' })
       return NextResponse.json(
         { success: false, error: 'Scout returned invalid JSON. Please try again.' },
-        { status: 502 }
+        { status: 502 },
       )
     }
 
     const validated = scoutOutputSchema.safeParse(scoutRaw)
     if (!validated.success) {
-      await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, { sport: input.sport, error_type: 'ai_schema' })
+      await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, { sport: input.sport, error_type: 'anthropic_schema_mismatch' })
       return NextResponse.json(
         { success: false, error: 'Scout output did not match expected schema. Please try again.' },
-        { status: 502 }
+        { status: 502 },
       )
     }
 
@@ -305,7 +434,7 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
       await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, { sport: input.sport, error_type: 'persist' })
       return NextResponse.json(
         { success: false, error: `Scout succeeded but failed to persist: ${insertErr.message}` },
-        { status: 500 }
+        { status: 500 },
       )
     }
 
@@ -313,21 +442,27 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
       sport:           input.sport,
       candidate_count: inserted?.length ?? 0,
       web_search_used: webSearchActuallyUsed,
+      fallback_used:   fallbackUsed,
       score_buckets:   rows.map(r => bucketScoutScore(r.scout_score ?? 0)),
     })
+
+    const fallbackLimitation = 'Live web-search context was unavailable, so Scout used limited-data mode. Verify current odds, injuries/news, line movement, and recent form before making any decision.'
+    const responseDisclaimer = fallbackUsed
+      ? `${validated.data.disclaimer}\n\n${fallbackLimitation}`
+      : validated.data.disclaimer
 
     return NextResponse.json({
       success: true,
       data: {
         opportunities:   inserted ?? [],
         web_search_used: webSearchActuallyUsed,
-        disclaimer:      validated.data.disclaimer,
+        fallback_used:   fallbackUsed,
+        disclaimer:      responseDisclaimer,
       },
     })
 
   } catch (err: unknown) {
-    console.error('[scout]', err)
-    const msg = err instanceof Error ? err.message : 'Internal error'
-    return NextResponse.json({ success: false, error: msg }, { status: 500 })
+    console.error('[scout] unhandled error', err)
+    return NextResponse.json({ success: false, error: 'Internal error' }, { status: 500 })
   }
 }
