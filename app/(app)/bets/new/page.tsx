@@ -268,7 +268,7 @@ export default function NewBetPage() {
             <label className="label">Odds *</label>
             <input
               className={`input ${errors.odds ? 'border-red-600' : ''}`}
-              type="number" step="0.01" min="1.01" placeholder="1.85"
+              type="number" step="0.0001" min="1.01" placeholder="1.85"
               value={form.odds}
               onChange={e => set('odds', e.target.value)}
             />
