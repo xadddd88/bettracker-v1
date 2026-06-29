@@ -315,6 +315,7 @@ export default function AIAnalystPage() {
       } catch (err: unknown) {
         trackClientEvent(EVENTS.DECISION_ACTION_FAILED, { decision_id: analysis.decision_id, action: 'placed', from_page: 'ai_page' })
         setRootErr(err instanceof Error ? err.message : String(err))
+        setShowRisk(false)
       } finally {
         setSaving(false)
       }
