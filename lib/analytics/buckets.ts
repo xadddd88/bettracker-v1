@@ -54,6 +54,15 @@ export function bucketAmount(amount: number): 'small' | 'medium' | 'large' {
   return 'large'
 }
 
+export function bucketPercent(pct: number): string {
+  if (pct < 1)  return 'lt_1pct'
+  if (pct < 3)  return '1_to_3pct'
+  if (pct < 5)  return '3_to_5pct'
+  if (pct < 10) return '5_to_10pct'
+  if (pct < 20) return '10_to_20pct'
+  return 'gt_20pct'
+}
+
 export function bucketCount(count: number): string {
   if (count === 0)  return '0'
   if (count <= 5)   return '1-5'

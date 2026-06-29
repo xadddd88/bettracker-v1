@@ -60,6 +60,13 @@ export const EVENTS = {
   DEPOSIT_RECORDED:     'deposit_recorded',
   WITHDRAWAL_RECORDED:  'withdrawal_recorded',
 
+  // Risk Manager
+  RISK_EVALUATION_REQUESTED: 'risk_evaluation_requested',
+  RISK_EVALUATION_COMPLETED: 'risk_evaluation_completed',
+  RISK_WARNING_SHOWN:        'risk_warning_shown',
+  RISK_PLACE_ANYWAY_CLICKED: 'risk_place_anyway_clicked',
+  RISK_STAKE_ADJUSTED:       'risk_stake_adjusted',
+
   // Settings
   SETTINGS_PAGE_VIEWED: 'settings_page_viewed',
   SETTINGS_SAVED:       'settings_saved',
