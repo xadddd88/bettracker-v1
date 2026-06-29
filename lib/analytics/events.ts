@@ -83,12 +83,13 @@ export const EVENTS = {
   SETTINGS_SAVED:       'settings_saved',
 
   // Page views
-  DASHBOARD_VIEWED:       'dashboard_viewed',
-  AI_PAGE_VIEWED:         'ai_page_viewed',
-  BET_DETAIL_VIEWED:      'bet_detail_viewed',
-  BETS_LIST_VIEWED:       'bets_list_viewed',
-  DECISION_DETAIL_VIEWED: 'decision_detail_viewed',
-  ANALYTICS_VIEWED:       'analytics_viewed',
+  DASHBOARD_VIEWED:        'dashboard_viewed',
+  AI_PAGE_VIEWED:          'ai_page_viewed',
+  BET_DETAIL_VIEWED:       'bet_detail_viewed',
+  BETS_LIST_VIEWED:        'bets_list_viewed',
+  DECISIONS_LIST_VIEWED:   'decisions_list_viewed',
+  DECISION_DETAIL_VIEWED:  'decision_detail_viewed',
+  ANALYTICS_VIEWED:        'analytics_viewed',
 } as const
 
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS]
