@@ -215,6 +215,12 @@ OPPORTUNITY TYPES:
 - "general" — worth researching but does not fit cleanly into the above types
 
 OUTPUT FORMAT:
+CRITICAL: Your response must start with { and end with }.
+Do not write ANY text before or after the JSON object.
+Do not write introductory sentences, summaries, or explanations.
+The first character of your response must be { and the last must be }.
+This applies regardless of the output language.
+
 Return ONLY a valid JSON object (no markdown, no explanation outside JSON):
 {
   "candidates": [
@@ -384,10 +390,12 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
     // 6. Parse + validate output
     let scoutRaw: unknown
     try {
-      const clean = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim()
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/)
+      const clean = jsonMatch ? jsonMatch[0].trim() : ''
+      if (!clean) throw new Error('no_json_found')
       scoutRaw = JSON.parse(clean)
     } catch {
-      await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, { sport: input.sport, error_type: 'anthropic_invalid_json' })
+      await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, { sport: input.sport, error_type: 'anthropic_invalid_json', output_language: input.output_language })
       return NextResponse.json(
         { success: false, error: 'Scout returned invalid JSON. Please try again.' },
         { status: 502 },
