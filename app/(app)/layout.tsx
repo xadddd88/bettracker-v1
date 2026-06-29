@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Sidebar from '@/components/ui/Sidebar'
 import MobileNav from '@/components/ui/MobileNav'
 import { AnalyticsIdentify } from '@/lib/analytics/AnalyticsIdentify'
+import FeedbackWidget from '@/components/feedback/FeedbackWidget'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -27,6 +28,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {/* Mobile bottom nav — hidden on desktop */}
       <MobileNav />
+
+      {/* Floating feedback button (all screen sizes) */}
+      <FeedbackWidget />
     </div>
   )
 }

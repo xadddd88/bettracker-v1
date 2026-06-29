@@ -4,6 +4,8 @@ import type { Bet } from '@/types'
 import BankrollWidget from './BankrollWidget'
 import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
+import OnboardingCard from '@/components/onboarding/OnboardingCard'
+import NextBestAction, { type NextAction } from '@/components/dashboard/NextBestAction'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -22,11 +24,18 @@ export default async function DashboardPage() {
     .eq('is_default', true)
     .single()
 
-  const { count: watchlistCount } = await supabase
-    .from('decisions')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user!.id)
-    .eq('final_action', 'watchlisted')
+  const [{ count: watchlistCount }, { data: profile }] = await Promise.all([
+    supabase
+      .from('decisions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user!.id)
+      .eq('final_action', 'watchlisted'),
+    supabase
+      .from('profiles')
+      .select('onboarding_completed')
+      .eq('id', user!.id)
+      .single(),
+  ])
 
   const bets: Bet[] = betsData || []
 
@@ -72,9 +81,51 @@ export default async function DashboardPage() {
 
   const recent = bets.slice(0, 6)
 
+  const nextAction: NextAction = (() => {
+    if (bets.length === 0) {
+      return {
+        type:   'first_analysis',
+        icon:   '🤖',
+        label:  'Analyze your first match',
+        detail: 'Get AI-powered edge, confidence, and risk scoring in seconds.',
+        href:   '/ai',
+      }
+    }
+    if ((watchlistCount ?? 0) > 0) {
+      return {
+        type:   'review_watchlist',
+        icon:   '👁️',
+        label:  `Review ${watchlistCount} watchlisted decision${watchlistCount === 1 ? '' : 's'}`,
+        detail: 'Opportunities you saved are waiting for a decision.',
+        href:   '/decisions',
+      }
+    }
+    if (pendingBets.length > 0) {
+      return {
+        type:   'settle_bets',
+        icon:   '🎯',
+        label:  `Settle ${pendingBets.length} pending bet${pendingBets.length === 1 ? '' : 's'}`,
+        detail: 'Record your results to keep analytics accurate.',
+        href:   '/bets',
+      }
+    }
+    return {
+      type:   'scout',
+      icon:   '🔍',
+      label:  'Scout for new value bets',
+      detail: 'AI-powered opportunity discovery across sports and leagues.',
+      href:   '/scout',
+    }
+  })()
+
+  const showOnboarding = !profile?.onboarding_completed
+
   return (
     <div className="flex flex-col gap-5">
       <PageView event={EVENTS.DASHBOARD_VIEWED} props={{ bet_count: bets.length }} />
+
+      {/* First-run onboarding card */}
+      {showOnboarding && <OnboardingCard />}
 
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
@@ -92,6 +143,9 @@ export default async function DashboardPage() {
 
       {/* Balance hero */}
       <BankrollWidget balance={bankroll?.balance || 0} sym={sym} />
+
+      {/* Next best action */}
+      <NextBestAction action={nextAction} />
 
       {/* Secondary stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
