@@ -33,13 +33,15 @@ export const EVENTS = {
   SCANNER_EXPRESS_DETECTED: 'scanner_express_detected',
 
   // Scout
-  SCOUT_STARTED:           'scout_started',
-  SCOUT_COMPLETED:         'scout_completed',
-  SCOUT_FAILED:            'scout_failed',
-  SCOUT_PAGE_VIEWED:       'scout_page_viewed',
-  OPPORTUNITY_ANALYSED:    'opportunity_analysed',
-  OPPORTUNITY_WATCHLISTED: 'opportunity_watchlisted',
-  OPPORTUNITY_DISMISSED:   'opportunity_dismissed',
+  SCOUT_STARTED:             'scout_started',
+  SCOUT_COMPLETED:           'scout_completed',
+  SCOUT_FAILED:              'scout_failed',
+  SCOUT_PAGE_VIEWED:         'scout_page_viewed',
+  SCOUT_WEB_SEARCH_FALLBACK: 'scout_web_search_fallback',
+  SCOUT_RATE_LIMITED:        'scout_rate_limited',
+  OPPORTUNITY_ANALYSED:      'opportunity_analysed',
+  OPPORTUNITY_WATCHLISTED:   'opportunity_watchlisted',
+  OPPORTUNITY_DISMISSED:     'opportunity_dismissed',
 
   // Coach
   COACH_STARTED:     'coach_started',
