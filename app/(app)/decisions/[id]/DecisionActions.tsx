@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation'
 import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
 import { bucketOdds, bucketStake } from '@/lib/analytics/buckets'
+import RiskEvaluator from '@/components/risk/RiskEvaluator'
 
 interface Props {
-  decisionId: string
+  decisionId:  string
   offeredOdds: number | null
 }
 
@@ -16,76 +17,82 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
   const supabase = createClient()
   const router   = useRouter()
 
-  const [saving, setSaving]   = useState(false)
-  const [error,  setError]    = useState('')
+  const [saving,     setSaving]     = useState(false)
+  const [error,      setError]      = useState('')
   const [stakeInput, setStakeInput] = useState('')
   const [showStake,  setShowStake]  = useState(false)
+  const [showRisk,   setShowRisk]   = useState(false)
 
-  async function handleAction(action: 'placed' | 'skipped' | 'watchlisted') {
-    if (action === 'placed' && !showStake) {
-      trackClientEvent(EVENTS.DECISION_ACTION_PLACE_CLICKED, {
-        decision_id: decisionId,
-        odds_bucket: offeredOdds != null ? bucketOdds(offeredOdds) : null,
-        from_page: 'decision_detail',
-      })
-      setShowStake(true)
-      return
-    }
+  function handleRiskCheck() {
+    const stake = parseFloat(stakeInput)
+    if (!stake || stake <= 0) { setError('Enter a valid stake amount'); return }
+    setError('')
+    setShowRisk(true)
+  }
 
+  async function handlePlaceBet() {
+    const stake = parseFloat(stakeInput)
     setSaving(true)
     setError('')
     try {
-      if (action === 'placed') {
-        const stake = parseFloat(stakeInput)
-        if (!stake || stake <= 0) { setError('Enter a valid stake amount'); setSaving(false); return }
+      trackClientEvent(EVENTS.BET_PLACE_CLICKED, {
+        decision_id:  decisionId,
+        from_page:    'decision_detail',
+        stake_bucket: bucketStake(stake),
+        odds_bucket:  offeredOdds != null ? bucketOdds(offeredOdds) : null,
+        is_ai_linked: true,
+      })
 
-        trackClientEvent(EVENTS.BET_PLACE_CLICKED, {
-          decision_id:  decisionId,
-          from_page:    'decision_detail',
-          stake_bucket: bucketStake(stake),
-          odds_bucket:  offeredOdds != null ? bucketOdds(offeredOdds) : null,
-          is_ai_linked: true,
-        })
-
-        const { data: betData, error: betErr } = await supabase.rpc('place_bet_from_decision', {
-          p_decision_id: decisionId,
-          p_stake:       stake,
-        })
-        if (betErr) {
-          const isDuplicate = betErr.code === '23505' || betErr.message?.includes('duplicate') || betErr.message?.includes('already placed')
-          if (isDuplicate) {
-            trackClientEvent(EVENTS.BET_DUPLICATE_REJECTED, { decision_id: decisionId, from_page: 'decision_detail' })
-          } else {
-            trackClientEvent(EVENTS.BET_PLACE_FAILED, { decision_id: decisionId, from_page: 'decision_detail' })
-          }
-          throw new Error(betErr.message || betErr.details || JSON.stringify(betErr))
-        }
-        const betPayload = betData as { bet_id?: string } | null
-        trackClientEvent(EVENTS.BET_PLACE_SUCCEEDED, {
-          bet_id:       betPayload?.bet_id,
-          decision_id:  decisionId,
-          bet_type:     'single',
-          source:       'decision_detail',
-          stake_bucket: bucketStake(stake),
-          odds_bucket:  offeredOdds != null ? bucketOdds(offeredOdds) : null,
-          is_ai_linked: true,
-          is_parlay:    false,
-          legs_count:   1,
-        })
-        trackClientEvent(EVENTS.DECISION_ACTION_PLACED, { decision_id: decisionId, from_page: 'decision_detail' })
-      } else {
-        const { error: actionErr } = await supabase.rpc('update_decision_action', {
-          p_decision_id:  decisionId,
-          p_final_action: action,
-        })
-        if (actionErr) throw new Error(actionErr.message || actionErr.details || JSON.stringify(actionErr))
-        if (action === 'watchlisted') {
-          trackClientEvent(EVENTS.DECISION_ACTION_WATCH, { decision_id: decisionId, from_page: 'decision_detail' })
+      const { data: betData, error: betErr } = await supabase.rpc('place_bet_from_decision', {
+        p_decision_id: decisionId,
+        p_stake:       stake,
+      })
+      if (betErr) {
+        const isDuplicate = betErr.code === '23505' || betErr.message?.includes('duplicate') || betErr.message?.includes('already placed')
+        if (isDuplicate) {
+          trackClientEvent(EVENTS.BET_DUPLICATE_REJECTED, { decision_id: decisionId, from_page: 'decision_detail' })
         } else {
-          trackClientEvent(EVENTS.DECISION_ACTION_SKIP, { decision_id: decisionId, from_page: 'decision_detail' })
+          trackClientEvent(EVENTS.BET_PLACE_FAILED, { decision_id: decisionId, from_page: 'decision_detail' })
         }
+        throw new Error(betErr.message || betErr.details || JSON.stringify(betErr))
       }
+      const betPayload = betData as { bet_id?: string } | null
+      trackClientEvent(EVENTS.BET_PLACE_SUCCEEDED, {
+        bet_id:       betPayload?.bet_id,
+        decision_id:  decisionId,
+        bet_type:     'single',
+        source:       'decision_detail',
+        stake_bucket: bucketStake(stake),
+        odds_bucket:  offeredOdds != null ? bucketOdds(offeredOdds) : null,
+        is_ai_linked: true,
+        is_parlay:    false,
+        legs_count:   1,
+      })
+      trackClientEvent(EVENTS.DECISION_ACTION_PLACED, { decision_id: decisionId, from_page: 'decision_detail' })
+      router.refresh()
+    } catch (err: unknown) {
+      trackClientEvent(EVENTS.DECISION_ACTION_FAILED, { decision_id: decisionId, action: 'placed', from_page: 'decision_detail' })
+      setError(err instanceof Error ? err.message : String(err))
+      setShowRisk(false)
+    } finally {
+      setSaving(false)
+    }
+  }
 
+  async function handleAction(action: 'skipped' | 'watchlisted') {
+    setSaving(true)
+    setError('')
+    try {
+      const { error: actionErr } = await supabase.rpc('update_decision_action', {
+        p_decision_id:  decisionId,
+        p_final_action: action,
+      })
+      if (actionErr) throw new Error(actionErr.message || actionErr.details || JSON.stringify(actionErr))
+      if (action === 'watchlisted') {
+        trackClientEvent(EVENTS.DECISION_ACTION_WATCH, { decision_id: decisionId, from_page: 'decision_detail' })
+      } else {
+        trackClientEvent(EVENTS.DECISION_ACTION_SKIP, { decision_id: decisionId, from_page: 'decision_detail' })
+      }
       router.refresh()
     } catch (err: unknown) {
       trackClientEvent(EVENTS.DECISION_ACTION_FAILED, { decision_id: decisionId, action, from_page: 'decision_detail' })
@@ -97,7 +104,19 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      {showStake && (
+      {/* Risk evaluator — shown after stake is entered */}
+      {showStake && showRisk && (
+        <RiskEvaluator
+          stake={parseFloat(stakeInput)}
+          decisionId={decisionId}
+          fromPage="decision_detail"
+          onConfirm={handlePlaceBet}
+          onAdjustStake={() => setShowRisk(false)}
+        />
+      )}
+
+      {/* Stake input */}
+      {showStake && !showRisk && (
         <div className="card border border-indigo-800 flex flex-col gap-3">
           <p className="text-sm text-gray-300">
             Enter stake amount{offeredOdds ? ` (odds: ${offeredOdds})` : ''}:
@@ -106,12 +125,12 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
             className="input"
             type="number" step="0.01" min="0.01" placeholder="100"
             value={stakeInput}
-            onChange={e => setStakeInput(e.target.value)}
+            onChange={e => { setStakeInput(e.target.value); setError('') }}
             autoFocus
           />
           <div className="flex gap-2">
-            <button className="btn-primary flex-1" onClick={() => handleAction('placed')} disabled={saving}>
-              {saving ? 'Saving…' : 'Confirm Bet'}
+            <button className="btn-primary flex-1" onClick={handleRiskCheck} disabled={saving}>
+              Check Risk
             </button>
             <button className="btn-ghost" onClick={() => { setShowStake(false); setStakeInput('') }}>
               Cancel
@@ -120,11 +139,19 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
         </div>
       )}
 
+      {/* Initial action buttons */}
       {!showStake && (
         <div className="flex gap-3">
           <button
             className="btn-primary flex-1"
-            onClick={() => handleAction('placed')}
+            onClick={() => {
+              trackClientEvent(EVENTS.DECISION_ACTION_PLACE_CLICKED, {
+                decision_id: decisionId,
+                odds_bucket: offeredOdds != null ? bucketOdds(offeredOdds) : null,
+                from_page:   'decision_detail',
+              })
+              setShowStake(true)
+            }}
             disabled={saving}
           >
             ✅ Place Bet

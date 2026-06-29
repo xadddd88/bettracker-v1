@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
 import { bucketOdds, bucketStake } from '@/lib/analytics/buckets'
+import RiskEvaluator from '@/components/risk/RiskEvaluator'
 
 // ─── Image helper ─────────────────────────────────────────────
 function fileToBase64(file: File): Promise<{ data: string; media_type: string }> {
@@ -151,6 +152,7 @@ export default function AIAnalystPage() {
   const [scanMsg,    setScanMsg]    = useState('')
   const [stakeStr,   setStakeStr]   = useState('')
   const [showStake,  setShowStake]  = useState(false)
+  const [showRisk,   setShowRisk]   = useState(false)
 
   function setField(k: string, v: string) {
     setForm(f => ({ ...f, [k]: v }))
@@ -213,6 +215,7 @@ export default function AIAnalystPage() {
 
     setAnalyzing(true)
     setShowStake(false)
+    setShowRisk(false)
     setStakeStr('')
     try {
       const res = await fetch('/api/ai/analyst', {
@@ -670,8 +673,19 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
             </div>
           )}
 
+          {/* Risk evaluator — shown after stake is entered */}
+          {showStake && showRisk && analysis && (
+            <RiskEvaluator
+              stake={parseFloat(stakeStr)}
+              decisionId={analysis.decision_id}
+              fromPage="ai_page"
+              onConfirm={() => handleAction('placed')}
+              onAdjustStake={() => { setShowRisk(false); setRootErr('') }}
+            />
+          )}
+
           {/* Stake input — shown when Place Bet is clicked */}
-          {showStake && (
+          {showStake && !showRisk && (
             <div className="flex gap-2 items-center">
               <input
                 type="number"
@@ -685,14 +699,19 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
               />
               <button
                 className="btn-primary px-5"
-                onClick={() => handleAction('placed')}
+                onClick={() => {
+                  const s = parseFloat(stakeStr)
+                  if (!stakeStr || isNaN(s) || s <= 0) { setRootErr('Enter a valid stake amount'); return }
+                  setRootErr('')
+                  setShowRisk(true)
+                }}
                 disabled={saving}
               >
-                {saving ? '\u2026' : 'Confirm'}
+                Check Risk
               </button>
               <button
                 className="px-3 py-2 rounded-lg bg-gray-800 text-gray-500 text-sm border border-gray-700"
-                onClick={() => { setShowStake(false); setStakeStr(''); setRootErr('') }}
+                onClick={() => { setShowStake(false); setShowRisk(false); setStakeStr(''); setRootErr('') }}
               >
                 ✕
               </button>
@@ -712,6 +731,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
                     })
                   }
                   setShowStake(true)
+                  setShowRisk(false)
                   setRootErr('')
                 }}
                 disabled={saving}
