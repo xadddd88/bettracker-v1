@@ -28,15 +28,15 @@ export default function Sidebar({ user }: { user: User }) {
   }
 
   return (
-    <aside className="w-[220px] flex-shrink-0 flex flex-col border-r border-gray-800 bg-gray-900">
+    <aside className="w-[220px] flex-shrink-0 flex flex-col border-r border-night-700 bg-night-900">
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-gray-800">
-        <div className="text-lg font-bold text-white">BetTracker</div>
-        <div className="text-xs text-gray-500 mt-0.5">v1.0 · Sprint 1</div>
+      <div className="px-5 py-5 border-b border-night-700">
+        <div className="text-lg font-bold text-white font-display">BetTracker</div>
+        <div className="text-xs text-amber-500/70 mt-0.5 font-mono tracking-wide">AI</div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
+      <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5">
         {NAV.map(({ href, icon, label }) => {
           const active = pathname === href || pathname.startsWith(href + '/')
           return (
@@ -45,8 +45,8 @@ export default function Sidebar({ user }: { user: User }) {
               href={href}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 active
-                  ? 'bg-indigo-600/20 text-indigo-400'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  ? 'bg-amber-500/10 text-amber-400'
+                  : 'text-slate-400 hover:text-white hover:bg-night-800'
               }`}
             >
               <span className="text-base">{icon}</span>
@@ -57,13 +57,13 @@ export default function Sidebar({ user }: { user: User }) {
       </nav>
 
       {/* User */}
-      <div className="px-3 py-4 border-t border-gray-800">
+      <div className="px-3 py-4 border-t border-night-700">
         <div className="px-3 py-2 mb-1">
-          <div className="text-xs text-gray-500 truncate">{user.email}</div>
+          <div className="text-xs text-slate-500 truncate">{user.email}</div>
         </div>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-night-800 transition-colors"
         >
           <span>🚪</span> Sign out
         </button>
