@@ -14,7 +14,7 @@ export default function EventPulseCard({ event }: Props) {
   if (event.tier === 3) {
     return (
       <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-night-700 bg-night-900">
-        <span className="text-sm shrink-0">{event.icon}</span>
+        <span className="text-xs font-mono uppercase tracking-widest" style={{ color: 'var(--neutral)' }}>Pulse</span>
         <span className="text-xs text-slate-400">{event.label}</span>
         <span className="text-[10px] text-slate-700 shrink-0">· Event Pulse</span>
         {event.dashboardCta && (
@@ -53,7 +53,6 @@ export default function EventPulseCard({ event }: Props) {
         {/* Header row */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            <span className="text-xl shrink-0">{event.icon}</span>
             <div className="min-w-0">
               <p
                 className="text-[10px] font-semibold uppercase tracking-widest mb-0.5"

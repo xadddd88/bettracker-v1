@@ -81,7 +81,7 @@ export default function LoginPage() {
 
           {magicSent ? (
             <div className="text-center py-4">
-              <div className="text-2xl mb-2">✉️</div>
+              <div className="text-xs font-mono uppercase tracking-widest text-tok-accent mb-2">✓ Sent</div>
               <div className="text-sm text-gray-300">Check your email for a login link.</div>
             </div>
           ) : (

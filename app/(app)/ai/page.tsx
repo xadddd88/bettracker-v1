@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -7,6 +7,7 @@ import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
 import { bucketOdds, bucketStake } from '@/lib/analytics/buckets'
 import RiskEvaluator from '@/components/risk/RiskEvaluator'
+import { Camera, Loader2, Eye, X, CheckCircle, Search } from 'lucide-react'
 
 // ─── Image helper ─────────────────────────────────────────────
 function fileToBase64(file: File): Promise<{ data: string; media_type: string }> {
@@ -55,14 +56,14 @@ interface Analysis {
 }
 
 // ─── Constants ────────────────────────────────────────────────
-const SPORTS: { value: Sport; label: string; icon: string }[] = [
-  { value: 'soccer',     label: 'Football',     icon: '\u26BD' },
-  { value: 'tennis',     label: 'Tennis',       icon: '\uD83C\uDFBE' },
-  { value: 'cs2',        label: 'CS2',          icon: '\uD83C\uDFAF' },
-  { value: 'basketball', label: 'Basketball',   icon: '\uD83C\uDFC0' },
-  { value: 'ice_hockey', label: 'Ice Hockey',   icon: '\uD83C\uDFD2' },
-  { value: 'mma',        label: 'MMA',          icon: '\uD83E\uDD4A' },
-  { value: 'other',      label: 'Other',        icon: '\uD83C\uDFC5' },
+const SPORTS: { value: Sport; label: string }[] = [
+  { value: 'soccer',     label: 'Football'   },
+  { value: 'tennis',     label: 'Tennis'     },
+  { value: 'cs2',        label: 'CS2'        },
+  { value: 'basketball', label: 'Basketball' },
+  { value: 'ice_hockey', label: 'Ice Hockey' },
+  { value: 'mma',        label: 'MMA'        },
+  { value: 'other',      label: 'Other'      },
 ]
 
 const LOCALES: { value: Locale; label: string }[] = [
@@ -429,7 +430,8 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
       {/* ── Scout pre-fill indicator ───────────────────────── */}
       {scoutId && !analysis && (
         <div className="text-xs text-indigo-400 bg-indigo-950/30 border border-indigo-900 rounded-lg px-3 py-2 flex items-center gap-2">
-          🔍 Pre-filled from Scout — enter current odds to analyse
+          <Search size={12} strokeWidth={2} />
+          Pre-filled from Scout — enter current odds to analyse
         </div>
       )}
 
@@ -443,13 +445,13 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
         {scanning ? (
           <div className="flex items-center justify-center gap-2 text-indigo-400 text-sm">
-            <span className="animate-spin">⏳</span> {scanMsg}
+            <Loader2 size={14} className="animate-spin" /> {scanMsg}
           </div>
         ) : scanMsg ? (
           <div className="text-sm text-gray-300">{scanMsg}</div>
         ) : (
           <div>
-            <div className="text-2xl mb-1">📸</div>
+            <div className="flex justify-center mb-1"><Camera size={24} strokeWidth={1.5} className="text-gray-500" /></div>
             <p className="text-sm text-gray-400 font-medium">Paste screenshot (Ctrl+V) or click to upload</p>
             <p className="text-xs text-gray-600 mt-0.5">Auto-fills event, market, odds, sport</p>
           </div>
@@ -470,7 +472,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
                   : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
               }`}
             >
-              {s.icon} {s.label}
+              {s.label}
             </button>
           ))}
         </div>
@@ -567,15 +569,15 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
         )}
 
         <button
-          className="btn-primary"
+          className="btn-primary flex items-center justify-center gap-2"
           onClick={handleAnalyze}
           disabled={analyzing}
         >
           {analyzing ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="animate-spin">⏳</span> Analyzing…
-            </span>
-          ) : '\uD83D\uDD0D Analyze'}
+            <><Loader2 size={14} className="animate-spin" /> Analyzing…</>
+          ) : (
+            <><Search size={14} strokeWidth={2} /> Analyze</>
+          )}
         </button>
       </div>
 
@@ -711,10 +713,10 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
                 Check Risk
               </button>
               <button
-                className="px-3 py-2 rounded-lg bg-gray-800 text-gray-500 text-sm border border-gray-700"
+                className="px-3 py-2 rounded-lg bg-gray-800 text-gray-500 text-sm border border-gray-700 flex items-center justify-center"
                 onClick={() => { setShowStake(false); setShowRisk(false); setStakeStr(''); setRootErr('') }}
               >
-                ✕
+                <X size={14} strokeWidth={2} />
               </button>
             </div>
           )}
@@ -722,7 +724,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
           <div className="flex gap-3">
             {!showStake && (
               <button
-                className="btn-primary flex-1"
+                className="btn-primary flex-1 flex items-center justify-center gap-1.5"
                 onClick={() => {
                   if (analysis?.decision_id) {
                     trackClientEvent(EVENTS.DECISION_ACTION_PLACE_CLICKED, {
@@ -737,22 +739,22 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
                 }}
                 disabled={saving}
               >
-                ✅ Place Bet
+                <CheckCircle size={14} strokeWidth={2} /> Place Bet
               </button>
             )}
             <button
-              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50"
+              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
               onClick={() => handleAction('watchlisted')}
               disabled={saving}
             >
-              👁 Watch
+              <Eye size={14} strokeWidth={2} /> Watch
             </button>
             <button
-              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50"
+              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
               onClick={() => handleAction('skipped')}
               disabled={saving}
             >
-              ✕ Skip
+              <X size={14} strokeWidth={2} /> Skip
             </button>
           </div>
           <p className="text-xs text-gray-600 text-center">Skipping or watching is a valid decision — it will be saved to your history.</p>

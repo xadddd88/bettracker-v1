@@ -297,7 +297,7 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
         </div>
       ) : (
         <div className="card flex flex-col items-center gap-3 py-10 text-center">
-          <span className="text-3xl">🧠</span>
+          <span className="text-3xl text-slate-600">—</span>
           <p className="text-sm font-medium text-gray-400">No coaching sessions yet</p>
           <p className="text-xs text-gray-600">
             {canRun
