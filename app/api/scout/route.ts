@@ -232,6 +232,10 @@ Return ONLY a valid JSON object (no markdown, no explanation outside JSON):
 export async function POST(req: NextRequest) {
   try {
     // 1. Auth
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.error('[scout] ANTHROPIC_API_KEY is not set — scout requests will fail')
+    }
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -333,7 +337,7 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
           fallbackUsed = true
         } catch (fallbackErr) {
           const fallbackError = classifyAnthropicError(fallbackErr)
-          console.error('[scout] fallback also failed:', fallbackError.type)
+          console.error('[scout] fallback also failed:', fallbackError.type, fallbackErr instanceof Error ? fallbackErr.name : typeof fallbackErr)
           await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, {
             sport:              input.sport,
             error_type:         fallbackError.type,
@@ -348,7 +352,7 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
         }
       } else {
         const classified = classifyAnthropicError(err)
-        console.error('[scout] call failed:', classified.type)
+        console.error('[scout] call failed:', classified.type, err instanceof Error ? err.name : typeof err)
         await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, {
           sport:      input.sport,
           error_type: classified.type,
@@ -462,7 +466,7 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
     })
 
   } catch (err: unknown) {
-    console.error('[scout] unhandled error', err)
+    console.error('[scout] unhandled error:', err instanceof Error ? err.name : 'unknown')
     return NextResponse.json({ success: false, error: 'Internal error' }, { status: 500 })
   }
 }
