@@ -8,17 +8,17 @@
   }
 
   body {
-    @apply bg-gray-950 text-gray-100 antialiased;
+    @apply bg-night-950 text-slate-100 antialiased;
   }
 
   * {
-    @apply border-gray-800;
+    @apply border-night-700;
   }
 }
 
 @layer components {
   .card {
-    @apply bg-gray-900 border border-gray-800 rounded-xl p-4;
+    @apply bg-night-900 border border-night-700 rounded-xl p-4;
   }
 
   .btn {
@@ -26,19 +26,19 @@
   }
 
   .btn-primary {
-    @apply btn bg-indigo-600 text-white hover:bg-indigo-500;
+    @apply btn bg-amber-500 text-night-950 hover:bg-amber-400 font-semibold;
   }
 
   .btn-ghost {
-    @apply btn text-gray-400 hover:text-white hover:bg-gray-800;
+    @apply btn text-slate-400 hover:text-white hover:bg-night-800;
   }
 
   .input {
-    @apply w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors;
+    @apply w-full bg-night-800 border border-night-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors;
   }
 
   .label {
-    @apply block text-xs font-medium text-gray-400 mb-1;
+    @apply block text-xs font-medium text-slate-400 mb-1;
   }
 
   .stat-card {
@@ -46,10 +46,10 @@
   }
 
   .stat-label {
-    @apply text-xs text-gray-500;
+    @apply text-xs text-slate-500 uppercase tracking-widest font-medium;
   }
 
   .stat-value {
-    @apply text-2xl font-bold text-white;
+    @apply text-2xl font-bold text-white font-mono;
   }
 }
