@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
+import FeedbackWidget from '@/components/feedback/FeedbackWidget'
 
 const NAV = [
   { href: '/dashboard',  icon: '📊', label: 'Dashboard' },
@@ -62,6 +63,7 @@ export default function Sidebar({ user }: { user: User }) {
         <div className="px-3 py-2 mb-1">
           <div className="text-xs text-slate-500 truncate">{user.email}</div>
         </div>
+        <FeedbackWidget />
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-night-800 transition-colors"

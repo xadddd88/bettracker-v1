@@ -24,12 +24,20 @@ export default async function DashboardPage() {
     .eq('is_default', true)
     .single()
 
-  const [{ count: watchlistCount }, { data: profile }] = await Promise.all([
+  const [
+    { count: watchlistCount },
+    { count: decisionsCount },
+    { data: profile },
+  ] = await Promise.all([
     supabase
       .from('decisions')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user!.id)
       .eq('final_action', 'watchlisted'),
+    supabase
+      .from('decisions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user!.id),
     supabase
       .from('profiles')
       .select('onboarding_completed')
@@ -82,24 +90,27 @@ export default async function DashboardPage() {
   const recent = bets.slice(0, 6)
 
   const nextAction: NextAction = (() => {
-    if (bets.length === 0) {
+    // No decisions at all → run AI analysis first
+    if ((decisionsCount ?? 0) === 0) {
       return {
         type:   'first_analysis',
         icon:   '🤖',
-        label:  'Analyze your first match',
-        detail: 'Get AI-powered edge, confidence, and risk scoring in seconds.',
+        label:  'Run AI Analysis',
+        detail: 'Get edge, confidence, and risk scoring for any market in seconds.',
         href:   '/ai',
       }
     }
-    if ((watchlistCount ?? 0) > 0) {
+    // Has decisions but no bets placed yet → act on decisions
+    if (bets.length === 0) {
       return {
-        type:   'review_watchlist',
-        icon:   '👁️',
-        label:  `Review ${watchlistCount} watchlisted decision${watchlistCount === 1 ? '' : 's'}`,
-        detail: 'Opportunities you saved are waiting for a decision.',
+        type:   'act_on_decisions',
+        icon:   '📋',
+        label:  'Place, Skip or Watch',
+        detail: 'You have decisions waiting for action.',
         href:   '/decisions',
       }
     }
+    // Has pending bets → settle them
     if (pendingBets.length > 0) {
       return {
         type:   'settle_bets',
@@ -107,6 +118,16 @@ export default async function DashboardPage() {
         label:  `Settle ${pendingBets.length} pending bet${pendingBets.length === 1 ? '' : 's'}`,
         detail: 'Record your results to keep analytics accurate.',
         href:   '/bets',
+      }
+    }
+    // Has settled bets → check analytics
+    if (settledBets.length > 0) {
+      return {
+        type:   'view_analytics',
+        icon:   '📈',
+        label:  'View your Analytics',
+        detail: 'See win rate, ROI, and performance trends.',
+        href:   '/analytics',
       }
     }
     return {

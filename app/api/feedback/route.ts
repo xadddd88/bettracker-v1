@@ -5,9 +5,9 @@ import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 
 const feedbackSchema = z.object({
-  rating:   z.number().int().min(1).max(5),
-  category: z.enum(['bug', 'suggestion', 'general', 'praise']),
-  message:  z.string().max(2000).optional(),
+  feedback_type: z.enum(['bug', 'idea', 'confusing', 'other']),
+  message:       z.string().min(1).max(2000),
+  page_path:     z.string().max(200).optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -25,19 +25,22 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { rating, category, message } = parsed.data
+    const { feedback_type, message, page_path } = parsed.data
 
     const { error } = await supabase
       .from('beta_feedback')
-      .insert({ user_id: user.id, rating, category, message: message ?? null })
+      .insert({ user_id: user.id, feedback_type, message, page_path: page_path ?? null })
 
     if (error) {
       console.error('[feedback] insert failed:', error.message)
       return NextResponse.json({ success: false, error: 'Failed to submit' }, { status: 500 })
     }
 
-    // Track rating + category only — never the message text
-    await trackServerEvent(user.id, EVENTS.BETA_FEEDBACK_SUBMITTED, { rating, category })
+    // Track type + page only — never the message text
+    await trackServerEvent(user.id, EVENTS.BETA_FEEDBACK_SUBMITTED, {
+      feedback_type,
+      page_path: page_path ?? null,
+    })
 
     return NextResponse.json({ success: true })
   } catch (err: unknown) {
