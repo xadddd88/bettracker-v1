@@ -65,6 +65,7 @@ export default async function AnalyticsPage() {
   if (bets.length === 0 && decisions.length === 0) {
     return (
       <div className="flex flex-col gap-6">
+        <PageView event={EVENTS.ANALYTICS_VIEWED} />
         <div>
           <h1 className="text-2xl font-bold text-white">Analytics</h1>
           <p className="text-sm text-gray-500 mt-1">No data yet</p>
