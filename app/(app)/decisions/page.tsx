@@ -72,6 +72,11 @@ export default async function DecisionsPage({
         <Link href="/ai" className="btn-primary text-sm">+ Analyze</Link>
       </div>
 
+      {/* Workflow note */}
+      {filter === 'all' && decisions.length > 0 && (
+        <p className="text-xs text-gray-600 px-0.5">Workflow: Analyse a match → place, watch, or skip → placed bets are tracked in Bets.</p>
+      )}
+
       {/* Filter tabs */}
       <div className="flex gap-1 bg-gray-900 rounded-lg p-1 w-fit flex-wrap">
         {FILTERS.map(({ value, label }) => (

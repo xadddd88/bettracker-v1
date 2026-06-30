@@ -7,6 +7,7 @@ import { EVENTS } from '@/lib/analytics/events'
 import { bucketScoutScore } from '@/lib/analytics/buckets'
 import type { MarketOpportunity, OpportunityStatus } from '@/types'
 import { Search, Eye, X, Loader2, AlertTriangle } from 'lucide-react'
+import BetaNote from '@/components/ui/BetaNote'
 
 type Sport     = 'soccer' | 'tennis' | 'cs2' | 'basketball' | 'ice_hockey' | 'mma' | 'other'
 type Locale    = 'auto' | 'uk' | 'ru' | 'en' | 'es' | 'fr' | 'de' | 'ar'
@@ -475,7 +476,18 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
       {/* ── Opportunities list ─────────────────────────────── */}
       {opportunities.length > 0 ? (
         <div className="flex flex-col gap-3">
-          <p className="text-xs text-gray-600">{opportunities.length} opportunit{opportunities.length === 1 ? 'y' : 'ies'} · sorted by most recent</p>
+          <div className="flex flex-col gap-1">
+            <p className="text-xs text-gray-600">{opportunities.length} opportunit{opportunities.length === 1 ? 'y' : 'ies'} · sorted by most recent</p>
+            <p className="text-[10px] text-gray-700">
+              <span className="text-green-500">value</span> = price edge ·{' '}
+              <span className="text-blue-500">contrarian</span> = against market ·{' '}
+              <span className="text-purple-500">pattern</span> = historical trend ·{' '}
+              score 0–100 · Analyse → AI Analyst
+            </p>
+          </div>
+          {opportunities.length < 5 && (
+            <BetaNote>Scout may return fewer candidates when low-quality or incomplete candidates are filtered out.</BetaNote>
+          )}
           {opportunities.map(opp => (
             <OpportunityCard
               key={opp.id}

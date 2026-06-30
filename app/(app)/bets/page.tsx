@@ -83,6 +83,17 @@ export default async function BetsPage() {
         </div>
       )}
 
+      {/* Status guide */}
+      {bets.length > 0 && (
+        <div className="flex flex-wrap gap-x-5 gap-y-1 px-1">
+          <span className="text-[10px] text-gray-600"><span className="text-yellow-400">●</span> Pending — awaiting result</span>
+          <span className="text-[10px] text-gray-600"><span className="text-green-400">●</span> Won — settled as win</span>
+          <span className="text-[10px] text-gray-600"><span className="text-red-400">●</span> Lost — settled as loss</span>
+          <span className="text-[10px] text-gray-600"><span className="text-gray-400">●</span> Void — cancelled, stake returned</span>
+          <span className="text-[10px] text-gray-600"><span className="text-purple-400">●</span> Cashed out — closed early</span>
+        </div>
+      )}
+
       {/* Bet list */}
       {bets.length === 0 ? (
         <div className="card text-center py-14">

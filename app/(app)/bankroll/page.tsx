@@ -39,7 +39,7 @@ export default async function BankrollPage() {
       <PageView event={EVENTS.BANKROLL_PAGE_VIEWED} />
       <div>
         <h1 className="text-2xl font-bold text-white">Bankroll</h1>
-        <p className="text-sm text-gray-500 mt-1">Balance and transaction history</p>
+        <p className="text-sm text-gray-500 mt-1">Your dedicated betting fund — track deposits, stake usage, and net results from settled bets.</p>
       </div>
       {bankroll ? (
         <BankrollView
