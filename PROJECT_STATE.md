@@ -37,6 +37,7 @@
 | #45 / #46 | Product structure + in-app guidance (Beta readiness) |
 | #47 | Quick Settle UI — inline Won/Lost/Void for pending bets |
 | #50 / Migration 012 | `settle_bet` fixes applied manually — future settlements update `bet_legs.leg_status`; `lost` outcome returns non-null `new_balance` when bankroll exists; historical `bet_legs` backfill applied, remaining mismatches verified as 0 |
+| #52 | CSP `Report-Only` header + `/api/csp-report` violation endpoint — live, collecting violations in Vercel runtime logs |
 
 ---
 
@@ -82,7 +83,6 @@
 
 Items parked for after beta — no timeline set:
 
-- CSP Report-Only header PR
 - `npm audit` / `package-lock` hygiene PR
 - `lucide-react` version check
 - Analytics taxonomy cleanup: `from: 'quick_settle'` → `from_page` field standardisation
