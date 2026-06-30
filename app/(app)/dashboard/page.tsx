@@ -8,6 +8,7 @@ import OnboardingCard from '@/components/onboarding/OnboardingCard'
 import NextBestAction, { type NextAction } from '@/components/dashboard/NextBestAction'
 import EventPulseCard from '@/components/pulse/EventPulseCard'
 import { getPrimaryEvent } from '@/lib/events/pulse'
+import QuickSettle from '@/components/bets/QuickSettle'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -194,34 +195,36 @@ export default async function DashboardPage() {
               const leg = bet.legs?.[0]
               const multiLeg = (bet.legs?.length || 0) > 1
               return (
-                <Link
-                  key={bet.id}
-                  href={`/bets/${bet.id}`}
-                  className="flex items-center gap-3 py-3 hover:opacity-75 transition-opacity"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-white truncate">
-                      {multiLeg ? `Express (${bet.legs!.length} events)` : leg?.event_name || '—'}
+                <div key={bet.id}>
+                  <Link
+                    href={`/bets/${bet.id}`}
+                    className="flex items-center gap-3 py-3 hover:opacity-75 transition-opacity"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-white truncate">
+                        {multiLeg ? `Express (${bet.legs!.length} events)` : leg?.event_name || '—'}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {multiLeg
+                          ? bet.legs!.map(l => l.selection || l.market_type).join(' · ')
+                          : (leg?.market_type || '—')}
+                        {leg && !multiLeg && (
+                          <span className="font-mono"> @{leg.odds.toFixed(2)}</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      {multiLeg
-                        ? bet.legs!.map(l => l.selection || l.market_type).join(' · ')
-                        : (leg?.market_type || '—')}
-                      {leg && !multiLeg && (
-                        <span className="font-mono"> @{leg.odds.toFixed(2)}</span>
-                      )}
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-xs text-slate-400 font-mono">{sym}{bet.stake}</div>
+                      <StatusBadge status={bet.status} />
                     </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-xs text-slate-400 font-mono">{sym}{bet.stake}</div>
-                    <StatusBadge status={bet.status} />
-                  </div>
-                  {bet.pnl != null && (
-                    <div className={`text-sm font-semibold font-mono w-16 text-right ${bet.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {bet.pnl >= 0 ? '+' : ''}{sym}{bet.pnl.toFixed(2)}
-                    </div>
-                  )}
-                </Link>
+                    {bet.pnl != null && (
+                      <div className={`text-sm font-semibold font-mono w-16 text-right ${bet.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {bet.pnl >= 0 ? '+' : ''}{sym}{bet.pnl.toFixed(2)}
+                      </div>
+                    )}
+                  </Link>
+                  {bet.status === 'pending' && <QuickSettle betId={bet.id} />}
+                </div>
               )
             })}
           </div>

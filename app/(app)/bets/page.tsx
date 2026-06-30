@@ -3,6 +3,7 @@ import Link from 'next/link'
 import type { Bet } from '@/types'
 import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
+import QuickSettle from '@/components/bets/QuickSettle'
 
 const SPORT_ICON: Record<string, string> = {
   football:   '⚽',
@@ -129,7 +130,8 @@ export default async function BetsPage() {
             })
 
             return (
-              <Link key={bet.id} href={`/bets/${bet.id}`} className="flex items-center gap-4 px-4 py-4 hover:bg-gray-800/30 transition-colors">
+              <div key={bet.id}>
+              <Link href={`/bets/${bet.id}`} className="flex items-center gap-4 px-4 py-4 hover:bg-gray-800/30 transition-colors">
 
                 {/* Sport icon */}
                 <div className="text-xl flex-shrink-0 w-7 text-center">
@@ -181,6 +183,8 @@ export default async function BetsPage() {
                 </div>
 
               </Link>
+              {bet.status === 'pending' && <QuickSettle betId={bet.id} />}
+              </div>
             )
           })}
         </div>
