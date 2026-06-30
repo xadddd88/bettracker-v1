@@ -444,7 +444,11 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
 
     const validated = scoutOutputSchema.safeParse(normalizeScoutRaw(scoutRaw))
     if (!validated.success) {
-      console.error('[scout] schema_mismatch', JSON.stringify(validated.error.issues))
+      console.error('[scout] schema_mismatch', {
+        issueCount: validated.error.issues.length,
+        issues: validated.error.issues.map(i => ({ path: i.path, code: i.code, message: i.message })),
+        outputChars: rawText.length,
+      })
       await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, { sport: input.sport, error_type: 'anthropic_schema_mismatch' })
       return NextResponse.json(
         { success: false, error: 'Scout output did not match expected schema. Please try again.' },

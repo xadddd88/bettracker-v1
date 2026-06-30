@@ -550,9 +550,11 @@ export async function POST(req: NextRequest) {
     const coachRaw2 = normalizeCoachRaw(coachRaw)
     const validated = coachOutputSchema.safeParse(coachRaw2)
     if (!validated.success) {
-      console.error('[coach] schema_mismatch',
-        JSON.stringify(validated.error.issues),
-        'raw:', rawText.slice(0, 1000))
+      console.error('[coach] schema_mismatch', {
+        issueCount: validated.error.issues.length,
+        issues: validated.error.issues.map(i => ({ path: i.path, code: i.code, message: i.message })),
+        outputChars: rawText.length,
+      })
       await trackServerEvent(user.id, EVENTS.COACH_FAILED, { period_days: input.period_days, error_type: 'ai_schema' })
       return NextResponse.json(
         { success: false, error: 'Coach output did not match expected schema. Please try again.' },

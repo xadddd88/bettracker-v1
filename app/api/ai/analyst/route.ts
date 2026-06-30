@@ -292,7 +292,11 @@ Return structured JSON analysis only.`
 
     const validated = analysisSchema.safeParse(normalizeAnalystRaw(analysisRaw))
     if (!validated.success) {
-      console.error('[analyst] schema_mismatch', JSON.stringify(validated.error.issues), 'raw:', rawText.slice(0,1000))
+      console.error('[analyst] schema_mismatch', {
+        issueCount: validated.error.issues.length,
+        issues: validated.error.issues.map(i => ({ path: i.path, code: i.code, message: i.message })),
+        outputChars: rawText.length,
+      })
       await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'ai_schema' })
       return NextResponse.json(
         { success: false, error: 'AI output did not match expected schema. Please try again.' },
