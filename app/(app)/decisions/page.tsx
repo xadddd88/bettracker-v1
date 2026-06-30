@@ -66,7 +66,7 @@ export default async function DecisionsPage({
         <div>
           <h1 className="text-2xl font-bold text-white font-display">Decisions</h1>
           <p className="text-sm text-slate-500 mt-1">
-            {decisions.length} {filter === 'all' ? 'total' : filter}
+            Every AI analysis saved here — {decisions.length} {filter === 'all' ? 'total' : filter}
           </p>
         </div>
         <Link href="/ai" className="btn-primary text-sm">+ Analyze</Link>
@@ -93,13 +93,16 @@ export default async function DecisionsPage({
       {decisions.length === 0 ? (
         <div className="card text-center py-14">
           <div className="text-4xl mb-3">📋</div>
-          <p className="text-slate-400 text-sm mb-4">
-            {filter === 'all'
-              ? 'No decisions yet. Run the AI Analyst to create your first.'
-              : `No ${filter} decisions.`}
-          </p>
-          {filter === 'all' && (
-            <Link href="/ai" className="btn-primary inline-flex text-sm">Analyze a match</Link>
+          {filter === 'all' ? (
+            <>
+              <p className="font-medium text-white mb-1">No decisions yet</p>
+              <p className="text-slate-400 text-sm mb-5">
+                Every AI analysis you run is saved here. Place, watch, or skip — all actions are tracked.
+              </p>
+              <Link href="/ai" className="btn-primary inline-flex text-sm">Analyse a match</Link>
+            </>
+          ) : (
+            <p className="text-slate-400 text-sm">No {filter} decisions.</p>
           )}
         </div>
       ) : (

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import type { Bet } from '@/types'
 import { calcPerformance } from '@/lib/analytics/performance'
+import BetaNote from '@/components/ui/BetaNote'
 import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
 
@@ -104,6 +105,12 @@ export default async function AnalyticsPage() {
         </p>
       </div>
 
+      {m.settledCount > 0 && m.settledCount < 10 && (
+        <BetaNote>
+          Metrics become more reliable with more settled bets. You have {m.settledCount} settled so far — keep tracking to improve accuracy.
+        </BetaNote>
+      )}
+
       {/* ── KPI Grid ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="stat-card">
@@ -111,7 +118,9 @@ export default async function AnalyticsPage() {
           <div className={`stat-value text-xl ${m.settledCount > 0 ? profitColor : 'text-gray-600'}`}>
             {m.settledCount > 0 ? fmtPnl(m.netProfit, sym) : '—'}
           </div>
-          {m.settledCount === 0 && <div className="text-xs text-gray-600">No settled bets</div>}
+          <div className="text-xs text-gray-600">
+            {m.settledCount === 0 ? 'No settled bets' : 'Settled bets only'}
+          </div>
         </div>
 
         <div className="stat-card">

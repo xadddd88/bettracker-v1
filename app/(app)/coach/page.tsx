@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import CoachView from './CoachView'
+import BetaNote from '@/components/ui/BetaNote'
 import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
 import type { CoachingSession } from '@/types'
@@ -30,8 +31,15 @@ export default async function CoachPage() {
       <PageView event={EVENTS.COACH_PAGE_VIEWED} />
       <div>
         <h1 className="text-2xl font-bold text-white">Coach</h1>
-        <p className="text-sm text-gray-500 mt-1">Retrospective performance analysis</p>
+        <p className="text-sm text-gray-500 mt-1">
+          AI-powered retrospective review of your settled bets — patterns, leaks, and actionable advice.
+        </p>
       </div>
+      {settledBetsCount < 5 && (
+        <BetaNote>
+          Coach works best with at least 5 settled bets. You have {settledBetsCount} so far — results improve as your history grows.
+        </BetaNote>
+      )}
       <CoachView initialSessions={sessions} settledBetsCount={settledBetsCount} />
     </div>
   )

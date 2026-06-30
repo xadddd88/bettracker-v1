@@ -49,8 +49,9 @@ export default async function BankrollPage() {
           stats={{ totalDeposited, totalWithdrawn, netFromBets }}
         />
       ) : (
-        <div className="card text-center py-12 text-red-400 text-sm">
-          Bankroll not found. Please contact support.
+        <div className="card text-center py-12">
+          <p className="text-red-400 text-sm font-medium mb-1">Bankroll not set up</p>
+          <p className="text-gray-500 text-xs">Your default bankroll could not be loaded. Try refreshing — if this persists, contact support.</p>
         </div>
       )}
     </div>

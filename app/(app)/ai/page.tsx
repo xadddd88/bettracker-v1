@@ -424,7 +424,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
     <div className="max-w-2xl flex flex-col gap-6" onPaste={handlePaste}>
       <div>
         <h1 className="text-2xl font-bold text-white">AI Analyst</h1>
-        <p className="text-sm text-gray-500 mt-1">Paste a coupon screenshot or fill in manually</p>
+        <p className="text-sm text-gray-500 mt-1">Enter match details or scan a coupon to get probability, edge, and risk analysis.</p>
       </div>
 
       {/* ── Scout pre-fill indicator ───────────────────────── */}
@@ -588,11 +588,23 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
           {(() => {
             const rec = REC_CONFIG[a.recommendation]
             const risk = RISK_CONFIG[a.risk_level]
+            const recDetail: Record<Recommendation, string> = {
+              bet:      'Edge detected — AI sees value at these odds.',
+              watch:    'Uncertain — monitor for odds movement or new info.',
+              skip:     'No meaningful edge found at current odds.',
+              no_value: 'AI does not recommend this market.',
+            }
             return (
               <div className={`card border ${rec.bg} flex flex-col gap-3`}>
-                <div className="flex items-center justify-between">
-                  <span className={`text-lg font-bold ${rec.color}`}>{rec.label}</span>
-                  <span className={`text-xs font-medium ${risk.color}`}>{risk.label}</span>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className={`text-lg font-bold ${rec.color}`}>{rec.label}</span>
+                    <p className="text-xs text-gray-500 mt-0.5">{recDetail[a.recommendation]}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className={`text-xs font-medium ${risk.color}`}>{risk.label}</span>
+                    <p className="text-[10px] text-gray-600 mt-0.5">edge · confidence · market</p>
+                  </div>
                 </div>
 
                 {/* Probabilities */}
@@ -600,16 +612,19 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
                   <div>
                     <div className="text-xs text-gray-500 mb-0.5">Model prob.</div>
                     <div className="text-xl font-bold text-white">{a.model_probability.toFixed(1)}%</div>
+                    <div className="text-[10px] text-gray-600 mt-0.5">AI win estimate</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500 mb-0.5">Implied</div>
                     <div className="text-xl font-bold text-gray-300">{a.implied_probability.toFixed(1)}%</div>
+                    <div className="text-[10px] text-gray-600 mt-0.5">From your odds</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500 mb-0.5">Edge</div>
                     <div className={`text-xl font-bold ${a.edge_percent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                       {a.edge_percent >= 0 ? '+' : ''}{a.edge_percent.toFixed(1)}%
                     </div>
+                    <div className="text-[10px] text-gray-600 mt-0.5">Model minus implied</div>
                   </div>
                 </div>
 
@@ -625,6 +640,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
                       style={{ width: `${a.confidence_score}%` }}
                     />
                   </div>
+                  <div className="text-[10px] text-gray-600 mt-1">How certain the model is in its estimate</div>
                 </div>
 
                 {/* Reasoning */}

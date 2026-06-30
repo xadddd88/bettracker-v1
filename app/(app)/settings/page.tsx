@@ -21,13 +21,14 @@ export default async function SettingsPage() {
       <PageView event={EVENTS.SETTINGS_PAGE_VIEWED} />
       <div>
         <h1 className="text-2xl font-bold text-white">Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">Profile and preferences</p>
+        <p className="text-sm text-gray-500 mt-1">Account details, currency, and app preferences</p>
       </div>
       {profile ? (
         <SettingsForm profile={profile as Profile} email={user.email ?? ''} />
       ) : (
-        <div className="card text-center py-12 text-red-400 text-sm">
-          Failed to load profile. Please refresh.
+        <div className="card text-center py-12">
+          <p className="text-red-400 text-sm font-medium mb-1">Could not load profile</p>
+          <p className="text-gray-500 text-xs">Try refreshing the page. If the problem persists, contact support.</p>
         </div>
       )}
     </div>
