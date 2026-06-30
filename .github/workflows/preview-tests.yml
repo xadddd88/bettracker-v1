@@ -5,6 +5,20 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
+  # ── Job 1: JSON parser unit tests ──────────────────────────────────────────
+  # Runs independently of any Vercel deployment.
+  unit-tests:
+    name: JSON parser unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run extractJsonObject tests
+        run: node scripts/test-extract-json.mjs
+
+  # ── Job 2: Smoke tests against Vercel preview deployment ───────────────────
   smoke:
     name: Smoke tests on preview
     runs-on: ubuntu-latest
@@ -21,21 +35,37 @@ jobs:
           SHA="${{ github.event.pull_request.head.sha }}"
           PROJECT_ID="prj_HgkXfIh2s8J7fdjStH4atnBpXBa2"
           TEAM_ID="team_Evt0BlM2Dy7FxfskYnlNcMo4"
+          API="https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&teamId=${TEAM_ID}&limit=10"
 
           echo "Polling Vercel for preview deployment (sha: $SHA)..."
 
           for i in $(seq 1 36); do
-            RESPONSE=$(curl -sf \
+            # Do NOT use -f: that flag exits with code 22 on any non-2xx HTTP
+            # response, aborting the loop on the first transient API error.
+            # Instead, capture the HTTP status separately and treat non-200
+            # responses as retryable.
+            HTTP_CODE=$(curl -s \
+              -o /tmp/vercel_resp.json \
+              -w "%{http_code}" \
+              --max-time 20 \
               -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v6/deployments?projectId=$PROJECT_ID&teamId=$TEAM_ID&limit=10")
+              "$API" 2>/dev/null || echo "000")
 
-            URL=$(echo "$RESPONSE" | jq -r \
-              --arg sha "$SHA" \
-              '[.deployments[] | select(.meta.githubCommitSha == $sha and .state == "READY")] | .[0].url // empty')
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "[$i] Vercel API returned HTTP $HTTP_CODE — retrying in 10s"
+              sleep 10
+              continue
+            fi
 
-            STATE=$(echo "$RESPONSE" | jq -r \
+            URL=$(jq -r \
               --arg sha "$SHA" \
-              '[.deployments[] | select(.meta.githubCommitSha == $sha)] | .[0].state // "not found"')
+              '[.deployments[] | select(.meta.githubCommitSha == $sha and .state == "READY")] | .[0].url // empty' \
+              /tmp/vercel_resp.json 2>/dev/null || true)
+
+            STATE=$(jq -r \
+              --arg sha "$SHA" \
+              '[.deployments[] | select(.meta.githubCommitSha == $sha)] | .[0].state // "not found"' \
+              /tmp/vercel_resp.json 2>/dev/null || echo "parse_error")
 
             echo "[$i] state=$STATE url=${URL:-—}"
 
