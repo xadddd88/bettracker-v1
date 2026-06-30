@@ -6,9 +6,14 @@ import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 import { extractJsonObject } from '@/lib/ai/extract-json'
 
+const envInt = (key: string, def: number) => {
+  const n = parseInt(process.env[key] ?? '', 10)
+  return Number.isFinite(n) && n > 0 ? n : def
+}
+
 // ─── Rate limit store (in-memory, rolling 24h) ───────────────
 const rateLimitStore = new Map<string, { day: number; dayTs: number }>()
-const RATE_LIMIT_PER_DAY = 2
+const RATE_LIMIT_PER_DAY = envInt('RATE_LIMIT_COACH_PER_DAY', 20)
 
 function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
   const now = Date.now()

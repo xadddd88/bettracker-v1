@@ -6,11 +6,16 @@ import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 import { bucketScoutScore } from '@/lib/analytics/buckets'
 
+const envInt = (key: string, def: number) => {
+  const n = parseInt(process.env[key] ?? '', 10)
+  return Number.isFinite(n) && n > 0 ? n : def
+}
+
 // ─── Rate limit store (in-memory) ────────────────────────────
 const rateLimitStore = new Map<string, { minute: number; day: number; minuteTs: number; dayTs: number }>()
 
-const RATE_LIMIT_PER_MINUTE = 3
-const RATE_LIMIT_PER_DAY    = 15
+const RATE_LIMIT_PER_MINUTE = envInt('RATE_LIMIT_SCOUT_PER_MINUTE', 3)
+const RATE_LIMIT_PER_DAY    = envInt('RATE_LIMIT_SCOUT_PER_DAY', 50)
 
 const TIMEOUT_WITH_WEB_SEARCH_MS    = 55_000
 const TIMEOUT_WITHOUT_WEB_SEARCH_MS = 55_000
