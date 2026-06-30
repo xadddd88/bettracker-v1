@@ -171,10 +171,6 @@ const candidateSchema = z.object({
   required_checks:     z.array(z.string().min(1)).min(1).max(10),
 })
 
-const scoutOutputSchema = z.object({
-  candidates: z.array(candidateSchema).min(1).max(5),
-  disclaimer:  z.string().min(10),
-})
 
 function normalizeScoutRaw(raw: unknown): unknown {
   if (raw && typeof raw === 'object') {
@@ -238,7 +234,7 @@ ${getScoutSportModule(sport)}
 
 SCOUT RULES (non-negotiable):
 - Return 1–5 candidates. Do not pad with weak candidates — quality over quantity.
-- Every candidate MUST have at least 1 required_check (specific, actionable verification step).
+- Every candidate MUST have at least 1 required_check (specific, actionable verification step) and a reasoning of at least 2 sentences. If you cannot fill all required fields for a candidate — omit that candidate entirely rather than leaving fields empty or null.
 - scout_score is NOT a win probability. It measures how worthwhile this market is to research (0–100).
 - confidence_score reflects your confidence in the quality of this analysis (not the outcome).
 - Without live data, confidence_score should honestly be in the range 30–60.
@@ -442,22 +438,43 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
       )
     }
 
-    const validated = scoutOutputSchema.safeParse(normalizeScoutRaw(scoutRaw))
-    if (!validated.success) {
-      console.error('[scout] schema_mismatch', {
-        issueCount: validated.error.issues.length,
-        issues: validated.error.issues.map(i => ({ path: i.path, code: i.code, message: i.message })),
-        outputChars: rawText.length,
-      })
-      await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, { sport: input.sport, error_type: 'anthropic_schema_mismatch' })
-      return NextResponse.json(
-        { success: false, error: 'Scout output did not match expected schema. Please try again.' },
-        { status: 502 },
-      )
+    const normalizedRaw = normalizeScoutRaw(scoutRaw)
+    const rawObj = (normalizedRaw && typeof normalizedRaw === 'object')
+      ? normalizedRaw as Record<string, unknown> : {}
+    const rawCandidates = Array.isArray(rawObj.candidates) ? rawObj.candidates : []
+
+    const validCandidates: z.infer<typeof candidateSchema>[] = []
+    const candidateIssues: unknown[] = []
+    for (const c of rawCandidates) {
+      const r = candidateSchema.safeParse(c)
+      if (r.success) validCandidates.push(r.data)
+      else candidateIssues.push(r.error.issues)
     }
 
+    if (validCandidates.length === 0) {
+      console.error('[scout] schema_mismatch',
+        JSON.stringify({ candidateIssues, outputChars: rawText.length }))
+      await trackServerEvent(user.id, EVENTS.SCOUT_FAILED,
+        { sport: input.sport, error_type: 'anthropic_schema_mismatch' })
+      return NextResponse.json(
+        { success: false, error: 'Scout output did not match expected schema. Please try again.' },
+        { status: 502 })
+    }
+
+    if (candidateIssues.length > 0) {
+      console.warn('[scout] dropped_invalid_candidates',
+        JSON.stringify({ dropped: candidateIssues.length, kept: validCandidates.length }))
+    }
+
+    const keptCandidates = validCandidates.slice(0, 5)
+
+    const disclaimerParse = z.string().min(10).safeParse(rawObj.disclaimer)
+    const disclaimer = disclaimerParse.success
+      ? disclaimerParse.data
+      : 'This scout analysis is based on general knowledge and does not include live injury reports, current odds, recent form updates, or breaking news.'
+
     // 7. Server-side implied_probability + edge_percent override when offered_odds is present
-    const rows = validated.data.candidates.map(c => {
+    const rows = keptCandidates.map(c => {
       const offered = c.offered_odds ?? null
       const implied = offered != null
         ? parseFloat(((1 / offered) * 100).toFixed(2))
@@ -517,8 +534,8 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
 
     const fallbackLimitation = 'Live web-search context was unavailable, so Scout used limited-data mode. Verify current odds, injuries/news, line movement, and recent form before making any decision.'
     const responseDisclaimer = fallbackUsed
-      ? `${validated.data.disclaimer}\n\n${fallbackLimitation}`
-      : validated.data.disclaimer
+      ? `${disclaimer}\n\n${fallbackLimitation}`
+      : disclaimer
 
     return NextResponse.json({
       success: true,
