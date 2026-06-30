@@ -38,6 +38,7 @@
 | #47 | Quick Settle UI — inline Won/Lost/Void for pending bets |
 | #50 / Migration 012 | `settle_bet` fixes applied manually — future settlements update `bet_legs.leg_status`; `lost` outcome returns non-null `new_balance` when bankroll exists; historical `bet_legs` backfill applied, remaining mismatches verified as 0 |
 | #52 | CSP `Report-Only` header + `/api/csp-report` violation endpoint — live, collecting violations in Vercel runtime logs |
+| #55 | `npm audit` lockfile hygiene — 4 in-range patch updates (`@supabase/supabase-js`, `postcss`, `posthog-js`, `posthog-node`); 2 moderate postcss vulns in Next.js nested deps accepted as non-exploitable |
 
 ---
 
@@ -83,7 +84,6 @@
 
 Items parked for after beta — no timeline set:
 
-- `npm audit` / `package-lock` hygiene PR
 - `lucide-react` version check
 - Analytics taxonomy cleanup: `from: 'quick_settle'` → `from_page` field standardisation
 - Optional Coach RU retest (after rate-limit tuning)
