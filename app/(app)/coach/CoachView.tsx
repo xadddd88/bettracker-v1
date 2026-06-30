@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import Link from 'next/link'
 import type { CoachingSession, CalibrationGrade, CoachRecommendation } from '@/types'
 
 type PeriodDays = 7 | 30 | 90 | 0
@@ -95,6 +96,9 @@ function SessionCard({
         </div>
         <CalibrationBadge grade={session.calibration_grade} />
       </div>
+      {session.calibration_grade && (
+        <p className="text-[10px] text-gray-600 -mt-2">Calibration: how well your confidence predictions matched your actual results.</p>
+      )}
 
       {/* Summary */}
       <p className="text-sm text-gray-200 leading-relaxed">{session.summary}</p>
@@ -240,6 +244,7 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
               </button>
             ))}
           </div>
+          <p className="text-[11px] text-gray-600 mt-1.5">Limits the AI to settled bets within this window — narrower periods show recent trends.</p>
         </div>
 
         {/* Focus notes */}
@@ -304,6 +309,14 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
               ? 'Run Coach to get your first performance analysis.'
               : "Run Coach after you've settled at least 5 bets."}
           </p>
+        </div>
+      )}
+
+      {/* ── Next-step CTA ──────────────────────────────────── */}
+      {latestSession && (
+        <div className="flex items-center justify-between px-1">
+          <p className="text-xs text-gray-600">Apply these insights in your next analysis.</p>
+          <Link href="/ai" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors shrink-0">→ AI Analyst</Link>
         </div>
       )}
 

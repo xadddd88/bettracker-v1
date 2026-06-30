@@ -127,6 +127,7 @@ export default function BankrollView({
         <p className="text-4xl font-bold text-white">
           {symbol}{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
+        <p className="text-[11px] text-gray-600 mt-2">Deposits + payouts − stakes − withdrawals</p>
       </div>
 
       {/* Stats */}
@@ -134,18 +135,22 @@ export default function BankrollView({
         <div className="stat-card">
           <p className="stat-label">Deposited</p>
           <p className="stat-value text-green-400">{fmtBalance(stats.totalDeposited, symbol)}</p>
+          <p className="text-[10px] text-gray-700 mt-0.5">total added</p>
         </div>
         <div className="stat-card">
           <p className="stat-label">Withdrawn</p>
           <p className="stat-value text-red-400">{fmtBalance(stats.totalWithdrawn, symbol)}</p>
+          <p className="text-[10px] text-gray-700 mt-0.5">total removed</p>
         </div>
         <div className="stat-card">
           <p className="stat-label">Net from bets</p>
           <p className={`stat-value ${stats.netFromBets >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {stats.netFromBets >= 0 ? '+' : '−'}{symbol}{Math.abs(stats.netFromBets).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
+          <p className="text-[10px] text-gray-700 mt-0.5">payouts minus stakes</p>
         </div>
       </div>
+      <p className="text-[10px] text-gray-600 -mt-2 text-center">Pending bet stakes are not automatically deducted from your balance.</p>
 
       {/* Action buttons */}
       <div className="flex gap-3">
