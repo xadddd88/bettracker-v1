@@ -63,20 +63,43 @@ export default function Sidebar({ user, primaryEvent }: SidebarProps) {
         </div>
       </div>
 
-      {/* Event badge — shown when a Pulse event is active */}
+      {/* Premium event chip — shown when a Pulse event is active */}
       {primaryEvent && (
-        <div className="px-5 py-2.5 border-b" style={{ borderColor: 'var(--border)' }}>
+        <div className="px-3 py-2.5 border-b" style={{ borderColor: 'var(--border)' }}>
           <div
-            className="text-[10px] uppercase tracking-[0.5px] font-semibold truncate"
-            style={{ color: 'var(--accent)' }}
+            className="relative rounded-lg px-3 py-2.5 overflow-hidden"
+            style={{
+              background: 'var(--accent-soft)',
+              border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
+              boxShadow: '0 0 16px var(--accent-glow)',
+            }}
           >
-            {primaryEvent.icon} {primaryEvent.label}
-          </div>
-          {primaryEvent.sublabel && (
-            <div className="text-[10px] text-slate-600 mt-0.5 truncate">
-              {primaryEvent.sublabel}
+            {/* Accent top edge */}
+            <div
+              className="absolute inset-x-0 top-0 h-px"
+              style={{ background: 'linear-gradient(90deg, transparent, var(--accent-soft), transparent)' }}
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-base leading-none flex-shrink-0">{primaryEvent.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-semibold text-white truncate leading-tight">
+                  {primaryEvent.label}
+                </div>
+                {primaryEvent.sublabel && (
+                  <div
+                    className="text-[10px] mt-0.5 truncate leading-none"
+                    style={{ color: 'var(--accent)', opacity: 0.75 }}
+                  >
+                    {primaryEvent.sublabel}
+                  </div>
+                )}
+              </div>
+              <div
+                className="w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse-breathe"
+                style={{ background: 'var(--accent)' }}
+              />
             </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -91,7 +114,11 @@ export default function Sidebar({ user, primaryEvent }: SidebarProps) {
               className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
               style={
                 active
-                  ? { backgroundColor: 'var(--accent-soft)', color: 'var(--accent)' }
+                  ? {
+                      background: 'var(--accent-soft)',
+                      color: 'var(--accent)',
+                      boxShadow: 'inset 2px 0 0 var(--accent-rail)',
+                    }
                   : undefined
               }
             >
@@ -122,11 +149,11 @@ export default function Sidebar({ user, primaryEvent }: SidebarProps) {
         </button>
       </div>
 
-      {/* Ambient glow — bleeds up from bottom, colored by active event */}
+      {/* Ambient glow — bleeds up from bottom */}
       <div
         className="absolute bottom-0 left-0 right-0 pointer-events-none"
         style={{
-          height: '120px',
+          height: '140px',
           background: 'linear-gradient(to top, var(--accent-glow), transparent)',
           transition: 'background 0.6s ease',
         }}

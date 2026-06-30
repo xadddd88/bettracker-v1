@@ -4,23 +4,21 @@ import { getAmbientTheme } from '@/lib/events/pulse-themes'
 export default function PulseThemeProvider() {
   const today = new Date().toISOString().slice(0, 10)
   const event = getPrimaryEvent(today)
-  const tokens = getAmbientTheme(event?.theme ?? 'default')
+  const t = getAmbientTheme(event?.theme ?? 'default')
 
-  const lines = [
-    `--accent: ${tokens.accent};`,
-    `--accent-soft: ${tokens.accentSoft};`,
-    `--accent-glow: ${tokens.accentGlow};`,
-    `--bg: ${tokens.bg};`,
+  const vars: string[] = [
+    `--accent: ${t.accent};`,
+    `--accent-soft: ${t.accentSoft};`,
+    `--accent-glow: ${t.accentGlow};`,
+    `--accent-rail: ${t.accentRail};`,
+    `--bg: ${t.bg};`,
   ]
 
-  if (tokens.texture) {
-    lines.push(`--body-texture: ${tokens.texture};`)
-  }
-  if (tokens.textureSize) {
-    lines.push(`--body-texture-size: ${tokens.textureSize};`)
-  }
+  if (t.surface1)    vars.push(`--surface-1: ${t.surface1};`)
+  if (t.surface2)    vars.push(`--surface-2: ${t.surface2};`)
+  if (t.bodyOverlay) vars.push(`--body-overlay: ${t.bodyOverlay};`)
+  if (t.texture)     vars.push(`--body-texture: ${t.texture};`)
+  if (t.textureSize) vars.push(`--body-texture-size: ${t.textureSize};`)
 
-  const css = `:root { ${lines.join(' ')} }`
-
-  return <style dangerouslySetInnerHTML={{ __html: css }} />
+  return <style dangerouslySetInnerHTML={{ __html: `:root { ${vars.join(' ')} }` }} />
 }
