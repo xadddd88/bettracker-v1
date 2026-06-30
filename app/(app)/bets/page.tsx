@@ -59,7 +59,9 @@ export default async function BetsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Bets</h1>
-          <p className="text-sm text-gray-500 mt-1">{bets.length} bets · {settled.length} settled</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {bets.length} bets · {settled.length} settled · live P&amp;L tracking
+          </p>
         </div>
         <Link href="/bets/new" className="btn-primary">+ Add Bet</Link>
       </div>
@@ -85,8 +87,14 @@ export default async function BetsPage() {
       {bets.length === 0 ? (
         <div className="card text-center py-14">
           <div className="text-4xl mb-3">🎯</div>
-          <p className="text-gray-400 mb-4">No bets yet.</p>
-          <Link href="/bets/new" className="btn-primary inline-flex">Add your first bet</Link>
+          <p className="font-medium text-white mb-1">No bets tracked yet</p>
+          <p className="text-gray-400 text-sm mb-5">
+            Place a bet from an AI analysis, or add manually. Results update win rate, ROI, and P&amp;L automatically.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Link href="/ai" className="btn-ghost text-sm">Analyse a match</Link>
+            <Link href="/bets/new" className="btn-primary text-sm">+ Add bet</Link>
+          </div>
         </div>
       ) : (
         <div className="card p-0 divide-y divide-gray-800">

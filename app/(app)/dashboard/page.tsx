@@ -64,11 +64,13 @@ export default async function DashboardPage() {
       label: 'Win Rate',
       value: winLostCount > 0 ? `${winRate.toFixed(1)}%` : '—',
       color: '',
+      sub: 'Won / (won + lost)',
     },
     {
       label: 'ROI',
       value: roiStake > 0 ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—',
       color: roiStake > 0 ? (roi >= 0 ? 'text-green-400' : 'text-red-400') : '',
+      sub: 'Return on settled stake',
     },
     {
       label: 'Net Profit',
@@ -76,11 +78,13 @@ export default async function DashboardPage() {
         ? `${netProfit >= 0 ? '+' : ''}${sym}${netProfit.toFixed(2)}`
         : '—',
       color: settledBets.length > 0 ? (netProfit >= 0 ? 'text-green-400' : 'text-red-400') : '',
+      sub: 'Settled bets only',
     },
     {
       label: 'Pending',
       value: `${sym}${pendingStake.toFixed(2)}`,
       color: '',
+      sub: `${pendingBets.length} open bet${pendingBets.length !== 1 ? 's' : ''}`,
     },
   ]
 
@@ -157,10 +161,11 @@ export default async function DashboardPage() {
 
       {/* Secondary stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {statCards.map(({ label, value, color }) => (
+        {statCards.map(({ label, value, color, sub }) => (
           <div key={label} className="stat-card">
             <div className="stat-label">{label}</div>
             <div className={`stat-value text-xl ${color || 'text-white'}`}>{value}</div>
+            <div className="text-xs text-gray-600">{sub}</div>
           </div>
         ))}
       </div>
@@ -176,10 +181,11 @@ export default async function DashboardPage() {
 
         {recent.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-slate-500 text-sm mb-4">No bets tracked yet. Start by analyzing a match.</p>
+            <p className="font-medium text-white mb-1">No bets yet</p>
+            <p className="text-slate-500 text-sm mb-5">Run the AI Analyst to get a recommendation, then place your first bet.</p>
             <div className="flex gap-3 justify-center">
-              <Link href="/ai" className="btn-ghost text-sm">Analyze match</Link>
-              <Link href="/bets/new" className="btn-primary text-sm">Quick add</Link>
+              <Link href="/ai" className="btn-ghost text-sm">Analyse match</Link>
+              <Link href="/bets/new" className="btn-primary text-sm">+ Quick add</Link>
             </div>
           </div>
         ) : (

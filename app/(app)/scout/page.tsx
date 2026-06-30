@@ -26,7 +26,9 @@ export default async function ScoutPage() {
       <PageView event={EVENTS.SCOUT_PAGE_VIEWED} />
       <div>
         <h1 className="text-2xl font-bold text-white">Scout</h1>
-        <p className="text-sm text-gray-500 mt-1">Find markets worth analysing</p>
+        <p className="text-sm text-gray-500 mt-1">
+          Research opportunity discovery — find markets that may have value, then analyse them in the AI Analyst.
+        </p>
       </div>
       <ScoutForm initialOpportunities={opportunities} pulsePresets={pulsePresets} />
     </div>
