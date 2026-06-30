@@ -9,13 +9,21 @@
 
 | Field | Value |
 |---|---|
-| **Status** | Beta READY |
+| **Engineering Shell** | READY |
+| **Product Vision Beta** | NOT READY |
+| **External beta launch** | PAUSED — product does not yet match founder vision |
 | **Production URL** | https://btdk.app |
 | **Repo** | xadddd88/bettracker-v1 |
 | **Branch model** | Feature branches → PR → CPO accept → Dima merges |
 | **Current UI** | Stable dark UI + Ambient Theme live as-is |
 | **Ambient Theme** | Current version live in production — further Design v2 / premium event skin work is parked |
-| **Active blockers** | None |
+| **Current phase** | Product Vision Gap / Beta v2 planning |
+| **Active blockers** | None in current main — product vision gaps documented in PRODUCT_VISION_GAP.md |
+| **External beta invites** | Do not invite external beta users yet |
+
+> **Note:** main is stable and frozen. No rollback needed. No urgent bugfix. Engineering shell is solid.
+> The pause is a product decision — the engineering work done is confirmed and retained.
+> See PRODUCT_VISION_GAP.md for the full roadmap to Product Vision Beta.
 
 ---
 
@@ -71,27 +79,44 @@
 
 ## 5. Do Not Do Now
 
+- Do NOT invite external beta users yet
+- Do NOT launch publicly
 - Do NOT continue Ambient Theme / Design v2
-- Do NOT start Scout v2
+- Do NOT start Scout v2 (until data provider decision)
 - Do NOT start i18n
 - Do NOT start legal pages
 - Do NOT start broad security hardening
+- Do NOT start public site work
+- Do NOT start mobile redesign (until mobile/tablet UX is planned)
+- Do NOT start native mobile app work
 - Do NOT do visual redesign
 - Do NOT merge any PR without explicit CPO ACCEPT
+- Do NOT open new code PRs unless a blocker appears in current main
 
 ---
 
 ## 6. Non-Blocking Backlog
 
-Items parked for after beta — no timeline set:
+Items parked for after product vision gaps are addressed:
 
 - Optional Coach RU retest (after rate-limit tuning)
-
-- Design v2 / premium event skin (future sprint)
+- Design v2 / premium event skin (future sprint — Phase 8)
+- CSP `eu-assets.i.posthog.com` script-src gap (add before CSP is enforced)
 
 ---
 
-## 7. Process Rules
+## 7. Passive Monitoring
+
+Daily health-check (read-only, no PR unless blocker):
+- Vercel: latest production deployment READY
+- Vercel runtime logs: errors/fatals clean
+- CSP violation logs: note recurring blocked sources
+- Sentry: no new unresolved issues
+- PostHog: core events flowing
+
+---
+
+## 8. Process Rules
 
 - **Claude Code** opens PRs only — no direct pushes to main (except CI hotfixes)
 - **Cowork** can review from Cowork side
@@ -102,7 +127,7 @@ Items parked for after beta — no timeline set:
 
 ---
 
-## 8. Product Identity
+## 9. Product Identity
 
 | Field | Value |
 |---|---|
