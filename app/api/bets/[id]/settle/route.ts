@@ -16,6 +16,19 @@ export async function POST(
 
   const { id } = await params
 
+  // Verify ownership before calling the RPC — settle_bet is likely SECURITY DEFINER
+  // (bypasses RLS), so we must enforce user_id scoping here in the route.
+  const { data: betRow } = await supabase
+    .from('bets')
+    .select('id, status')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!betRow) {
+    return NextResponse.json({ error: 'Bet not found' }, { status: 404 })
+  }
+
   let body: unknown
   try { body = await req.json() } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
