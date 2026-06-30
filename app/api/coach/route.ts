@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
+import { extractJsonObject } from '@/lib/ai/extract-json'
 
 // ─── Rate limit store (in-memory, rolling 24h) ───────────────
 const rateLimitStore = new Map<string, { day: number; dayTs: number }>()
@@ -520,8 +521,7 @@ export async function POST(req: NextRequest) {
     // 11. Parse + Zod validate
     let coachRaw: unknown
     try {
-      const clean = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim()
-      coachRaw = JSON.parse(clean)
+      coachRaw = JSON.parse(extractJsonObject(rawText))
     } catch {
       await trackServerEvent(user.id, EVENTS.COACH_FAILED, { period_days: input.period_days, error_type: 'ai_parse' })
       return NextResponse.json(

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 import { bucketOdds, bucketEdge, bucketConfidence } from '@/lib/analytics/buckets'
+import { extractJsonObject } from '@/lib/ai/extract-json'
 
 // ─── Rate limit store (in-memory, Sprint 2) ──────────────────
 // Sprint 3: replace with Redis
@@ -258,16 +259,17 @@ Return structured JSON analysis only.`
       system: systemPrompt,
     })
 
-    const rawText = message.content[0].type === 'text' ? message.content[0].text : ''
+    const rawText = message.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map(b => b.text)
+      .at(-1) ?? ''
     const inputChars  = userMessage.length + systemPrompt.length
     const outputChars = rawText.length
 
     // 7. Parse + validate output
     let analysisRaw: unknown
     try {
-      // Strip markdown fences if present
-      const clean = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim()
-      analysisRaw = JSON.parse(clean)
+      analysisRaw = JSON.parse(extractJsonObject(rawText))
     } catch {
       await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'ai_parse' })
       return NextResponse.json(
