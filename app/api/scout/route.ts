@@ -176,6 +176,24 @@ const scoutOutputSchema = z.object({
   disclaimer:  z.string().min(10),
 })
 
+function normalizeScoutRaw(raw: unknown): unknown {
+  if (raw && typeof raw === 'object') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const o = raw as Record<string, any>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lc = (v: any) => typeof v === 'string' ? v.toLowerCase().trim() : v
+    if (Array.isArray(o.candidates)) {
+      for (const c of o.candidates) {
+        if (c && typeof c === 'object') {
+          c.opportunity_type = lc(c.opportunity_type)
+          c.risk_level       = lc(c.risk_level)
+        }
+      }
+    }
+  }
+  return raw
+}
+
 // ─── Sport module ─────────────────────────────────────────────
 function getScoutSportModule(sport: string): string {
   switch (sport) {
@@ -424,8 +442,9 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
       )
     }
 
-    const validated = scoutOutputSchema.safeParse(scoutRaw)
+    const validated = scoutOutputSchema.safeParse(normalizeScoutRaw(scoutRaw))
     if (!validated.success) {
+      console.error('[scout] schema_mismatch', JSON.stringify(validated.error.issues))
       await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, { sport: input.sport, error_type: 'anthropic_schema_mismatch' })
       return NextResponse.json(
         { success: false, error: 'Scout output did not match expected schema. Please try again.' },
