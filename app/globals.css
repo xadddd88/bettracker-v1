@@ -7,8 +7,12 @@
   /* Ambient — overridden per-request by PulseThemeProvider */
   --bg:          #0A0A0A;
   --accent:      #F5A623;
-  --accent-soft: rgba(245,166,35,0.12);
+  --accent-soft: rgba(245,166,35,0.10);
   --accent-glow: rgba(245,166,35,0.15);
+  --accent-rail: rgba(245,166,35,0.85);
+
+  /* Atmospheric depth — transparent by default; overridden per-event */
+  --body-overlay: radial-gradient(ellipse at 50% -5%, transparent 0%, transparent 100%);
 
   /* Body texture — overridden by PulseThemeProvider when a themed event is active */
   --body-texture:      linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
@@ -48,7 +52,7 @@
 }
 
 /* ─── Reduced motion ─────────────────────────────────────── */
-/* Scope to theme transitions only — loading spinners (animate-spin) must remain usable */
+/* Scope to theme animations only — loading spinners (animate-spin) must remain usable */
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
@@ -66,6 +70,7 @@
     background-image:    var(--body-texture);
     background-size:     var(--body-texture-size);
     background-position: 0 0;
+    background-repeat:   repeat;
     background-attachment: fixed;
     transition: background-color 0.6s ease;
   }
@@ -78,39 +83,47 @@
 /* ─── Components ─────────────────────────────────────────── */
 @layer components {
   .card {
-    background: var(--surface-1);
+    background: linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--accent) 3%, var(--surface-1)) 0%,
+      var(--surface-1) 55%
+    );
     border: 1px solid var(--border);
     @apply rounded-xl p-4;
   }
 
   .card-highlight {
-    background: var(--surface-1);
-    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent) inset;
-    background-image: linear-gradient(160deg, color-mix(in srgb, var(--accent) 5%, transparent) 0%, transparent 50%);
+    background: linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--accent) 9%, var(--surface-1)) 0%,
+      var(--surface-1) 60%
+    );
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    box-shadow: 0 0 24px color-mix(in srgb, var(--accent-glow) 70%, transparent),
+                inset 0 1px 0 rgba(255,255,255,0.05);
     @apply rounded-xl p-4;
   }
 
   .card-status-win {
-    background: var(--surface-1);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--win) 4%, var(--surface-1)) 0%, var(--surface-1) 55%);
     border: 1px solid var(--border);
     border-left: 3px solid var(--win);
     @apply rounded-xl p-4;
   }
   .card-status-loss {
-    background: var(--surface-1);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--loss) 4%, var(--surface-1)) 0%, var(--surface-1) 55%);
     border: 1px solid var(--border);
     border-left: 3px solid var(--loss);
     @apply rounded-xl p-4;
   }
   .card-status-pending {
-    background: var(--surface-1);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--pending) 4%, var(--surface-1)) 0%, var(--surface-1) 55%);
     border: 1px solid var(--border);
     border-left: 3px solid var(--pending);
     @apply rounded-xl p-4;
   }
   .card-status-watch {
-    background: var(--surface-1);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--neutral) 4%, var(--surface-1)) 0%, var(--surface-1) 55%);
     border: 1px solid var(--border);
     border-left: 3px solid var(--neutral);
     @apply rounded-xl p-4;
