@@ -48,6 +48,23 @@ const coachOutputSchema = z.object({
   disclaimer:        z.string().min(20),
 })
 
+function normalizeCoachRaw(raw: unknown): unknown {
+  if (raw && typeof raw === 'object') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const o = raw as Record<string, any>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lc = (v: any) => typeof v === 'string' ? v.toLowerCase().trim() : v
+    const grade = lc(o.calibration_grade)
+    o.calibration_grade = ['excellent', 'good', 'fair', 'poor'].includes(grade) ? grade : null
+    if (Array.isArray(o.recommendations)) {
+      for (const r of o.recommendations) {
+        if (r && typeof r === 'object') r.priority = lc(r.priority)
+      }
+    }
+  }
+  return raw
+}
+
 // ─── Data types ───────────────────────────────────────────────
 type DbBet = {
   id: string
@@ -530,8 +547,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const validated = coachOutputSchema.safeParse(coachRaw)
+    const coachRaw2 = normalizeCoachRaw(coachRaw)
+    const validated = coachOutputSchema.safeParse(coachRaw2)
     if (!validated.success) {
+      console.error('[coach] schema_mismatch',
+        JSON.stringify(validated.error.issues),
+        'raw:', rawText.slice(0, 1000))
       await trackServerEvent(user.id, EVENTS.COACH_FAILED, { period_days: input.period_days, error_type: 'ai_schema' })
       return NextResponse.json(
         { success: false, error: 'Coach output did not match expected schema. Please try again.' },
