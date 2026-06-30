@@ -84,7 +84,6 @@
 
 Items parked for after beta — no timeline set:
 
-- Analytics taxonomy cleanup: `from: 'quick_settle'` → `from_page` field standardisation
 - Optional Coach RU retest (after rate-limit tuning)
 - Optional controlled $1 Quick Settle live mutation test
 - Design v2 / premium event skin (future sprint)

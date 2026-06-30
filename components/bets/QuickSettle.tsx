@@ -20,7 +20,7 @@ export default function QuickSettle({ betId }: Props) {
     lockRef.current = true
     setBusy(outcome)
     setError('')
-    trackClientEvent(EVENTS.BET_SETTLE_CLICKED, { bet_id: betId, outcome, from: 'quick_settle' })
+    trackClientEvent(EVENTS.BET_SETTLE_CLICKED, { bet_id: betId, outcome, from_page: 'quick_settle' })
     try {
       const res  = await fetch(`/api/bets/${betId}/settle`, {
         method:  'POST',
