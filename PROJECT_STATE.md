@@ -36,6 +36,7 @@
 | #44 | Ambient Theme v2 — event header strip + app-shell depth; merged/live; further Design v2 parked |
 | #45 / #46 | Product structure + in-app guidance (Beta readiness) |
 | #47 | Quick Settle UI — inline Won/Lost/Void for pending bets |
+| #50 / Migration 012 | `settle_bet` fixes applied manually — future settlements update `bet_legs.leg_status`; `lost` outcome returns non-null `new_balance` when bankroll exists |
 
 ---
 
@@ -81,7 +82,7 @@
 
 Items parked for after beta — no timeline set:
 
-- `012_settle_bet_fixes.sql` — PR + manual Supabase apply
+- Optional historical `bet_legs` backfill — existing settled bets still have `leg_status = 'pending'`; not a Beta blocker
 - CSP Report-Only header PR
 - `npm audit` / `package-lock` hygiene PR
 - `lucide-react` version check
