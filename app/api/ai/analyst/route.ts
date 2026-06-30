@@ -7,12 +7,17 @@ import { EVENTS } from '@/lib/analytics/events'
 import { bucketOdds, bucketEdge, bucketConfidence } from '@/lib/analytics/buckets'
 import { extractJsonObject } from '@/lib/ai/extract-json'
 
+const envInt = (key: string, def: number) => {
+  const n = parseInt(process.env[key] ?? '', 10)
+  return Number.isFinite(n) && n > 0 ? n : def
+}
+
 // ─── Rate limit store (in-memory, Sprint 2) ──────────────────
 // Sprint 3: replace with Redis
 const rateLimitStore = new Map<string, { minute: number; day: number; minuteTs: number; dayTs: number }>()
 
-const RATE_LIMIT_PER_MINUTE = 10
-const RATE_LIMIT_PER_DAY    = 50
+const RATE_LIMIT_PER_MINUTE = envInt('RATE_LIMIT_ANALYST_PER_MINUTE', 10)
+const RATE_LIMIT_PER_DAY    = envInt('RATE_LIMIT_ANALYST_PER_DAY', 200)
 
 function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
   const now = Date.now()
