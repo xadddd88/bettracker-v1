@@ -48,10 +48,13 @@
 }
 
 /* ─── Reduced motion ─────────────────────────────────────── */
+/* Scope to theme transitions only — loading spinners (animate-spin) must remain usable */
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
-    animation:  none !important;
+  }
+  .animate-pulse-breathe {
+    animation: none !important;
   }
 }
 
