@@ -29,11 +29,14 @@ export class SportMonksAdapter implements EnrichmentAdapter {
   }
 
   // Read-only leagues check (per_page=1) — no enrichment data touched.
+  // Uses documented api_token query-param auth (not the Authorization
+  // header) so redactUrl()'s existing api_token handling covers it.
   async pingSmoke(): Promise<{ ok: true }> {
     const { SPORTMONKS_TOKEN } = getProviderEnv()
-    await providerFetch(this.provider, `${BASE_URL}/football/leagues?per_page=1`, {
-      headers: { Authorization: `Bearer ${SPORTMONKS_TOKEN}` },
-    })
+    const url = new URL(`${BASE_URL}/football/leagues`)
+    url.searchParams.set('per_page', '1')
+    url.searchParams.set('api_token', SPORTMONKS_TOKEN)
+    await providerFetch(this.provider, url.toString())
     return { ok: true }
   }
 }

@@ -107,6 +107,18 @@ test('sanitizeProviderError message contains REDACTED, not the raw token', () =>
   assert.equal(err.httpStatus, 401);
 });
 
+test('SportMonks pingSmoke URL shape cannot leak SPORTMONKS_TOKEN through ProviderError', () => {
+  const { sanitizeProviderError } = require(path.join(buildDir, 'lib/providers/errors.js'));
+  // Mirrors exactly what SportMonksAdapter.pingSmoke() builds.
+  const url = new URL('https://api.sportmonks.com/v3/football/leagues');
+  url.searchParams.set('per_page', '1');
+  url.searchParams.set('api_token', 'REAL_SPORTMONKS_TOKEN_VALUE');
+  const err = sanitizeProviderError('sportmonks', 'auth', 401, url.toString());
+  assert.ok(!err.message.includes('REAL_SPORTMONKS_TOKEN_VALUE'), `leaked token: ${err.message}`);
+  assert.ok(err.message.includes('api_token=REDACTED'), `did not redact api_token: ${err.message}`);
+  assert.ok(err.message.includes('per_page=1'), `non-secret param dropped: ${err.message}`);
+});
+
 // ── 3. Missing-env reporting names exactly the absent vars ───────────────
 test('findMissingEnvNames lists all three when none are set', () => {
   const out = runInFreshProcess(
