@@ -19,6 +19,24 @@ What the product must become before an external beta launch:
 - First-class mobile/tablet experience
 - Future native mobile app readiness
 
+The founder has clarified that the core value of the product is **not** shallow bet
+tracking or generic AI analysis. The core value is:
+
+- **Deep Predictive Sports Intelligence** — forecasting football and tennis outcomes
+  with maximum available context, not surface-level pattern matching
+- **Market-aware bet analysis and bet variation generation** — analysis must connect
+  to the current odds market and produce multiple actionable bet options, not a
+  single generic recommendation
+- **Internal sports knowledge base / intelligence graph** — stable sports knowledge
+  (teams, players, coaches, venues, tournaments, styles, H2H) stored and reused
+  internally, not re-derived from scratch on every request
+- **Learning from outcomes** — analysis outcomes, bet outcomes, settlement results,
+  user feedback, and calibration must feed back into the system over time
+- **Dynamic current context ingestion** — news, injuries, lineups, weather, and odds
+  movement must be fetched and factored in at analysis time, not assumed static
+- **Future video/social/expert-analysis ingestion**, where legally allowed, to add
+  qualitative expert context on top of structured data
+
 ---
 
 ## 2. What Is Currently Built
@@ -69,6 +87,146 @@ Football and tennis analysis must become sport-specific and much deeper.
 - Set-level result history
 - Player stats (aces, break points, serve %)
 - Odds movement
+
+---
+
+### Predictive Betting Intelligence Gap
+
+The core product is not a shallow AI form. It must deeply forecast and analyze
+football/tennis bets with maximum context, including:
+
+- form
+- teams/players
+- coaches
+- tactical styles
+- league/championship specifics
+- venue/stadium
+- weather
+- injuries/suspensions
+- expected lineups
+- motivation
+- odds movement
+- historical patterns
+- previous match performance
+- qualitative expert context
+
+It must remain probabilistic decision support:
+- no guaranteed picks
+- no sure wins
+- no profit promises
+
+---
+
+### Sports Knowledge Base / Intelligence Graph Gap
+
+The system should store stable/base knowledge internally for fast retrieval:
+
+- teams
+- players
+- coaches
+- venues/stadiums
+- leagues/tournaments
+- tennis surfaces
+- tactical/style profiles
+- H2H summaries
+- league characteristics
+- long-term statistical baselines
+
+This is currently missing. Every analysis today re-derives context from scratch
+instead of drawing on a reusable internal base of sports knowledge.
+
+---
+
+### Dynamic Context Ingestion Gap
+
+The system should fetch/refresh dynamic event-specific information:
+
+- recent form
+- injuries
+- suspensions
+- lineups
+- weather
+- odds movement
+- news
+- recent match reports
+- travel/rest/fatigue
+- tournament motivation
+
+This is currently missing. Analysis today has no live ingestion pipeline for
+event-specific context that changes in the hours/days before a fixture.
+
+---
+
+### Video / Social / Expert Analysis Gap
+
+Future system should use legally accessible:
+
+- YouTube tactical breakdowns
+- previous match analysis
+- expert previews
+- post-match reviews
+- press conferences
+- transcripts/captions/metadata
+- social clips only where allowed
+
+**Important:** Do not blindly scrape copyrighted media. Store structured insights,
+citations/source links, timestamps, summaries, embeddings, and confidence — not
+raw copyrighted video.
+
+---
+
+### Market-Aware Bet Variations Gap
+
+After analysis, the product must generate market-aware bet options based on
+current odds:
+
+- conservative
+- balanced/value
+- aggressive
+- alternative/hedge
+- no-bet/wait
+
+Each option should include:
+- market type
+- selection
+- current odds
+- bookmaker/source
+- odds timestamp
+- fair/model odds
+- minimum acceptable odds
+- edge %
+- confidence
+- risk
+- why this market fits the analysis
+- what would invalidate it
+
+Rules:
+- AI must not invent odds.
+- If odds are stale/unavailable, show target odds only: "Play only if odds ≥ X."
+- Product must be comfortable saying "no bet."
+
+This is currently missing. AI Analyst v1 produces generic analysis, not
+market-aware, odds-connected bet variations.
+
+---
+
+### Learning / Calibration Gap
+
+The system should learn from:
+
+- saved analyses
+- decisions
+- placed bets
+- settled outcomes
+- edge vs actual result
+- confidence calibration
+- user overrides
+- feedback
+- recurring team/player/market patterns
+
+This is currently missing. Coach analyzes user decision patterns today, but there
+is no feedback loop that calibrates model confidence against actual settled
+outcomes over time.
 
 ---
 
@@ -191,41 +349,61 @@ Needs:
 - Stable fixture IDs shared across product
 - Caching and sync plan
 
-### Phase 2 — Scout v2 Calendar-Driven
+### Phase 2 — Sports Knowledge Base / Intelligence Graph
+- Internal storage for stable/base sports knowledge (teams, players, coaches,
+  venues, leagues/tournaments, tennis surfaces, style profiles, H2H summaries)
+- Fast retrieval layer reusable across Scout, Analyst, Coach, and future public/
+  mobile surfaces
+- Long-term statistical baselines and league characteristics
+
+### Phase 3 — Scout v2 Calendar-Driven
 - Real upcoming fixtures as Scout input
 - Football and tennis first
 - Odds-aware candidate generation
 - AI used for ranking and explanation — only after real data retrieval
 - No fabricated matches
 
-### Phase 3 — Football Analyst v2 + Tennis Analyst v2
+### Phase 4 — Football Analyst v2 + Tennis Analyst v2
 - Sport-specific analysis schemas
 - Deeper contextual inputs (form, H2H, surface, etc.)
 - Stronger confidence and risk reasoning
 - Source-aware explanations (AI cites what data it used)
 
-### Phase 4 — Auto Settlement v1
+### Phase 5 — Market-Aware Bet Builder
+- Connect analysis output to current odds market
+- Generate conservative / balanced / aggressive / alternative-hedge / no-bet
+  options
+- Fair odds, minimum acceptable odds, edge %, confidence, and risk per option
+- Target-odds messaging when live odds are stale/unavailable
+
+### Phase 6 — Dynamic Context Ingestion
+- Live ingestion of news, injuries, suspensions, lineups, weather, odds movement
+- Recent match reports and tournament motivation context
+- Separation of verified structured data vs. editorial/social context
+- Foundation for future video/social/expert-analysis ingestion
+
+### Phase 7 — Auto Settlement v1
 - Result ingestion from data provider
 - Fixture/result mapping to open bets
 - Settlement for safe v1 market types (1X2, Match Winner)
 - Settlement logs and audit trail
 - Manual override for edge cases
 
-### Phase 5 — Public Site + Auth Split
+### Phase 8 — Public Site + Auth Split
 - Public landing page
 - Public example analysis
 - Auth-gated advanced tools
 - Waitlist / beta access flow
 - Trust disclaimer and responsible gambling notice
 
-### Phase 6 — i18n v1
+### Phase 9 — i18n v1
 Languages: EN, ES, FR, DE, AR, UK, RU
 - Full app UI translation
 - Public pages translation
 - Arabic RTL layout
 - Localized date/number/currency
 
-### Phase 7 — Mobile / Tablet Experience v1
+### Phase 10 — Mobile / Tablet Experience v1
 - Mobile-first app flows
 - Tablet-optimized app shell
 - Touch-friendly bet tracking and settlement
@@ -233,14 +411,14 @@ Languages: EN, ES, FR, DE, AR, UK, RU
 - Responsive analytics and charts
 - PWA readiness
 
-### Phase 8 — Design v2 / Premium Event Skin
+### Phase 11 — Design v2 / Premium Event Skin
 - Visual direction first (references, concepts, not implementation)
 - App shell redesign
 - Public landing design
 - Event-aware skins
 - Motion system
 
-### Phase 9 — Native Mobile App Exploration
+### Phase 12 — Native Mobile App Exploration
 - React Native / Expo feasibility study
 - Shared API layer assessment
 - Shared i18n integration
@@ -268,6 +446,24 @@ The following must all be true before an external beta launch:
 - Design meets premium sports intelligence standard
 - User can complete the full product loop without manual hacks or workarounds
 - Architecture leaves a clear path open for a future native mobile app
+- Football and tennis analysis uses real fixture context, current form, odds,
+  venue/stadium/weather where available
+- Tennis analysis accounts for surface, player form, fatigue/rest, ranking/profile,
+  H2H, tournament stage
+- Football analysis accounts for team form, tactical style, coach/team tendencies,
+  injuries/suspensions, venue/weather, league context
+- System stores reusable base knowledge for fast retrieval
+- System separates stable knowledge from live/current context
+- After analysis, product suggests multiple market-aware bet options: conservative,
+  balanced/value, aggressive, alternative/hedge, no-bet/wait
+- Each bet option includes current odds, source/bookmaker, timestamp, fair odds,
+  minimum acceptable odds, edge %, confidence, and risk
+- Product can say "no bet" when no current market has value
+- If odds are stale/unavailable, product shows target odds instead of an active
+  recommendation
+- Product learns from outcomes and calibration over time
+- Video/social/expert analysis is supported as a future ingestion layer with
+  legal/commercial constraints
 
 ---
 
@@ -284,6 +480,11 @@ Until the above gaps are closed and acceptance criteria are met:
 - No native mobile app until web product architecture and API boundaries are stable
 - No random design iteration
 - No new code PRs unless a blocker appears in current main
+- No market-aware bet builder implementation until odds provider and market
+  normalization are decided
+- No dynamic context/video ingestion until source/legal model is planned
+- No learning/calibration implementation until data model and privacy implications
+  are planned
 
 ---
 
@@ -309,9 +510,20 @@ Providers to evaluate:
 Evaluation criteria:
 - Real upcoming fixtures for football and tennis
 - Match results with sufficient latency for auto-settlement
-- Odds data availability
+- Odds data availability, including snapshots suitable for a future market-aware
+  bet builder
+- Stable IDs for fixtures/teams/players across time
 - Historical data for backtesting
 - Pricing and rate limits for beta scale
 - API stability and documentation quality
 
-**This decision unlocks Phases 2–5 of the roadmap.**
+The selected provider strategy must support, at minimum:
+- fixtures
+- results
+- odds snapshots
+- stable IDs
+- football/tennis first
+- the future market-aware bet builder (Phase 5)
+- future auto-settlement (Phase 7)
+
+**This decision unlocks Phases 2–7 of the roadmap.**

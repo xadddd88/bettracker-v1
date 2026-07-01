@@ -100,7 +100,7 @@
 Items parked for after product vision gaps are addressed:
 
 - Optional Coach RU retest (after rate-limit tuning)
-- Design v2 / premium event skin (future sprint — Phase 8)
+- Design v2 / premium event skin (future sprint — Phase 11)
 - CSP `eu-assets.i.posthog.com` script-src gap (add before CSP is enforced)
 
 ---
