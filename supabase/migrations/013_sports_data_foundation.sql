@@ -10,13 +10,14 @@
 --
 -- These are PROVIDER-SOURCED SYSTEM TABLES, not user-owned rows — there
 -- is no user_id column and no per-user RLS policy. RLS posture follows
--- the global_config precedent from migration 001: RLS enabled, a single
--- read-only policy for authenticated users on the "final truth" tables,
--- and NO write policy anywhere (all writes happen via the service-role
--- client in future sync/cron routes, which bypasses RLS). The two
--- internal working tables (fixture_provider_links, football_enrichment)
--- get NO authenticated policy at all — service-role only, per §9
--- ("must not affect user-facing analysis until promoted").
+-- the global_config precedent from migration 001: RLS enabled, NO write
+-- policy anywhere (all writes happen via the service-role client in future
+-- sync/cron routes, which bypasses RLS). An authenticated read policy is
+-- granted ONLY on the two tables that carry no raw_provider_payload
+-- (canonical_fixtures, market_catalog). Every table that carries
+-- raw_provider_payload (fixture_provider_links, odds_snapshots,
+-- fixture_results, football_enrichment) is service-role-only, per §9 —
+-- raw payload is debug/internal metadata, and RLS cannot hide columns.
 --
 -- No settlement logic, no auto-settlement. market_catalog seeds the
 -- full known market taxonomy (including deferred whole-line/Asian
@@ -101,12 +102,16 @@ CREATE TABLE canonical_fixtures (
   metadata            jsonb,
   created_at          timestamptz NOT NULL DEFAULT now(),
   updated_at          timestamptz NOT NULL DEFAULT now(),
+  -- CPO fix (§10): field-family exclusivity, NOT mandatory participants.
+  -- Football uses home/away, tennis uses participant_a/b — never mixed.
+  -- Participants MAY be NULL for TBD fixtures (cup draws, qualifiers,
+  -- unfilled World Cup slots, tennis draws). "Participants known" is
+  -- enforced later at the betting/settlement/analysis eligibility layer,
+  -- not at insert time.
   CONSTRAINT chk_fixture_participant_naming CHECK (
-    (sport = 'football' AND home_ref IS NOT NULL AND away_ref IS NOT NULL
-       AND participant_a_ref IS NULL AND participant_b_ref IS NULL)
+    (sport = 'football' AND participant_a_ref IS NULL AND participant_b_ref IS NULL)
     OR
-    (sport = 'tennis' AND participant_a_ref IS NOT NULL AND participant_b_ref IS NOT NULL
-       AND home_ref IS NULL AND away_ref IS NULL)
+    (sport = 'tennis' AND home_ref IS NULL AND away_ref IS NULL)
   )
 );
 
@@ -202,7 +207,12 @@ CREATE INDEX idx_fixture_results_review ON fixture_results (needs_manual_review)
 CREATE TABLE football_enrichment (
   id                          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   canonical_fixture_id        uuid NOT NULL REFERENCES canonical_fixtures(id) ON DELETE CASCADE,
-  fixture_provider_link_id    uuid REFERENCES fixture_provider_links(id) ON DELETE SET NULL,
+  -- CPO fix (§9): trusted-link binding. NOT NULL + the
+  -- validate_football_enrichment_link() trigger below guarantee this link
+  -- is for the SAME canonical_fixture_id, is a SportMonks link, and had
+  -- exact/high mapping confidence at write time. needs_review/medium/low
+  -- links can never drive enrichment.
+  fixture_provider_link_id    uuid NOT NULL REFERENCES fixture_provider_links(id) ON DELETE CASCADE,
   -- Snapshot of the mapping confidence AT WRITE TIME. Hard DB-level
   -- gate matching §9: only exact/high may ever land here, even if the
   -- link's confidence is later downgraded.
@@ -221,6 +231,38 @@ CREATE TABLE football_enrichment (
   UNIQUE (canonical_fixture_id)
 );
 
+-- ── ENRICHMENT TRUSTED-LINK VALIDATION (CPO fix, §9) ─────────
+-- Hard DB-level gate: football_enrichment may only reference a
+-- fixture_provider_links row that (a) belongs to the SAME
+-- canonical_fixture_id, (b) is a SportMonks link, and (c) had exact/high
+-- mapping confidence at write time. Complements mapping_confidence_at_write.
+CREATE OR REPLACE FUNCTION validate_football_enrichment_link()
+RETURNS trigger LANGUAGE plpgsql AS $
+DECLARE lnk fixture_provider_links%ROWTYPE;
+BEGIN
+  SELECT * INTO lnk FROM fixture_provider_links
+    WHERE id = NEW.fixture_provider_link_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'football_enrichment: provider link % not found', NEW.fixture_provider_link_id;
+  END IF;
+  IF lnk.provider <> 'sportmonks' THEN
+    RAISE EXCEPTION 'football_enrichment: link must be sportmonks, got %', lnk.provider;
+  END IF;
+  IF lnk.canonical_fixture_id <> NEW.canonical_fixture_id THEN
+    RAISE EXCEPTION 'football_enrichment: link fixture % does not match row fixture %',
+      lnk.canonical_fixture_id, NEW.canonical_fixture_id;
+  END IF;
+  IF lnk.mapping_confidence NOT IN ('exact','high') THEN
+    RAISE EXCEPTION 'football_enrichment: requires exact/high link confidence, got %', lnk.mapping_confidence;
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+CREATE TRIGGER trg_validate_football_enrichment_link
+  BEFORE INSERT OR UPDATE ON football_enrichment
+  FOR EACH ROW EXECUTE FUNCTION validate_football_enrichment_link();
+
 -- ── UPDATED_AT TRIGGERS (reuse set_updated_at() from migration 001) ──
 CREATE TRIGGER trg_canonical_fixtures_updated_at     BEFORE UPDATE ON canonical_fixtures     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_fixture_provider_links_updated_at BEFORE UPDATE ON fixture_provider_links FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -237,9 +279,14 @@ ALTER TABLE odds_snapshots     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fixture_results    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE market_catalog     ENABLE ROW LEVEL SECURITY;
 
+-- CPO fix (§9): odds_snapshots and fixture_results carry
+-- raw_provider_payload, and Postgres RLS cannot hide columns — an
+-- authenticated SELECT would expose raw provider JSON. They are therefore
+-- service-role-only in M1.1 (RLS enabled above, NO authenticated policy).
+-- Only the two tables that carry NO raw_provider_payload keep an
+-- authenticated read policy. Curated, payload-free read views/RPC are a
+-- later PR, added when an app path actually needs them.
 CREATE POLICY "read canonical_fixtures" ON canonical_fixtures FOR SELECT TO authenticated USING (true);
-CREATE POLICY "read odds_snapshots"     ON odds_snapshots     FOR SELECT TO authenticated USING (true);
-CREATE POLICY "read fixture_results"    ON fixture_results    FOR SELECT TO authenticated USING (true);
 CREATE POLICY "read market_catalog"     ON market_catalog     FOR SELECT TO authenticated USING (true);
 
 -- Internal/working tables: RLS enabled with NO policies at all for
