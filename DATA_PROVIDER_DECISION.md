@@ -67,8 +67,9 @@ without breaking canonical fixture identity.
 
 ## 5. Phase 1 implications
 
-Once a Phase 1 technical plan is written (see Section 10), Phase 1 work will
-need to include:
+Phase 1 technical plan now exists in `PHASE_1_TECHNICAL_PLAN.md` and was
+merged as PR #63. Implementation still requires CPO review/accept per PR.
+Phase 1 work needs to include:
 
 - Provider abstraction layer (uniform internal interface over API-Football,
   SportMonks, and API-Tennis)
@@ -118,13 +119,14 @@ None of this is implemented by this document.
 
 ## 9. Security note
 
-- `SPORTMONKS_TOKEN` must be **rotated before integration** — it briefly
-  appeared in an open field and should be treated as exposed.
-- Provider tokens are stored as **Vercel Sensitive environment variables**.
-- Code must **never log provider tokens**, in application logs, error
-  messages, or CI output.
+- `SPORTMONKS_TOKEN` was rotated after briefly appearing in an open field.
+- Provider tokens are stored as **Vercel Sensitive env vars**.
+- Code must **never log provider tokens or token-bearing request URLs**.
+- SportMonks `api_token` must be redacted in logs/errors.
+- No provider keys may use `NEXT_PUBLIC_` exposure.
 
-This document does not read, print, or reference the value of any token.
+This document does not read, print, or reference the value of any token. No
+provider integration is implemented by this document.
 
 ---
 
@@ -136,5 +138,6 @@ This document does not read, print, or reference the value of any token.
 - No cron
 - No auto-settlement
 
-**Next step:** a Phase 1 technical plan, to be written after the
-`SPORTMONKS_TOKEN` rotation is confirmed complete.
+Phase 1 technical plan now exists and was merged as PR #63. Implementation
+still requires CPO review/accept per PR. Do not merge PR #66 or apply
+migration 013 until CPO review accepts it explicitly.
