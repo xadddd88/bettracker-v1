@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current beta status.**
-> Last updated: 2026-06-30
+> Last updated: 2026-07-01
 
 ---
 
@@ -24,6 +24,17 @@
 > **Note:** main is stable and frozen. No rollback needed. No urgent bugfix. Engineering shell is solid.
 > The pause is a product decision — the engineering work done is confirmed and retained.
 > See PRODUCT_VISION_GAP.md for the full roadmap to Product Vision Beta.
+
+---
+
+## 1a. Sports Data Provider Decision
+
+| Field | Value |
+|---|---|
+| **Football** | Split strategy — API-Football / API-Sports Ultra (broad calendar/odds/results) + SportMonks (deep enrichment: xG, pressure, predictions, match facts) |
+| **Tennis** | API-Tennis Business (fixtures/odds/results/H2H, source of truth) |
+| **Security note** | `SPORTMONKS_TOKEN` rotation **complete** — token was rotated after briefly appearing in an open field; stored as a Vercel Sensitive env var. Redact SportMonks `api_token` in logs/errors. |
+| **Status** | Decision recorded — see `DATA_PROVIDER_DECISION.md`. Phase 1 technical plan exists in `PHASE_1_TECHNICAL_PLAN.md` (merged PR #63). No provider client, DB migration, or Scout v2 implementation started. Product Vision Beta remains NOT READY; external launch remains PAUSED. |
 
 ---
 
@@ -102,6 +113,8 @@ Items parked for after product vision gaps are addressed:
 - Optional Coach RU retest (after rate-limit tuning)
 - Design v2 / premium event skin (future sprint — Phase 11)
 - CSP `eu-assets.i.posthog.com` script-src gap (add before CSP is enforced)
+
+- Beta v2 sports intelligence direction — see `SPORTS_INTELLIGENCE_ARCHITECTURE.md` (planning only, not started)
 
 ---
 
