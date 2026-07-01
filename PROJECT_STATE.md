@@ -71,7 +71,7 @@
 | Analyst RU / UK | ✅ PASS | |
 | Scout RU / UK | ✅ PASS | |
 | Quick Settle (static) | ✅ PASS | Won/Lost/Void/409 paths verified |
-| Quick Settle (live mutation) | Optional | Not required for Beta readiness |
+| Quick Settle (live mutation) | ✅ PASS | $1 live settle test completed; `from_page: 'quick_settle'` confirmed in PostHog |
 | Vercel runtime logs | ✅ Clean | No 4xx/5xx errors |
 | Sentry | ✅ Clean | No unresolved issues |
 
