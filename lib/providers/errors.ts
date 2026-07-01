@@ -26,12 +26,15 @@ export class ProviderError extends Error {
 // all three providers' known secret-bearing query param names.
 const SECRET_QUERY_PARAMS = ['api_token', 'apikey', 'api_key', 'token', 'key']
 
+// Matched case-insensitively: api-tennis.com's real query param is `APIkey`
+// (mixed case), which a case-sensitive match against SECRET_QUERY_PARAMS
+// would silently miss.
 export function redactUrl(rawUrl: string): string {
   try {
     const url = new URL(rawUrl)
-    for (const param of SECRET_QUERY_PARAMS) {
-      if (url.searchParams.has(param)) {
-        url.searchParams.set(param, 'REDACTED')
+    for (const key of [...url.searchParams.keys()]) {
+      if (SECRET_QUERY_PARAMS.includes(key.toLowerCase())) {
+        url.searchParams.set(key, 'REDACTED')
       }
     }
     return url.toString()
