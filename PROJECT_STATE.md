@@ -27,6 +27,17 @@
 
 ---
 
+## 1a. Sports Data Provider Decision
+
+| Field | Value |
+|---|---|
+| **Football** | Split strategy — API-Football / API-Sports Ultra (broad calendar/odds/results) + SportMonks (deep enrichment: xG, pressure, predictions, match facts) |
+| **Tennis** | API-Tennis Business (fixtures/odds/results/H2H, source of truth) |
+| **Security note** | `SPORTMONKS_TOKEN` rotation required before integration — briefly appeared in an open field |
+| **Status** | Decision recorded only — see `DATA_PROVIDER_DECISION.md`. No provider client, DB migration, or Scout v2 implementation started. |
+
+---
+
 ## 2. Confirmed Production Fixes (merged to main)
 
 | PR | Description |
