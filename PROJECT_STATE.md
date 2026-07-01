@@ -103,6 +103,8 @@ Items parked for after product vision gaps are addressed:
 - Design v2 / premium event skin (future sprint — Phase 11)
 - CSP `eu-assets.i.posthog.com` script-src gap (add before CSP is enforced)
 
+- Beta v2 sports intelligence direction — see `SPORTS_INTELLIGENCE_ARCHITECTURE.md` (planning only, not started)
+
 ---
 
 ## 7. Passive Monitoring
