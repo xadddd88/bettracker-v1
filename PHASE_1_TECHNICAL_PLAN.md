@@ -237,12 +237,12 @@ required before any integration work begins.
 
 ## 13. Decisions needed before M1
 
-- Confirm `SportMonks` token rotation complete
-- Confirm first football competitions
-- Confirm first tennis tournaments/tours
-- Confirm safe v1 market list with push/void rules (Section 8)
-- Confirm tennis retirement/walkover policy = manual review in v1
-- Confirm cron host = Vercel Cron for M1, unless proven insufficient
+1. Confirm `SportMonks` token rotation complete
+2. ✅ Confirm first football competitions — CPO: confirmed per §10 list.
+3. ✅ Confirm first tennis tournaments/tours — CPO: confirmed per §10 list.
+4. ✅ Confirm safe v1 market list with push/void rules — CPO: confirmed per §8 restricted list.
+5. Confirm tennis retirement/walkover policy = manual review in v1
+6. Confirm cron host = Vercel Cron for M1, unless proven insufficient
 
 M1 build does not start until these are confirmed.
 
