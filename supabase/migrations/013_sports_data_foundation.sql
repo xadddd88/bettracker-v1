@@ -237,7 +237,7 @@ CREATE TABLE football_enrichment (
 -- canonical_fixture_id, (b) is a SportMonks link, and (c) had exact/high
 -- mapping confidence at write time. Complements mapping_confidence_at_write.
 CREATE OR REPLACE FUNCTION validate_football_enrichment_link()
-RETURNS trigger LANGUAGE plpgsql AS $
+RETURNS trigger LANGUAGE plpgsql AS $func$
 DECLARE lnk fixture_provider_links%ROWTYPE;
 BEGIN
   SELECT * INTO lnk FROM fixture_provider_links
@@ -257,7 +257,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$func$;
 
 CREATE TRIGGER trg_validate_football_enrichment_link
   BEFORE INSERT OR UPDATE ON football_enrichment
