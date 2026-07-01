@@ -138,10 +138,12 @@ export default function MobileNav() {
         className={`fixed inset-0 z-50 md:hidden transition-opacity duration-200 ${
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
-        onClick={e => { if (e.target === e.currentTarget) setOpen(false) }}
         aria-hidden={!open}
       >
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+        <div
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={() => setOpen(false)}
+        />
 
         <div
           id={SHEET_ID}
