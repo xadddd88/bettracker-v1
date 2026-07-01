@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current beta status.**
-> Last updated: 2026-06-30
+> Last updated: 2026-07-01
 
 ---
 
@@ -33,8 +33,8 @@
 |---|---|
 | **Football** | Split strategy — API-Football / API-Sports Ultra (broad calendar/odds/results) + SportMonks (deep enrichment: xG, pressure, predictions, match facts) |
 | **Tennis** | API-Tennis Business (fixtures/odds/results/H2H, source of truth) |
-| **Security note** | `SPORTMONKS_TOKEN` rotation required before integration — briefly appeared in an open field |
-| **Status** | Decision recorded only — see `DATA_PROVIDER_DECISION.md`. No provider client, DB migration, or Scout v2 implementation started. |
+| **Security note** | `SPORTMONKS_TOKEN` rotation **complete** — token was rotated after briefly appearing in an open field; stored as a Vercel Sensitive env var. Redact SportMonks `api_token` in logs/errors. |
+| **Status** | Decision recorded — see `DATA_PROVIDER_DECISION.md`. Phase 1 technical plan exists in `PHASE_1_TECHNICAL_PLAN.md` (merged PR #63). No provider client, DB migration, or Scout v2 implementation started. Product Vision Beta remains NOT READY; external launch remains PAUSED. |
 
 ---
 
