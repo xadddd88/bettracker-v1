@@ -99,7 +99,7 @@ shape. Each adapter is responsible for:
 
 - Translating provider responses into canonical shapes
 - Attaching raw payload metadata (Section 4) for debugging
-- Sanitizing all errors before they leave the adapter (Section 10)
+- Sanitizing all errors before they leave the adapter (Section 11)
 
 ---
 
