@@ -131,7 +131,7 @@ export default async function DashboardPage() {
   const showOnboarding = !profile?.onboarding_completed
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5 lg:gap-6">
       <PageView event={EVENTS.DASHBOARD_VIEWED} props={{ bet_count: bets.length }} />
 
       {/* First-run onboarding card */}
@@ -140,7 +140,7 @@ export default async function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white font-display">Dashboard</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold text-white font-display">Dashboard</h1>
           <p className="text-xs text-slate-500 mt-1">
             {bets.length} bets tracked · {watchlistCount || 0} on watchlist
           </p>
@@ -154,11 +154,14 @@ export default async function DashboardPage() {
       {/* Balance hero */}
       <BankrollWidget balance={bankroll?.balance || 0} sym={sym} />
 
-      {/* Event Pulse */}
-      {primaryEvent && <EventPulseCard event={primaryEvent} />}
-
-      {/* Next best action */}
-      <NextBestAction action={nextAction} />
+      {/* Event Pulse + Next best action — paired side by side on desktop so the
+          dashboard doesn't read as two full-width stretched mobile cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 items-stretch">
+        {primaryEvent && <EventPulseCard event={primaryEvent} />}
+        <div className={`grid ${!primaryEvent ? 'lg:col-span-2' : ''}`}>
+          <NextBestAction action={nextAction} />
+        </div>
+      </div>
 
       {/* Secondary stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
