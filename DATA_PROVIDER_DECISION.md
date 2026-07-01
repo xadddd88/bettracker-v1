@@ -118,13 +118,16 @@ None of this is implemented by this document.
 
 ## 9. Security note
 
-- `SPORTMONKS_TOKEN` must be **rotated before integration** — it briefly
-  appeared in an open field and should be treated as exposed.
+- `SPORTMONKS_TOKEN` was **rotated** after briefly appearing in an open
+  field, and is now considered secured.
 - Provider tokens are stored as **Vercel Sensitive environment variables**.
-- Code must **never log provider tokens**, in application logs, error
-  messages, or CI output.
+- Code must **never log provider tokens or token-bearing request URLs**, in
+  application logs, error messages, or CI output.
+- SportMonks `api_token` (passed as a query parameter) must be **redacted**
+  in logs and errors.
 
-This document does not read, print, or reference the value of any token.
+This document does not read, print, or reference the value of any token, and
+no provider integration is implemented by this document.
 
 ---
 
@@ -136,5 +139,6 @@ This document does not read, print, or reference the value of any token.
 - No cron
 - No auto-settlement
 
-**Next step:** a Phase 1 technical plan, to be written after the
-`SPORTMONKS_TOKEN` rotation is confirmed complete.
+**Next step:** the Phase 1 technical plan now exists and was merged as PR
+#63. Implementation still requires CPO review/accept per PR. No provider
+integration is implemented by this document.
