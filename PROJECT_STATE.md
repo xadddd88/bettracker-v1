@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current beta status.**
-> Last updated: 2026-06-30
+> Last updated: 2026-07-01
 
 ---
 
@@ -17,13 +17,13 @@
 | **Branch model** | Feature branches → PR → CPO accept → Dima merges |
 | **Current UI** | Stable dark UI + Ambient Theme live as-is |
 | **Ambient Theme** | Current version live in production — further Design v2 / premium event skin work is parked |
-| **Current phase** | Product Vision Gap / Beta v2 planning |
-| **Active blockers** | None in current main — product vision gaps documented in PRODUCT_VISION_GAP.md |
+| **Current phase** | Product Vision Gap / Beta v2 planning → Phase 1 sports data foundation |
+| **Active blockers** | None in current main. Product vision gaps remain documented in `PRODUCT_VISION_GAP.md`; PR #66 is on HOLD pending full CPO review. |
 | **External beta invites** | Do not invite external beta users yet |
 
 > **Note:** main is stable and frozen. No rollback needed. No urgent bugfix. Engineering shell is solid.
 > The pause is a product decision — the engineering work done is confirmed and retained.
-> See PRODUCT_VISION_GAP.md for the full roadmap to Product Vision Beta.
+> Product Vision Beta remains NOT READY and external launch remains PAUSED.
 
 ---
 
@@ -33,8 +33,10 @@
 |---|---|
 | **Football** | Split strategy — API-Football / API-Sports Ultra (broad calendar/odds/results) + SportMonks (deep enrichment: xG, pressure, predictions, match facts) |
 | **Tennis** | API-Tennis Business (fixtures/odds/results/H2H, source of truth) |
-| **Security note** | `SPORTMONKS_TOKEN` rotation required before integration — briefly appeared in an open field |
-| **Status** | Decision recorded only — see `DATA_PROVIDER_DECISION.md`. No provider client, DB migration, or Scout v2 implementation started. |
+| **Security note** | `SPORTMONKS_TOKEN` rotation complete after briefly appearing in an open field. Provider tokens are stored as Vercel Sensitive env vars. Code must never log provider tokens or token-bearing request URLs; SportMonks `api_token` must be redacted in logs/errors. |
+| **Decision status** | Data provider decision recorded in `DATA_PROVIDER_DECISION.md`. |
+| **Phase 1 plan** | `PHASE_1_TECHNICAL_PLAN.md` exists and was merged as PR #63. |
+| **Implementation status** | No additional implementation started by this docs PR. PR #66 remains open/on HOLD and still requires full CPO review/accept before merge or manual Supabase migration. |
 
 ---
 
@@ -93,7 +95,11 @@
 - Do NOT invite external beta users yet
 - Do NOT launch publicly
 - Do NOT continue Ambient Theme / Design v2
-- Do NOT start Scout v2 (until data provider decision)
+- Do NOT start Scout v2
+- Do NOT merge PR #66 yet
+- Do NOT apply migration 013
+- Do NOT start M1.2
+- Do NOT start provider live calls
 - Do NOT start i18n
 - Do NOT start legal pages
 - Do NOT start broad security hardening
@@ -101,6 +107,8 @@
 - Do NOT start mobile redesign (until mobile/tablet UX is planned)
 - Do NOT start native mobile app work
 - Do NOT do visual redesign
+- Do NOT start auto-settlement
+- Do NOT start market-aware bet builder implementation
 - Do NOT merge any PR without explicit CPO ACCEPT
 - Do NOT open new code PRs unless a blocker appears in current main
 
