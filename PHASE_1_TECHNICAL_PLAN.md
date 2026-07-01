@@ -3,8 +3,8 @@
 > **Status: CPO ACCEPT IN PRINCIPLE — minor changes incorporated below before M1 build.**
 > This is a technical planning document only. It does not authorize code,
 > schemas, migrations, Supabase changes, or Scout v2 implementation. M1 build
-> does not start from this document alone — see Section 13, Decisions Needed
-> Before M1.
+> does not start from this document alone — see Section 14, Decisions Before
+> M1.
 
 Builds on `DATA_PROVIDER_DECISION.md` (accepted split football provider
 strategy: API-Football + SportMonks; API-Tennis for tennis) and
@@ -235,20 +235,36 @@ required before any integration work begins.
 
 ---
 
-## 13. Decisions needed before M1
+## 13. Scope: first competitions (CPO confirmed)
 
-1. Confirm `SportMonks` token rotation complete
-2. ✅ Confirm first football competitions — CPO: confirmed per §10 list.
-3. ✅ Confirm first tennis tournaments/tours — CPO: confirmed per §10 list.
-4. ✅ Confirm safe v1 market list with push/void rules — CPO: confirmed per §8 restricted list.
-5. Confirm tennis retirement/walkover policy = manual review in v1
-6. Confirm cron host = Vercel Cron for M1, unless proven insufficient
+**Football (Phase 1):**
+- World Cup 2026 / international marquee events
+- UCL / Euro club competitions where covered
+- Top-5 EU leagues where available via API-Football
+- SportMonks enrichment only where mapping confidence is exact/high and coverage exists in the paid SportMonks stack
 
-M1 build does not start until these are confirmed.
+**Tennis (Phase 1):**
+- ATP / WTA main tour
+- Grand Slams / major tournaments where API-Tennis coverage is reliable
+
+Do not attempt "everything" in Phase 1.
 
 ---
 
-## 14. Out of scope for M1
+## 14. Decisions before M1
+
+1. ✅ Confirm SportMonks token rotation complete — CPO/founder confirmed rotated in Vercel.
+2. ✅ Confirm first football competitions — CPO confirmed per §13 scope.
+3. ✅ Confirm first tennis tournaments/tours — CPO confirmed per §13 scope.
+4. ✅ Confirm safe v1 market list with push/void rules — CPO confirmed per §8 restricted list.
+5. ✅ Confirm tennis retirement/walkover policy — manual review in v1.
+6. ✅ Confirm cron host — Vercel Cron for M1 unless proven insufficient.
+
+M1 build does not start from this document alone. It starts only after this docs PR is merged and CPO gives an explicit M1 implementation prompt.
+
+---
+
+## 15. Out of scope for M1
 
 - No Scout v2 code
 - No DB migration
