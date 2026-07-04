@@ -1,6 +1,6 @@
 # M1.2.b Fixture Sync Runbook
 
-Status: M1.2.b dry-run done; M1.2.c write safety guard draft for PR review
+Status: draft for PR review
 
 ## Scope
 
@@ -70,22 +70,6 @@ curl -X POST 'https://btdk.app/api/admin/sports/fixtures/sync' \
 
 The response contains only counts and sync metadata. It does not return raw provider payloads.
 
-## M1.2.c write safety guardrails
-
-These guardrails prepare controlled fixture write validation without enabling write mode.
-
-For `dryRun=false`, the route rejects unsafe request shapes before any provider fetch:
-
-- exactly one provider is required
-- `dateFrom` must equal `dateTo`
-
-After the provider fetch, write-shaped requests are still capped before any Supabase write:
-
-- max fetched fixtures: `25`
-- if fetched fixtures exceed `25`, the route returns `400` and writes nothing
-
-Dry-run behavior is unchanged. `dryRun=true` can still request multiple providers and multiple days within the existing 7-day M1.2.b date-range limit.
-
 ## Write request
 
 Writes require all three gates:
@@ -124,7 +108,6 @@ For a new provider fixture, the sync inserts a canonical fixture and then insert
 
 ## Safety notes
 
-- Keep `SPORTS_FIXTURE_SYNC_WRITE_ENABLED` absent/off until the separate controlled M1.2.c write validation is explicitly approved.
 - No provider token is returned in API responses.
 - No raw provider payload is returned from dry-run responses.
 - Provider request URLs are sanitized through the existing provider error path.
