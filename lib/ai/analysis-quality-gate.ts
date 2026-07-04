@@ -13,9 +13,10 @@ export type FixtureStatus =
   | 'retired'
   | 'walkover'
   | 'not_bettable'
-export type AnalysisActionability = 'actionable' | 'status_unverified' | 'not_actionable'
+export type AnalysisActionability = 'actionable' | 'status_unverified' | 'not_actionable' | 'live_not_supported'
 export type LegSupportLevel = 'full' | 'approximate' | 'unsupported'
 export type AnalystTrustLocale = 'en' | 'uk'
+export type CouponStatusSource = 'coupon' | 'provider' | 'unknown'
 
 export interface AnalysisDataCoverage {
   liveInjuries?: boolean
@@ -26,10 +27,19 @@ export interface AnalysisDataCoverage {
 
 export interface AnalysisLegQualityInput {
   label?: string
+  rawText?: string | null
   sport?: string | null
   eventName?: string | null
   marketType?: string | null
   selection?: string | null
+  odds?: number | null
+  isLive?: boolean
+  periodOrPhase?: string | null
+  statusText?: string | null
+  scoreText?: string | null
+  statusSource?: CouponStatusSource
+  statusConfidence?: number | null
+  actionability?: AnalysisActionability
   modelProbability?: number | null
   sportModuleSupport?: SportModuleSupport
   dataCoverage?: AnalysisDataCoverage
@@ -58,6 +68,14 @@ export interface MissingDataByLeg {
   eventName: string | null
   marketType: string | null
   selection: string | null
+  rawText?: string | null
+  odds?: number | null
+  isLive?: boolean
+  periodOrPhase?: string | null
+  statusText?: string | null
+  scoreText?: string | null
+  statusSource?: CouponStatusSource
+  statusConfidence?: number | null
   fixtureStatus: FixtureStatus
   actionability: AnalysisActionability
   supportLevel: LegSupportLevel
@@ -71,6 +89,7 @@ export interface AnalysisQualityGateResult {
     | 'INSUFFICIENT DATA'
     | 'NO PRICE - unsupported mixed-sport parlay'
     | 'NO PRICE - unsupported / partially supported bet'
+    | 'LIVE COUPON - live analysis unavailable'
     | 'NOT ACTIONABLE - event already started or finished'
   supportLabel: 'Priced betting analysis' | 'Unsupported / partially supported bet'
   pricingAllowed: boolean
@@ -127,6 +146,15 @@ export interface AnalystTrustLeg {
   eventName: string
   marketType: string
   selection: string | null
+  rawText?: string | null
+  odds?: number | null
+  isLive?: boolean
+  periodOrPhase?: string | null
+  statusText?: string | null
+  scoreText?: string | null
+  statusSource?: CouponStatusSource
+  statusSourceLabel?: string | null
+  statusConfidence?: number | null
   fixtureStatus: FixtureStatus
   fixtureStatusLabel: string
   actionability: AnalysisActionability
@@ -260,6 +288,22 @@ const TENNIS_TERMS = [
   'medvedev',
 ]
 
+const FOOTBALL_TERMS = [
+  'football',
+  'soccer',
+  'match result',
+  'перерва',
+  'halftime',
+]
+
+interface CouponLiveSignal {
+  isLive: boolean
+  periodOrPhase: string | null
+  statusText: string | null
+  statusSource: CouponStatusSource
+  statusConfidence: number | null
+}
+
 function cleanSport(sport: string | null | undefined): string {
   return (sport ?? 'other').toLowerCase().trim() || 'other'
 }
@@ -272,6 +316,12 @@ function actionabilityForFixtureStatus(status: FixtureStatus): AnalysisActionabi
   if (status === 'unknown') return 'status_unverified'
   if (NOT_ACTIONABLE_FIXTURE_STATUSES.has(status)) return 'not_actionable'
   return 'actionable'
+}
+
+function actionabilityForLeg(leg: AnalysisLegQualityInput, status: FixtureStatus): AnalysisActionability {
+  if (leg.actionability) return leg.actionability
+  if (leg.isLive || (status === 'live' && leg.statusSource === 'coupon')) return 'live_not_supported'
+  return actionabilityForFixtureStatus(status)
 }
 
 function hasValidProbability(value: number | null | undefined): boolean {
@@ -300,20 +350,116 @@ function isParlayLike(input: AnalysisQualityGateInput): boolean {
     /\s\+\s/.test(input.selection ?? '')
 }
 
-function detectSportFromText(text: string, fallback: string): string {
+function detectCouponLiveSignal(text: string): CouponLiveSignal {
+  const setMatch = text.match(/(?:^|[\s,])([1-5]-й\s+сет)(?=$|[\s,])/i) ??
+    text.match(/(?:^|[\s,])([1-5](?:st|nd|rd|th)\s+set)(?=$|[\s,])/i)
+  if (setMatch?.[1]) {
+    return {
+      isLive: true,
+      periodOrPhase: setMatch[1].trim(),
+      statusText: setMatch[1].trim(),
+      statusSource: 'coupon',
+      statusConfidence: 0.95,
+    }
+  }
+
+  const halftimeMatch = text.match(/перерва/i) ?? text.match(/halftime/i)
+  if (halftimeMatch?.[0]) {
+    return {
+      isLive: true,
+      periodOrPhase: halftimeMatch[0].trim(),
+      statusText: halftimeMatch[0].trim(),
+      statusSource: 'coupon',
+      statusConfidence: 0.95,
+    }
+  }
+
+  const liveMatch = text.match(/лайв/i) ?? text.match(/\blive\b/i) ?? text.match(/\bin-play\b/i)
+  if (liveMatch?.[0]) {
+    return {
+      isLive: true,
+      periodOrPhase: null,
+      statusText: liveMatch[0].trim(),
+      statusSource: 'coupon',
+      statusConfidence: 0.9,
+    }
+  }
+
+  return {
+    isLive: false,
+    periodOrPhase: null,
+    statusText: null,
+    statusSource: 'unknown',
+    statusConfidence: null,
+  }
+}
+
+function stripLeadingLivePhase(text: string, phase: string | null): string {
+  if (!phase) return text.trim()
+  const escaped = phase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return text.replace(new RegExp(`^\\s*${escaped}\\s*,?\\s*`, 'i'), '').trim()
+}
+
+function detectSportFromText(text: string, fallback: string, allowFallback = true): string {
   const normalized = text.toLowerCase()
+  if (/(?:^|[\s,])[1-5]-й\s+сет(?:$|[\s,])/.test(normalized)) return 'tennis'
+  if (/(?:^|[\s,])[1-5](?:st|nd|rd|th)\s+set(?:$|[\s,])/.test(normalized)) return 'tennis'
   if (TENNIS_TERMS.some(term => normalized.includes(term))) return 'tennis'
-  return fallback
+  if (FOOTBALL_TERMS.some(term => normalized.includes(term))) return 'soccer'
+  return allowFallback ? fallback : 'other'
+}
+
+function enrichLegFromCouponText(
+  leg: AnalysisLegQualityInput & { label: string },
+  primarySport: string,
+  allowSportFallback: boolean
+): AnalysisLegQualityInput & { label: string } {
+  const rawText = leg.rawText ?? leg.eventName ?? ''
+  const liveSignal = detectCouponLiveSignal([
+    rawText,
+    leg.eventName ?? '',
+    leg.marketType ?? '',
+    leg.selection ?? '',
+  ].join(' '))
+  const isLive = leg.isLive ?? liveSignal.isLive
+  const periodOrPhase = leg.periodOrPhase ?? liveSignal.periodOrPhase
+  const statusText = leg.statusText ?? liveSignal.statusText
+  const statusSource = leg.statusSource ?? liveSignal.statusSource
+  const statusConfidence = leg.statusConfidence ?? liveSignal.statusConfidence
+  const eventName = leg.eventName ? stripLeadingLivePhase(leg.eventName, periodOrPhase) : leg.eventName
+  const sport = leg.sport
+    ? cleanSport(leg.sport)
+    : detectSportFromText(`${rawText} ${eventName ?? ''} ${leg.selection ?? ''}`, primarySport, allowSportFallback)
+
+  return {
+    ...leg,
+    rawText,
+    sport,
+    eventName,
+    isLive,
+    periodOrPhase,
+    statusText,
+    statusSource,
+    statusConfidence,
+    fixtureStatus: leg.fixtureStatus ?? (isLive ? 'live' : undefined),
+    sportModuleSupport: leg.sportModuleSupport ?? (
+      sport === 'other' ? 'none' : sport === primarySport ? undefined : 'approximate'
+    ),
+  }
 }
 
 function inferLegs(input: AnalysisQualityGateInput): Array<AnalysisLegQualityInput & { label: string }> {
   if (input.legs && input.legs.length > 0) {
-    return input.legs.map((leg, index) => ({ ...leg, label: leg.label ?? `Leg ${index + 1}` }))
+    return input.legs.map((leg, index) => enrichLegFromCouponText(
+      { ...leg, label: leg.label ?? `Leg ${index + 1}` },
+      cleanSport(input.sport),
+      false
+    ))
   }
 
   const primarySport = cleanSport(input.sport)
   if (!isParlayLike(input)) {
-    return [{
+    return [enrichLegFromCouponText({
       label: 'Leg 1',
       sport: primarySport,
       eventName: input.eventName,
@@ -322,7 +468,7 @@ function inferLegs(input: AnalysisQualityGateInput): Array<AnalysisLegQualityInp
       modelProbability: input.modelProbability ?? null,
       sportModuleSupport: input.sportModuleSupport,
       dataCoverage: input.dataCoverage,
-    }]
+    }, primarySport, true)]
   }
 
   const eventParts = input.eventName.split(/\s+\+\s+/).map(part => part.trim()).filter(Boolean)
@@ -331,9 +477,11 @@ function inferLegs(input: AnalysisQualityGateInput): Array<AnalysisLegQualityInp
 
   return parts.map((eventName, index) => {
     const selection = selectionParts[index] || null
-    const sport = detectSportFromText(`${eventName} ${selection ?? ''}`, primarySport)
-    return {
+    const liveSignal = detectCouponLiveSignal(`${eventName} ${selection ?? ''}`)
+    const sport = detectSportFromText(`${eventName} ${selection ?? ''}`, primarySport, !liveSignal.isLive)
+    return enrichLegFromCouponText({
       label: `Leg ${index + 1}`,
+      rawText: eventName,
       sport,
       eventName,
       marketType: input.marketType,
@@ -341,7 +489,7 @@ function inferLegs(input: AnalysisQualityGateInput): Array<AnalysisLegQualityInp
       modelProbability: null,
       sportModuleSupport: sport === primarySport ? input.sportModuleSupport : 'approximate',
       dataCoverage: input.dataCoverage,
-    }
+    }, primarySport, !liveSignal.isLive)
   })
 }
 
@@ -384,10 +532,12 @@ export function evaluateAnalysisQuality(input: AnalysisQualityGateInput): Analys
     const support = resolveSportSupport(primarySport, legSport, leg.sportModuleSupport)
     const supportLevel = supportLevelFromSportSupport(support)
     const fixtureStatus = resolveFixtureStatus(leg.fixtureStatus ?? input.fixtureStatus)
-    const actionability = actionabilityForFixtureStatus(fixtureStatus)
+    const actionability = actionabilityForLeg(leg, fixtureStatus)
     const missing: string[] = []
 
-    if (actionability === 'not_actionable') {
+    if (actionability === 'live_not_supported') {
+      topLevelActionability = 'live_not_supported'
+    } else if (actionability === 'not_actionable' && topLevelActionability !== 'live_not_supported') {
       topLevelActionability = 'not_actionable'
     } else if (actionability === 'status_unverified' && topLevelActionability === 'actionable') {
       topLevelActionability = 'status_unverified'
@@ -420,6 +570,14 @@ export function evaluateAnalysisQuality(input: AnalysisQualityGateInput): Analys
     if (actionability === 'not_actionable') {
       addMissing(missing, 'event actionability')
       reasons.add('Event has already started, finished, or is not currently bettable.')
+    }
+
+    if (actionability === 'live_not_supported') {
+      addMissing(missing, 'current score')
+      addMissing(missing, 'set/game/minute')
+      addMissing(missing, 'live odds movement')
+      addMissing(missing, 'provider-backed live status')
+      reasons.add('Live coupon requires a provider-backed live analysis module before pricing.')
     }
 
     checks++
@@ -458,6 +616,14 @@ export function evaluateAnalysisQuality(input: AnalysisQualityGateInput): Analys
         eventName: leg.eventName ?? null,
         marketType: leg.marketType ?? input.marketType ?? null,
         selection: leg.selection ?? null,
+        rawText: leg.rawText ?? null,
+        odds: leg.odds ?? null,
+        isLive: leg.isLive ?? false,
+        periodOrPhase: leg.periodOrPhase ?? null,
+        statusText: leg.statusText ?? null,
+        scoreText: leg.scoreText ?? null,
+        statusSource: leg.statusSource ?? 'unknown',
+        statusConfidence: leg.statusConfidence ?? null,
         fixtureStatus,
         actionability,
         supportLevel,
@@ -495,8 +661,11 @@ export function evaluateAnalysisQuality(input: AnalysisQualityGateInput): Analys
   }
 
   const isMixedSport = uniqueSports.size > 1
-  const status: AnalysisQualityStatus = isMixedSport || hasUnsupportedSport ? 'unsupported' : 'insufficient_data'
-  const label = topLevelActionability === 'not_actionable'
+  const hasUnsupportedLiveCoupon = topLevelActionability === 'live_not_supported'
+  const status: AnalysisQualityStatus = hasUnsupportedLiveCoupon || isMixedSport || hasUnsupportedSport ? 'unsupported' : 'insufficient_data'
+  const label = hasUnsupportedLiveCoupon
+    ? 'LIVE COUPON - live analysis unavailable'
+    : topLevelActionability === 'not_actionable'
     ? 'NOT ACTIONABLE - event already started or finished'
     : status === 'unsupported'
     ? (isMixedSport ? 'NO PRICE - unsupported mixed-sport parlay' : 'NO PRICE - unsupported / partially supported bet')
@@ -542,22 +711,34 @@ const TRUST_LABELS = {
     insufficientData: 'INSUFFICIENT DATA',
     unsupportedMixedSportParlay: 'unsupported mixed-sport parlay',
     unsupportedPartial: 'Unsupported / partially supported bet',
+    liveCoupon: 'LIVE COUPON',
+    liveAnalysisUnavailable: 'live analysis unavailable',
     notActionable: 'NOT ACTIONABLE',
     eventStartedOrFinished: 'event already started or finished',
     safeExplanationBlocked: 'Price is unavailable because the coupon does not have enough verified data coverage for every leg.',
     safeExplanationUnsupported: 'Price is unavailable because this parlay contains unsupported or only partially supported legs.',
     safeExplanationUnverified: 'Price is unavailable because event status is unverified and the coupon is missing required per-leg data.',
     safeExplanationNotActionable: 'This coupon is not actionable because at least one event has already started, finished, or is not currently bettable.',
+    safeExplanationLive: 'This coupon contains live events. The current module supports only static pre-match risk review, so live pricing is unavailable without current score, set/game/minute, live odds movement, and provider-backed live status.',
     safeNextSteps: [
       'Verify the start time and fixture status for every leg.',
       'Add current team news, injury context, recent form, and line movement.',
       'Confirm full sport-specific support for every leg before pricing.',
     ],
+    safeNextStepsLive: [
+      'Use a provider-backed live module before pricing this coupon.',
+      'Add current score, set/game/minute, and live odds movement for every leg.',
+      'Confirm live status from a trusted provider before any value calculation.',
+    ],
     leg: 'Leg',
     sport: 'Sport',
     event: 'Event',
     marketSelection: 'Market / selection',
+    odds: 'Odds',
     fixtureStatus: 'Fixture status',
+    periodOrPhase: 'Period / phase',
+    statusSource: 'Status source',
+    statusDetectedFromCoupon: 'status detected from coupon',
     supportLevel: 'Support level',
     actionability: 'Actionability',
     safeFactorCoverage: 'Data coverage',
@@ -589,6 +770,7 @@ const TRUST_LABELS = {
       actionable: 'actionable',
       status_unverified: 'status unverified',
       not_actionable: 'not actionable',
+      live_not_supported: 'live analysis not supported',
     },
     supportLabels: {
       full: 'full',
@@ -606,6 +788,10 @@ const TRUST_LABELS = {
       'actual model inputs backing model probability': 'actual model inputs',
       'event start time / fixture status': 'event start time / fixture status',
       'event actionability': 'event actionability',
+      'current score': 'current score',
+      'set/game/minute': 'set/game/minute',
+      'live odds movement': 'live odds movement',
+      'provider-backed live status': 'provider-backed live status',
     },
   },
   uk: {
@@ -633,22 +819,34 @@ const TRUST_LABELS = {
     insufficientData: 'НЕДОСТАТНЬО ДАНИХ',
     unsupportedMixedSportParlay: 'непідтримуваний експрес із різних видів спорту',
     unsupportedPartial: 'Ставка не підтримується або підтримується частково',
+    liveCoupon: 'ЛАЙВ-КУПОН',
+    liveAnalysisUnavailable: 'live-аналіз недоступний',
     notActionable: 'НЕАКТУАЛЬНО',
     eventStartedOrFinished: 'подія вже почалась або завершилась',
     safeExplanationBlocked: 'Оцінка недоступна, бо для купона бракує перевіреного покриття даних по кожній нозі.',
     safeExplanationUnsupported: 'Оцінка недоступна, бо експрес містить непідтримувані або частково підтримувані ноги.',
     safeExplanationUnverified: 'Оцінка недоступна, бо статус подій не перевірено і бракує обов’язкових даних по ногах.',
     safeExplanationNotActionable: 'Купон неактуальний, бо одна або більше подій уже почалась, завершилась або недоступна для ставки.',
+    safeExplanationLive: 'Цей купон містить live-події. Поточний модуль підтримує лише статичний pre-match огляд ризику; для live-оцінки потрібні поточний рахунок, сет/гейм/хвилина, рух live-лінії та підтверджений провайдером live-статус.',
     safeNextSteps: [
       'Перевірити час початку та статус кожної події.',
       'Додати актуальні новини команд, травми, поточну форму та рух лінії.',
       'Підтвердити повну підтримку спортивного модуля для кожної ноги.',
     ],
+    safeNextStepsLive: [
+      'Використати провайдерський live-модуль перед оцінкою цього купона.',
+      'Додати поточний рахунок, сет/гейм/хвилину та рух live-лінії для кожної ноги.',
+      'Підтвердити live-статус у надійного провайдера перед будь-яким розрахунком цінності.',
+    ],
     leg: 'Нога',
     sport: 'Спорт',
     event: 'Подія',
     marketSelection: 'Ринок / вибір',
+    odds: 'Коефіцієнт',
     fixtureStatus: 'Статус матчу',
+    periodOrPhase: 'Період / фаза',
+    statusSource: 'Джерело статусу',
+    statusDetectedFromCoupon: 'статус визначено з купона',
     supportLevel: 'Рівень підтримки',
     actionability: 'Актуальність',
     safeFactorCoverage: 'Покриття даних',
@@ -680,6 +878,7 @@ const TRUST_LABELS = {
       actionable: 'можна розглядати',
       status_unverified: 'статус не перевірено',
       not_actionable: 'неактуально',
+      live_not_supported: 'live-аналіз не підтримується',
     },
     supportLabels: {
       full: 'повна підтримка',
@@ -697,6 +896,10 @@ const TRUST_LABELS = {
       'actual model inputs backing model probability': 'фактичні модельні вхідні дані',
       'event start time / fixture status': 'час початку події / статус матчу',
       'event actionability': 'актуальність події для ставки',
+      'current score': 'поточний рахунок',
+      'set/game/minute': 'сет/гейм/хвилина',
+      'live odds movement': 'рух live-лінії',
+      'provider-backed live status': 'підтверджений провайдером live-статус',
     },
   },
 } as const
@@ -789,6 +992,11 @@ function buildFallbackDecisionQualityGate(input: AnalystDecisionSurfaceInput): A
 function localizedQualityGateLabel(result: AnalysisQualityGateResult, locale: AnalystTrustLocale): string {
   const labels = TRUST_LABELS[locale]
   if (result.label === 'PRICED BETTING ANALYSIS') return locale === 'uk' ? 'ОЦІНЕНИЙ АНАЛІЗ СТАВКИ' : 'PRICED BETTING ANALYSIS'
+  if (result.label === 'LIVE COUPON - live analysis unavailable') {
+    return locale === 'uk'
+      ? 'ЛАЙВ-КУПОН — оцінка недоступна без live-даних'
+      : `${labels.liveCoupon} - ${labels.liveAnalysisUnavailable}`
+  }
   if (result.label === 'INSUFFICIENT DATA') return labels.insufficientData
   if (result.label === 'NO PRICE - unsupported mixed-sport parlay') {
     return `${labels.noPrice} - ${labels.unsupportedMixedSportParlay}`
@@ -803,6 +1011,7 @@ function localizedSupportLabel(result: AnalysisQualityGateResult, locale: Analys
   if (result.supportLabel === 'Priced betting analysis') {
     return locale === 'uk' ? 'Оцінений аналіз ставки' : 'Priced betting analysis'
   }
+  if (result.label === 'LIVE COUPON - live analysis unavailable') return TRUST_LABELS[locale].liveAnalysisUnavailable
   return TRUST_LABELS[locale].unsupportedPartial
 }
 
@@ -813,6 +1022,7 @@ function localizedMissingItem(item: string, locale: AnalystTrustLocale): string 
 
 function inferSafeExplanation(result: AnalysisQualityGateResult, locale: AnalystTrustLocale): string {
   const labels = TRUST_LABELS[locale]
+  if (result.actionability === 'live_not_supported') return labels.safeExplanationLive
   if (result.actionability === 'not_actionable') return labels.safeExplanationNotActionable
   if (result.actionability === 'status_unverified') return labels.safeExplanationUnverified
   if (result.status === 'unsupported') return labels.safeExplanationUnsupported
@@ -854,7 +1064,7 @@ export function buildAnalystTrustView(input: BuildAnalystTrustViewInput): Analys
   const resultActionability = result.actionability ?? (result.pricingAllowed ? 'actionable' : 'status_unverified')
   const showRawAiAnalysis = result.pricingAllowed
   const showPlaceBet = result.pricingAllowed && resultActionability === 'actionable'
-  const showWatch = resultActionability !== 'not_actionable'
+  const showWatch = resultActionability !== 'not_actionable' && resultActionability !== 'live_not_supported'
   const fallbackLeg: MissingDataByLeg = {
     legLabel: 'Leg 1',
     legNumber: 1,
@@ -882,8 +1092,23 @@ export function buildAnalystTrustView(input: BuildAnalystTrustViewInput): Analys
       eventName: leg.eventName ?? input.eventName,
       marketType: leg.marketType ?? input.marketType,
       selection: leg.selection ?? input.selection ?? null,
+      rawText: leg.rawText ?? null,
+      odds: leg.odds ?? null,
+      isLive: leg.isLive ?? fixtureStatus === 'live',
+      periodOrPhase: leg.periodOrPhase ?? null,
+      statusText: leg.statusText ?? null,
+      scoreText: leg.scoreText ?? null,
+      statusSource: leg.statusSource ?? 'unknown',
+      statusSourceLabel: leg.statusSource === 'coupon'
+        ? labels.statusDetectedFromCoupon
+        : leg.statusSource === 'provider'
+        ? 'provider'
+        : null,
+      statusConfidence: leg.statusConfidence ?? null,
       fixtureStatus,
-      fixtureStatusLabel: labels.fixtureStatuses[fixtureStatus],
+      fixtureStatusLabel: leg.statusSource === 'coupon'
+        ? labels.statusDetectedFromCoupon
+        : labels.fixtureStatuses[fixtureStatus],
       actionability,
       actionabilityLabel: labels.actionabilityLabels[actionability],
       supportLevel,
@@ -919,7 +1144,7 @@ export function buildAnalystTrustView(input: BuildAnalystTrustViewInput): Analys
     actionability: resultActionability,
     actionabilityLabel: labels.actionabilityLabels[resultActionability],
     safeExplanation: inferSafeExplanation(result, locale),
-    safeNextSteps: [...labels.safeNextSteps],
+    safeNextSteps: resultActionability === 'live_not_supported' ? [...labels.safeNextStepsLive] : [...labels.safeNextSteps],
     legs,
     showPlaceBet,
     showWatch,
@@ -960,7 +1185,11 @@ export function renderAnalystTrustSummaryText(view: AnalystTrustView): string {
     lines.push(`${labels.sport}: ${leg.sportLabel}`)
     lines.push(`${labels.event}: ${leg.eventName}`)
     lines.push(`${labels.marketSelection}: ${leg.marketType}${leg.selection ? ` / ${leg.selection}` : ''}`)
+    if (leg.odds != null) lines.push(`${labels.odds}: ${leg.odds}`)
     lines.push(`${labels.fixtureStatus}: ${leg.fixtureStatusLabel}`)
+    if (leg.statusSourceLabel) lines.push(`${labels.statusSource}: ${leg.statusSourceLabel}`)
+    if (leg.periodOrPhase) lines.push(`${labels.periodOrPhase}: ${leg.periodOrPhase}`)
+    if (leg.scoreText) lines.push(`Score: ${leg.scoreText}`)
     lines.push(`${labels.supportLevel}: ${leg.supportLabel}`)
     lines.push(`${labels.actionability}: ${leg.actionabilityLabel}`)
     if (leg.missingData.length > 0) {

@@ -10,6 +10,7 @@ import {
   buildAnalystPricingPayload,
   buildAnalystTrustPayload,
   evaluateAnalysisQuality,
+  type AnalysisLegQualityInput,
   type SportModuleSupport,
 } from '@/lib/ai/analysis-quality-gate'
 
@@ -73,6 +74,20 @@ const requestSchema = z.object({
   bookmaker:       z.string().max(100).optional(),
   notes:           z.string().max(1000).optional(),
   output_language: z.enum(LOCALES).default('auto'),
+  legs: z.array(z.object({
+    rawText:          z.string().max(500).nullable().optional(),
+    eventName:        z.string().max(500).nullable().optional(),
+    marketType:       z.string().max(500).nullable().optional(),
+    selection:        z.string().max(200).nullable().optional(),
+    odds:             z.number().min(1.01).max(1000).nullable().optional(),
+    sport:            z.enum(SPORTS).nullable().optional(),
+    isLive:           z.boolean().optional(),
+    periodOrPhase:    z.string().max(80).nullable().optional(),
+    statusText:       z.string().max(120).nullable().optional(),
+    scoreText:        z.string().max(80).nullable().optional(),
+    statusSource:     z.enum(['coupon', 'provider', 'unknown']).optional(),
+    statusConfidence: z.number().min(0).max(1).nullable().optional(),
+  })).max(20).optional(),
 })
 
 const factorSchema = z.object({
@@ -332,6 +347,7 @@ Return structured JSON analysis only.`
       modelProbability:   analysis.model_probability,
       modelInputsPresent: false,
       sportModuleSupport: getAnalystSportSupport(input.sport),
+      legs:               input.legs as AnalysisLegQualityInput[] | undefined,
     })
     const gatedPricing = buildAnalystPricingPayload({
       qualityGate,
@@ -368,6 +384,7 @@ Return structured JSON analysis only.`
       line:         input.line ?? null,
       offered_odds: input.offered_odds,
       bookmaker:    input.bookmaker ?? null,
+      legs:         input.legs ?? null,
     }
     const outputJson = {
       model_probability:   gatedPricing.model_probability,

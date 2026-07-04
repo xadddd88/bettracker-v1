@@ -14,6 +14,7 @@ import {
   renderAnalystTrustShareText,
   renderPricingSummaryLine,
   shouldShowPricingStats,
+  type AnalysisLegQualityInput,
   type AnalysisQualityGateResult,
   type AnalystTrustView,
 } from '@/lib/ai/analysis-quality-gate'
@@ -196,10 +197,12 @@ export default function AIAnalystPage() {
   const [stakeStr,   setStakeStr]   = useState('')
   const [showStake,  setShowStake]  = useState(false)
   const [showRisk,   setShowRisk]   = useState(false)
+  const [couponLegs, setCouponLegs] = useState<AnalysisLegQualityInput[] | null>(null)
 
   function setField(k: string, v: string) {
     setForm(f => ({ ...f, [k]: v }))
     setErrors(e => ({ ...e, [k]: '' }))
+    if (['event_name', 'market_type', 'selection', 'odds'].includes(k)) setCouponLegs(null)
   }
 
   // ── Scanner ────────────────────────────────────────────────
@@ -225,6 +228,7 @@ export default function AIAnalystPage() {
         odds:        d.odds != null ? String(d.odds) : prev.odds,
         bookmaker:   d.bookmaker   ?? prev.bookmaker,
       }))
+      setCouponLegs(Array.isArray(d.legs) && d.legs.length > 0 ? d.legs : null)
       if (SPORTS_LIST.includes(d.sport)) setSport(d.sport as Sport)
       setScanMsg('\u2705 Coupon scanned \u2014 review and analyze')
     } catch {
@@ -274,6 +278,7 @@ export default function AIAnalystPage() {
           bookmaker:       form.bookmaker.trim() || undefined,
           notes:           form.notes.trim() || undefined,
           output_language: locale,
+          legs:            couponLegs ?? undefined,
         }),
       })
       const json = await res.json()
@@ -298,7 +303,7 @@ export default function AIAnalystPage() {
     } finally {
       setAnalyzing(false)
     }
-  }, [sport, locale, form, scoutId])
+  }, [sport, locale, form, scoutId, couponLegs])
 
   // ── Act on already-persisted decision ─────────────────────
   // Decision is created immediately by /api/ai/analyst.
@@ -404,9 +409,12 @@ export default function AIAnalystPage() {
       `<li><strong>${escapeHtml(leg.legLabel)} (${escapeHtml(leg.sportLabel)})</strong><ul>${
         [
           leg.eventName,
+          leg.periodOrPhase ? `${trustView?.locale === 'uk' ? 'Період / фаза' : 'Period / phase'}: ${leg.periodOrPhase}` : null,
+          leg.statusSourceLabel ? `${trustView?.locale === 'uk' ? 'Джерело статусу' : 'Status source'}: ${leg.statusSourceLabel}` : null,
+          leg.odds != null ? `${trustView?.locale === 'uk' ? 'Коефіцієнт' : 'Odds'}: ${leg.odds}` : null,
           `${leg.fixtureStatusLabel} · ${leg.supportLabel} · ${leg.actionabilityLabel}`,
           ...leg.missingData,
-        ].map(item => `<li>${escapeHtml(item)}</li>`).join('')
+        ].filter(Boolean).map(item => `<li>${escapeHtml(item)}</li>`).join('')
       }</ul></li>`
     ).join('') ?? ''
     const pricingHtml = showPricing
@@ -785,6 +793,15 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                               <div className="font-medium">{leg.legLabel} / {leg.sportLabel}</div>
                               <div className="text-amber-100/75 mt-0.5">{leg.eventName}</div>
                               <div className="text-amber-100/75">{leg.marketType}{leg.selection ? ` / ${leg.selection}` : ''}</div>
+                              {leg.periodOrPhase && (
+                                <div className="text-amber-100/75">{trust.locale === 'uk' ? 'Період / фаза' : 'Period / phase'}: {leg.periodOrPhase}</div>
+                              )}
+                              {leg.statusSourceLabel && (
+                                <div className="text-amber-100/75">{trust.locale === 'uk' ? 'Джерело статусу' : 'Status source'}: {leg.statusSourceLabel}</div>
+                              )}
+                              {leg.odds != null && (
+                                <div className="text-amber-100/75">{trust.locale === 'uk' ? 'Коефіцієнт' : 'Odds'}: {leg.odds}</div>
+                              )}
                               <div className="mt-1 text-amber-200/80">{leg.fixtureStatusLabel} · {leg.supportLabel} · {leg.actionabilityLabel}</div>
                               <ul className="list-disc pl-4 mt-0.5 text-amber-200/80">
                                 {leg.missingData.map(item => <li key={item}>{item}</li>)}

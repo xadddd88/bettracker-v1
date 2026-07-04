@@ -92,6 +92,14 @@ const exactPdfCoupon = {
   offeredOdds: 2.2,
 };
 
+const exactLiveCoupon = {
+  sport: 'tennis',
+  eventName: '3-й сет, Тейлор Фріц - Лоренцо Сонего + Перерва, Канада - Марокко + 1-й сет, Френсіс Тіафо - Олександр Бублик',
+  marketType: 'Експрес (3 ноги)',
+  selection: 'Тейлор Фріц + Марокко + Олександр Бублик',
+  offeredOdds: 7.253,
+};
+
 function buildExactPdfCouponTrustView() {
   const qualityGate = evaluateAnalysisQuality({
     sport: exactPdfCoupon.sport,
@@ -238,6 +246,67 @@ function buildExactSavedDecisionFixture() {
 }
 
 console.log('\nAnalysis Quality Gate checks\n');
+
+test('exact live coupon is parsed per leg and blocked as unsupported live analysis', () => {
+  const qualityGate = evaluateAnalysisQuality({
+    sport: exactLiveCoupon.sport,
+    eventName: exactLiveCoupon.eventName,
+    marketType: exactLiveCoupon.marketType,
+    selection: exactLiveCoupon.selection,
+    webSearchEnabled: false,
+    modelProbability: 41,
+  });
+  const view = buildAnalystTrustView({
+    qualityGate,
+    locale: 'uk',
+    eventName: exactLiveCoupon.eventName,
+    marketType: exactLiveCoupon.marketType,
+    selection: exactLiveCoupon.selection,
+    rawReasoning: 'Model probability 41.0%, implied probability 13.79%, Edge +27.2%. Status unverified.',
+    rawFactors: [
+      { name: 'Factor Analysis', score: 2, detail: 'Live coupon looks valuable.' },
+    ],
+  });
+  const summaryText = renderAnalystTrustSummaryText(view);
+  const shareText = renderAnalystTrustShareText(view, exactLiveCoupon);
+  const pdfText = renderAnalystTrustPdfText(view, exactLiveCoupon);
+  const combined = [summaryText, shareText, pdfText, view.displayReasoning, ...view.displayFactors.flatMap(f => [f.name, f.detail])].join('\n');
+
+  assert.equal(qualityGate.pricingAllowed, false);
+  assert.equal(qualityGate.actionability, 'live_not_supported');
+  assert.equal(qualityGate.missingDataByLeg.length, 3);
+  assert.equal(qualityGate.missingDataByLeg[0].sport, 'tennis');
+  assert.equal(qualityGate.missingDataByLeg[0].fixtureStatus, 'live');
+  assert.equal(qualityGate.missingDataByLeg[0].periodOrPhase, '3-й сет');
+  assert.equal(qualityGate.missingDataByLeg[0].statusSource, 'coupon');
+  assert.equal(qualityGate.missingDataByLeg[1].sport, 'soccer');
+  assert.equal(qualityGate.missingDataByLeg[1].fixtureStatus, 'live');
+  assert.equal(qualityGate.missingDataByLeg[1].periodOrPhase, 'Перерва');
+  assert.equal(qualityGate.missingDataByLeg[1].statusSource, 'coupon');
+  assert.equal(qualityGate.missingDataByLeg[2].sport, 'tennis');
+  assert.equal(qualityGate.missingDataByLeg[2].fixtureStatus, 'live');
+  assert.equal(qualityGate.missingDataByLeg[2].periodOrPhase, '1-й сет');
+  assert.equal(qualityGate.missingDataByLeg[2].statusSource, 'coupon');
+
+  assert.equal(view.label, 'ЛАЙВ-КУПОН — оцінка недоступна без live-даних');
+  assert.equal(view.showRawAiAnalysis, false);
+  assert.equal(view.showPlaceBet, false);
+  assert.equal(view.showWatch, false);
+  assert.equal(view.showSkip, true);
+  assert.ok(combined.includes('Нога 1'), combined);
+  assert.ok(combined.includes('теніс'), combined);
+  assert.ok(combined.includes('Нога 2'), combined);
+  assert.ok(combined.includes('футбол'), combined);
+  assert.ok(combined.includes('Нога 3'), combined);
+  assert.ok(combined.includes('статус визначено з купона'), combined);
+  assert.ok(combined.includes('3-й сет'), combined);
+  assert.ok(combined.includes('Перерва'), combined);
+  assert.ok(combined.includes('1-й сет'), combined);
+  assert.ok(combined.includes('live-аналіз не підтримується'), combined);
+  assert.ok(combined.includes('поточний рахунок'), combined);
+  assert.ok(!combined.includes('статус не перевірено'), combined);
+  assertNoForbiddenPricingText(combined);
+});
 
 test('blocks model probability and edge when live data and model inputs are missing', () => {
   const result = evaluateAnalysisQuality({

@@ -24,7 +24,23 @@ Required format:
   "odds":        1.96,
   "stake":       null,
   "bookmaker":   "bookmaker name, or null",
-  "sport":       "soccer|tennis|cs2|basketball|ice_hockey|mma|other"
+  "sport":       "soccer|tennis|cs2|basketball|ice_hockey|mma|other",
+  "legs": [
+    {
+      "rawText": "exact text for this leg",
+      "eventName": "team/player names for this leg without the live phase prefix",
+      "marketType": "market shown for this leg, or null",
+      "selection": "selected outcome for this leg",
+      "odds": 1.19,
+      "sport": "soccer|tennis|cs2|basketball|ice_hockey|mma|other|null",
+      "isLive": true,
+      "periodOrPhase": "3-й сет / Перерва / 1-й сет / null",
+      "statusText": "visible status text, or null",
+      "scoreText": "visible score, or null",
+      "statusSource": "coupon|unknown",
+      "statusConfidence": 0.95
+    }
+  ]
 }
 
 Rules:
@@ -34,6 +50,9 @@ Rules:
 - stake is usually not printed on coupons — return null unless clearly visible
 - Return null for any field not clearly visible
 - sport should reflect the dominant sport on the coupon
+- For express/parlay coupons, preserve every leg in legs[] instead of only flattening the event and selection
+- Infer sport per leg; do not blindly apply the dominant sport to every leg
+- If a leg visibly says Лайв, Live, In-play, 1-й сет, 2-й сет, 3-й сет, Перерва, or Halftime, set isLive=true and statusSource="coupon"
 - Return ONLY the JSON object, nothing else`
 
 // ─── Schemas ─────────────────────────────────────────────────
@@ -54,6 +73,23 @@ const scanOutputSchema = z.object({
     'soccer', 'tennis', 'cs2', 'basketball', 'ice_hockey', 'mma', 'other',
     'football', 'hockey', // legacy — mapped below
   ]).nullable().optional(),
+  legs: z.array(z.object({
+    rawText:          z.string().nullable().optional(),
+    eventName:        z.string().nullable().optional(),
+    marketType:       z.string().nullable().optional(),
+    selection:        z.string().nullable().optional(),
+    odds:             z.number().nullable().optional(),
+    sport:            z.enum([
+      'soccer', 'tennis', 'cs2', 'basketball', 'ice_hockey', 'mma', 'other',
+      'football', 'hockey',
+    ]).nullable().optional(),
+    isLive:           z.boolean().optional(),
+    periodOrPhase:    z.string().nullable().optional(),
+    statusText:       z.string().nullable().optional(),
+    scoreText:        z.string().nullable().optional(),
+    statusSource:     z.enum(['coupon', 'unknown']).optional(),
+    statusConfidence: z.number().min(0).max(1).nullable().optional(),
+  })).optional(),
 })
 
 // ─── Handler ─────────────────────────────────────────────────
@@ -157,6 +193,12 @@ export async function POST(req: NextRequest) {
   const data = validated.data
   if (data.sport && SPORT_MAP[data.sport]) {
     data.sport = SPORT_MAP[data.sport] as typeof data.sport
+  }
+  if (data.legs?.length) {
+    data.legs = data.legs.map(leg => ({
+      ...leg,
+      sport: leg.sport && SPORT_MAP[leg.sport] ? SPORT_MAP[leg.sport] as typeof leg.sport : leg.sport,
+    }))
   }
 
   const isExpress = !!(
