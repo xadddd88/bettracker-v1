@@ -108,6 +108,8 @@ const TENNIS_TERMS = [
   'sinner',
   'djokovic',
   'alcaraz',
+  'de minaur',
+  'svajda',
   'medvedev',
 ]
 

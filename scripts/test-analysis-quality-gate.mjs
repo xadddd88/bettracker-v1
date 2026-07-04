@@ -96,6 +96,25 @@ test('blocks unsupported mixed-sport parlay and reports every leg', () => {
   assertMissing(result, 'tennis module');
 });
 
+test('PDF coupon exact mixed-sport express detects the tennis leg and blocks pricing', () => {
+  const result = evaluateAnalysisQuality({
+    sport: 'soccer',
+    eventName: 'Сучжоу Донгву - Гуандун ДжейЗі-Пауер + Qingdao West Coast - Shanghai Port + Alex De Minaur - Zachary Svajda',
+    marketType: 'Express / 3 legs',
+    selection: 'Гуандун ДжейЗі-Пауер + Over 2.0 + Alex De Minaur -4.0',
+    webSearchEnabled: false,
+    modelProbability: 28,
+  });
+
+  assert.equal(result.status, 'unsupported');
+  assert.equal(result.label, 'NO PRICE - unsupported mixed-sport parlay');
+  assert.equal(result.pricingAllowed, false);
+  assert.equal(result.missingDataByLeg.length, 3);
+  assert.equal(result.missingDataByLeg[2].sport, 'tennis');
+  assertMissing(result, 'tennis module unavailable or approximate');
+  assert.ok(result.reasons.includes('Mixed-sport parlay requires sport-specific support for every leg.'));
+});
+
 test('blocks final EV when a tennis leg is only approximate', () => {
   const result = evaluateAnalysisQuality({
     sport: 'soccer',
