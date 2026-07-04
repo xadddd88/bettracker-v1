@@ -10,7 +10,8 @@
     "test:extract-json": "node scripts/test-extract-json.mjs",
     "build:provider-scripts": "tsc -p tsconfig.scripts.json",
     "smoke:providers": "npm run build:provider-scripts && node build/provider-smoke/scripts/provider-smoke.js",
-    "test:provider-safety": "npm run build:provider-scripts && node scripts/test-provider-safety.mjs"
+    "test:provider-safety": "npm run build:provider-scripts && node scripts/test-provider-safety.mjs",
+    "test:analysis-quality-gate": "npm run build:provider-scripts && node scripts/test-analysis-quality-gate.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

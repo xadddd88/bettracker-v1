@@ -11,9 +11,10 @@ import RiskEvaluator from '@/components/risk/RiskEvaluator'
 interface Props {
   decisionId:  string
   offeredOdds: number | null
+  canPlaceBet?: boolean
 }
 
-export default function DecisionActions({ decisionId, offeredOdds }: Props) {
+export default function DecisionActions({ decisionId, offeredOdds, canPlaceBet = true }: Props) {
   const supabase = createClient()
   const router   = useRouter()
 
@@ -142,6 +143,7 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
       {/* Initial action buttons */}
       {!showStake && (
         <div className="flex gap-3">
+          {canPlaceBet && (
           <button
             className="btn-primary flex-1"
             onClick={() => {
@@ -156,6 +158,7 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
           >
             ✅ Place Bet
           </button>
+          )}
           <button
             className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50"
             onClick={() => handleAction('watchlisted')}

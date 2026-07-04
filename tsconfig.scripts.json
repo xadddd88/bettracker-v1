@@ -15,6 +15,7 @@
   },
   "include": [
     "app/api/admin/sports/fixtures/sync/route.ts",
+    "lib/ai/**/*.ts",
     "lib/providers/**/*.ts",
     "lib/env.ts",
     "scripts/provider-smoke.ts"
