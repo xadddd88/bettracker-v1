@@ -2,7 +2,15 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { ProviderError } from '@/lib/providers/errors'
-import { FIXTURE_SYNC_WRITE_CONFIRMATION, runFixtureSync } from '@/lib/providers/fixture-sync'
+import {
+  DEFAULT_FIXTURE_SYNC_PROVIDERS,
+  FIXTURE_SYNC_WRITE_CONFIRMATION,
+  FIXTURE_SYNC_WRITE_SINGLE_DAY_ERROR,
+  FIXTURE_SYNC_WRITE_SINGLE_PROVIDER_ERROR,
+  FixtureSyncSafetyError,
+  runFixtureSync,
+  type FixtureSyncProvider,
+} from '@/lib/providers/fixture-sync'
 
 export const runtime = 'nodejs'
 
@@ -70,6 +78,24 @@ function fixtureSyncRangeDays(dateFrom: string, dateTo: string): number {
   return Math.floor((dateOnlyToUtcMs(dateTo) - dateOnlyToUtcMs(dateFrom)) / DAY_MS) + 1
 }
 
+function requestedProviders(body: z.infer<typeof fixtureSyncBodySchema>): FixtureSyncProvider[] {
+  return body.providers?.length ? body.providers : [...DEFAULT_FIXTURE_SYNC_PROVIDERS]
+}
+
+function validateWriteSafety(body: z.infer<typeof fixtureSyncBodySchema>): NextResponse | null {
+  if (body.dryRun) return null
+
+  if (requestedProviders(body).length !== 1) {
+    return NextResponse.json({ success: false, error: FIXTURE_SYNC_WRITE_SINGLE_PROVIDER_ERROR }, { status: 400 })
+  }
+
+  if (body.dateFrom !== body.dateTo) {
+    return NextResponse.json({ success: false, error: FIXTURE_SYNC_WRITE_SINGLE_DAY_ERROR }, { status: 400 })
+  }
+
+  return null
+}
+
 export async function POST(req: NextRequest) {
   const unauthorized = authorize(req)
   if (unauthorized) return unauthorized
@@ -89,6 +115,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: DATE_RANGE_LIMIT_ERROR }, { status: 400 })
     }
 
+    const writeSafetyError = validateWriteSafety(parsed.data)
+    if (writeSafetyError) return writeSafetyError
+
     const report = await runFixtureSync(parsed.data)
 
     return NextResponse.json({
@@ -97,6 +126,10 @@ export async function POST(req: NextRequest) {
       report,
     })
   } catch (error) {
+    if (error instanceof FixtureSyncSafetyError) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 })
+    }
+
     if (error instanceof ProviderError) {
       return NextResponse.json(
         { success: false, error: error.message, provider: error.provider, kind: error.kind },

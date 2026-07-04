@@ -4,8 +4,19 @@ import { ApiTennisAdapter } from './adapters/api-tennis'
 import type { CanonicalFixtureDraft, FixtureSyncAdapter, FixtureStatus, ProviderMeta } from './types'
 
 export const FIXTURE_SYNC_WRITE_CONFIRMATION = 'WRITE_FIXTURE_SYNC_M1_2_B'
+export const FIXTURE_SYNC_WRITE_MAX_FIXTURES = 25
+export const DEFAULT_FIXTURE_SYNC_PROVIDERS = ['api_football', 'api_tennis'] as const
+export const FIXTURE_SYNC_WRITE_SINGLE_PROVIDER_ERROR = 'write mode requires exactly one provider'
+export const FIXTURE_SYNC_WRITE_SINGLE_DAY_ERROR = 'write mode requires dateFrom and dateTo to be the same day'
 
-export type FixtureSyncProvider = 'api_football' | 'api_tennis'
+export type FixtureSyncProvider = (typeof DEFAULT_FIXTURE_SYNC_PROVIDERS)[number]
+
+export class FixtureSyncSafetyError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'FixtureSyncSafetyError'
+  }
+}
 
 type FixtureDraftWithMeta = ProviderMeta & { fixture: CanonicalFixtureDraft }
 
@@ -99,6 +110,18 @@ function summarize(provider: FixtureSyncProvider, fixtures: FixtureDraftWithMeta
     bySport,
     byStatus,
     byCompetition,
+  }
+}
+
+function assertWriteRequestSafety(params: FixtureSyncParams, providers: FixtureSyncProvider[]): void {
+  if (params.dryRun) return
+
+  if (providers.length !== 1) {
+    throw new FixtureSyncSafetyError(FIXTURE_SYNC_WRITE_SINGLE_PROVIDER_ERROR)
+  }
+
+  if (params.dateFrom !== params.dateTo) {
+    throw new FixtureSyncSafetyError(FIXTURE_SYNC_WRITE_SINGLE_DAY_ERROR)
   }
 }
 
@@ -217,7 +240,9 @@ async function writeFixtures(
 }
 
 export async function runFixtureSync(params: FixtureSyncParams): Promise<FixtureSyncReport> {
-  const providers = params.providers?.length ? params.providers : (['api_football', 'api_tennis'] as FixtureSyncProvider[])
+  const providers = params.providers?.length ? params.providers : [...DEFAULT_FIXTURE_SYNC_PROVIDERS]
+  assertWriteRequestSafety(params, providers)
+
   const syncRunId = nextSyncRunId()
   const writeEnabled = process.env.SPORTS_FIXTURE_SYNC_WRITE_ENABLED === 'true'
   const operatorConfirmed = params.operatorConfirm === FIXTURE_SYNC_WRITE_CONFIRMATION
@@ -234,6 +259,12 @@ export async function runFixtureSync(params: FixtureSyncParams): Promise<Fixture
     })
 
     const summary = summarize(provider, fixtures)
+    if (!params.dryRun && fixtures.length > FIXTURE_SYNC_WRITE_MAX_FIXTURES) {
+      throw new FixtureSyncSafetyError(
+        `fetched fixtures exceed M1.2.c write safety cap of ${FIXTURE_SYNC_WRITE_MAX_FIXTURES}`
+      )
+    }
+
     if (shouldWrite) {
       summary.wrote = await writeFixtures(provider, fixtures, syncRunId)
     }
