@@ -7,6 +7,9 @@ import { FIXTURE_SYNC_WRITE_CONFIRMATION, runFixtureSync } from '@/lib/providers
 export const runtime = 'nodejs'
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
+const DAY_MS = 24 * 60 * 60 * 1000
+const MAX_FIXTURE_SYNC_RANGE_DAYS = 7
+const DATE_RANGE_LIMIT_ERROR = 'date range exceeds M1.2.b safety limit of 7 days'
 
 const fixtureSyncBodySchema = z
   .object({
@@ -58,6 +61,15 @@ function providerErrorStatus(error: ProviderError): number {
   return 502
 }
 
+function dateOnlyToUtcMs(value: string): number {
+  const [year, month, day] = value.split('-').map(Number)
+  return Date.UTC(year, month - 1, day)
+}
+
+function fixtureSyncRangeDays(dateFrom: string, dateTo: string): number {
+  return Math.floor((dateOnlyToUtcMs(dateTo) - dateOnlyToUtcMs(dateFrom)) / DAY_MS) + 1
+}
+
 export async function POST(req: NextRequest) {
   const unauthorized = authorize(req)
   if (unauthorized) return unauthorized
@@ -71,6 +83,10 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'Invalid input', details: parsed.error.flatten() },
         { status: 400 }
       )
+    }
+
+    if (fixtureSyncRangeDays(parsed.data.dateFrom, parsed.data.dateTo) > MAX_FIXTURE_SYNC_RANGE_DAYS) {
+      return NextResponse.json({ success: false, error: DATE_RANGE_LIMIT_ERROR }, { status: 400 })
     }
 
     const report = await runFixtureSync(parsed.data)

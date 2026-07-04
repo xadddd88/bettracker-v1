@@ -16,6 +16,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import Module from 'node:module';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -68,6 +69,13 @@ function jsonResponse(payload, status = 200) {
     status,
     headers: { 'content-type': 'application/json' },
   });
+}
+
+async function readJsonResponse(response) {
+  return {
+    status: response.status,
+    body: await response.json(),
+  };
 }
 
 function footballPayload() {
@@ -248,6 +256,62 @@ test('no NEXT_PUBLIC provider env vars referenced in lib/providers', () => {
 process.env.API_FOOTBALL_KEY = 'dummy-football';
 process.env.API_TENNIS_KEY = 'dummy-tennis';
 process.env.SPORTMONKS_TOKEN = 'dummy-sportmonks';
+
+await testAsync('fixture sync route rejects date ranges above the 7-day safety limit', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const originalResolveFilename = Module._resolveFilename;
+  let fetchCalls = 0;
+
+  Module._resolveFilename = function resolveAlias(request, parent, isMain, options) {
+    if (request.startsWith('@/')) {
+      return originalResolveFilename.call(this, path.join(buildDir, request.slice(2)), parent, isMain, options);
+    }
+
+    return originalResolveFilename.call(this, request, parent, isMain, options);
+  };
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    throw new Error('provider fetch should not be called');
+  };
+
+  try {
+    const { POST } = require(path.join(buildDir, 'app/api/admin/sports/fixtures/sync/route.js'));
+    const response = await POST(
+      new Request('https://example.test/api/admin/sports/fixtures/sync', {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer operator-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          providers: ['api_football'],
+          dateFrom: '2026-07-01',
+          dateTo: '2026-07-08',
+          dryRun: true,
+        }),
+      })
+    );
+    const result = await readJsonResponse(response);
+
+    assert.equal(result.status, 400);
+    assert.equal(result.body.success, false);
+    assert.equal(result.body.error, 'date range exceeds M1.2.b safety limit of 7 days');
+    assert.equal(result.body.details, undefined);
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    Module._resolveFilename = originalResolveFilename;
+
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
 
 await testAsync('ApiFootballAdapter.fetchFixtures fetches unfiltered ranges one day at a time', async () => {
   const originalFetch = globalThis.fetch;
