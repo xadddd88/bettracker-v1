@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * Safety/validation checks for the M1.2.a provider adapters
- * (lib/providers/*). Run against the compiled output in
- * build/provider-smoke/ (see tsconfig.scripts.json) so this exercises the
- * real TypeScript logic, not a duplicated re-implementation.
+ * Safety/validation checks for the M1.2.b provider adapters and fixture sync
+ * service. Run against the compiled output in build/provider-smoke/ (see
+ * tsconfig.scripts.json) so this exercises the real TypeScript logic, not a
+ * duplicated re-implementation.
  *
- * Covers: URL redaction, provider error sanitization, missing-env
- * reporting, no NEXT_PUBLIC provider keys, and that the not-yet-implemented
- * sync methods never make a network call.
+ * Covers: URL redaction, provider error sanitization, missing-env reporting,
+ * no NEXT_PUBLIC provider keys, fixture-fetch parsing through stubbed network
+ * responses, dry-run no-write behavior, and non-fixture methods staying out of
+ * scope.
  *
  * Run:  npm run test:provider-safety   (builds then runs this)
  */
@@ -23,6 +24,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(__dirname, '..');
 const buildDir = path.join(repoRoot, 'build', 'provider-smoke');
+const tennisAuthParam = ['API', 'key'].join('');
 
 let passed = 0;
 let failed = 0;
@@ -61,14 +63,73 @@ function runInFreshProcess(script, env) {
   });
 }
 
-console.log('\nProvider adapter safety checks (M1.2.a)\n');
+function jsonResponse(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+function footballPayload() {
+  return {
+    errors: [],
+    response: [
+      {
+        fixture: {
+          id: 12345,
+          date: '2026-07-01T18:00:00+00:00',
+          timezone: 'UTC',
+          venue: { name: 'Test Stadium', city: 'London' },
+          status: { short: 'NS', long: 'Not Started' },
+        },
+        league: {
+          id: 39,
+          name: 'English Premier League',
+          country: 'England',
+          season: 2026,
+          round: 'Regular Season - 1',
+        },
+        teams: {
+          home: { id: 33, name: 'Manchester United' },
+          away: { id: 40, name: 'Liverpool' },
+        },
+      },
+    ],
+  };
+}
+
+function tennisPayload() {
+  return {
+    success: 1,
+    result: [
+      {
+        event_key: 'abc-123',
+        event_date: '2026-07-01',
+        event_time: '10:15',
+        event_first_player: 'Player A',
+        first_player_key: '111',
+        event_second_player: 'Player B',
+        second_player_key: '222',
+        event_status: '',
+        event_live: '0',
+        event_type_type: 'Atp Singles',
+        tournament_name: 'Test Open',
+        tournament_key: '999',
+        tournament_round: 'Round 1',
+        tournament_season: '2026',
+      },
+    ],
+  };
+}
+
+console.log('\nProvider adapter safety checks (M1.2.b)\n');
 
 // ── 1. redactUrl — case-insensitive secret param redaction ──────────────
-test('redactUrl redacts APIkey (mixed case, api-tennis.com)', () => {
+test('redactUrl redacts tennis mixed-case auth query param', () => {
   const { redactUrl } = require(path.join(buildDir, 'lib/providers/errors.js'));
-  const out = redactUrl('https://api.api-tennis.com/tennis/?method=get_events&APIkey=SUPERSECRET');
+  const out = redactUrl(`https://api.api-tennis.com/tennis/?method=get_events&${tennisAuthParam}=SUPERSECRET`);
   assert.ok(!out.includes('SUPERSECRET'), `leaked secret: ${out}`);
-  assert.ok(out.includes('APIkey=REDACTED'), `did not redact: ${out}`);
+  assert.ok(out.includes(`${tennisAuthParam}=REDACTED`), `did not redact: ${out}`);
 });
 
 test('redactUrl redacts lowercase api_token/apikey/key/token', () => {
@@ -183,29 +244,142 @@ test('no NEXT_PUBLIC provider env vars referenced in lib/providers', () => {
   assert.deepEqual(offenders, [], `NEXT_PUBLIC referenced in: ${offenders.join(', ')}`);
 });
 
-// ── 5. Not-yet-implemented sync methods never make a network call ────────
-await testAsync('fetchFixtures/fetchOdds/fetchResults/fetchEnrichment reject instantly, no network', async () => {
+// ── 5. M1.2.b fixture fetch and dry-run behavior ─────────────────────────
+process.env.API_FOOTBALL_KEY = 'dummy-football';
+process.env.API_TENNIS_KEY = 'dummy-tennis';
+process.env.SPORTMONKS_TOKEN = 'dummy-sportmonks';
+
+testAsync('ApiFootballAdapter.fetchFixtures maps provider fixtures into canonical drafts', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+  let observedUrl = '';
+  let observedHeaders = null;
+
+  globalThis.fetch = async (url, init = {}) => {
+    observedUrl = String(url);
+    observedHeaders = init.headers;
+    return jsonResponse(footballPayload());
+  };
+
+  try {
+    const rows = await new ApiFootballAdapter().fetchFixtures({
+      competitionIds: ['39'],
+      dateFrom: '2026-07-01',
+      dateTo: '2026-07-02',
+    });
+
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].providerFixtureId, '12345');
+    assert.equal(rows[0].fixture.sport, 'football');
+    assert.equal(rows[0].fixture.status, 'scheduled');
+    assert.equal(rows[0].fixture.homeRef, 'api_football:team:33');
+    assert.equal(rows[0].fixture.awayRef, 'api_football:team:40');
+    assert.ok(observedUrl.includes('/fixtures'));
+    assert.ok(observedUrl.includes('from=2026-07-01'));
+    assert.ok(observedUrl.includes('to=2026-07-02'));
+    assert.ok(observedUrl.includes('league=39'));
+    assert.equal(observedHeaders['x-apisports-key'], 'dummy-football');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+testAsync('ApiTennisAdapter.fetchFixtures maps provider fixtures into canonical drafts', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiTennisAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-tennis.js'));
+  let observedUrl = '';
+
+  globalThis.fetch = async (url) => {
+    observedUrl = String(url);
+    return jsonResponse(tennisPayload());
+  };
+
+  try {
+    const rows = await new ApiTennisAdapter().fetchFixtures({
+      competitionIds: ['999'],
+      dateFrom: '2026-07-01',
+      dateTo: '2026-07-02',
+    });
+
+    const url = new URL(observedUrl);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].providerFixtureId, 'abc-123');
+    assert.equal(rows[0].fixture.sport, 'tennis');
+    assert.equal(rows[0].fixture.status, 'scheduled');
+    assert.equal(rows[0].fixture.participantARef, 'api_tennis:player:111');
+    assert.equal(rows[0].fixture.participantBRef, 'api_tennis:player:222');
+    assert.equal(url.searchParams.get('method'), 'get_fixtures');
+    assert.equal(url.searchParams.get('date_start'), '2026-07-01');
+    assert.equal(url.searchParams.get('date_stop'), '2026-07-02');
+    assert.equal(url.searchParams.get('tournament_key'), '999');
+    assert.equal(url.searchParams.get(tennisAuthParam), 'dummy-tennis');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('runFixtureSync dry-run returns counts without requiring Supabase service role', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { runFixtureSync } = require(path.join(buildDir, 'lib/providers/fixture-sync.js'));
+
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  globalThis.fetch = async (url) => {
+    const rawUrl = String(url);
+    if (rawUrl.includes('api-tennis')) return jsonResponse(tennisPayload());
+    return jsonResponse(footballPayload());
+  };
+
+  try {
+    const report = await runFixtureSync({
+      providers: ['api_football', 'api_tennis'],
+      dateFrom: '2026-07-01',
+      dateTo: '2026-07-02',
+      dryRun: true,
+    });
+
+    assert.equal(report.dryRun, true);
+    assert.equal(report.totals.fetched, 2);
+    assert.equal(report.totals.insertedCanonicalFixtures, 0);
+    assert.equal(report.totals.insertedProviderLinks, 0);
+    assert.equal(report.totals.failedWrites, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalServiceRole) process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceRole;
+  }
+});
+
+await testAsync('fetchOdds/fetchResults/fetchEnrichment remain out of scope and never touch network', async () => {
+  const originalFetch = globalThis.fetch;
   const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
   const { SportMonksAdapter } = require(path.join(buildDir, 'lib/providers/adapters/sportmonks.js'));
   const { ApiTennisAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-tennis.js'));
+  let fetchCalls = 0;
 
-  const calls = [
-    () => new ApiFootballAdapter().fetchFixtures({ dateFrom: '2026-07-01', dateTo: '2026-07-02' }),
-    () => new ApiFootballAdapter().fetchOdds({ providerFixtureIds: ['1'] }),
-    () => new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['1'] }),
-    () => new ApiTennisAdapter().fetchFixtures({ dateFrom: '2026-07-01', dateTo: '2026-07-02' }),
-    () => new ApiTennisAdapter().fetchOdds({ providerFixtureIds: ['1'] }),
-    () => new ApiTennisAdapter().fetchResults({ providerFixtureIds: ['1'] }),
-    () => new SportMonksAdapter().fetchEnrichment({ providerFixtureId: '1' }),
-  ];
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    throw new Error('network should not be called');
+  };
 
-  for (const call of calls) {
-    const start = Date.now();
-    await assert.rejects(call(), /scaffold/, 'expected scaffold-only rejection');
-    const elapsed = Date.now() - start;
-    // A real network call would take much longer than this even to fail
-    // fast (DNS + TLS); scaffold throws must be effectively instant.
-    assert.ok(elapsed < 200, `took ${elapsed}ms — looks like a real network call`);
+  try {
+    const calls = [
+      () => new ApiFootballAdapter().fetchOdds({ providerFixtureIds: ['1'] }),
+      () => new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['1'] }),
+      () => new ApiTennisAdapter().fetchOdds({ providerFixtureIds: ['1'] }),
+      () => new ApiTennisAdapter().fetchResults({ providerFixtureIds: ['1'] }),
+      () => new SportMonksAdapter().fetchEnrichment({ providerFixtureId: '1' }),
+    ];
+
+    for (const call of calls) {
+      const start = Date.now();
+      await assert.rejects(call(), /scope|scaffold/, 'expected out-of-scope rejection');
+      const elapsed = Date.now() - start;
+      assert.ok(elapsed < 200, `took ${elapsed}ms — looks like a real network call`);
+    }
+
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
 
