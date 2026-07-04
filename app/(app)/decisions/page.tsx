@@ -2,8 +2,39 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
+import {
+  buildAnalystDecisionSurfaceView,
+  type AnalysisQualityGateResult,
+  type AnalystTrustView,
+} from '@/lib/ai/analysis-quality-gate'
 
 type Filter = 'all' | 'watchlisted' | 'pending' | 'placed' | 'skipped'
+
+interface AnalysisRunRow {
+  output_json: {
+    quality_gate?: AnalysisQualityGateResult | null
+    trust_view?: AnalystTrustView | null
+    edge_bucket?: string | null
+  } | null
+}
+
+interface DecisionListRow {
+  id: string
+  sport: string | null
+  event_name: string
+  market_type: string | null
+  selection: string | null
+  offered_odds: number | null
+  recommendation: string | null
+  final_action: string
+  confidence_score: number | null
+  model_probability: number | null
+  implied_probability: number | null
+  edge_percent: number | null
+  output_language: string | null
+  created_at: string
+  ai_analysis_runs: AnalysisRunRow[] | null
+}
 
 const FILTERS: { value: Filter; label: string }[] = [
   { value: 'all',         label: 'All' },
@@ -48,14 +79,20 @@ export default async function DecisionsPage({
 
   let query = supabase
     .from('decisions')
-    .select('id, sport, event_name, market_type, selection, offered_odds, recommendation, final_action, confidence_score, created_at')
+    .select(`
+      id, sport, event_name, market_type, selection, offered_odds,
+      recommendation, final_action, confidence_score,
+      model_probability, implied_probability, edge_percent,
+      output_language, created_at,
+      ai_analysis_runs(output_json)
+    `)
     .eq('user_id', user!.id)
     .order('created_at', { ascending: false })
 
   if (filter !== 'all') query = query.eq('final_action', filter)
 
   const { data } = await query
-  const decisions = data ?? []
+  const decisions = (data ?? []) as unknown as DecisionListRow[]
 
   return (
     <div className="flex flex-col gap-5">
@@ -116,6 +153,29 @@ export default async function DecisionsPage({
             const rec    = d.recommendation ? REC_CONFIG[d.recommendation] : null
             const action = ACTION_CONFIG[d.final_action] ?? ACTION_CONFIG.pending
             const icon   = SPORT_ICONS[d.sport ?? ''] ?? '🏅'
+            const analysisOutput = d.ai_analysis_runs?.[0]?.output_json ?? null
+            const qualityGate = analysisOutput?.quality_gate ?? null
+            const trustView = analysisOutput?.trust_view ?? null
+            const surface = buildAnalystDecisionSurfaceView({
+              qualityGate,
+              trustView,
+              locale:             d.output_language,
+              sport:              d.sport,
+              eventName:          d.event_name,
+              marketType:         d.market_type ?? '',
+              selection:          d.selection,
+              offeredOdds:        d.offered_odds,
+              recommendation:     d.recommendation,
+              finalAction:        d.final_action,
+              confidenceScore:    d.confidence_score,
+              modelProbability:   d.model_probability,
+              impliedProbability: d.implied_probability,
+              edgePercent:        d.edge_percent,
+              edgeBucket:         analysisOutput?.edge_bucket,
+            })
+            const recommendationLabel = surface.isTrustBlocked ? surface.listRecommendationLabel : rec?.label
+            const recommendationColor = surface.isTrustBlocked ? 'text-amber-300' : rec?.color
+            const actionLabel = surface.isTrustBlocked ? surface.actionLabel : action.label
             const date   = new Date(d.created_at).toLocaleDateString('en-GB', {
               day: '2-digit', month: 'short',
             })
@@ -128,7 +188,10 @@ export default async function DecisionsPage({
                 className="flex items-center gap-4 px-4 py-3.5 hover:bg-gray-800/30 transition-colors"
               >
                 {/* Sport icon */}
-                <span className="text-xl shrink-0 w-7 text-center">{icon}</span>
+                <span className="shrink-0 w-12 text-center">
+                  <span className="block text-xl">{icon}</span>
+                  <span className="block text-[10px] text-slate-600 truncate">{surface.sportLabel}</span>
+                </span>
 
                 {/* Event + market */}
                 <div className="flex-1 min-w-0">
@@ -140,9 +203,9 @@ export default async function DecisionsPage({
                 </div>
 
                 {/* AI recommendation */}
-                {rec && (
-                  <span className={`text-xs font-semibold shrink-0 hidden sm:block ${rec.color}`}>
-                    {rec.label}
+                {recommendationLabel && (
+                  <span className={`text-xs font-semibold shrink-0 hidden sm:block ${recommendationColor ?? 'text-slate-400'}`}>
+                    {recommendationLabel}
                   </span>
                 )}
 
@@ -160,7 +223,7 @@ export default async function DecisionsPage({
 
                 {/* Action badge */}
                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium border shrink-0 ${action.bg} ${action.color}`}>
-                  {action.label}
+                  {actionLabel}
                 </span>
               </Link>
             )

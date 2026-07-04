@@ -24,6 +24,16 @@ const {
 } = qualityGateModule;
 const renderAnalystTrustShareText = qualityGateModule.renderAnalystTrustShareText ?? (() => 'MISSING SHARE RENDERER');
 const renderAnalystTrustPdfText = qualityGateModule.renderAnalystTrustPdfText ?? (() => 'MISSING PDF RENDERER');
+const buildAnalystDecisionSurfaceView = qualityGateModule.buildAnalystDecisionSurfaceView ?? ((input) => ({
+  isTrustBlocked: false,
+  listRecommendationLabel: input.recommendation === 'no_value' ? 'NO VALUE' : String(input.recommendation ?? ''),
+  detailRecommendationLabel: input.recommendation === 'no_value' ? 'NO VALUE' : String(input.recommendation ?? ''),
+  sportLabel: input.sport === 'soccer' ? 'SOCC' : String(input.sport ?? ''),
+  actionLabel: input.finalAction === 'pending' ? 'Pending' : String(input.finalAction ?? ''),
+  trustView: input.trustView ?? null,
+}));
+const renderAnalystDecisionSurfaceShareText = qualityGateModule.renderAnalystDecisionSurfaceShareText ?? (() => 'MISSING DECISION SHARE RENDERER');
+const renderAnalystDecisionSurfacePdfText = qualityGateModule.renderAnalystDecisionSurfacePdfText ?? (() => 'MISSING DECISION PDF RENDERER');
 
 let passed = 0;
 let failed = 0;
@@ -149,6 +159,82 @@ function assertContainsUkrainianBlockedCopy(text) {
   for (const needle of required) {
     assert.ok(lowerText.includes(needle.toLocaleLowerCase('uk')), `expected localized blocked-mode text to include ${needle}; got:\n${text}`);
   }
+}
+
+function assertNoDecisionSurfaceLeaks(text) {
+  const forbidden = [
+    'SOCC',
+    'SOCCER',
+    'NO VALUE',
+    'NO PRICE',
+    'High Risk',
+    'risk warning',
+    'Data coverage',
+    'Missing data checklist',
+    'Leg',
+    'Factor Analysis',
+    'Confidence',
+    'Watch',
+    'Skip',
+    'This analysis is based only',
+    'live injuries',
+    'team news',
+    'recent form updates',
+    'current line movement',
+    'Model probability',
+    'Implied probability',
+    'Edge',
+    '28.0%',
+    '45.5%',
+    '45.45%',
+    '-17.4%',
+    '21.6%',
+    '25-30%',
+  ];
+  for (const needle of forbidden) {
+    assert.ok(!text.includes(needle), `expected decision surface text not to include ${needle}; got:\n${text}`);
+  }
+}
+
+function buildExactSavedDecisionFixture() {
+  const qualityGate = evaluateAnalysisQuality({
+    sport: exactPdfCoupon.sport,
+    eventName: exactPdfCoupon.eventName,
+    marketType: exactPdfCoupon.marketType,
+    selection: exactPdfCoupon.selection,
+    webSearchEnabled: false,
+    modelProbability: 28,
+  });
+  const trustView = buildAnalystTrustView({
+    qualityGate,
+    locale: 'uk',
+    eventName: exactPdfCoupon.eventName,
+    marketType: exactPdfCoupon.marketType,
+    selection: exactPdfCoupon.selection,
+    rawReasoning: 'NO VALUE because Model probability is 28.0%, implied probability is 45.45%, Edge is -17.4%.',
+    rawFactors: [
+      { name: 'Factor Analysis', score: -3, detail: 'High Risk: 25-30% real probability creates negative expected value.' },
+    ],
+  });
+
+  return {
+    sport: exactPdfCoupon.sport,
+    eventName: exactPdfCoupon.eventName,
+    marketType: exactPdfCoupon.marketType,
+    selection: exactPdfCoupon.selection,
+    offeredOdds: exactPdfCoupon.offeredOdds,
+    bookmaker: null,
+    locale: 'uk',
+    recommendation: 'no_value',
+    riskLevel: 'high',
+    finalAction: 'pending',
+    confidenceScore: 22,
+    modelProbability: null,
+    impliedProbability: null,
+    edgePercent: null,
+    qualityGate,
+    trustView,
+  };
 }
 
 console.log('\nAnalysis Quality Gate checks\n');
@@ -575,6 +661,113 @@ test('exact Ukrainian PDF coupon PDF string-builder uses localized blocked-mode 
   assertNoForbiddenPricingText(pdfText);
   assertNoBlockedEnglishLeaks(pdfText);
   assertContainsUkrainianBlockedCopy(pdfText);
+});
+
+test('saved unpriced Analyst decision list surface uses trust label instead of legacy NO VALUE', () => {
+  const decision = buildExactSavedDecisionFixture();
+  const surface = buildAnalystDecisionSurfaceView(decision);
+  const listText = [
+    surface.sportLabel,
+    surface.listRecommendationLabel,
+    surface.actionLabel,
+    `${decision.confidenceScore}%`,
+  ].join('\n');
+
+  assert.equal(surface.isTrustBlocked, true);
+  assert.ok(listText.includes('БЕЗ ОЦІНКИ'), listText);
+  assert.ok(listText.includes('футбол'), listText);
+  assert.ok(!listText.includes('NO VALUE'), listText);
+  assert.ok(!listText.includes('SOCC'), listText);
+});
+
+test('legacy saved unpriced decision without stored trust view still uses localized blocked labels', () => {
+  const decision = {
+    ...buildExactSavedDecisionFixture(),
+    qualityGate: null,
+    trustView: null,
+    edgeBucket: 'unpriced',
+  };
+  const surface = buildAnalystDecisionSurfaceView(decision);
+  const listText = [
+    surface.sportLabel,
+    surface.listRecommendationLabel,
+    surface.actionLabel,
+  ].join('\n');
+
+  assert.equal(surface.isTrustBlocked, true);
+  assert.ok(listText.includes('БЕЗ ОЦІНКИ'), listText);
+  assert.ok(listText.includes('футбол'), listText);
+  assert.ok(listText.includes('Очікує рішення'), listText);
+  assert.ok(!listText.includes('NO VALUE'), listText);
+  assert.ok(!listText.includes('NO PRICE'), listText);
+  assert.ok(!listText.includes('SOCC'), listText);
+  assert.ok(!listText.includes('Pending'), listText);
+});
+
+test('legacy saved Ukrainian coupon with stale English trust view is localized on decision surfaces', () => {
+  const decision = buildExactSavedDecisionFixture();
+  const staleEnglishTrustView = buildAnalystTrustView({
+    qualityGate: decision.qualityGate,
+    locale: 'en',
+    eventName: decision.eventName,
+    marketType: decision.marketType,
+    selection: decision.selection,
+    rawReasoning: 'NO PRICE because this is unsupported.',
+    rawFactors: [],
+  });
+  const surface = buildAnalystDecisionSurfaceView({
+    ...decision,
+    locale: null,
+    trustView: staleEnglishTrustView,
+    edgeBucket: 'unpriced',
+  });
+  const listText = [
+    surface.sportLabel,
+    surface.listRecommendationLabel,
+    surface.actionLabel,
+  ].join('\n');
+
+  assert.equal(surface.isTrustBlocked, true);
+  assert.ok(listText.includes('БЕЗ ОЦІНКИ'), listText);
+  assert.ok(listText.includes('футбол'), listText);
+  assert.ok(listText.includes('Очікує рішення'), listText);
+  assert.ok(!listText.includes('NO PRICE'), listText);
+  assert.ok(!listText.includes('soccer'), listText);
+  assert.ok(!listText.includes('Pending'), listText);
+});
+
+test('saved unpriced Analyst decision detail header uses localized sport and full trust label', () => {
+  const decision = buildExactSavedDecisionFixture();
+  const surface = buildAnalystDecisionSurfaceView(decision);
+  const headerText = [
+    surface.sportLabel,
+    surface.detailRecommendationLabel,
+    surface.actionLabel,
+    surface.trustView?.supportLabel,
+  ].filter(Boolean).join('\n');
+
+  assert.equal(surface.isTrustBlocked, true);
+  assert.ok(headerText.includes('футбол'), headerText);
+  assert.ok(headerText.includes('БЕЗ ОЦІНКИ - непідтримуваний експрес із різних видів спорту'), headerText);
+  assert.ok(!headerText.includes('SOCC'), headerText);
+  assert.ok(!headerText.includes('NO VALUE'), headerText);
+  assert.ok(!headerText.includes('Pending'), headerText);
+});
+
+test('saved unpriced Analyst decision detail share and PDF strings use trust view only', () => {
+  const decision = buildExactSavedDecisionFixture();
+  const surface = buildAnalystDecisionSurfaceView(decision);
+  const shareText = renderAnalystDecisionSurfaceShareText(surface, decision);
+  const pdfText = renderAnalystDecisionSurfacePdfText(surface, decision);
+  const combined = `${shareText}\n${pdfText}`;
+
+  assert.ok(combined.includes('БЕЗ ОЦІНКИ - непідтримуваний експрес із різних видів спорту'), combined);
+  assert.ok(combined.includes('футбол'), combined);
+  assert.ok(combined.includes('теніс'), combined);
+  assert.ok(combined.includes('статус не перевірено'), combined);
+  assert.ok(combined.includes('Покриття даних'), combined);
+  assert.ok(combined.includes('Перелік відсутніх даних'), combined);
+  assertNoDecisionSurfaceLeaks(combined);
 });
 
 if (failed > 0) {
