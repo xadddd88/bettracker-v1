@@ -10,14 +10,20 @@ const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(__dirname, '..');
 const buildDir = path.join(repoRoot, 'build', 'provider-smoke');
 
+const qualityGateModule = require(path.join(buildDir, 'lib/ai/analysis-quality-gate.js'));
 const {
   evaluateAnalysisQuality,
   applyQualityGateToPricing,
   buildAnalystPricingPayload,
+  buildAnalystTrustPayload,
+  buildAnalystTrustView,
+  renderAnalystTrustSummaryText,
   shouldShowPricingStats,
   renderPricingSummaryLine,
   renderQualityGateSummaryText,
-} = require(path.join(buildDir, 'lib/ai/analysis-quality-gate.js'));
+} = qualityGateModule;
+const renderAnalystTrustShareText = qualityGateModule.renderAnalystTrustShareText ?? (() => 'MISSING SHARE RENDERER');
+const renderAnalystTrustPdfText = qualityGateModule.renderAnalystTrustPdfText ?? (() => 'MISSING PDF RENDERER');
 
 let passed = 0;
 let failed = 0;
@@ -40,6 +46,109 @@ function assertMissing(result, needle) {
     allMissing.some(item => item.toLowerCase().includes(needle.toLowerCase())),
     `expected missing checklist to include ${needle}; got ${JSON.stringify(allMissing)}`
   );
+}
+
+function assertNoForbiddenPricingText(text) {
+  const forbidden = [
+    'Model probability',
+    'Implied probability',
+    'Edge',
+    'EV',
+    'expected value',
+    'negative edge',
+    'real probability',
+    'model probability',
+    '28.0%',
+    '45.5%',
+    '45.45%',
+    '-17.4%',
+    '21.6%',
+    '25-30%',
+    'реальна ймовірність',
+    'імплікована ймовірність',
+    'негативний край',
+    'очікуване значення',
+  ];
+  for (const needle of forbidden) {
+    assert.ok(!text.includes(needle), `expected blocked-mode text not to include ${needle}; got:\n${text}`);
+  }
+}
+
+const exactPdfCoupon = {
+  sport: 'soccer',
+  eventName: 'Сучжоу Донгву - Гуандун ДжейЗі-Пауер + Qingdao West Coast - Shanghai Port + Alex De Minaur - Zachary Svajda',
+  marketType: 'Експрес (3 ноги)',
+  selection: 'Гуандун ДжейЗі-Пауер + Over (2.0) + Alex De Minaur -4.0',
+  offeredOdds: 2.2,
+};
+
+function buildExactPdfCouponTrustView() {
+  const qualityGate = evaluateAnalysisQuality({
+    sport: exactPdfCoupon.sport,
+    eventName: exactPdfCoupon.eventName,
+    marketType: exactPdfCoupon.marketType,
+    selection: exactPdfCoupon.selection,
+    webSearchEnabled: false,
+    modelProbability: 28,
+  });
+
+  return buildAnalystTrustView({
+    qualityGate,
+    locale: 'uk',
+    eventName: exactPdfCoupon.eventName,
+    marketType: exactPdfCoupon.marketType,
+    selection: exactPdfCoupon.selection,
+    rawReasoning: 'NO VALUE because Model probability is 28.0%, implied probability is 45.45%, Edge is -17.4%. This analysis is based only on the information provided and does not include live injuries, team news, recent form updates, or current line movement.',
+    rawFactors: [
+      { name: 'Factor Analysis', score: -3, detail: 'High Risk: 25-30% real probability creates negative expected value.' },
+    ],
+  });
+}
+
+function assertNoBlockedEnglishLeaks(text) {
+  const forbidden = [
+    'This analysis is based only',
+    'live injuries',
+    'team news',
+    'recent form updates',
+    'current line movement',
+    'SOCCER',
+    'TENNIS',
+    'NO PRICE',
+    'High Risk',
+    'risk warning',
+    'Data coverage',
+    'Missing data checklist',
+    'Leg 1',
+    'Factor Analysis',
+    'Confidence',
+    'Watch',
+    'Skip',
+    'Generated',
+    'Analysis is for informational purposes only',
+  ];
+  for (const needle of forbidden) {
+    assert.ok(!text.includes(needle), `expected localized blocked-mode text not to include ${needle}; got:\n${text}`);
+  }
+}
+
+function assertContainsUkrainianBlockedCopy(text) {
+  const required = [
+    'БЕЗ ОЦІНКИ',
+    'футбол',
+    'теніс',
+    'статус не перевірено',
+    'покриття даних',
+    'перелік відсутніх даних',
+    'нога',
+    'впевненість',
+    'спостерігати',
+    'пропустити',
+  ];
+  const lowerText = text.toLocaleLowerCase('uk');
+  for (const needle of required) {
+    assert.ok(lowerText.includes(needle.toLocaleLowerCase('uk')), `expected localized blocked-mode text to include ${needle}; got:\n${text}`);
+  }
 }
 
 console.log('\nAnalysis Quality Gate checks\n');
@@ -162,6 +271,7 @@ test('allows priced betting analysis only when required coverage and model input
     modelProbability: 54,
     modelInputsPresent: true,
     sportModuleSupport: 'full',
+    fixtureStatus: 'scheduled',
     dataCoverage: {
       liveInjuries: true,
       teamNews: true,
@@ -268,6 +378,7 @@ test('render helpers show pricing only for valid priced analysis', () => {
     modelProbability: 54,
     modelInputsPresent: true,
     sportModuleSupport: 'full',
+    fixtureStatus: 'scheduled',
     dataCoverage: {
       liveInjuries: true,
       teamNews: true,
@@ -294,6 +405,176 @@ test('render helpers show pricing only for valid priced analysis', () => {
   assert.ok(line.includes('Model probability: 54.0%'));
   assert.ok(line.includes('Implied probability: 50.0%'));
   assert.ok(line.includes('Edge: +4.0%'));
+});
+
+test('Ukrainian trust view localizes exact mixed-sport coupon and structurally hides raw pricing analysis', () => {
+  const qualityGate = evaluateAnalysisQuality({
+    sport: 'soccer',
+    eventName: 'Сучжоу Донгву - Гуандун ДжейЗі-Пауер + Qingdao West Coast - Shanghai Port + Alex De Minaur - Zachary Svajda',
+    marketType: 'Експрес (3 ноги)',
+    selection: 'Гуандун ДжейЗі-Пауер + Over (2.0) + Alex De Minaur -4.0',
+    webSearchEnabled: false,
+    modelProbability: 28,
+  });
+
+  const view = buildAnalystTrustView({
+    qualityGate,
+    locale: 'uk',
+    eventName: 'Сучжоу Донгву - Гуандун ДжейЗі-Пауер + Qingdao West Coast - Shanghai Port + Alex De Minaur - Zachary Svajda',
+    marketType: 'Експрес (3 ноги)',
+    selection: 'Гуандун ДжейЗі-Пауер + Over (2.0) + Alex De Minaur -4.0',
+    rawReasoning: 'NO VALUE: implied probability 45.45% vs real probability 25-30%, negative edge -17.4%.',
+    rawFactors: [
+      { name: 'bookmaker coefficient vs real probability', score: -3, detail: 'Model probability 28.0% creates negative EV.' },
+    ],
+  });
+  const text = renderAnalystTrustSummaryText(view);
+
+  assert.equal(view.locale, 'uk');
+  assert.equal(view.showRawAiAnalysis, false);
+  assert.equal(view.showPlaceBet, false);
+  assert.equal(view.showWatch, true);
+  assert.equal(view.showSkip, true);
+  assert.ok(text.includes('БЕЗ ОЦІНКИ'));
+  assert.ok(text.includes('непідтримуваний експрес із різних видів спорту'));
+  assert.ok(text.includes('Попередження про ризик'));
+  assert.ok(text.includes('Покриття даних'));
+  assert.ok(text.includes('Перелік відсутніх даних'));
+  assert.ok(text.includes('Нога 3'));
+  assert.ok(text.includes('теніс'));
+  assert.ok(text.includes('статус не перевірено'));
+  assert.ok(text.includes('Гуандун ДжейЗі-Пауер'));
+  assert.ok(text.includes('Alex De Minaur'));
+  assert.equal(view.downloadPdfLabel, 'Завантажити PDF');
+  assert.equal(view.copyToShareLabel, 'Скопіювати для поширення');
+  assert.equal(view.watchLabel, 'Спостерігати');
+  assert.equal(view.skipLabel, 'Пропустити');
+  assert.equal(view.placeBetLabel, 'Зробити ставку');
+  assertNoForbiddenPricingText(text);
+});
+
+test('trust view marks finished or live legs as not actionable and hides Watch', () => {
+  const qualityGate = evaluateAnalysisQuality({
+    sport: 'soccer',
+    eventName: 'Finished FC - Closed Town',
+    marketType: 'Match Winner',
+    selection: 'Finished FC',
+    webSearchEnabled: true,
+    modelProbability: 62,
+    modelInputsPresent: true,
+    sportModuleSupport: 'full',
+    fixtureStatus: 'finished',
+    dataCoverage: {
+      liveInjuries: true,
+      teamNews: true,
+      recentForm: true,
+      lineMovement: true,
+    },
+  });
+
+  const view = buildAnalystTrustView({
+    qualityGate,
+    locale: 'uk',
+    eventName: 'Finished FC - Closed Town',
+    marketType: 'Match Winner',
+    selection: 'Finished FC',
+  });
+  const text = renderAnalystTrustSummaryText(view);
+
+  assert.equal(qualityGate.pricingAllowed, false);
+  assert.equal(view.actionability, 'not_actionable');
+  assert.equal(view.showPlaceBet, false);
+  assert.equal(view.showWatch, false);
+  assert.equal(view.showSkip, true);
+  assert.ok(text.includes('неактуально'));
+  assert.ok(text.includes('подія вже почалась або завершилась'));
+});
+
+test('blocked Analyst payload replaces raw pricing-like reasoning and factors with safe trust view content', () => {
+  const qualityGate = evaluateAnalysisQuality({
+    sport: 'soccer',
+    eventName: 'Сучжоу Донгву - Гуандун ДжейЗі-Пауер + Qingdao West Coast - Shanghai Port + Alex De Minaur - Zachary Svajda',
+    marketType: 'Експрес (3 ноги)',
+    selection: 'Гуандун ДжейЗі-Пауер + Over (2.0) + Alex De Minaur -4.0',
+    webSearchEnabled: false,
+    modelProbability: 28,
+  });
+
+  const payload = buildAnalystTrustPayload({
+    qualityGate,
+    locale: 'uk',
+    eventName: 'Сучжоу Донгву - Гуандун ДжейЗі-Пауер + Qingdao West Coast - Shanghai Port + Alex De Minaur - Zachary Svajda',
+    marketType: 'Експрес (3 ноги)',
+    selection: 'Гуандун ДжейЗі-Пауер + Over (2.0) + Alex De Minaur -4.0',
+    rawReasoning: 'NO VALUE because Model probability is 28.0%, implied probability is 45.45%, Edge is -17.4%.',
+    rawFactors: [
+      { name: 'bookmaker coefficient vs real probability', score: -3, detail: '25-30% real probability creates negative expected value.' },
+    ],
+  });
+
+  const combined = [
+    payload.reasoning,
+    payload.trust_view.safeExplanation,
+    ...payload.factors.flatMap(factor => [factor.name, factor.detail]),
+    renderAnalystTrustSummaryText(payload.trust_view),
+  ].join('\n');
+
+  assert.equal(payload.trust_view.showRawAiAnalysis, false);
+  assert.equal(payload.trust_view.showPlaceBet, false);
+  assert.ok(payload.trust_view.displayFactors.length >= 3);
+  assert.ok(combined.includes('Оцінка недоступна'));
+  assert.ok(combined.includes('Покриття даних'));
+  assertNoForbiddenPricingText(combined);
+});
+
+test('exact Ukrainian PDF coupon trust strings do not leak legacy English blocked-mode copy', () => {
+  const view = buildExactPdfCouponTrustView();
+  const text = [
+    renderAnalystTrustSummaryText(view),
+    view.uiDisclaimer,
+    view.riskDisclaimer,
+    view.footerDisclaimer,
+    view.shareHeader,
+    view.pdfHeader,
+    view.pdfFooter,
+    view.confidenceLabel,
+    view.watchLabel,
+    view.skipLabel,
+  ].filter(Boolean).join('\n');
+
+  assert.equal(view.showRawAiAnalysis, false);
+  assert.equal(view.showPlaceBet, false);
+  assert.equal(view.showWatch, true);
+  assert.equal(view.legs[2].sportLabel, 'теніс');
+  assert.ok(text.includes('Цей аналіз базується лише на наданій інформації'));
+  assertNoForbiddenPricingText(text);
+  assertNoBlockedEnglishLeaks(text);
+  assertContainsUkrainianBlockedCopy(text);
+});
+
+test('exact Ukrainian PDF coupon share text uses localized sport header and no English disclaimer', () => {
+  const view = buildExactPdfCouponTrustView();
+  const shareText = renderAnalystTrustShareText(view, exactPdfCoupon);
+  const shareHeader = shareText.split('\n').slice(0, 2).join('\n');
+
+  assert.ok(shareHeader.includes('футбол'), `expected localized sport in share header; got:\n${shareHeader}`);
+  assert.ok(!shareHeader.includes('SOCCER'), `expected share header not to include SOCCER; got:\n${shareHeader}`);
+  assert.ok(!shareText.includes('This analysis is based only'), shareText);
+  assertNoForbiddenPricingText(shareText);
+  assertNoBlockedEnglishLeaks(shareText);
+  assertContainsUkrainianBlockedCopy(shareText);
+});
+
+test('exact Ukrainian PDF coupon PDF string-builder uses localized blocked-mode labels only', () => {
+  const view = buildExactPdfCouponTrustView();
+  const pdfText = renderAnalystTrustPdfText(view, exactPdfCoupon);
+
+  assert.ok(pdfText.includes('футбол'), pdfText);
+  assert.ok(pdfText.includes('теніс'), pdfText);
+  assert.ok(pdfText.includes('Цей аналіз базується лише на наданій інформації'), pdfText);
+  assertNoForbiddenPricingText(pdfText);
+  assertNoBlockedEnglishLeaks(pdfText);
+  assertContainsUkrainianBlockedCopy(pdfText);
 });
 
 if (failed > 0) {

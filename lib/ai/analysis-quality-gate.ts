@@ -2,6 +2,20 @@ export type PricingField = 'model_probability' | 'implied_probability' | 'edge_p
 export type AnalysisQualityStatus = 'priced' | 'insufficient_data' | 'unsupported'
 export type AnalysisType = 'risk_warning' | 'priced_betting_analysis'
 export type SportModuleSupport = 'full' | 'approximate' | 'none'
+export type FixtureStatus =
+  | 'scheduled'
+  | 'unknown'
+  | 'live'
+  | 'finished'
+  | 'cancelled'
+  | 'abandoned'
+  | 'postponed'
+  | 'retired'
+  | 'walkover'
+  | 'not_bettable'
+export type AnalysisActionability = 'actionable' | 'status_unverified' | 'not_actionable'
+export type LegSupportLevel = 'full' | 'approximate' | 'unsupported'
+export type AnalystTrustLocale = 'en' | 'uk'
 
 export interface AnalysisDataCoverage {
   liveInjuries?: boolean
@@ -19,6 +33,7 @@ export interface AnalysisLegQualityInput {
   modelProbability?: number | null
   sportModuleSupport?: SportModuleSupport
   dataCoverage?: AnalysisDataCoverage
+  fixtureStatus?: FixtureStatus | null
 }
 
 export interface AnalysisQualityGateInput {
@@ -32,12 +47,20 @@ export interface AnalysisQualityGateInput {
   modelInputsPresent?: boolean
   sportModuleSupport?: SportModuleSupport
   dataCoverage?: AnalysisDataCoverage
+  fixtureStatus?: FixtureStatus | null
   legs?: AnalysisLegQualityInput[]
 }
 
 export interface MissingDataByLeg {
   legLabel: string
+  legNumber: number
   sport: string
+  eventName: string | null
+  marketType: string | null
+  selection: string | null
+  fixtureStatus: FixtureStatus
+  actionability: AnalysisActionability
+  supportLevel: LegSupportLevel
   missing: string[]
 }
 
@@ -48,6 +71,7 @@ export interface AnalysisQualityGateResult {
     | 'INSUFFICIENT DATA'
     | 'NO PRICE - unsupported mixed-sport parlay'
     | 'NO PRICE - unsupported / partially supported bet'
+    | 'NOT ACTIONABLE - event already started or finished'
   supportLabel: 'Priced betting analysis' | 'Unsupported / partially supported bet'
   pricingAllowed: boolean
   dataCoverageScore: number
@@ -55,6 +79,7 @@ export interface AnalysisQualityGateResult {
   suppressedPricingFields: PricingField[]
   reasons: string[]
   analysisType: AnalysisType
+  actionability: AnalysisActionability
 }
 
 export interface PricingFields {
@@ -88,7 +113,103 @@ export interface PricingRenderInput {
   edgePercent?: number | null
 }
 
+export interface AnalystTrustFactor {
+  name: string
+  score: number
+  detail: string
+}
+
+export interface AnalystTrustLeg {
+  legLabel: string
+  legNumber: number
+  sport: string
+  sportLabel: string
+  eventName: string
+  marketType: string
+  selection: string | null
+  fixtureStatus: FixtureStatus
+  fixtureStatusLabel: string
+  actionability: AnalysisActionability
+  actionabilityLabel: string
+  supportLevel: LegSupportLevel
+  supportLabel: string
+  missingData: string[]
+}
+
+export interface AnalystTrustView {
+  locale: AnalystTrustLocale
+  label: string
+  supportLabel: string
+  riskWarningLabel: string
+  dataCoverageLabel: string
+  missingDataChecklistLabel: string
+  confidenceLabel: string
+  factorAnalysisLabel: string
+  downloadPdfLabel: string
+  copyToShareLabel: string
+  copiedLabel: string
+  watchLabel: string
+  skipLabel: string
+  placeBetLabel: string
+  uiDisclaimer: string
+  riskDisclaimer: string
+  footerDisclaimer: string
+  shareHeader: string
+  pdfHeader: string
+  pdfFooter: string
+  generatedLabel: string
+  viaLabel: string
+  dataCoverageScore: number
+  actionability: AnalysisActionability
+  actionabilityLabel: string
+  safeExplanation: string
+  safeNextSteps: string[]
+  legs: AnalystTrustLeg[]
+  showPlaceBet: boolean
+  showWatch: boolean
+  showSkip: boolean
+  showRawAiAnalysis: boolean
+  displayReasoning: string
+  displayFactors: AnalystTrustFactor[]
+}
+
+export interface BuildAnalystTrustViewInput {
+  qualityGate: AnalysisQualityGateResult
+  locale?: string | null
+  eventName: string
+  marketType: string
+  selection?: string | null
+  rawReasoning?: string | null
+  rawFactors?: AnalystTrustFactor[] | null
+}
+
+export interface AnalystTrustPayload {
+  trust_view: AnalystTrustView
+  reasoning: string
+  factors: AnalystTrustFactor[]
+}
+
+export interface AnalystTrustRenderContext {
+  eventName: string
+  sport?: string | null
+  marketType: string
+  selection?: string | null
+  offeredOdds?: number | string | null
+  bookmaker?: string | null
+  generatedDate?: Date | string | null
+}
+
 const SUPPORTED_SPORT_MODULES = new Set(['soccer', 'tennis', 'cs2'])
+const NOT_ACTIONABLE_FIXTURE_STATUSES = new Set<FixtureStatus>([
+  'live',
+  'finished',
+  'cancelled',
+  'abandoned',
+  'postponed',
+  'retired',
+  'walkover',
+  'not_bettable',
+])
 
 const PARLAY_TERMS = [
   'express',
@@ -115,6 +236,16 @@ const TENNIS_TERMS = [
 
 function cleanSport(sport: string | null | undefined): string {
   return (sport ?? 'other').toLowerCase().trim() || 'other'
+}
+
+function resolveFixtureStatus(status: FixtureStatus | null | undefined): FixtureStatus {
+  return status ?? 'unknown'
+}
+
+function actionabilityForFixtureStatus(status: FixtureStatus): AnalysisActionability {
+  if (status === 'unknown') return 'status_unverified'
+  if (NOT_ACTIONABLE_FIXTURE_STATUSES.has(status)) return 'not_actionable'
+  return 'actionable'
 }
 
 function hasValidProbability(value: number | null | undefined): boolean {
@@ -149,7 +280,7 @@ function detectSportFromText(text: string, fallback: string): string {
   return fallback
 }
 
-function inferLegs(input: AnalysisQualityGateInput): Required<Pick<AnalysisLegQualityInput, 'label'>>[] & AnalysisLegQualityInput[] {
+function inferLegs(input: AnalysisQualityGateInput): Array<AnalysisLegQualityInput & { label: string }> {
   if (input.legs && input.legs.length > 0) {
     return input.legs.map((leg, index) => ({ ...leg, label: leg.label ?? `Leg ${index + 1}` }))
   }
@@ -198,6 +329,12 @@ function resolveSportSupport(
   return SUPPORTED_SPORT_MODULES.has(legSport) ? 'full' : 'none'
 }
 
+function supportLevelFromSportSupport(support: SportModuleSupport): LegSupportLevel {
+  if (support === 'full') return 'full'
+  if (support === 'approximate') return 'approximate'
+  return 'unsupported'
+}
+
 function addMissing(missing: string[], item: string) {
   if (!missing.includes(item)) missing.push(item)
 }
@@ -209,16 +346,26 @@ export function evaluateAnalysisQuality(input: AnalysisQualityGateInput): Analys
   const uniqueSports = new Set<string>()
   const missingDataByLeg: MissingDataByLeg[] = []
   const reasons = new Set<string>()
+  let topLevelActionability: AnalysisActionability = 'actionable'
 
   let checks = 0
   let covered = 0
 
-  for (const leg of legs) {
+  for (const [index, leg] of legs.entries()) {
     const legSport = cleanSport(leg.sport)
     uniqueSports.add(legSport)
 
     const support = resolveSportSupport(primarySport, legSport, leg.sportModuleSupport)
+    const supportLevel = supportLevelFromSportSupport(support)
+    const fixtureStatus = resolveFixtureStatus(leg.fixtureStatus ?? input.fixtureStatus)
+    const actionability = actionabilityForFixtureStatus(fixtureStatus)
     const missing: string[] = []
+
+    if (actionability === 'not_actionable') {
+      topLevelActionability = 'not_actionable'
+    } else if (actionability === 'status_unverified' && topLevelActionability === 'actionable') {
+      topLevelActionability = 'status_unverified'
+    }
 
     const coverageChecks: Array<[keyof AnalysisDataCoverage, string]> = [
       ['liveInjuries', 'live injuries'],
@@ -234,6 +381,19 @@ export function evaluateAnalysisQuality(input: AnalysisQualityGateInput): Analys
       } else {
         addMissing(missing, label)
       }
+    }
+
+    checks++
+    if (fixtureStatus !== 'unknown') {
+      covered++
+    } else {
+      addMissing(missing, 'event start time / fixture status')
+      reasons.add('Fixture status must be verified before pricing.')
+    }
+
+    if (actionability === 'not_actionable') {
+      addMissing(missing, 'event actionability')
+      reasons.add('Event has already started, finished, or is not currently bettable.')
     }
 
     checks++
@@ -266,8 +426,15 @@ export function evaluateAnalysisQuality(input: AnalysisQualityGateInput): Analys
 
     if (missing.length > 0) {
       missingDataByLeg.push({
-        legLabel: leg.label ?? `Leg ${missingDataByLeg.length + 1}`,
+        legLabel: leg.label ?? `Leg ${index + 1}`,
+        legNumber: index + 1,
         sport: legSport,
+        eventName: leg.eventName ?? null,
+        marketType: leg.marketType ?? input.marketType ?? null,
+        selection: leg.selection ?? null,
+        fixtureStatus,
+        actionability,
+        supportLevel,
         missing,
       })
     }
@@ -283,7 +450,7 @@ export function evaluateAnalysisQuality(input: AnalysisQualityGateInput): Analys
       item.includes('tennis module')
     )
   )
-  const pricingAllowed = missingDataByLeg.length === 0 && reasons.size === 0
+  const pricingAllowed = missingDataByLeg.length === 0 && reasons.size === 0 && topLevelActionability === 'actionable'
   const dataCoverageScore = checks === 0 ? 0 : Math.round((covered / checks) * 100)
 
   if (pricingAllowed) {
@@ -297,12 +464,15 @@ export function evaluateAnalysisQuality(input: AnalysisQualityGateInput): Analys
       suppressedPricingFields: [],
       reasons: [],
       analysisType: 'priced_betting_analysis',
+      actionability: 'actionable',
     }
   }
 
   const isMixedSport = uniqueSports.size > 1
   const status: AnalysisQualityStatus = isMixedSport || hasUnsupportedSport ? 'unsupported' : 'insufficient_data'
-  const label = status === 'unsupported'
+  const label = topLevelActionability === 'not_actionable'
+    ? 'NOT ACTIONABLE - event already started or finished'
+    : status === 'unsupported'
     ? (isMixedSport ? 'NO PRICE - unsupported mixed-sport parlay' : 'NO PRICE - unsupported / partially supported bet')
     : 'INSUFFICIENT DATA'
 
@@ -316,6 +486,470 @@ export function evaluateAnalysisQuality(input: AnalysisQualityGateInput): Analys
     suppressedPricingFields: ['model_probability', 'implied_probability', 'edge_percent'],
     reasons: [...reasons],
     analysisType: 'risk_warning',
+    actionability: topLevelActionability,
+  }
+}
+
+const TRUST_LABELS = {
+  en: {
+    riskWarning: 'Risk warning',
+    dataCoverage: 'Data coverage',
+    missingDataChecklist: 'Missing data checklist',
+    confidence: 'Confidence',
+    factorAnalysis: 'Factor Analysis',
+    downloadPdf: 'Download PDF',
+    copyToShare: 'Copy to share',
+    copied: 'Copied',
+    watch: 'Watch',
+    skip: 'Skip',
+    placeBet: 'Place Bet',
+    uiDisclaimer: 'This analysis is based only on the information provided and does not include live injuries, team news, recent form updates, or current line movement.',
+    riskDisclaimer: 'This is a risk warning, not a priced betting analysis.',
+    footerDisclaimer: 'Analysis is for informational purposes only',
+    shareHeader: 'Risk warning',
+    pdfHeader: 'BetTracker AI analysis',
+    pdfFooter: 'Analysis is for informational purposes only',
+    generated: 'Generated',
+    via: 'via BetTracker AI',
+    availableActions: 'Available actions',
+    noPrice: 'NO PRICE',
+    insufficientData: 'INSUFFICIENT DATA',
+    unsupportedMixedSportParlay: 'unsupported mixed-sport parlay',
+    unsupportedPartial: 'Unsupported / partially supported bet',
+    notActionable: 'NOT ACTIONABLE',
+    eventStartedOrFinished: 'event already started or finished',
+    safeExplanationBlocked: 'Price is unavailable because the coupon does not have enough verified data coverage for every leg.',
+    safeExplanationUnsupported: 'Price is unavailable because this parlay contains unsupported or only partially supported legs.',
+    safeExplanationUnverified: 'Price is unavailable because event status is unverified and the coupon is missing required per-leg data.',
+    safeExplanationNotActionable: 'This coupon is not actionable because at least one event has already started, finished, or is not currently bettable.',
+    safeNextSteps: [
+      'Verify the start time and fixture status for every leg.',
+      'Add current team news, injury context, recent form, and line movement.',
+      'Confirm full sport-specific support for every leg before pricing.',
+    ],
+    leg: 'Leg',
+    sport: 'Sport',
+    event: 'Event',
+    marketSelection: 'Market / selection',
+    fixtureStatus: 'Fixture status',
+    supportLevel: 'Support level',
+    actionability: 'Actionability',
+    safeFactorCoverage: 'Data coverage',
+    safeFactorSupport: 'Leg support',
+    safeFactorActionability: 'Event actionability',
+    noMissingData: 'No missing data listed',
+    sports: {
+      soccer: 'soccer',
+      tennis: 'tennis',
+      cs2: 'CS2',
+      basketball: 'basketball',
+      ice_hockey: 'ice hockey',
+      mma: 'MMA',
+      other: 'other',
+    },
+    fixtureStatuses: {
+      scheduled: 'scheduled',
+      unknown: 'status unverified',
+      live: 'live',
+      finished: 'finished',
+      cancelled: 'cancelled',
+      abandoned: 'abandoned',
+      postponed: 'postponed',
+      retired: 'retired',
+      walkover: 'walkover',
+      not_bettable: 'not bettable',
+    },
+    actionabilityLabels: {
+      actionable: 'actionable',
+      status_unverified: 'status unverified',
+      not_actionable: 'not actionable',
+    },
+    supportLabels: {
+      full: 'full',
+      approximate: 'approximate',
+      unsupported: 'unsupported',
+    },
+    missing: {
+      'live injuries': 'live injuries',
+      'team news': 'team news',
+      'recent form updates': 'recent form updates',
+      'current line movement': 'current line movement',
+      'sport-specific support confirmed for this leg': 'sport-specific support confirmed for this leg',
+      'tennis module unavailable or approximate': 'tennis module unavailable or approximate',
+      'per-leg model probability': 'per-leg model inputs',
+      'actual model inputs backing model probability': 'actual model inputs',
+      'event start time / fixture status': 'event start time / fixture status',
+      'event actionability': 'event actionability',
+    },
+  },
+  uk: {
+    riskWarning: 'Попередження про ризик',
+    dataCoverage: 'Покриття даних',
+    missingDataChecklist: 'Перелік відсутніх даних',
+    confidence: 'Впевненість',
+    factorAnalysis: 'Фактори ризику',
+    downloadPdf: 'Завантажити PDF',
+    copyToShare: 'Скопіювати для поширення',
+    copied: 'Скопійовано',
+    watch: 'Спостерігати',
+    skip: 'Пропустити',
+    placeBet: 'Зробити ставку',
+    uiDisclaimer: 'Цей аналіз базується лише на наданій інформації та не містить перевірених даних про травми, склади, форму команд, рух лінії або актуальний статус подій.',
+    riskDisclaimer: 'Це попередження про ризик, а не оцінений аналіз ставки.',
+    footerDisclaimer: 'Аналіз лише для інформаційної підтримки',
+    shareHeader: 'Попередження про ризик',
+    pdfHeader: 'Аналіз BetTracker AI',
+    pdfFooter: 'Аналіз лише для інформаційної підтримки',
+    generated: 'Згенеровано',
+    via: 'через BetTracker AI',
+    availableActions: 'Доступні дії',
+    noPrice: 'БЕЗ ОЦІНКИ',
+    insufficientData: 'НЕДОСТАТНЬО ДАНИХ',
+    unsupportedMixedSportParlay: 'непідтримуваний експрес із різних видів спорту',
+    unsupportedPartial: 'Ставка не підтримується або підтримується частково',
+    notActionable: 'НЕАКТУАЛЬНО',
+    eventStartedOrFinished: 'подія вже почалась або завершилась',
+    safeExplanationBlocked: 'Оцінка недоступна, бо для купона бракує перевіреного покриття даних по кожній нозі.',
+    safeExplanationUnsupported: 'Оцінка недоступна, бо експрес містить непідтримувані або частково підтримувані ноги.',
+    safeExplanationUnverified: 'Оцінка недоступна, бо статус подій не перевірено і бракує обов’язкових даних по ногах.',
+    safeExplanationNotActionable: 'Купон неактуальний, бо одна або більше подій уже почалась, завершилась або недоступна для ставки.',
+    safeNextSteps: [
+      'Перевірити час початку та статус кожної події.',
+      'Додати актуальні новини команд, травми, поточну форму та рух лінії.',
+      'Підтвердити повну підтримку спортивного модуля для кожної ноги.',
+    ],
+    leg: 'Нога',
+    sport: 'Спорт',
+    event: 'Подія',
+    marketSelection: 'Ринок / вибір',
+    fixtureStatus: 'Статус матчу',
+    supportLevel: 'Рівень підтримки',
+    actionability: 'Актуальність',
+    safeFactorCoverage: 'Покриття даних',
+    safeFactorSupport: 'Підтримка ніг',
+    safeFactorActionability: 'Актуальність події',
+    noMissingData: 'Відсутні дані не вказані',
+    sports: {
+      soccer: 'футбол',
+      tennis: 'теніс',
+      cs2: 'CS2',
+      basketball: 'баскетбол',
+      ice_hockey: 'хокей',
+      mma: 'MMA',
+      other: 'інше',
+    },
+    fixtureStatuses: {
+      scheduled: 'заплановано',
+      unknown: 'статус не перевірено',
+      live: 'наживо',
+      finished: 'завершено',
+      cancelled: 'скасовано',
+      abandoned: 'перервано',
+      postponed: 'відкладено',
+      retired: 'знято з гри',
+      walkover: 'технічна перемога',
+      not_bettable: 'недоступно для ставки',
+    },
+    actionabilityLabels: {
+      actionable: 'можна розглядати',
+      status_unverified: 'статус не перевірено',
+      not_actionable: 'неактуально',
+    },
+    supportLabels: {
+      full: 'повна підтримка',
+      approximate: 'приблизна підтримка',
+      unsupported: 'не підтримується',
+    },
+    missing: {
+      'live injuries': 'актуальні травми',
+      'team news': 'новини команд',
+      'recent form updates': 'оновлення поточної форми',
+      'current line movement': 'поточний рух лінії',
+      'sport-specific support confirmed for this leg': 'підтверджена підтримка виду спорту для цієї ноги',
+      'tennis module unavailable or approximate': 'тенісний модуль недоступний або лише приблизний',
+      'per-leg model probability': 'модельні вхідні дані для кожної ноги',
+      'actual model inputs backing model probability': 'фактичні модельні вхідні дані',
+      'event start time / fixture status': 'час початку події / статус матчу',
+      'event actionability': 'актуальність події для ставки',
+    },
+  },
+} as const
+
+function normalizeTrustLocale(locale: string | null | undefined): AnalystTrustLocale {
+  return locale === 'uk' ? 'uk' : 'en'
+}
+
+export function localizeAnalystTrustSport(sport: string | null | undefined, locale: AnalystTrustLocale): string {
+  const labels = TRUST_LABELS[locale]
+  const normalized = cleanSport(sport)
+  return labels.sports[normalized as keyof typeof labels.sports] ?? normalized
+}
+
+function localizedQualityGateLabel(result: AnalysisQualityGateResult, locale: AnalystTrustLocale): string {
+  const labels = TRUST_LABELS[locale]
+  if (result.label === 'PRICED BETTING ANALYSIS') return locale === 'uk' ? 'ОЦІНЕНИЙ АНАЛІЗ СТАВКИ' : 'PRICED BETTING ANALYSIS'
+  if (result.label === 'INSUFFICIENT DATA') return labels.insufficientData
+  if (result.label === 'NO PRICE - unsupported mixed-sport parlay') {
+    return `${labels.noPrice} - ${labels.unsupportedMixedSportParlay}`
+  }
+  if (result.label === 'NOT ACTIONABLE - event already started or finished') {
+    return `${labels.notActionable} - ${labels.eventStartedOrFinished}`
+  }
+  return `${labels.noPrice} - ${labels.unsupportedPartial}`
+}
+
+function localizedSupportLabel(result: AnalysisQualityGateResult, locale: AnalystTrustLocale): string {
+  if (result.supportLabel === 'Priced betting analysis') {
+    return locale === 'uk' ? 'Оцінений аналіз ставки' : 'Priced betting analysis'
+  }
+  return TRUST_LABELS[locale].unsupportedPartial
+}
+
+function localizedMissingItem(item: string, locale: AnalystTrustLocale): string {
+  const labels = TRUST_LABELS[locale]
+  return labels.missing[item as keyof typeof labels.missing] ?? item
+}
+
+function inferSafeExplanation(result: AnalysisQualityGateResult, locale: AnalystTrustLocale): string {
+  const labels = TRUST_LABELS[locale]
+  if (result.actionability === 'not_actionable') return labels.safeExplanationNotActionable
+  if (result.actionability === 'status_unverified') return labels.safeExplanationUnverified
+  if (result.status === 'unsupported') return labels.safeExplanationUnsupported
+  return labels.safeExplanationBlocked
+}
+
+function buildDeterministicFactors(view: Pick<AnalystTrustView, 'locale' | 'dataCoverageScore' | 'legs' | 'actionabilityLabel'>): AnalystTrustFactor[] {
+  const labels = TRUST_LABELS[view.locale]
+  const missingCount = view.legs.reduce((sum, leg) => sum + leg.missingData.length, 0)
+  const unsupportedCount = view.legs.filter(leg => leg.supportLevel !== 'full').length
+
+  return [
+    {
+      name: labels.safeFactorCoverage,
+      score: missingCount === 0 ? 0 : -2,
+      detail: view.locale === 'uk'
+        ? `${labels.dataCoverage}: ${view.dataCoverageScore}/100. ${labels.missingDataChecklist}: ${missingCount}.`
+        : `${labels.dataCoverage}: ${view.dataCoverageScore}/100. ${labels.missingDataChecklist}: ${missingCount}.`,
+    },
+    {
+      name: labels.safeFactorSupport,
+      score: unsupportedCount === 0 ? 0 : -2,
+      detail: view.locale === 'uk'
+        ? `Ноги з неповною підтримкою: ${unsupportedCount}.`
+        : `Legs without full support: ${unsupportedCount}.`,
+    },
+    {
+      name: labels.safeFactorActionability,
+      score: view.actionabilityLabel === labels.actionabilityLabels.actionable ? 0 : -2,
+      detail: `${labels.actionability}: ${view.actionabilityLabel}.`,
+    },
+  ]
+}
+
+export function buildAnalystTrustView(input: BuildAnalystTrustViewInput): AnalystTrustView {
+  const locale = normalizeTrustLocale(input.locale)
+  const labels = TRUST_LABELS[locale]
+  const result = input.qualityGate
+  const resultActionability = result.actionability ?? (result.pricingAllowed ? 'actionable' : 'status_unverified')
+  const showRawAiAnalysis = result.pricingAllowed
+  const showPlaceBet = result.pricingAllowed && resultActionability === 'actionable'
+  const showWatch = resultActionability !== 'not_actionable'
+  const fallbackLeg: MissingDataByLeg = {
+    legLabel: 'Leg 1',
+    legNumber: 1,
+    sport: 'other',
+    eventName: input.eventName,
+    marketType: input.marketType,
+    selection: input.selection ?? null,
+    fixtureStatus: 'unknown',
+    actionability: 'status_unverified',
+    supportLevel: 'unsupported',
+    missing: ['event start time / fixture status'],
+  }
+  const gateLegs = result.missingDataByLeg.length > 0 ? result.missingDataByLeg : [fallbackLeg]
+  const legs: AnalystTrustLeg[] = gateLegs.map((leg, index) => {
+    const sport = leg.sport || 'other'
+    const fixtureStatus = leg.fixtureStatus ?? 'unknown'
+    const actionability = leg.actionability ?? actionabilityForFixtureStatus(fixtureStatus)
+    const supportLevel = leg.supportLevel ?? 'unsupported'
+
+    return {
+      legLabel: `${labels.leg} ${leg.legNumber ?? index + 1}`,
+      legNumber: leg.legNumber ?? index + 1,
+      sport,
+      sportLabel: labels.sports[sport as keyof typeof labels.sports] ?? sport,
+      eventName: leg.eventName ?? input.eventName,
+      marketType: leg.marketType ?? input.marketType,
+      selection: leg.selection ?? input.selection ?? null,
+      fixtureStatus,
+      fixtureStatusLabel: labels.fixtureStatuses[fixtureStatus],
+      actionability,
+      actionabilityLabel: labels.actionabilityLabels[actionability],
+      supportLevel,
+      supportLabel: labels.supportLabels[supportLevel],
+      missingData: leg.missing.map(item => localizedMissingItem(item, locale)),
+    }
+  })
+
+  const viewBase = {
+    locale,
+    label: localizedQualityGateLabel(result, locale),
+    supportLabel: localizedSupportLabel(result, locale),
+    riskWarningLabel: labels.riskWarning,
+    dataCoverageLabel: labels.dataCoverage,
+    missingDataChecklistLabel: labels.missingDataChecklist,
+    confidenceLabel: labels.confidence,
+    factorAnalysisLabel: labels.factorAnalysis,
+    downloadPdfLabel: labels.downloadPdf,
+    copyToShareLabel: labels.copyToShare,
+    copiedLabel: labels.copied,
+    watchLabel: labels.watch,
+    skipLabel: labels.skip,
+    placeBetLabel: labels.placeBet,
+    uiDisclaimer: labels.uiDisclaimer,
+    riskDisclaimer: labels.riskDisclaimer,
+    footerDisclaimer: labels.footerDisclaimer,
+    shareHeader: labels.shareHeader,
+    pdfHeader: labels.pdfHeader,
+    pdfFooter: labels.pdfFooter,
+    generatedLabel: labels.generated,
+    viaLabel: labels.via,
+    dataCoverageScore: result.dataCoverageScore,
+    actionability: resultActionability,
+    actionabilityLabel: labels.actionabilityLabels[resultActionability],
+    safeExplanation: inferSafeExplanation(result, locale),
+    safeNextSteps: [...labels.safeNextSteps],
+    legs,
+    showPlaceBet,
+    showWatch,
+    showSkip: true,
+    showRawAiAnalysis,
+  }
+
+  const displayReasoning = showRawAiAnalysis
+    ? input.rawReasoning ?? ''
+    : viewBase.safeExplanation
+  const displayFactors = showRawAiAnalysis
+    ? input.rawFactors ?? []
+    : buildDeterministicFactors(viewBase)
+
+  return {
+    ...viewBase,
+    displayReasoning,
+    displayFactors,
+  }
+}
+
+export function renderAnalystTrustSummaryText(view: AnalystTrustView): string {
+  const labels = TRUST_LABELS[view.locale]
+  const lines = [
+    view.riskWarningLabel,
+    view.label,
+    view.supportLabel,
+    `${view.dataCoverageLabel}: ${view.dataCoverageScore}/100`,
+    `${labels.actionability}: ${view.actionabilityLabel}`,
+    '',
+    view.safeExplanation,
+    '',
+    view.missingDataChecklistLabel,
+  ]
+
+  for (const leg of view.legs) {
+    lines.push(`${leg.legLabel}`)
+    lines.push(`${labels.sport}: ${leg.sportLabel}`)
+    lines.push(`${labels.event}: ${leg.eventName}`)
+    lines.push(`${labels.marketSelection}: ${leg.marketType}${leg.selection ? ` / ${leg.selection}` : ''}`)
+    lines.push(`${labels.fixtureStatus}: ${leg.fixtureStatusLabel}`)
+    lines.push(`${labels.supportLevel}: ${leg.supportLabel}`)
+    lines.push(`${labels.actionability}: ${leg.actionabilityLabel}`)
+    if (leg.missingData.length > 0) {
+      for (const item of leg.missingData) lines.push(`- ${item}`)
+    } else {
+      lines.push(`- ${labels.noMissingData}`)
+    }
+  }
+
+  lines.push('')
+  lines.push(...view.safeNextSteps.map(step => `- ${step}`))
+
+  return lines.join('\n')
+}
+
+function renderAnalystTrustMetaLine(view: AnalystTrustView, context: AnalystTrustRenderContext): string {
+  const parts = [
+    localizeAnalystTrustSport(context.sport, view.locale),
+    context.marketType,
+    context.selection,
+    context.offeredOdds != null ? `@${context.offeredOdds}` : null,
+    context.bookmaker,
+  ]
+
+  return parts.filter(Boolean).join(' · ')
+}
+
+function renderAnalystTrustActions(view: AnalystTrustView): string[] {
+  return [
+    view.showPlaceBet ? view.placeBetLabel : null,
+    view.showWatch ? view.watchLabel : null,
+    view.showSkip ? view.skipLabel : null,
+  ].filter((value): value is string => Boolean(value))
+}
+
+function renderAnalystTrustGeneratedDate(value: Date | string | null | undefined): string {
+  if (!value) return new Date().toLocaleDateString()
+  if (value instanceof Date) return value.toLocaleDateString()
+  return value
+}
+
+export function renderAnalystTrustShareText(view: AnalystTrustView, context: AnalystTrustRenderContext): string {
+  const labels = TRUST_LABELS[view.locale]
+  const actions = renderAnalystTrustActions(view)
+  const lines = [
+    `${view.shareHeader} - ${context.eventName}`,
+    renderAnalystTrustMetaLine(view, context),
+    '',
+    view.label,
+    renderAnalystTrustSummaryText(view),
+    `${view.confidenceLabel}: ${view.dataCoverageScore}/100 | ${view.actionabilityLabel}`,
+    actions.length > 0 ? `${labels.availableActions}: ${actions.join(' / ')}` : null,
+    '',
+    view.uiDisclaimer,
+    view.footerDisclaimer,
+    '',
+    view.viaLabel,
+  ]
+
+  return lines.filter(Boolean).join('\n')
+}
+
+export function renderAnalystTrustPdfText(view: AnalystTrustView, context: AnalystTrustRenderContext): string {
+  const labels = TRUST_LABELS[view.locale]
+  const actions = renderAnalystTrustActions(view)
+  const lines = [
+    view.pdfHeader,
+    context.eventName,
+    renderAnalystTrustMetaLine(view, context),
+    '',
+    view.label,
+    renderAnalystTrustSummaryText(view),
+    `${view.confidenceLabel}: ${view.dataCoverageScore}/100 | ${view.actionabilityLabel}`,
+    actions.length > 0 ? `${labels.availableActions}: ${actions.join(' / ')}` : null,
+    '',
+    view.uiDisclaimer,
+    `${view.generatedLabel} ${renderAnalystTrustGeneratedDate(context.generatedDate)}`,
+    view.pdfFooter,
+  ]
+
+  return lines.filter(Boolean).join('\n')
+}
+
+export function buildAnalystTrustPayload(input: BuildAnalystTrustViewInput): AnalystTrustPayload {
+  const trustView = buildAnalystTrustView(input)
+
+  return {
+    trust_view: trustView,
+    reasoning: trustView.displayReasoning,
+    factors: trustView.displayFactors,
   }
 }
 
