@@ -10,7 +10,8 @@ import RiskEvaluator from '@/components/risk/RiskEvaluator'
 import { Camera, Loader2, Eye, X, CheckCircle, Search } from 'lucide-react'
 import {
   buildAnalystTrustView,
-  renderAnalystTrustSummaryText,
+  localizeAnalystTrustSport,
+  renderAnalystTrustShareText,
   renderPricingSummaryLine,
   shouldShowPricingStats,
   type AnalysisQualityGateResult,
@@ -426,13 +427,16 @@ export default function AIAnalystPage() {
     const factorsHtml = displayFactors.map(f =>
       `<tr><td>${escapeHtml(f.name)}</td><td style="text-align:center;font-weight:bold;color:${f.score>0?'#22c55e':f.score<0?'#ef4444':'#9ca3af'}">${f.score>0?'+':''}${f.score}</td><td style="color:#9ca3af;font-size:12px">${escapeHtml(f.detail)}</td></tr>`
     ).join('')
-    const localizedPdf = trustView && !showPricing && trustView.locale === 'uk'
-    const pdfTitle = localizedPdf ? trustView.riskWarningLabel : 'AI Analysis'
+    const blockedTrustView = trustView && !showPricing ? trustView : null
+    const localizedPdf = blockedTrustView?.locale === 'uk'
+    const pdfTitle = blockedTrustView ? blockedTrustView.pdfHeader : 'AI Analysis'
     const factorHeader = localizedPdf ? 'Фактор' : 'Factor'
     const scoreHeader = localizedPdf ? 'Бал' : 'Score'
     const detailHeader = localizedPdf ? 'Деталі' : 'Detail'
-    const generatedLabel = localizedPdf ? 'Згенеровано' : 'Generated'
-    const footerLabel = localizedPdf ? 'Аналіз лише для інформаційної підтримки' : 'Analysis is for informational purposes only'
+    const generatedLabel = blockedTrustView ? blockedTrustView.generatedLabel : 'Generated'
+    const footerLabel = blockedTrustView ? blockedTrustView.pdfFooter : 'Analysis is for informational purposes only'
+    const metaSport = blockedTrustView ? localizeAnalystTrustSport(a.sport, blockedTrustView.locale) : a.sport.toUpperCase()
+    const disclaimerText = blockedTrustView ? blockedTrustView.uiDisclaimer : a.disclaimer
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(pdfTitle)} \u2014 ${escapeHtml(a.event_name)}</title>
 <style>
   body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:20px;color:#111;background:#fff}
@@ -458,11 +462,11 @@ export default function AIAnalystPage() {
   @media print{body{margin:20px}}
 </style></head><body>
 <h1>${escapeHtml(a.event_name)}</h1>
-<div class="meta">${escapeHtml(a.sport.toUpperCase())} \u00B7 ${escapeHtml(a.market_type)}${a.selection?' \u00B7 '+escapeHtml(a.selection):''} \u00B7 @${a.offered_odds}${a.bookmaker?' \u00B7 '+escapeHtml(a.bookmaker):''}</div>
+<div class="meta">${escapeHtml(metaSport)} \u00B7 ${escapeHtml(a.market_type)}${a.selection?' \u00B7 '+escapeHtml(a.selection):''} \u00B7 @${a.offered_odds}${a.bookmaker?' \u00B7 '+escapeHtml(a.bookmaker):''}</div>
 <div class="rec">${escapeHtml(showPricing ? recLabels[a.recommendation]??a.recommendation : trustView?.label ?? recLabels[a.recommendation]??a.recommendation)}</div>
 ${pricingHtml}
 <div class="reasoning">${escapeHtml(trustView && !showPricing ? trustView.displayReasoning : a.reasoning)}</div>
-${a.disclaimer?`<div class="disclaimer">${escapeHtml(a.disclaimer)}</div>`:''}
+${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:''}
 <h3 style="margin-top:20px;font-size:14px">${escapeHtml(trustView?.factorAnalysisLabel ?? 'Factor Analysis')}</h3>
 <table><thead><tr><th>${escapeHtml(factorHeader)}</th><th>${escapeHtml(scoreHeader)}</th><th>${escapeHtml(detailHeader)}</th></tr></thead><tbody>${factorsHtml}</tbody></table>
 <div class="footer">BetTracker AI \u00B7 ${escapeHtml(generatedLabel)} ${new Date().toLocaleDateString()} \u00B7 ${escapeHtml(footerLabel)}</div>
@@ -488,34 +492,33 @@ ${a.disclaimer?`<div class="disclaimer">${escapeHtml(a.disclaimer)}</div>`:''}
       impliedProbability: a.implied_probability,
       edgePercent:        a.edge_percent,
     })
-    const pricingSummary = showPricing
-      ? renderPricingSummaryLine({
-        qualityGate:        a.quality_gate,
-        modelProbability:   a.model_probability,
-        impliedProbability: a.implied_probability,
-        edgePercent:        a.edge_percent,
+    const text = trustView && !showPricing
+      ? renderAnalystTrustShareText(trustView, {
+        eventName:   a.event_name,
+        sport:       a.sport,
+        marketType:  a.market_type,
+        selection:   a.selection,
+        offeredOdds: a.offered_odds,
+        bookmaker:   a.bookmaker,
       })
-      : trustView
-        ? renderAnalystTrustSummaryText(trustView)
-        : renderPricingSummaryLine({
+      : [
+        `\uD83D\uDCCA AI Analysis \u2014 ${a.event_name}`,
+        `${a.sport.toUpperCase()} \u00B7 ${a.market_type}${a.selection?' \u00B7 '+a.selection:''} \u00B7 @${a.offered_odds}`,
+        ``,
+        `Recommendation: ${recLabels[a.recommendation]??a.recommendation}`,
+        renderPricingSummaryLine({
           qualityGate:        a.quality_gate,
           modelProbability:   a.model_probability,
           impliedProbability: a.implied_probability,
           edgePercent:        a.edge_percent,
-        })
-    const text = [
-      `\uD83D\uDCCA ${trustView && !showPricing ? trustView.riskWarningLabel : 'AI Analysis'} \u2014 ${a.event_name}`,
-      `${a.sport.toUpperCase()} \u00B7 ${a.market_type}${a.selection?' \u00B7 '+a.selection:''} \u00B7 @${a.offered_odds}`,
-      ``,
-      showPricing ? `Recommendation: ${recLabels[a.recommendation]??a.recommendation}` : trustView?.label,
-      pricingSummary,
-      `${trustView?.confidenceLabel ?? 'Confidence'}: ${a.confidence_score}/100${trustView && !showPricing ? ` | ${trustView.actionabilityLabel}` : ` | Risk: ${a.risk_level}`}`,
-      ``,
-      trustView && !showPricing ? trustView.displayReasoning : a.reasoning,
-      a.disclaimer?`\n\u26A0\uFE0F ${a.disclaimer}`:'',
-      ``,
-      trustView && !showPricing && trustView.locale === 'uk' ? `через BetTracker AI` : `via BetTracker AI`,
-    ].filter(Boolean).join('\n')
+        }),
+        `${trustView?.confidenceLabel ?? 'Confidence'}: ${a.confidence_score}/100 | Risk: ${a.risk_level}`,
+        ``,
+        a.reasoning,
+        a.disclaimer?`\n\u26A0\uFE0F ${a.disclaimer}`:'',
+        ``,
+        `via BetTracker AI`,
+      ].filter(Boolean).join('\n')
     await navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -712,6 +715,7 @@ ${a.disclaimer?`<div class="disclaimer">${escapeHtml(a.disclaimer)}</div>`:''}
               skip:     'No meaningful edge found at current odds.',
               no_value: 'AI does not recommend this market.',
             }
+            const disclaimerText = trust && !showPricing ? trust.uiDisclaimer : a.disclaimer
             return (
               <div className={`card border ${rec.bg} flex flex-col gap-3`}>
                 <div className="flex items-start justify-between gap-2">
@@ -816,8 +820,8 @@ ${a.disclaimer?`<div class="disclaimer">${escapeHtml(a.disclaimer)}</div>`:''}
                 <p className="text-sm text-gray-300 leading-relaxed">{trust && !showPricing ? trust.displayReasoning : a.reasoning}</p>
 
                 {/* Disclaimer */}
-                {a.disclaimer && (
-                  <p className="text-xs text-gray-500 border-t border-gray-700 pt-2 mt-1">{a.disclaimer}</p>
+                {disclaimerText && (
+                  <p className="text-xs text-gray-500 border-t border-gray-700 pt-2 mt-1">{disclaimerText}</p>
                 )}
               </div>
             )

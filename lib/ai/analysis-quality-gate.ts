@@ -151,6 +151,14 @@ export interface AnalystTrustView {
   watchLabel: string
   skipLabel: string
   placeBetLabel: string
+  uiDisclaimer: string
+  riskDisclaimer: string
+  footerDisclaimer: string
+  shareHeader: string
+  pdfHeader: string
+  pdfFooter: string
+  generatedLabel: string
+  viaLabel: string
   dataCoverageScore: number
   actionability: AnalysisActionability
   actionabilityLabel: string
@@ -179,6 +187,16 @@ export interface AnalystTrustPayload {
   trust_view: AnalystTrustView
   reasoning: string
   factors: AnalystTrustFactor[]
+}
+
+export interface AnalystTrustRenderContext {
+  eventName: string
+  sport?: string | null
+  marketType: string
+  selection?: string | null
+  offeredOdds?: number | string | null
+  bookmaker?: string | null
+  generatedDate?: Date | string | null
 }
 
 const SUPPORTED_SPORT_MODULES = new Set(['soccer', 'tennis', 'cs2'])
@@ -485,6 +503,15 @@ const TRUST_LABELS = {
     watch: 'Watch',
     skip: 'Skip',
     placeBet: 'Place Bet',
+    uiDisclaimer: 'This analysis is based only on the information provided and does not include live injuries, team news, recent form updates, or current line movement.',
+    riskDisclaimer: 'This is a risk warning, not a priced betting analysis.',
+    footerDisclaimer: 'Analysis is for informational purposes only',
+    shareHeader: 'Risk warning',
+    pdfHeader: 'BetTracker AI analysis',
+    pdfFooter: 'Analysis is for informational purposes only',
+    generated: 'Generated',
+    via: 'via BetTracker AI',
+    availableActions: 'Available actions',
     noPrice: 'NO PRICE',
     insufficientData: 'INSUFFICIENT DATA',
     unsupportedMixedSportParlay: 'unsupported mixed-sport parlay',
@@ -567,6 +594,15 @@ const TRUST_LABELS = {
     watch: 'Спостерігати',
     skip: 'Пропустити',
     placeBet: 'Зробити ставку',
+    uiDisclaimer: 'Цей аналіз базується лише на наданій інформації та не містить перевірених даних про травми, склади, форму команд, рух лінії або актуальний статус подій.',
+    riskDisclaimer: 'Це попередження про ризик, а не оцінений аналіз ставки.',
+    footerDisclaimer: 'Аналіз лише для інформаційної підтримки',
+    shareHeader: 'Попередження про ризик',
+    pdfHeader: 'Аналіз BetTracker AI',
+    pdfFooter: 'Аналіз лише для інформаційної підтримки',
+    generated: 'Згенеровано',
+    via: 'через BetTracker AI',
+    availableActions: 'Доступні дії',
     noPrice: 'БЕЗ ОЦІНКИ',
     insufficientData: 'НЕДОСТАТНЬО ДАНИХ',
     unsupportedMixedSportParlay: 'непідтримуваний експрес із різних видів спорту',
@@ -641,6 +677,12 @@ const TRUST_LABELS = {
 
 function normalizeTrustLocale(locale: string | null | undefined): AnalystTrustLocale {
   return locale === 'uk' ? 'uk' : 'en'
+}
+
+export function localizeAnalystTrustSport(sport: string | null | undefined, locale: AnalystTrustLocale): string {
+  const labels = TRUST_LABELS[locale]
+  const normalized = cleanSport(sport)
+  return labels.sports[normalized as keyof typeof labels.sports] ?? normalized
 }
 
 function localizedQualityGateLabel(result: AnalysisQualityGateResult, locale: AnalystTrustLocale): string {
@@ -764,6 +806,14 @@ export function buildAnalystTrustView(input: BuildAnalystTrustViewInput): Analys
     watchLabel: labels.watch,
     skipLabel: labels.skip,
     placeBetLabel: labels.placeBet,
+    uiDisclaimer: labels.uiDisclaimer,
+    riskDisclaimer: labels.riskDisclaimer,
+    footerDisclaimer: labels.footerDisclaimer,
+    shareHeader: labels.shareHeader,
+    pdfHeader: labels.pdfHeader,
+    pdfFooter: labels.pdfFooter,
+    generatedLabel: labels.generated,
+    viaLabel: labels.via,
     dataCoverageScore: result.dataCoverageScore,
     actionability: resultActionability,
     actionabilityLabel: labels.actionabilityLabels[resultActionability],
@@ -823,6 +873,74 @@ export function renderAnalystTrustSummaryText(view: AnalystTrustView): string {
   lines.push(...view.safeNextSteps.map(step => `- ${step}`))
 
   return lines.join('\n')
+}
+
+function renderAnalystTrustMetaLine(view: AnalystTrustView, context: AnalystTrustRenderContext): string {
+  const parts = [
+    localizeAnalystTrustSport(context.sport, view.locale),
+    context.marketType,
+    context.selection,
+    context.offeredOdds != null ? `@${context.offeredOdds}` : null,
+    context.bookmaker,
+  ]
+
+  return parts.filter(Boolean).join(' · ')
+}
+
+function renderAnalystTrustActions(view: AnalystTrustView): string[] {
+  return [
+    view.showPlaceBet ? view.placeBetLabel : null,
+    view.showWatch ? view.watchLabel : null,
+    view.showSkip ? view.skipLabel : null,
+  ].filter((value): value is string => Boolean(value))
+}
+
+function renderAnalystTrustGeneratedDate(value: Date | string | null | undefined): string {
+  if (!value) return new Date().toLocaleDateString()
+  if (value instanceof Date) return value.toLocaleDateString()
+  return value
+}
+
+export function renderAnalystTrustShareText(view: AnalystTrustView, context: AnalystTrustRenderContext): string {
+  const labels = TRUST_LABELS[view.locale]
+  const actions = renderAnalystTrustActions(view)
+  const lines = [
+    `${view.shareHeader} - ${context.eventName}`,
+    renderAnalystTrustMetaLine(view, context),
+    '',
+    view.label,
+    renderAnalystTrustSummaryText(view),
+    `${view.confidenceLabel}: ${view.dataCoverageScore}/100 | ${view.actionabilityLabel}`,
+    actions.length > 0 ? `${labels.availableActions}: ${actions.join(' / ')}` : null,
+    '',
+    view.uiDisclaimer,
+    view.footerDisclaimer,
+    '',
+    view.viaLabel,
+  ]
+
+  return lines.filter(Boolean).join('\n')
+}
+
+export function renderAnalystTrustPdfText(view: AnalystTrustView, context: AnalystTrustRenderContext): string {
+  const labels = TRUST_LABELS[view.locale]
+  const actions = renderAnalystTrustActions(view)
+  const lines = [
+    view.pdfHeader,
+    context.eventName,
+    renderAnalystTrustMetaLine(view, context),
+    '',
+    view.label,
+    renderAnalystTrustSummaryText(view),
+    `${view.confidenceLabel}: ${view.dataCoverageScore}/100 | ${view.actionabilityLabel}`,
+    actions.length > 0 ? `${labels.availableActions}: ${actions.join(' / ')}` : null,
+    '',
+    view.uiDisclaimer,
+    `${view.generatedLabel} ${renderAnalystTrustGeneratedDate(context.generatedDate)}`,
+    view.pdfFooter,
+  ]
+
+  return lines.filter(Boolean).join('\n')
 }
 
 export function buildAnalystTrustPayload(input: BuildAnalystTrustViewInput): AnalystTrustPayload {

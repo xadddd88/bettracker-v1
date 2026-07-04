@@ -354,7 +354,10 @@ Return structured JSON analysis only.`
     const honestDisclaimer = input.output_language === 'uk'
       ? 'Цей аналіз базується лише на наданій інформації та не включає актуальні травми, новини команд, оновлення поточної форми або поточний рух лінії.'
       : 'This analysis is based only on the information provided and does not include live injuries, team news, recent form updates, or current line movement.'
-    if (!analysis.disclaimer) analysis.disclaimer = honestDisclaimer
+    const safeDisclaimer = qualityGate.pricingAllowed
+      ? analysis.disclaimer || honestDisclaimer
+      : trustPayload.trust_view.uiDisclaimer
+    analysis.disclaimer = safeDisclaimer
 
     // 10. Persist decision immediately — every Analyst call creates a decision + ai_analysis_run
     const inputSnapshot = {
@@ -375,7 +378,7 @@ Return structured JSON analysis only.`
       recommendation:      gatedPricing.recommendation,
       reasoning:           trustPayload.reasoning,
       factors:             trustPayload.factors,
-      disclaimer:          analysis.disclaimer,
+      disclaimer:          safeDisclaimer,
       quality_gate:        qualityGate,
       trust_view:          trustPayload.trust_view,
     }
@@ -457,7 +460,7 @@ Return structured JSON analysis only.`
         recommendation:      gatedPricing.recommendation,
         reasoning:           trustPayload.reasoning,
         factors:             trustPayload.factors,
-        disclaimer:          analysis.disclaimer,
+        disclaimer:          safeDisclaimer,
         quality_gate:        qualityGate,
         trust_view:          trustPayload.trust_view,
         // Input context echoed back (for UI display, PDF, share)
