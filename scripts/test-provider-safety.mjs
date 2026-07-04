@@ -249,7 +249,7 @@ process.env.API_FOOTBALL_KEY = 'dummy-football';
 process.env.API_TENNIS_KEY = 'dummy-tennis';
 process.env.SPORTMONKS_TOKEN = 'dummy-sportmonks';
 
-testAsync('ApiFootballAdapter.fetchFixtures maps provider fixtures into canonical drafts', async () => {
+await testAsync('ApiFootballAdapter.fetchFixtures maps provider fixtures into canonical drafts', async () => {
   const originalFetch = globalThis.fetch;
   const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
   let observedUrl = '';
@@ -284,7 +284,7 @@ testAsync('ApiFootballAdapter.fetchFixtures maps provider fixtures into canonica
   }
 });
 
-testAsync('ApiTennisAdapter.fetchFixtures maps provider fixtures into canonical drafts', async () => {
+await testAsync('ApiTennisAdapter.fetchFixtures maps provider fixtures into canonical drafts', async () => {
   const originalFetch = globalThis.fetch;
   const { ApiTennisAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-tennis.js'));
   let observedUrl = '';
