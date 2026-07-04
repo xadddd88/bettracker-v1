@@ -199,6 +199,32 @@ export interface AnalystTrustRenderContext {
   generatedDate?: Date | string | null
 }
 
+export interface AnalystDecisionSurfaceInput extends AnalystTrustRenderContext {
+  qualityGate?: AnalysisQualityGateResult | null
+  trustView?: AnalystTrustView | null
+  locale?: string | null
+  recommendation?: string | null
+  finalAction?: string | null
+  confidenceScore?: number | null
+  modelProbability?: number | null
+  impliedProbability?: number | null
+  edgePercent?: number | null
+  edgeBucket?: string | null
+  rawReasoning?: string | null
+  rawFactors?: AnalystTrustFactor[] | null
+}
+
+export interface AnalystDecisionSurfaceView {
+  isTrustBlocked: boolean
+  showPricing: boolean
+  locale: AnalystTrustLocale
+  trustView: AnalystTrustView | null
+  sportLabel: string
+  listRecommendationLabel: string
+  detailRecommendationLabel: string
+  actionLabel: string
+}
+
 const SUPPORTED_SPORT_MODULES = new Set(['soccer', 'tennis', 'cs2'])
 const NOT_ACTIONABLE_FIXTURE_STATUSES = new Set<FixtureStatus>([
   'live',
@@ -685,6 +711,81 @@ export function localizeAnalystTrustSport(sport: string | null | undefined, loca
   return labels.sports[normalized as keyof typeof labels.sports] ?? normalized
 }
 
+const DECISION_RECOMMENDATION_LABELS: Record<string, string> = {
+  bet: 'BET',
+  watch: 'WATCH',
+  skip: 'SKIP',
+  no_value: 'NO VALUE',
+}
+
+const DECISION_ACTION_LABELS = {
+  en: {
+    pending: 'Pending',
+    placed: 'Placed',
+    skipped: 'Skipped',
+    watchlisted: 'Watchlisted',
+    ignored: 'Ignored',
+  },
+  uk: {
+    pending: 'Очікує рішення',
+    placed: 'Розміщено',
+    skipped: 'Пропущено',
+    watchlisted: 'Під спостереженням',
+    ignored: 'Ігноровано',
+  },
+} as const
+
+function localizeDecisionAction(action: string | null | undefined, locale: AnalystTrustLocale): string {
+  const normalized = action ?? 'pending'
+  const labels = DECISION_ACTION_LABELS[locale]
+  return labels[normalized as keyof typeof labels] ?? normalized
+}
+
+function compactTrustLabel(view: AnalystTrustView): string {
+  return view.label.split(' - ')[0] ?? view.label
+}
+
+function hasUkrainianDecisionText(input: AnalystDecisionSurfaceInput): boolean {
+  return /[А-Яа-яІіЇїЄєҐґ]/.test([
+    input.eventName,
+    input.marketType,
+    input.selection,
+  ].filter(Boolean).join(' '))
+}
+
+function shouldUseBlockedDecisionSurface(input: AnalystDecisionSurfaceInput, showPricing: boolean): boolean {
+  const gateBlocksPricing = input.qualityGate?.pricingAllowed === false ||
+    input.qualityGate?.analysisType === 'risk_warning'
+  const recommendationIsUnpriced = input.recommendation === 'no_value' ||
+    input.recommendation === 'no_price'
+
+  return Boolean(
+    gateBlocksPricing ||
+    input.edgeBucket === 'unpriced' ||
+    (recommendationIsUnpriced && !showPricing)
+  )
+}
+
+function inferDecisionSurfaceLocale(
+  input: AnalystDecisionSurfaceInput,
+  shouldBlockSurface: boolean
+): AnalystTrustLocale {
+  if (shouldBlockSurface && hasUkrainianDecisionText(input)) return 'uk'
+  if (input.locale) return normalizeTrustLocale(input.locale)
+  return input.trustView?.locale ?? normalizeTrustLocale(input.locale)
+}
+
+function buildFallbackDecisionQualityGate(input: AnalystDecisionSurfaceInput): AnalysisQualityGateResult {
+  return evaluateAnalysisQuality({
+    sport:             input.sport ?? 'other',
+    eventName:         input.eventName,
+    marketType:        input.marketType,
+    selection:         input.selection,
+    webSearchEnabled:  false,
+    modelProbability:  input.modelProbability,
+  })
+}
+
 function localizedQualityGateLabel(result: AnalysisQualityGateResult, locale: AnalystTrustLocale): string {
   const labels = TRUST_LABELS[locale]
   if (result.label === 'PRICED BETTING ANALYSIS') return locale === 'uk' ? 'ОЦІНЕНИЙ АНАЛІЗ СТАВКИ' : 'PRICED BETTING ANALYSIS'
@@ -941,6 +1042,100 @@ export function renderAnalystTrustPdfText(view: AnalystTrustView, context: Analy
   ]
 
   return lines.filter(Boolean).join('\n')
+}
+
+function resolveAnalystDecisionTrustView(
+  input: AnalystDecisionSurfaceInput,
+  shouldBlockSurface: boolean,
+  locale: AnalystTrustLocale
+): AnalystTrustView | null {
+  if (input.trustView && input.trustView.locale === locale) return input.trustView
+  if (!input.qualityGate && !shouldBlockSurface) return input.trustView ?? null
+
+  const qualityGate = input.qualityGate ?? buildFallbackDecisionQualityGate(input)
+
+  return buildAnalystTrustView({
+    qualityGate,
+    locale,
+    eventName:    input.eventName,
+    marketType:   input.marketType,
+    selection:    input.selection ?? null,
+    rawReasoning: input.rawReasoning,
+    rawFactors:   input.rawFactors,
+  })
+}
+
+export function buildAnalystDecisionSurfaceView(input: AnalystDecisionSurfaceInput): AnalystDecisionSurfaceView {
+  const showPricing = shouldShowPricingStats({
+    qualityGate:        input.qualityGate,
+    modelProbability:   input.modelProbability,
+    impliedProbability: input.impliedProbability,
+    edgePercent:        input.edgePercent,
+  })
+  const shouldBlockSurface = shouldUseBlockedDecisionSurface(input, showPricing)
+  const locale = inferDecisionSurfaceLocale(input, shouldBlockSurface)
+  const trustView = resolveAnalystDecisionTrustView(input, shouldBlockSurface, locale)
+  const isTrustBlocked = Boolean(
+    trustView &&
+    shouldBlockSurface
+  )
+  const legacyRecommendation = input.recommendation
+    ? DECISION_RECOMMENDATION_LABELS[input.recommendation] ?? input.recommendation
+    : ''
+
+  return {
+    isTrustBlocked,
+    showPricing,
+    locale,
+    trustView,
+    sportLabel: localizeAnalystTrustSport(input.sport, locale),
+    listRecommendationLabel: isTrustBlocked && trustView ? compactTrustLabel(trustView) : legacyRecommendation,
+    detailRecommendationLabel: isTrustBlocked && trustView ? trustView.label : legacyRecommendation,
+    actionLabel: isTrustBlocked ? localizeDecisionAction(input.finalAction, locale) : localizeDecisionAction(input.finalAction, 'en'),
+  }
+}
+
+export function renderAnalystDecisionSurfaceShareText(
+  surface: AnalystDecisionSurfaceView,
+  context: AnalystTrustRenderContext
+): string {
+  if (surface.isTrustBlocked && surface.trustView) {
+    return renderAnalystTrustShareText(surface.trustView, context)
+  }
+
+  return [
+    `AI Analysis - ${context.eventName}`,
+    [
+      surface.sportLabel,
+      context.marketType,
+      context.selection,
+      context.offeredOdds != null ? `@${context.offeredOdds}` : null,
+      context.bookmaker,
+    ].filter(Boolean).join(' · '),
+    surface.detailRecommendationLabel,
+  ].filter(Boolean).join('\n')
+}
+
+export function renderAnalystDecisionSurfacePdfText(
+  surface: AnalystDecisionSurfaceView,
+  context: AnalystTrustRenderContext
+): string {
+  if (surface.isTrustBlocked && surface.trustView) {
+    return renderAnalystTrustPdfText(surface.trustView, context)
+  }
+
+  return [
+    'BetTracker AI analysis',
+    context.eventName,
+    [
+      surface.sportLabel,
+      context.marketType,
+      context.selection,
+      context.offeredOdds != null ? `@${context.offeredOdds}` : null,
+      context.bookmaker,
+    ].filter(Boolean).join(' · '),
+    surface.detailRecommendationLabel,
+  ].filter(Boolean).join('\n')
 }
 
 export function buildAnalystTrustPayload(input: BuildAnalystTrustViewInput): AnalystTrustPayload {

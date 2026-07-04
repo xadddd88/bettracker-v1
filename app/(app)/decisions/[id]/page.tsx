@@ -5,6 +5,7 @@ import DecisionActions from './DecisionActions'
 import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
 import {
+  buildAnalystDecisionSurfaceView,
   buildAnalystTrustView,
   shouldShowPricingStats,
   type AnalysisQualityGateResult,
@@ -17,6 +18,7 @@ interface AnalysisRunRow {
   output_json: {
     quality_gate?: AnalysisQualityGateResult | null
     trust_view?: AnalystTrustView | null
+    edge_bucket?: string | null
   } | null
 }
 
@@ -64,11 +66,6 @@ const ACTION_CONFIG: Record<string, { label: string; color: string }> = {
   skipped:     { label: 'Skipped',     color: 'text-gray-500' },
   watchlisted: { label: 'Watchlisted', color: 'text-yellow-400' },
   ignored:     { label: 'Ignored',     color: 'text-gray-600' },
-}
-
-const SPORT_ABBR: Record<string, string> = {
-  soccer: 'SOCC', tennis: 'TEN', basketball: 'BASK',
-  ice_hockey: 'HOC', cs2: 'CS2', mma: 'MMA', other: 'OTH',
 }
 
 function getDecisionTrustView(d: DecisionRow, qualityGate: AnalysisQualityGateResult | null): AnalystTrustView | null {
@@ -148,16 +145,37 @@ export default async function DecisionDetailPage({
   const rec    = d.recommendation ? REC_CONFIG[d.recommendation]   : null
   const risk   = d.risk_level     ? RISK_CONFIG[d.risk_level]      : null
   const action = ACTION_CONFIG[d.final_action] ?? ACTION_CONFIG.pending
-  const sportAbbr = SPORT_ABBR[d.sport ?? ''] ?? 'OTH'
   const linkedBet = d.bet_legs?.[0]?.bets ?? null
-  const qualityGate = d.ai_analysis_runs?.[0]?.output_json?.quality_gate ?? null
-  const trustView = getDecisionTrustView(d, qualityGate)
+  const analysisOutput = d.ai_analysis_runs?.[0]?.output_json ?? null
+  const qualityGate = analysisOutput?.quality_gate ?? null
+  const storedTrustView = getDecisionTrustView(d, qualityGate)
   const showPricing = shouldShowPricingStats({
     qualityGate,
     modelProbability:   d.model_probability,
     impliedProbability: d.implied_probability,
     edgePercent:        d.edge_percent,
   })
+  const surface = buildAnalystDecisionSurfaceView({
+    qualityGate,
+    trustView:          storedTrustView,
+    locale:             d.output_language,
+    sport:              d.sport,
+    eventName:          d.event_name,
+    marketType:         d.market_type ?? '',
+    selection:          d.selection,
+    offeredOdds:        d.offered_odds,
+    bookmaker:          d.bookmaker,
+    recommendation:     d.recommendation,
+    finalAction:        d.final_action,
+    confidenceScore:    d.confidence_score,
+    modelProbability:   d.model_probability,
+    impliedProbability: d.implied_probability,
+    edgePercent:        d.edge_percent,
+    edgeBucket:         analysisOutput?.edge_bucket,
+    rawReasoning:       d.reasoning,
+    rawFactors:         d.factors,
+  })
+  const trustView = surface.trustView
   const displayFactors: Factor[] = trustView && !showPricing ? trustView.displayFactors : d.factors ?? []
 
   const date = new Date(d.created_at).toLocaleDateString('en-GB', {
@@ -174,7 +192,7 @@ export default async function DecisionDetailPage({
 
       {/* Header */}
       <div className="flex items-start gap-3">
-        <span className="text-[11px] font-mono font-bold text-slate-500 bg-night-800 border border-night-700 px-1.5 py-0.5 rounded self-start mt-1">{sportAbbr}</span>
+        <span className="text-[11px] font-bold text-slate-500 bg-night-800 border border-night-700 px-1.5 py-0.5 rounded self-start mt-1">{surface.sportLabel}</span>
         <div>
           <h1 className="text-xl font-bold text-white leading-tight">{d.event_name}</h1>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -182,8 +200,12 @@ export default async function DecisionDetailPage({
             {d.offered_odds ? ` · @${d.offered_odds}` : ''}
           </p>
           <div className="flex items-center gap-3 mt-1">
-            <span className={`text-xs font-medium ${action.color}`}>{action.label}</span>
-            {rec && <span className={`text-xs font-semibold ${showPricing ? rec.color : 'text-amber-300'}`}>{showPricing ? `AI: ${rec.label}` : trustView?.label ?? rec.label}</span>}
+            <span className={`text-xs font-medium ${action.color}`}>{surface.isTrustBlocked ? surface.actionLabel : action.label}</span>
+            {(rec || surface.isTrustBlocked) && (
+              <span className={`text-xs font-semibold ${showPricing ? rec?.color ?? 'text-slate-400' : 'text-amber-300'}`}>
+                {showPricing ? `AI: ${rec?.label ?? surface.detailRecommendationLabel}` : surface.detailRecommendationLabel}
+              </span>
+            )}
             {risk && <span className={`text-xs ${risk.color}`}>{localizedRiskLabel(d.risk_level, risk.label, trustView)}</span>}
             <span className="text-xs text-gray-600">{date}</span>
           </div>
@@ -191,7 +213,7 @@ export default async function DecisionDetailPage({
       </div>
 
       {/* AI Analysis card */}
-      {(showPricing || qualityGate || d.reasoning) && (
+      {(showPricing || surface.isTrustBlocked || d.reasoning) && (
         <div className={`card border ${rec?.bg ?? 'border-gray-700'} flex flex-col gap-4`}>
           <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold">{trustView?.locale === 'uk' ? 'AI-аналіз' : 'AI Analysis'}</div>
 
@@ -219,23 +241,23 @@ export default async function DecisionDetailPage({
             </div>
           )}
 
-          {!showPricing && qualityGate && (
+          {!showPricing && surface.isTrustBlocked && trustView && (
             <div className="rounded-lg border border-amber-900/70 bg-amber-950/25 px-3 py-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-amber-300">{trustView?.riskWarningLabel ?? 'Risk warning'}</div>
-                  <div className="text-lg font-bold text-amber-100 mt-0.5">{trustView?.label ?? qualityGate.label}</div>
-                  <div className="text-sm text-amber-100/80 mt-0.5">{trustView?.supportLabel ?? qualityGate.supportLabel}</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-amber-300">{trustView.riskWarningLabel}</div>
+                  <div className="text-lg font-bold text-amber-100 mt-0.5">{trustView.label}</div>
+                  <div className="text-sm text-amber-100/80 mt-0.5">{trustView.supportLabel}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs text-amber-400">{trustView?.dataCoverageLabel ?? 'Data coverage'}</div>
-                  <div className="text-lg font-bold text-amber-100">{qualityGate.dataCoverageScore}/100</div>
+                  <div className="text-xs text-amber-400">{trustView.dataCoverageLabel}</div>
+                  <div className="text-lg font-bold text-amber-100">{trustView.dataCoverageScore}/100</div>
                 </div>
               </div>
-              {trustView?.safeExplanation && (
+              {trustView.safeExplanation && (
                 <p className="text-xs text-amber-100/90 mt-3">{trustView.safeExplanation}</p>
               )}
-              {trustView && trustView.legs.length > 0 ? (
+              {trustView.legs.length > 0 ? (
                 <div className="mt-3">
                   <div className="text-xs font-medium text-amber-300 mb-1">{trustView.missingDataChecklistLabel}</div>
                   <div className="flex flex-col gap-2">
@@ -331,7 +353,10 @@ export default async function DecisionDetailPage({
 
       {d.final_action !== 'pending' && (
         <div className="text-center text-sm text-gray-600">
-          This decision was marked as <span className={`font-medium ${action.color}`}>{action.label.toLowerCase()}</span>.
+          {surface.isTrustBlocked && surface.locale === 'uk' ? 'Це рішення позначено як ' : 'This decision was marked as '}
+          <span className={`font-medium ${action.color}`}>
+            {surface.isTrustBlocked ? surface.actionLabel.toLowerCase() : action.label.toLowerCase()}
+          </span>.
         </div>
       )}
     </div>
