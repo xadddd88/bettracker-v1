@@ -249,6 +249,40 @@ process.env.API_FOOTBALL_KEY = 'dummy-football';
 process.env.API_TENNIS_KEY = 'dummy-tennis';
 process.env.SPORTMONKS_TOKEN = 'dummy-sportmonks';
 
+await testAsync('ApiFootballAdapter.fetchFixtures fetches unfiltered ranges one day at a time', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+  const observedUrls = [];
+
+  globalThis.fetch = async (url) => {
+    observedUrls.push(String(url));
+    return jsonResponse({ errors: [], response: [] });
+  };
+
+  try {
+    const rows = await new ApiFootballAdapter().fetchFixtures({
+      dateFrom: '2026-07-04',
+      dateTo: '2026-07-05',
+    });
+
+    assert.equal(rows.length, 0);
+    assert.equal(observedUrls.length, 2);
+    assert.deepEqual(
+      observedUrls.map((rawUrl) => new URL(rawUrl).searchParams.get('date')),
+      ['2026-07-04', '2026-07-05']
+    );
+
+    for (const rawUrl of observedUrls) {
+      const url = new URL(rawUrl);
+      assert.equal(url.searchParams.get('from'), null);
+      assert.equal(url.searchParams.get('to'), null);
+      assert.equal(url.searchParams.get('league'), null);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 await testAsync('ApiFootballAdapter.fetchFixtures maps provider fixtures into canonical drafts', async () => {
   const originalFetch = globalThis.fetch;
   const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
@@ -339,7 +373,7 @@ await testAsync('runFixtureSync dry-run returns counts without requiring Supabas
     });
 
     assert.equal(report.dryRun, true);
-    assert.equal(report.totals.fetched, 2);
+    assert.equal(report.totals.fetched, 3);
     assert.equal(report.totals.insertedCanonicalFixtures, 0);
     assert.equal(report.totals.insertedProviderLinks, 0);
     assert.equal(report.totals.failedWrites, 0);

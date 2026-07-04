@@ -11,6 +11,7 @@ import { getProviderEnv } from '../../env'
 import { providerFetch } from '../http'
 
 const BASE_URL = 'https://v3.football.api-sports.io'
+const DAY_MS = 24 * 60 * 60 * 1000
 
 interface ApiFootballFixturesEnvelope {
   errors?: unknown
@@ -79,6 +80,28 @@ function teamRef(id: unknown, name: unknown): string | null {
   return toStringOrNull(name)
 }
 
+function dateOnlyToUtcMs(value: string): number {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return Number.NaN
+
+  return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+}
+
+function datesInRange(dateFrom: string, dateTo: string): string[] {
+  const start = dateOnlyToUtcMs(dateFrom)
+  const end = dateOnlyToUtcMs(dateTo)
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) {
+    return [dateFrom]
+  }
+
+  const dates: string[] = []
+  for (let value = start; value <= end; value += DAY_MS) {
+    dates.push(new Date(value).toISOString().slice(0, 10))
+  }
+  return dates
+}
+
 function parseApiFootballFixture(row: unknown): (ProviderMeta & { fixture: CanonicalFixtureDraft }) | null {
   const fixtureRow = row as ApiFootballFixtureRow
   const providerFixtureId = toStringOrNull(fixtureRow.fixture?.id)
@@ -136,14 +159,21 @@ export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, 
     dateTo: string
   }): Promise<Array<ProviderMeta & { fixture: CanonicalFixtureDraft }>> {
     const { API_FOOTBALL_KEY } = getProviderEnv()
-    const leagueIds = params.competitionIds?.length ? params.competitionIds : [undefined]
+    const leagueIds = params.competitionIds?.length ? params.competitionIds : []
     const fixtures: Array<ProviderMeta & { fixture: CanonicalFixtureDraft }> = []
+    const requests = leagueIds.length
+      ? leagueIds.map((leagueId) => ({ leagueId, date: null as string | null }))
+      : datesInRange(params.dateFrom, params.dateTo).map((date) => ({ leagueId: null as string | null, date }))
 
-    for (const leagueId of leagueIds) {
+    for (const request of requests) {
       const url = new URL(`${BASE_URL}/fixtures`)
-      url.searchParams.set('from', params.dateFrom)
-      url.searchParams.set('to', params.dateTo)
-      if (leagueId) url.searchParams.set('league', leagueId)
+      if (request.date) {
+        url.searchParams.set('date', request.date)
+      } else {
+        url.searchParams.set('from', params.dateFrom)
+        url.searchParams.set('to', params.dateTo)
+        if (request.leagueId) url.searchParams.set('league', request.leagueId)
+      }
 
       const body = await providerFetch<ApiFootballFixturesEnvelope>(this.provider, url.toString(), {
         headers: { 'x-apisports-key': API_FOOTBALL_KEY },
