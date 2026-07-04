@@ -1,0 +1,94 @@
+import { timingSafeEqual } from 'node:crypto'
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { ProviderError } from '@/lib/providers/errors'
+import { FIXTURE_SYNC_WRITE_CONFIRMATION, runFixtureSync } from '@/lib/providers/fixture-sync'
+
+export const runtime = 'nodejs'
+
+const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
+
+const fixtureSyncBodySchema = z
+  .object({
+    providers: z.array(z.enum(['api_football', 'api_tennis'])).min(1).optional(),
+    dateFrom: dateSchema,
+    dateTo: dateSchema,
+    competitionIds: z.array(z.string().min(1).max(80)).max(50).optional(),
+    dryRun: z.boolean().default(true),
+    operatorConfirm: z.string().optional(),
+  })
+  .refine((body) => body.dateFrom <= body.dateTo, {
+    message: 'dateFrom must be on or before dateTo',
+    path: ['dateTo'],
+  })
+
+function getBearerToken(req: NextRequest): string | null {
+  const authorization = req.headers.get('authorization')
+  if (authorization?.startsWith('Bearer ')) return authorization.slice('Bearer '.length).trim()
+  return req.headers.get('x-bettracker-sync-token')?.trim() ?? null
+}
+
+function safeEqual(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left)
+  const rightBuffer = Buffer.from(right)
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer)
+}
+
+function authorize(req: NextRequest): NextResponse | null {
+  const expected = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN
+  if (!expected) {
+    return NextResponse.json(
+      { success: false, error: 'Fixture sync operator token is not configured' },
+      { status: 503 }
+    )
+  }
+
+  const provided = getBearerToken(req)
+  if (!provided || !safeEqual(provided, expected)) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  }
+
+  return null
+}
+
+function providerErrorStatus(error: ProviderError): number {
+  if (error.kind === 'auth') return 502
+  if (error.kind === 'rate_limit') return 429
+  if (error.kind === 'timeout' || error.kind === 'network') return 504
+  return 502
+}
+
+export async function POST(req: NextRequest) {
+  const unauthorized = authorize(req)
+  if (unauthorized) return unauthorized
+
+  try {
+    const body = await req.json()
+    const parsed = fixtureSyncBodySchema.safeParse(body)
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid input', details: parsed.error.flatten() },
+        { status: 400 }
+      )
+    }
+
+    const report = await runFixtureSync(parsed.data)
+
+    return NextResponse.json({
+      success: true,
+      writeConfirmationRequiredForWrites: FIXTURE_SYNC_WRITE_CONFIRMATION,
+      report,
+    })
+  } catch (error) {
+    if (error instanceof ProviderError) {
+      return NextResponse.json(
+        { success: false, error: error.message, provider: error.provider, kind: error.kind },
+        { status: providerErrorStatus(error) }
+      )
+    }
+
+    console.error('[fixture-sync] unhandled error:', error instanceof Error ? error.name : 'unknown')
+    return NextResponse.json({ success: false, error: 'Internal error' }, { status: 500 })
+  }
+}
