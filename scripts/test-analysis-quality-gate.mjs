@@ -14,6 +14,9 @@ const {
   evaluateAnalysisQuality,
   applyQualityGateToPricing,
   buildAnalystPricingPayload,
+  buildAnalystTrustPayload,
+  buildAnalystTrustView,
+  renderAnalystTrustSummaryText,
   shouldShowPricingStats,
   renderPricingSummaryLine,
   renderQualityGateSummaryText,
@@ -40,6 +43,32 @@ function assertMissing(result, needle) {
     allMissing.some(item => item.toLowerCase().includes(needle.toLowerCase())),
     `expected missing checklist to include ${needle}; got ${JSON.stringify(allMissing)}`
   );
+}
+
+function assertNoForbiddenPricingText(text) {
+  const forbidden = [
+    'Model probability',
+    'Implied probability',
+    'Edge',
+    'EV',
+    'expected value',
+    'negative edge',
+    'real probability',
+    'model probability',
+    '28.0%',
+    '45.5%',
+    '45.45%',
+    '-17.4%',
+    '21.6%',
+    '25-30%',
+    'реальна ймовірність',
+    'імплікована ймовірність',
+    'негативний край',
+    'очікуване значення',
+  ];
+  for (const needle of forbidden) {
+    assert.ok(!text.includes(needle), `expected blocked-mode text not to include ${needle}; got:\n${text}`);
+  }
 }
 
 console.log('\nAnalysis Quality Gate checks\n');
@@ -162,6 +191,7 @@ test('allows priced betting analysis only when required coverage and model input
     modelProbability: 54,
     modelInputsPresent: true,
     sportModuleSupport: 'full',
+    fixtureStatus: 'scheduled',
     dataCoverage: {
       liveInjuries: true,
       teamNews: true,
@@ -268,6 +298,7 @@ test('render helpers show pricing only for valid priced analysis', () => {
     modelProbability: 54,
     modelInputsPresent: true,
     sportModuleSupport: 'full',
+    fixtureStatus: 'scheduled',
     dataCoverage: {
       liveInjuries: true,
       teamNews: true,
@@ -294,6 +325,126 @@ test('render helpers show pricing only for valid priced analysis', () => {
   assert.ok(line.includes('Model probability: 54.0%'));
   assert.ok(line.includes('Implied probability: 50.0%'));
   assert.ok(line.includes('Edge: +4.0%'));
+});
+
+test('Ukrainian trust view localizes exact mixed-sport coupon and structurally hides raw pricing analysis', () => {
+  const qualityGate = evaluateAnalysisQuality({
+    sport: 'soccer',
+    eventName: 'Сучжоу Донгву - Гуандун ДжейЗі-Пауер + Qingdao West Coast - Shanghai Port + Alex De Minaur - Zachary Svajda',
+    marketType: 'Експрес (3 ноги)',
+    selection: 'Гуандун ДжейЗі-Пауер + Over (2.0) + Alex De Minaur -4.0',
+    webSearchEnabled: false,
+    modelProbability: 28,
+  });
+
+  const view = buildAnalystTrustView({
+    qualityGate,
+    locale: 'uk',
+    eventName: 'Сучжоу Донгву - Гуандун ДжейЗі-Пауер + Qingdao West Coast - Shanghai Port + Alex De Minaur - Zachary Svajda',
+    marketType: 'Експрес (3 ноги)',
+    selection: 'Гуандун ДжейЗі-Пауер + Over (2.0) + Alex De Minaur -4.0',
+    rawReasoning: 'NO VALUE: implied probability 45.45% vs real probability 25-30%, negative edge -17.4%.',
+    rawFactors: [
+      { name: 'bookmaker coefficient vs real probability', score: -3, detail: 'Model probability 28.0% creates negative EV.' },
+    ],
+  });
+  const text = renderAnalystTrustSummaryText(view);
+
+  assert.equal(view.locale, 'uk');
+  assert.equal(view.showRawAiAnalysis, false);
+  assert.equal(view.showPlaceBet, false);
+  assert.equal(view.showWatch, true);
+  assert.equal(view.showSkip, true);
+  assert.ok(text.includes('БЕЗ ОЦІНКИ'));
+  assert.ok(text.includes('непідтримуваний експрес із різних видів спорту'));
+  assert.ok(text.includes('Попередження про ризик'));
+  assert.ok(text.includes('Покриття даних'));
+  assert.ok(text.includes('Перелік відсутніх даних'));
+  assert.ok(text.includes('Нога 3'));
+  assert.ok(text.includes('теніс'));
+  assert.ok(text.includes('статус не перевірено'));
+  assert.ok(text.includes('Гуандун ДжейЗі-Пауер'));
+  assert.ok(text.includes('Alex De Minaur'));
+  assert.equal(view.downloadPdfLabel, 'Завантажити PDF');
+  assert.equal(view.copyToShareLabel, 'Скопіювати для поширення');
+  assert.equal(view.watchLabel, 'Спостерігати');
+  assert.equal(view.skipLabel, 'Пропустити');
+  assert.equal(view.placeBetLabel, 'Зробити ставку');
+  assertNoForbiddenPricingText(text);
+});
+
+test('trust view marks finished or live legs as not actionable and hides Watch', () => {
+  const qualityGate = evaluateAnalysisQuality({
+    sport: 'soccer',
+    eventName: 'Finished FC - Closed Town',
+    marketType: 'Match Winner',
+    selection: 'Finished FC',
+    webSearchEnabled: true,
+    modelProbability: 62,
+    modelInputsPresent: true,
+    sportModuleSupport: 'full',
+    fixtureStatus: 'finished',
+    dataCoverage: {
+      liveInjuries: true,
+      teamNews: true,
+      recentForm: true,
+      lineMovement: true,
+    },
+  });
+
+  const view = buildAnalystTrustView({
+    qualityGate,
+    locale: 'uk',
+    eventName: 'Finished FC - Closed Town',
+    marketType: 'Match Winner',
+    selection: 'Finished FC',
+  });
+  const text = renderAnalystTrustSummaryText(view);
+
+  assert.equal(qualityGate.pricingAllowed, false);
+  assert.equal(view.actionability, 'not_actionable');
+  assert.equal(view.showPlaceBet, false);
+  assert.equal(view.showWatch, false);
+  assert.equal(view.showSkip, true);
+  assert.ok(text.includes('неактуально'));
+  assert.ok(text.includes('подія вже почалась або завершилась'));
+});
+
+test('blocked Analyst payload replaces raw pricing-like reasoning and factors with safe trust view content', () => {
+  const qualityGate = evaluateAnalysisQuality({
+    sport: 'soccer',
+    eventName: 'Сучжоу Донгву - Гуандун ДжейЗі-Пауер + Qingdao West Coast - Shanghai Port + Alex De Minaur - Zachary Svajda',
+    marketType: 'Експрес (3 ноги)',
+    selection: 'Гуандун ДжейЗі-Пауер + Over (2.0) + Alex De Minaur -4.0',
+    webSearchEnabled: false,
+    modelProbability: 28,
+  });
+
+  const payload = buildAnalystTrustPayload({
+    qualityGate,
+    locale: 'uk',
+    eventName: 'Сучжоу Донгву - Гуандун ДжейЗі-Пауер + Qingdao West Coast - Shanghai Port + Alex De Minaur - Zachary Svajda',
+    marketType: 'Експрес (3 ноги)',
+    selection: 'Гуандун ДжейЗі-Пауер + Over (2.0) + Alex De Minaur -4.0',
+    rawReasoning: 'NO VALUE because Model probability is 28.0%, implied probability is 45.45%, Edge is -17.4%.',
+    rawFactors: [
+      { name: 'bookmaker coefficient vs real probability', score: -3, detail: '25-30% real probability creates negative expected value.' },
+    ],
+  });
+
+  const combined = [
+    payload.reasoning,
+    payload.trust_view.safeExplanation,
+    ...payload.factors.flatMap(factor => [factor.name, factor.detail]),
+    renderAnalystTrustSummaryText(payload.trust_view),
+  ].join('\n');
+
+  assert.equal(payload.trust_view.showRawAiAnalysis, false);
+  assert.equal(payload.trust_view.showPlaceBet, false);
+  assert.ok(payload.trust_view.displayFactors.length >= 3);
+  assert.ok(combined.includes('Оцінка недоступна'));
+  assert.ok(combined.includes('Покриття даних'));
+  assertNoForbiddenPricingText(combined);
 });
 
 if (failed > 0) {

@@ -8,6 +8,7 @@ import { bucketOdds, bucketConfidence } from '@/lib/analytics/buckets'
 import { extractJsonObject } from '@/lib/ai/extract-json'
 import {
   buildAnalystPricingPayload,
+  buildAnalystTrustPayload,
   evaluateAnalysisQuality,
   type SportModuleSupport,
 } from '@/lib/ai/analysis-quality-gate'
@@ -339,9 +340,20 @@ Return structured JSON analysis only.`
       recommendation:   analysis.recommendation,
       riskLevel:        analysis.risk_level,
     })
+    const trustPayload = buildAnalystTrustPayload({
+      qualityGate,
+      locale:       input.output_language,
+      eventName:    input.event_name,
+      marketType:   input.market_type,
+      selection:    input.selection ?? null,
+      rawReasoning: analysis.reasoning,
+      rawFactors:   analysis.factors,
+    })
 
     // 9. Sprint 2: always include honesty disclaimer
-    const honestDisclaimer = 'This analysis is based only on the information provided and does not include live injuries, team news, recent form updates, or current line movement.'
+    const honestDisclaimer = input.output_language === 'uk'
+      ? 'Цей аналіз базується лише на наданій інформації та не включає актуальні травми, новини команд, оновлення поточної форми або поточний рух лінії.'
+      : 'This analysis is based only on the information provided and does not include live injuries, team news, recent form updates, or current line movement.'
     if (!analysis.disclaimer) analysis.disclaimer = honestDisclaimer
 
     // 10. Persist decision immediately — every Analyst call creates a decision + ai_analysis_run
@@ -361,10 +373,11 @@ Return structured JSON analysis only.`
       confidence_score:    analysis.confidence_score,
       risk_level:          gatedPricing.risk_level,
       recommendation:      gatedPricing.recommendation,
-      reasoning:           analysis.reasoning,
-      factors:             analysis.factors,
+      reasoning:           trustPayload.reasoning,
+      factors:             trustPayload.factors,
       disclaimer:          analysis.disclaimer,
       quality_gate:        qualityGate,
+      trust_view:          trustPayload.trust_view,
     }
 
     const { data: rpcData, error: rpcErr } = await supabase.rpc('create_decision_with_analysis', {
@@ -382,8 +395,8 @@ Return structured JSON analysis only.`
       p_confidence_score:    analysis.confidence_score,
       p_risk_level:          gatedPricing.risk_level,
       p_recommendation:      gatedPricing.recommendation,
-      p_reasoning:           analysis.reasoning,
-      p_factors:             analysis.factors,
+      p_reasoning:           trustPayload.reasoning,
+      p_factors:             trustPayload.factors,
       p_model_name:          model,
       p_input_snapshot:      inputSnapshot,
       p_output_json:         outputJson,
@@ -442,10 +455,11 @@ Return structured JSON analysis only.`
         confidence_score:    analysis.confidence_score,
         risk_level:          gatedPricing.risk_level,
         recommendation:      gatedPricing.recommendation,
-        reasoning:           analysis.reasoning,
-        factors:             analysis.factors,
+        reasoning:           trustPayload.reasoning,
+        factors:             trustPayload.factors,
         disclaimer:          analysis.disclaimer,
         quality_gate:        qualityGate,
+        trust_view:          trustPayload.trust_view,
         // Input context echoed back (for UI display, PDF, share)
         sport:           input.sport,
         event_name:      input.event_name,

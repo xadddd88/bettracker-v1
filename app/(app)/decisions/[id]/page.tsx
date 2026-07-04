@@ -5,14 +5,19 @@ import DecisionActions from './DecisionActions'
 import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
 import {
+  buildAnalystTrustView,
   shouldShowPricingStats,
   type AnalysisQualityGateResult,
+  type AnalystTrustView,
 } from '@/lib/ai/analysis-quality-gate'
 
 interface Factor { name: string; score: number; detail: string }
 
 interface AnalysisRunRow {
-  output_json: { quality_gate?: AnalysisQualityGateResult | null } | null
+  output_json: {
+    quality_gate?: AnalysisQualityGateResult | null
+    trust_view?: AnalystTrustView | null
+  } | null
 }
 
 interface DecisionRow {
@@ -64,6 +69,30 @@ const ACTION_CONFIG: Record<string, { label: string; color: string }> = {
 const SPORT_ABBR: Record<string, string> = {
   soccer: 'SOCC', tennis: 'TEN', basketball: 'BASK',
   ice_hockey: 'HOC', cs2: 'CS2', mma: 'MMA', other: 'OTH',
+}
+
+function getDecisionTrustView(d: DecisionRow, qualityGate: AnalysisQualityGateResult | null): AnalystTrustView | null {
+  const stored = d.ai_analysis_runs?.[0]?.output_json?.trust_view ?? null
+  if (stored) return stored
+  if (!qualityGate) return null
+  return buildAnalystTrustView({
+    qualityGate,
+    locale:       d.output_language,
+    eventName:    d.event_name,
+    marketType:   d.market_type ?? '',
+    selection:    d.selection,
+    rawReasoning: d.reasoning,
+    rawFactors:   d.factors,
+  })
+}
+
+function localizedRiskLabel(risk: string | null, fallback: string | null, trustView: AnalystTrustView | null): string | null {
+  if (!fallback) return null
+  if (trustView?.locale !== 'uk') return fallback
+  if (risk === 'high') return 'Високий ризик'
+  if (risk === 'medium') return 'Середній ризик'
+  if (risk === 'low') return 'Низький ризик'
+  return fallback
 }
 
 function ScoreBar({ score }: { score: number }) {
@@ -122,12 +151,14 @@ export default async function DecisionDetailPage({
   const sportAbbr = SPORT_ABBR[d.sport ?? ''] ?? 'OTH'
   const linkedBet = d.bet_legs?.[0]?.bets ?? null
   const qualityGate = d.ai_analysis_runs?.[0]?.output_json?.quality_gate ?? null
+  const trustView = getDecisionTrustView(d, qualityGate)
   const showPricing = shouldShowPricingStats({
     qualityGate,
     modelProbability:   d.model_probability,
     impliedProbability: d.implied_probability,
     edgePercent:        d.edge_percent,
   })
+  const displayFactors: Factor[] = trustView && !showPricing ? trustView.displayFactors : d.factors ?? []
 
   const date = new Date(d.created_at).toLocaleDateString('en-GB', {
     day: '2-digit', month: 'short', year: 'numeric',
@@ -152,8 +183,8 @@ export default async function DecisionDetailPage({
           </p>
           <div className="flex items-center gap-3 mt-1">
             <span className={`text-xs font-medium ${action.color}`}>{action.label}</span>
-            {rec && <span className={`text-xs font-semibold ${rec.color}`}>AI: {rec.label}</span>}
-            {risk && <span className={`text-xs ${risk.color}`}>{risk.label}</span>}
+            {rec && <span className={`text-xs font-semibold ${showPricing ? rec.color : 'text-amber-300'}`}>{showPricing ? `AI: ${rec.label}` : trustView?.label ?? rec.label}</span>}
+            {risk && <span className={`text-xs ${risk.color}`}>{localizedRiskLabel(d.risk_level, risk.label, trustView)}</span>}
             <span className="text-xs text-gray-600">{date}</span>
           </div>
         </div>
@@ -162,7 +193,7 @@ export default async function DecisionDetailPage({
       {/* AI Analysis card */}
       {(showPricing || qualityGate || d.reasoning) && (
         <div className={`card border ${rec?.bg ?? 'border-gray-700'} flex flex-col gap-4`}>
-          <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold">AI Analysis</div>
+          <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold">{trustView?.locale === 'uk' ? 'AI-аналіз' : 'AI Analysis'}</div>
 
           {/* Probabilities */}
           {showPricing && (
@@ -192,30 +223,36 @@ export default async function DecisionDetailPage({
             <div className="rounded-lg border border-amber-900/70 bg-amber-950/25 px-3 py-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-amber-300">Risk warning</div>
-                  <div className="text-lg font-bold text-amber-100 mt-0.5">{qualityGate.label}</div>
-                  <div className="text-sm text-amber-100/80 mt-0.5">{qualityGate.supportLabel}</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-amber-300">{trustView?.riskWarningLabel ?? 'Risk warning'}</div>
+                  <div className="text-lg font-bold text-amber-100 mt-0.5">{trustView?.label ?? qualityGate.label}</div>
+                  <div className="text-sm text-amber-100/80 mt-0.5">{trustView?.supportLabel ?? qualityGate.supportLabel}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs text-amber-400">Data coverage</div>
+                  <div className="text-xs text-amber-400">{trustView?.dataCoverageLabel ?? 'Data coverage'}</div>
                   <div className="text-lg font-bold text-amber-100">{qualityGate.dataCoverageScore}/100</div>
                 </div>
               </div>
-              {qualityGate.missingDataByLeg.length > 0 && (
+              {trustView?.safeExplanation && (
+                <p className="text-xs text-amber-100/90 mt-3">{trustView.safeExplanation}</p>
+              )}
+              {trustView && trustView.legs.length > 0 ? (
                 <div className="mt-3">
-                  <div className="text-xs font-medium text-amber-300 mb-1">Missing data checklist</div>
+                  <div className="text-xs font-medium text-amber-300 mb-1">{trustView.missingDataChecklistLabel}</div>
                   <div className="flex flex-col gap-2">
-                    {qualityGate.missingDataByLeg.map(leg => (
-                      <div key={`${leg.legLabel}-${leg.sport}`} className="text-xs text-amber-100/90">
-                        <div className="font-medium">{leg.legLabel} / {leg.sport}</div>
+                    {trustView.legs.map(leg => (
+                      <div key={`${leg.legLabel}-${leg.sport}-${leg.legNumber}`} className="text-xs text-amber-100/90 rounded border border-amber-900/40 px-2 py-2">
+                        <div className="font-medium">{leg.legLabel} / {leg.sportLabel}</div>
+                        <div className="text-amber-100/75 mt-0.5">{leg.eventName}</div>
+                        <div className="text-amber-100/75">{leg.marketType}{leg.selection ? ` / ${leg.selection}` : ''}</div>
+                        <div className="mt-1 text-amber-200/80">{leg.fixtureStatusLabel} · {leg.supportLabel} · {leg.actionabilityLabel}</div>
                         <ul className="list-disc pl-4 mt-0.5 text-amber-200/80">
-                          {leg.missing.map(item => <li key={item}>{item}</li>)}
+                          {leg.missingData.map(item => <li key={item}>{item}</li>)}
                         </ul>
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
+              ) : null}
             </div>
           )}
 
@@ -223,7 +260,7 @@ export default async function DecisionDetailPage({
           {d.confidence_score != null && (
             <div>
               <div className="flex justify-between text-xs mb-1">
-                <span className="text-gray-500">Confidence</span>
+                <span className="text-gray-500">{trustView?.confidenceLabel ?? 'Confidence'}</span>
                 <span className="text-gray-300">{d.confidence_score}/100</span>
               </div>
               <div className="bg-gray-800 rounded-full h-1.5">
@@ -237,16 +274,16 @@ export default async function DecisionDetailPage({
 
           {/* Reasoning */}
           {d.reasoning && (
-            <p className="text-sm text-gray-300 leading-relaxed">{d.reasoning}</p>
+            <p className="text-sm text-gray-300 leading-relaxed">{trustView && !showPricing ? trustView.displayReasoning : d.reasoning}</p>
           )}
         </div>
       )}
 
       {/* Factors */}
-      {d.factors && d.factors.length > 0 && (
+      {displayFactors.length > 0 && (
         <div className="card flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-gray-300 mb-1">Factor Analysis</h3>
-          {d.factors.map((f: Factor, i: number) => (
+          <h3 className="text-sm font-semibold text-gray-300 mb-1">{trustView?.factorAnalysisLabel ?? 'Factor Analysis'}</h3>
+          {displayFactors.map((f: Factor, i: number) => (
             <div key={i} className="py-1.5 border-b border-gray-800 last:border-0">
               <span className="text-sm text-gray-200">{f.name}</span>
               <ScoreBar score={f.score} />
@@ -272,7 +309,24 @@ export default async function DecisionDetailPage({
 
       {/* Actions — only if still pending */}
       {d.final_action === 'pending' && (
-        <DecisionActions decisionId={d.id} offeredOdds={d.offered_odds} canPlaceBet={showPricing} />
+        <DecisionActions
+          decisionId={d.id}
+          offeredOdds={d.offered_odds}
+          canPlaceBet={showPricing && (trustView?.showPlaceBet ?? true)}
+          canWatch={trustView?.showWatch !== false}
+          labels={trustView ? {
+            placeBet:     trustView.placeBetLabel,
+            watch:        trustView.watchLabel,
+            skip:         trustView.skipLabel,
+            checkRisk:    trustView.locale === 'uk' ? 'Перевірити ризик' : 'Check Risk',
+            cancel:       trustView.locale === 'uk' ? 'Скасувати' : 'Cancel',
+            stakePrompt:  trustView.locale === 'uk' ? 'Введіть суму ставки' : 'Enter stake amount',
+            invalidStake: trustView.locale === 'uk' ? 'Введіть коректну суму ставки' : 'Enter a valid stake amount',
+            helper:       trustView.locale === 'uk'
+              ? 'Пропуск або спостереження буде збережено в історії рішень.'
+              : 'Skipping or watching is a valid decision - it will be saved to your history.',
+          } : undefined}
+        />
       )}
 
       {d.final_action !== 'pending' && (
