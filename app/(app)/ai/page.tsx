@@ -8,6 +8,11 @@ import { EVENTS } from '@/lib/analytics/events'
 import { bucketOdds, bucketStake } from '@/lib/analytics/buckets'
 import RiskEvaluator from '@/components/risk/RiskEvaluator'
 import { Camera, Loader2, Eye, X, CheckCircle, Search } from 'lucide-react'
+import {
+  renderPricingSummaryLine,
+  shouldShowPricingStats,
+  type AnalysisQualityGateResult,
+} from '@/lib/ai/analysis-quality-gate'
 
 // ─── Image helper ─────────────────────────────────────────────
 function fileToBase64(file: File): Promise<{ data: string; media_type: string }> {
@@ -35,15 +40,16 @@ interface Analysis {
   decision_id:      string
   analysis_run_id?: string | null
   // AI output (server-corrected)
-  model_probability:   number
-  implied_probability: number
-  edge_percent:        number
+  model_probability:   number | null
+  implied_probability: number | null
+  edge_percent:        number | null
   confidence_score:    number
   risk_level:          RiskLevel
   recommendation:      Recommendation
   reasoning:           string
   factors:             Factor[]
   disclaimer:          string
+  quality_gate?:       AnalysisQualityGateResult | null
   // Input echoed back from server
   sport:           string
   event_name:      string
@@ -351,6 +357,28 @@ export default function AIAnalystPage() {
     if (!analysis) return
     const a = analysis
     const recLabels: Record<string, string> = { bet: 'BET', skip: 'SKIP', watch: 'WATCH', no_value: 'NO VALUE' }
+    const showPricing = shouldShowPricingStats({
+      qualityGate:        a.quality_gate,
+      modelProbability:   a.model_probability,
+      impliedProbability: a.implied_probability,
+      edgePercent:        a.edge_percent,
+    })
+    const gateChecklistHtml = a.quality_gate?.missingDataByLeg.map(leg =>
+      `<li><strong>${leg.legLabel} (${leg.sport})</strong><ul>${leg.missing.map(item => `<li>${item}</li>`).join('')}</ul></li>`
+    ).join('') ?? ''
+    const pricingHtml = showPricing
+      ? `<div class="grid">
+  <div class="stat"><div class="stat-label">Model probability</div><div class="stat-value">${a.model_probability?.toFixed(1)}%</div></div>
+  <div class="stat"><div class="stat-label">Implied probability</div><div class="stat-value">${a.implied_probability?.toFixed(1)}%</div></div>
+  <div class="stat"><div class="stat-label">Edge</div><div class="stat-value" style="color:${(a.edge_percent ?? 0)>=0?'#16a34a':'#dc2626'}">${(a.edge_percent ?? 0)>=0?'+':''}${a.edge_percent?.toFixed(1)}%</div></div>
+</div>`
+      : `<div class="quality-gate">
+  <div class="gate-kicker">Risk warning</div>
+  <div class="gate-label">${a.quality_gate?.label ?? 'INSUFFICIENT DATA'}</div>
+  <div class="gate-support">${a.quality_gate?.supportLabel ?? 'Unsupported / partially supported bet'}</div>
+  <div class="gate-score">Data coverage score: ${a.quality_gate?.dataCoverageScore ?? 0}/100</div>
+  ${gateChecklistHtml ? `<div class="gate-missing-title">Missing data checklist</div><ul class="gate-missing">${gateChecklistHtml}</ul>` : ''}
+</div>`
     const factorsHtml = a.factors.map(f =>
       `<tr><td>${f.name}</td><td style="text-align:center;font-weight:bold;color:${f.score>0?'#22c55e':f.score<0?'#ef4444':'#9ca3af'}">${f.score>0?'+':''}${f.score}</td><td style="color:#9ca3af;font-size:12px">${f.detail}</td></tr>`
     ).join('')
@@ -363,6 +391,12 @@ export default function AIAnalystPage() {
   .stat{background:#f8f8f8;padding:12px;border-radius:8px;text-align:center}
   .stat-label{font-size:11px;color:#888;margin-bottom:4px}
   .stat-value{font-size:22px;font-weight:700}
+  .quality-gate{background:#fff7ed;border:1px solid #fed7aa;padding:14px;border-radius:8px;margin:16px 0}
+  .gate-kicker{font-size:11px;color:#9a3412;text-transform:uppercase;font-weight:700;letter-spacing:.04em}
+  .gate-label{font-size:18px;font-weight:800;color:#9a3412;margin-top:4px}
+  .gate-support,.gate-score{font-size:12px;color:#7c2d12;margin-top:4px}
+  .gate-missing-title{font-size:12px;font-weight:700;color:#7c2d12;margin-top:10px}
+  .gate-missing{font-size:12px;color:#7c2d12;margin-top:4px;padding-left:18px}
   .rec{display:inline-block;padding:4px 12px;border-radius:6px;font-weight:700;font-size:14px;background:#f0f0f0;margin-bottom:12px}
   .reasoning{background:#f8f8f8;padding:14px;border-radius:8px;margin:12px 0;line-height:1.6}
   table{width:100%;border-collapse:collapse;margin-top:12px}
@@ -375,11 +409,7 @@ export default function AIAnalystPage() {
 <h1>${a.event_name}</h1>
 <div class="meta">${a.sport.toUpperCase()} \u00B7 ${a.market_type}${a.selection?' \u00B7 '+a.selection:''} \u00B7 @${a.offered_odds}${a.bookmaker?' \u00B7 '+a.bookmaker:''}</div>
 <div class="rec">${recLabels[a.recommendation]??a.recommendation}</div>
-<div class="grid">
-  <div class="stat"><div class="stat-label">Model probability</div><div class="stat-value">${a.model_probability.toFixed(1)}%</div></div>
-  <div class="stat"><div class="stat-label">Implied probability</div><div class="stat-value">${a.implied_probability.toFixed(1)}%</div></div>
-  <div class="stat"><div class="stat-label">Edge</div><div class="stat-value" style="color:${a.edge_percent>=0?'#16a34a':'#dc2626'}">${a.edge_percent>=0?'+':''}${a.edge_percent.toFixed(1)}%</div></div>
-</div>
+${pricingHtml}
 <div class="reasoning">${a.reasoning}</div>
 ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
 <h3 style="margin-top:20px;font-size:14px">Factor Analysis</h3>
@@ -400,12 +430,18 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
     if (!analysis) return
     const a = analysis
     const recLabels: Record<string, string> = { bet: '\u2705 BET', skip: '\u2715 SKIP', watch: '\uD83D\uDC41 WATCH', no_value: '\u274C NO VALUE' }
+    const pricingSummary = renderPricingSummaryLine({
+      qualityGate:        a.quality_gate,
+      modelProbability:   a.model_probability,
+      impliedProbability: a.implied_probability,
+      edgePercent:        a.edge_percent,
+    })
     const text = [
       `\uD83D\uDCCA AI Analysis \u2014 ${a.event_name}`,
       `${a.sport.toUpperCase()} \u00B7 ${a.market_type}${a.selection?' \u00B7 '+a.selection:''} \u00B7 @${a.offered_odds}`,
       ``,
       `Recommendation: ${recLabels[a.recommendation]??a.recommendation}`,
-      `Model prob: ${a.model_probability.toFixed(1)}% | Implied: ${a.implied_probability.toFixed(1)}% | Edge: ${a.edge_percent>=0?'+':''}${a.edge_percent.toFixed(1)}%`,
+      pricingSummary,
       `Confidence: ${a.confidence_score}/100 | Risk: ${a.risk_level}`,
       ``,
       a.reasoning,
@@ -419,12 +455,18 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
   }, [analysis])
 
   const a = analysis
+  const pricingVisible = a ? shouldShowPricingStats({
+    qualityGate:        a.quality_gate,
+    modelProbability:   a.model_probability,
+    impliedProbability: a.implied_probability,
+    edgePercent:        a.edge_percent,
+  }) : false
 
   return (
     <div className="max-w-2xl flex flex-col gap-6" onPaste={handlePaste}>
       <div>
         <h1 className="text-2xl font-bold text-white">AI Analyst</h1>
-        <p className="text-sm text-gray-500 mt-1">Enter match details or scan a coupon to get probability, edge, and risk analysis.</p>
+        <p className="text-sm text-gray-500 mt-1">Enter match details or scan a coupon to get risk, coverage, and priced analysis when supported.</p>
       </div>
 
       {/* ── Scout pre-fill indicator ───────────────────────── */}
@@ -588,6 +630,13 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
           {(() => {
             const rec = REC_CONFIG[a.recommendation]
             const risk = RISK_CONFIG[a.risk_level]
+            const gate = a.quality_gate ?? null
+            const showPricing = shouldShowPricingStats({
+              qualityGate:        gate,
+              modelProbability:   a.model_probability,
+              impliedProbability: a.implied_probability,
+              edgePercent:        a.edge_percent,
+            })
             const recDetail: Record<Recommendation, string> = {
               bet:      'Edge detected — AI sees value at these odds.',
               watch:    'Uncertain — monitor for odds movement or new info.',
@@ -598,35 +647,76 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
               <div className={`card border ${rec.bg} flex flex-col gap-3`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <span className={`text-lg font-bold ${rec.color}`}>{rec.label}</span>
-                    <p className="text-xs text-gray-500 mt-0.5">{recDetail[a.recommendation]}</p>
+                    <span className={`text-lg font-bold ${showPricing ? rec.color : 'text-amber-300'}`}>
+                      {showPricing ? rec.label : gate?.label ?? 'INSUFFICIENT DATA'}
+                    </span>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {showPricing ? recDetail[a.recommendation] : gate?.supportLabel ?? 'Unsupported / partially supported bet'}
+                    </p>
                   </div>
+                  {showPricing ? (
                   <div className="text-right shrink-0">
                     <span className={`text-xs font-medium ${risk.color}`}>{risk.label}</span>
                     <p className="text-[10px] text-gray-600 mt-0.5">edge · confidence · market</p>
                   </div>
+                  ) : (
+                    <div className="text-right shrink-0">
+                      <span className={`text-xs font-medium ${risk.color}`}>{risk.label}</span>
+                      <p className="text-[10px] text-gray-600 mt-0.5">risk warning / data coverage</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Probabilities */}
+                {showPricing ? (
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div>
                     <div className="text-xs text-gray-500 mb-0.5">Model prob.</div>
-                    <div className="text-xl font-bold text-white">{a.model_probability.toFixed(1)}%</div>
+                    <div className="text-xl font-bold text-white">{a.model_probability?.toFixed(1)}%</div>
                     <div className="text-[10px] text-gray-600 mt-0.5">AI win estimate</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500 mb-0.5">Implied</div>
-                    <div className="text-xl font-bold text-gray-300">{a.implied_probability.toFixed(1)}%</div>
+                    <div className="text-xl font-bold text-gray-300">{a.implied_probability?.toFixed(1)}%</div>
                     <div className="text-[10px] text-gray-600 mt-0.5">From your odds</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500 mb-0.5">Edge</div>
-                    <div className={`text-xl font-bold ${a.edge_percent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {a.edge_percent >= 0 ? '+' : ''}{a.edge_percent.toFixed(1)}%
+                    <div className={`text-xl font-bold ${(a.edge_percent ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {(a.edge_percent ?? 0) >= 0 ? '+' : ''}{a.edge_percent?.toFixed(1)}%
                     </div>
                     <div className="text-[10px] text-gray-600 mt-0.5">Model minus implied</div>
                   </div>
                 </div>
+                ) : gate && (
+                  <div className="rounded-lg border border-amber-900/70 bg-amber-950/25 px-3 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-amber-300">Risk warning</div>
+                        <div className="text-sm text-amber-100 mt-0.5">{gate.supportLabel}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-amber-400">Data coverage</div>
+                        <div className="text-lg font-bold text-amber-100">{gate.dataCoverageScore}/100</div>
+                      </div>
+                    </div>
+                    {gate.missingDataByLeg.length > 0 && (
+                      <div className="mt-3">
+                        <div className="text-xs font-medium text-amber-300 mb-1">Missing data checklist</div>
+                        <div className="flex flex-col gap-2">
+                          {gate.missingDataByLeg.map(leg => (
+                            <div key={`${leg.legLabel}-${leg.sport}`} className="text-xs text-amber-100/90">
+                              <div className="font-medium">{leg.legLabel} / {leg.sport}</div>
+                              <ul className="list-disc pl-4 mt-0.5 text-amber-200/80">
+                                {leg.missing.map(item => <li key={item}>{item}</li>)}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Confidence */}
                 <div>
@@ -738,7 +828,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
           )}
 
           <div className="flex gap-3">
-            {!showStake && (
+            {pricingVisible && !showStake && (
               <button
                 className="btn-primary flex-1 flex items-center justify-center gap-1.5"
                 onClick={() => {

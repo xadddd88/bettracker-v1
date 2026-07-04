@@ -4,8 +4,13 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
-import { bucketOdds, bucketEdge, bucketConfidence } from '@/lib/analytics/buckets'
+import { bucketOdds, bucketConfidence } from '@/lib/analytics/buckets'
 import { extractJsonObject } from '@/lib/ai/extract-json'
+import {
+  buildAnalystPricingPayload,
+  evaluateAnalysisQuality,
+  type SportModuleSupport,
+} from '@/lib/ai/analysis-quality-gate'
 
 const envInt = (key: string, def: number) => {
   const n = parseInt(process.env[key] ?? '', 10)
@@ -157,6 +162,10 @@ Evaluate all relevant factors for this sport and market.
 Consider: form, head-to-head, contextual motivation, market-specific indicators.
 Be explicit when data is limited.`
   }
+}
+
+function getAnalystSportSupport(sport: string): SportModuleSupport {
+  return ['soccer', 'tennis', 'cs2'].includes(sport) ? 'full' : 'none'
 }
 
 // ─── System prompt ────────────────────────────────────────────
@@ -311,11 +320,25 @@ Return structured JSON analysis only.`
 
     const analysis = validated.data
 
-    // 8. Server owns implied_probability and edge_percent — override AI values
-    const serverImplied = parseFloat(((1 / input.offered_odds) * 100).toFixed(2))
-    const serverEdge    = parseFloat((analysis.model_probability - serverImplied).toFixed(2))
-    analysis.implied_probability = serverImplied
-    analysis.edge_percent        = serverEdge
+    // 8. Server owns pricing, but the quality gate can suppress it entirely.
+    const qualityGate = evaluateAnalysisQuality({
+      sport:              input.sport,
+      eventName:          input.event_name,
+      marketType:         input.market_type,
+      selection:          input.selection ?? null,
+      notes:              input.notes ?? null,
+      webSearchEnabled,
+      modelProbability:   analysis.model_probability,
+      modelInputsPresent: false,
+      sportModuleSupport: getAnalystSportSupport(input.sport),
+    })
+    const gatedPricing = buildAnalystPricingPayload({
+      qualityGate,
+      modelProbability: analysis.model_probability,
+      offeredOdds:      input.offered_odds,
+      recommendation:   analysis.recommendation,
+      riskLevel:        analysis.risk_level,
+    })
 
     // 9. Sprint 2: always include honesty disclaimer
     const honestDisclaimer = 'This analysis is based only on the information provided and does not include live injuries, team news, recent form updates, or current line movement.'
@@ -332,15 +355,16 @@ Return structured JSON analysis only.`
       bookmaker:    input.bookmaker ?? null,
     }
     const outputJson = {
-      model_probability:   analysis.model_probability,
-      implied_probability: serverImplied,
-      edge_percent:        serverEdge,
+      model_probability:   gatedPricing.model_probability,
+      implied_probability: gatedPricing.implied_probability,
+      edge_percent:        gatedPricing.edge_percent,
       confidence_score:    analysis.confidence_score,
-      risk_level:          analysis.risk_level,
-      recommendation:      analysis.recommendation,
+      risk_level:          gatedPricing.risk_level,
+      recommendation:      gatedPricing.recommendation,
       reasoning:           analysis.reasoning,
       factors:             analysis.factors,
       disclaimer:          analysis.disclaimer,
+      quality_gate:        qualityGate,
     }
 
     const { data: rpcData, error: rpcErr } = await supabase.rpc('create_decision_with_analysis', {
@@ -352,12 +376,12 @@ Return structured JSON analysis only.`
       p_offered_odds:        input.offered_odds,
       p_bookmaker:           input.bookmaker ?? null,
       p_output_language:     input.output_language === 'auto' ? null : input.output_language,
-      p_model_probability:   analysis.model_probability,
-      p_implied_probability: serverImplied,
-      p_edge_percent:        serverEdge,
+      p_model_probability:   gatedPricing.model_probability,
+      p_implied_probability: gatedPricing.implied_probability,
+      p_edge_percent:        gatedPricing.edge_percent,
       p_confidence_score:    analysis.confidence_score,
-      p_risk_level:          analysis.risk_level,
-      p_recommendation:      analysis.recommendation,
+      p_risk_level:          gatedPricing.risk_level,
+      p_recommendation:      gatedPricing.recommendation,
       p_reasoning:           analysis.reasoning,
       p_factors:             analysis.factors,
       p_model_name:          model,
@@ -391,9 +415,9 @@ Return structured JSON analysis only.`
     await Promise.all([
       trackServerEvent(user.id, EVENTS.AI_ANALYSIS_COMPLETED, {
         sport:             input.sport,
-        recommendation:    analysis.recommendation,
-        risk_level:        analysis.risk_level,
-        edge_bucket:       bucketEdge(serverEdge),
+        recommendation:    gatedPricing.recommendation,
+        risk_level:        gatedPricing.risk_level,
+        edge_bucket:       gatedPricing.edge_bucket,
         confidence_bucket: bucketConfidence(analysis.confidence_score),
         odds_bucket:       bucketOdds(input.offered_odds),
         decision_id:       decisionId,
@@ -401,8 +425,8 @@ Return structured JSON analysis only.`
       trackServerEvent(user.id, EVENTS.DECISION_CREATED, {
         decision_id:    decisionId,
         sport:          input.sport,
-        recommendation: analysis.recommendation,
-        risk_level:     analysis.risk_level,
+        recommendation: gatedPricing.recommendation,
+        risk_level:     gatedPricing.risk_level,
       }),
     ])
 
@@ -412,15 +436,16 @@ Return structured JSON analysis only.`
         decision_id:      decisionId,
         analysis_run_id:  analysisRunId ?? null,
         // AI output (server-corrected implied + edge)
-        model_probability:   analysis.model_probability,
-        implied_probability: serverImplied,
-        edge_percent:        serverEdge,
+        model_probability:   gatedPricing.model_probability,
+        implied_probability: gatedPricing.implied_probability,
+        edge_percent:        gatedPricing.edge_percent,
         confidence_score:    analysis.confidence_score,
-        risk_level:          analysis.risk_level,
-        recommendation:      analysis.recommendation,
+        risk_level:          gatedPricing.risk_level,
+        recommendation:      gatedPricing.recommendation,
         reasoning:           analysis.reasoning,
         factors:             analysis.factors,
         disclaimer:          analysis.disclaimer,
+        quality_gate:        qualityGate,
         // Input context echoed back (for UI display, PDF, share)
         sport:           input.sport,
         event_name:      input.event_name,

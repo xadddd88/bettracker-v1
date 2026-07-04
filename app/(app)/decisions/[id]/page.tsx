@@ -4,8 +4,16 @@ import Link from 'next/link'
 import DecisionActions from './DecisionActions'
 import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
+import {
+  shouldShowPricingStats,
+  type AnalysisQualityGateResult,
+} from '@/lib/ai/analysis-quality-gate'
 
 interface Factor { name: string; score: number; detail: string }
+
+interface AnalysisRunRow {
+  output_json: { quality_gate?: AnalysisQualityGateResult | null } | null
+}
 
 interface DecisionRow {
   id: string
@@ -29,6 +37,7 @@ interface DecisionRow {
   output_language: string | null
   created_at: string
   bet_legs: { bet_id: string; bets: { id: string; stake: number; status: string; total_odds: number | null } | null }[]
+  ai_analysis_runs: AnalysisRunRow[] | null
 }
 
 const REC_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -97,7 +106,8 @@ export default async function DecisionDetailPage({
       recommendation, risk_level, model_probability, implied_probability,
       edge_percent, confidence_score, reasoning, factors,
       output_language, created_at,
-      bet_legs(bet_id, bets(id, stake, status, total_odds))
+      bet_legs(bet_id, bets(id, stake, status, total_odds)),
+      ai_analysis_runs(output_json)
     `)
     .eq('id', id)
     .eq('user_id', user.id)
@@ -111,6 +121,13 @@ export default async function DecisionDetailPage({
   const action = ACTION_CONFIG[d.final_action] ?? ACTION_CONFIG.pending
   const sportAbbr = SPORT_ABBR[d.sport ?? ''] ?? 'OTH'
   const linkedBet = d.bet_legs?.[0]?.bets ?? null
+  const qualityGate = d.ai_analysis_runs?.[0]?.output_json?.quality_gate ?? null
+  const showPricing = shouldShowPricingStats({
+    qualityGate,
+    modelProbability:   d.model_probability,
+    impliedProbability: d.implied_probability,
+    edgePercent:        d.edge_percent,
+  })
 
   const date = new Date(d.created_at).toLocaleDateString('en-GB', {
     day: '2-digit', month: 'short', year: 'numeric',
@@ -143,16 +160,16 @@ export default async function DecisionDetailPage({
       </div>
 
       {/* AI Analysis card */}
-      {(d.model_probability != null || d.reasoning) && (
+      {(showPricing || qualityGate || d.reasoning) && (
         <div className={`card border ${rec?.bg ?? 'border-gray-700'} flex flex-col gap-4`}>
           <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold">AI Analysis</div>
 
           {/* Probabilities */}
-          {d.model_probability != null && (
+          {showPricing && (
             <div className="grid grid-cols-3 gap-3 text-center">
               <div>
                 <div className="text-xs text-gray-500 mb-0.5">Model prob.</div>
-                <div className="text-2xl font-bold text-white">{d.model_probability.toFixed(1)}%</div>
+                <div className="text-2xl font-bold text-white">{d.model_probability?.toFixed(1)}%</div>
               </div>
               <div>
                 <div className="text-xs text-gray-500 mb-0.5">Implied</div>
@@ -168,6 +185,37 @@ export default async function DecisionDetailPage({
                     : '—'}
                 </div>
               </div>
+            </div>
+          )}
+
+          {!showPricing && qualityGate && (
+            <div className="rounded-lg border border-amber-900/70 bg-amber-950/25 px-3 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-amber-300">Risk warning</div>
+                  <div className="text-lg font-bold text-amber-100 mt-0.5">{qualityGate.label}</div>
+                  <div className="text-sm text-amber-100/80 mt-0.5">{qualityGate.supportLabel}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-amber-400">Data coverage</div>
+                  <div className="text-lg font-bold text-amber-100">{qualityGate.dataCoverageScore}/100</div>
+                </div>
+              </div>
+              {qualityGate.missingDataByLeg.length > 0 && (
+                <div className="mt-3">
+                  <div className="text-xs font-medium text-amber-300 mb-1">Missing data checklist</div>
+                  <div className="flex flex-col gap-2">
+                    {qualityGate.missingDataByLeg.map(leg => (
+                      <div key={`${leg.legLabel}-${leg.sport}`} className="text-xs text-amber-100/90">
+                        <div className="font-medium">{leg.legLabel} / {leg.sport}</div>
+                        <ul className="list-disc pl-4 mt-0.5 text-amber-200/80">
+                          {leg.missing.map(item => <li key={item}>{item}</li>)}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -224,7 +272,7 @@ export default async function DecisionDetailPage({
 
       {/* Actions — only if still pending */}
       {d.final_action === 'pending' && (
-        <DecisionActions decisionId={d.id} offeredOdds={d.offered_odds} />
+        <DecisionActions decisionId={d.id} offeredOdds={d.offered_odds} canPlaceBet={showPricing} />
       )}
 
       {d.final_action !== 'pending' && (
