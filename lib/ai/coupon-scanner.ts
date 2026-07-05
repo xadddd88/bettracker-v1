@@ -133,7 +133,8 @@ export function normalizeLooseCouponExtraction(input: LooseCouponExtraction): No
     ? input.legs.map(normalizeProvidedLeg).filter(hasLegIdentity)
     : []
   const parsedRawLegs = rawText ? parseLegsFromRawText(rawText) : []
-  const legs = existingLegs.length > 0 ? existingLegs : parsedRawLegs
+  const flattenedLegs = parsedRawLegs.length > 0 ? [] : parseLegsFromFlattenedFields(input)
+  const legs = existingLegs.length > 0 ? existingLegs : parsedRawLegs.length > 0 ? parsedRawLegs : flattenedLegs
 
   if (legs.length === 0) {
     throw Object.assign(new Error('scanner_normalization_failed'), {
@@ -238,6 +239,40 @@ function parseLegsFromRawText(rawText: string): NormalizedScannerLeg[] {
   return legs
 }
 
+function parseLegsFromFlattenedFields(input: LooseCouponExtraction): NormalizedScannerLeg[] {
+  const eventParts = splitExpressParts(cleanString(input.event_name))
+  const selectionParts = splitExpressParts(cleanString(input.selection))
+  if (eventParts.length < 2) return []
+
+  const topLevelSport = canonicalSport(input.sport)
+  const topLevelMarket = cleanString(input.market_type)
+
+  return eventParts.map((eventPart, index) => {
+    const phase = extractPhase(eventPart)
+    const eventName = stripPhasePrefix(eventPart)
+    const sport = inferSport(phase, eventName) ?? topLevelSport
+    const isLive = isLivePhase(phase)
+    const selection = selectionParts[index] ?? null
+    const marketType = inferLegMarketType(sport, topLevelMarket)
+    const statusSource: NormalizedScannerLeg['statusSource'] = isLive ? 'coupon' : 'unknown'
+
+    return {
+      rawText: [eventPart, marketType, selection].filter(Boolean).join('\n'),
+      eventName,
+      marketType,
+      selection,
+      odds: null,
+      sport,
+      isLive,
+      periodOrPhase: phase,
+      statusText: isLive ? 'Лайв' : null,
+      scoreText: null,
+      statusSource,
+      statusConfidence: isLive ? 0.95 : null,
+    }
+  }).filter(hasLegIdentity)
+}
+
 function hasLegIdentity(leg: NormalizedScannerLeg): boolean {
   return Boolean(leg.eventName || leg.selection || leg.rawText)
 }
@@ -248,6 +283,24 @@ function looksLikeCouponText(text: string): boolean {
 
 function inferCouponType(text: string): string {
   return /кількість результатів\s*\n?\s*[2-9]|express|parlay|експрес|экспресс/i.test(text) ? 'express' : 'single'
+}
+
+function splitExpressParts(value: string | null): string[] {
+  if (!value) return []
+  return value
+    .split(/\s+\+\s+/)
+    .map(part => part.trim())
+    .filter(Boolean)
+}
+
+function inferLegMarketType(
+  sport: NormalizedScannerLeg['sport'],
+  topLevelMarket: string | null
+): string | null {
+  if (topLevelMarket && !/express|parlay|експрес|экспресс/i.test(topLevelMarket)) return topLevelMarket
+  if (sport === 'tennis') return 'Переможець'
+  if (sport === 'soccer') return 'Результат матчу'
+  return null
 }
 
 function looksLikeEventLine(line: string): boolean {

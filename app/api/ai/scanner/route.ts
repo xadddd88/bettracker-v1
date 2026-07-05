@@ -87,6 +87,47 @@ Rules:
 - If a leg visibly says Лайв, Live, In-play, 1-й сет, 2-й сет, 3-й сет, Перерва, or Halftime, set isLive=true and statusSource="coupon"
 - Return ONLY the JSON object, nothing else`
 
+const FALLBACK_SCAN_PROMPT = `You are doing a second-pass OCR extraction for a betting coupon screenshot.
+
+Return ONLY JSON. Do not explain. Do not return empty legs if a coupon card is visible.
+
+Focus on the visible coupon cards and preserve line order. For each visible card:
+- read the pink live marker (Лайв / Live)
+- read the phase line, e.g. "3-й сет, Player A - Player B" or "Перерва, Team A - Team B"
+- read the market line, e.g. "Переможець" or "Результат матчу"
+- read the selected outcome line
+- read the individual odds shown on the right
+
+Use this exact shape:
+{
+  "rawText": "all visible text in line order",
+  "couponType": "express",
+  "totalOdds": 7.253,
+  "warnings": [],
+  "legs": [
+    {
+      "rawText": "visible text for this card",
+      "eventName": "event names without phase prefix",
+      "marketType": "market line",
+      "selection": "selected outcome",
+      "odds": 1.19,
+      "sport": "tennis|soccer|other|null",
+      "isLive": true,
+      "periodOrPhase": "3-й сет / Перерва / 1-й сет",
+      "statusText": "Лайв",
+      "scoreText": null,
+      "statusSource": "coupon",
+      "statusConfidence": 0.95
+    }
+  ]
+}
+
+Rules:
+- 1-й/2-й/3-й сет means tennis.
+- Перерва / Halftime means soccer.
+- Total odds are shown near "Загальний коефіцієнт" / "Total odds".
+- If a field is unreadable, use null for that field but keep the leg object.`
+
 function shouldExposeScannerDebug() {
   return process.env.NODE_ENV !== 'production' || process.env.VERCEL_ENV === 'preview'
 }
@@ -95,6 +136,52 @@ function scannerFailurePayload(stage: ScannerParseStage, missingFields: string[]
   const failure = buildScannerFailureResponse(stage, missingFields)
   if (shouldExposeScannerDebug()) return failure
   return { error: failure.error }
+}
+
+function shouldRetryScannerParse(err: unknown) {
+  const stage = (err as { scannerParseStage?: ScannerParseStage }).scannerParseStage
+  const missingFields = (err as { missingFields?: string[] }).missingFields ?? []
+  return stage === 'normalization' && missingFields.includes('legs')
+}
+
+async function callAnthropicScanner(
+  apiKey: string,
+  image: string,
+  media_type: z.infer<typeof requestSchema>['media_type'],
+  prompt: string
+) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1200,
+      temperature: 0,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image', source: { type: 'base64', media_type, data: image } },
+        ],
+      }],
+    }),
+  })
+
+  if (!response.ok) {
+    const err = await response.text()
+    console.error('[scanner] Anthropic error:', err)
+    throw Object.assign(new Error('scanner_api_error'), { scannerParseStage: 'vision_response' as ScannerParseStage })
+  }
+
+  const data = await response.json()
+  return data.content
+    ?.filter((block: { type?: string; text?: string }) => block.type === 'text' && block.text)
+    .map((block: { text: string }) => block.text)
+    .at(-1) ?? ''
 }
 
 // ─── Schemas ─────────────────────────────────────────────────
@@ -174,42 +261,11 @@ export async function POST(req: NextRequest) {
   // Call Claude Vision
   let raw: string
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 900,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type, data: image } },
-            { type: 'text', text: SCAN_PROMPT },
-          ],
-        }],
-      }),
-    })
-
-    if (!response.ok) {
-      const err = await response.text()
-      console.error('[scanner] Anthropic error:', err)
-      await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'api_error' })
-      return NextResponse.json({ error: 'Scanner API error' }, { status: 502 })
-    }
-
-    const data = await response.json()
-    raw = data.content
-      ?.filter((block: { type?: string; text?: string }) => block.type === 'text' && block.text)
-      .map((block: { text: string }) => block.text)
-      .at(-1) ?? ''
+    raw = await callAnthropicScanner(apiKey, image, media_type, SCAN_PROMPT)
   } catch (err) {
     console.error('[scanner] fetch error:', err)
-    await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'unknown' })
-    return NextResponse.json({ error: 'Scanner request failed' }, { status: 500 })
+    await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'api_error' })
+    return NextResponse.json({ error: 'Scanner API error' }, { status: 502 })
   }
 
   // Parse loose scanner output, then normalize to the strict app schema.
@@ -217,11 +273,24 @@ export async function POST(req: NextRequest) {
   try {
     normalizedData = normalizeLooseCouponExtraction(parseScannerVisionResult(raw))
   } catch (err) {
-    const stage = (err as { scannerParseStage?: ScannerParseStage }).scannerParseStage ?? 'normalization'
-    const missingFields = (err as { missingFields?: string[] }).missingFields ?? []
-    console.error('[scanner] parse/normalization failed:', { stage, missingFields })
-    await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'parse_failed' })
-    return NextResponse.json(scannerFailurePayload(stage, missingFields), { status: 422 })
+    if (shouldRetryScannerParse(err)) {
+      try {
+        const fallbackRaw = await callAnthropicScanner(apiKey, image, media_type, FALLBACK_SCAN_PROMPT)
+        normalizedData = normalizeLooseCouponExtraction(parseScannerVisionResult(fallbackRaw))
+      } catch (fallbackErr) {
+        const stage = (fallbackErr as { scannerParseStage?: ScannerParseStage }).scannerParseStage ?? 'normalization'
+        const missingFields = (fallbackErr as { missingFields?: string[] }).missingFields ?? []
+        console.error('[scanner] fallback parse/normalization failed:', { stage, missingFields })
+        await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'parse_failed' })
+        return NextResponse.json(scannerFailurePayload(stage, missingFields), { status: 422 })
+      }
+    } else {
+      const stage = (err as { scannerParseStage?: ScannerParseStage }).scannerParseStage ?? 'normalization'
+      const missingFields = (err as { missingFields?: string[] }).missingFields ?? []
+      console.error('[scanner] parse/normalization failed:', { stage, missingFields })
+      await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'parse_failed' })
+      return NextResponse.json(scannerFailurePayload(stage, missingFields), { status: 422 })
+    }
   }
 
   // Validate shape with Zod

@@ -320,6 +320,29 @@ test('exact live coupon text normalizes to three live legs with coupon status so
   assert.deepEqual(normalized.legs.map(leg => leg.odds), [1.19, 2.65, 2.3]);
 });
 
+test('legacy flattened scanner response reconstructs express legs without raw legs', () => {
+  const normalized = normalizeLooseCouponExtraction({
+    event_name: [
+      '3-й сет, Тейлор Фріц - Лоренцо Сонего',
+      'Перерва, Канада - Марокко',
+      '1-й сет, Френсіс Тіафо - Олександр Бублик',
+    ].join(' + '),
+    market_type: 'Експрес (3 ноги)',
+    selection: 'Тейлор Фріц + Марокко + Олександр Бублик',
+    odds: 7.253,
+    sport: 'soccer',
+    legs: [],
+  });
+
+  assert.strictEqual(normalized.market_type, 'Експрес (3 ноги)');
+  assert.strictEqual(normalized.odds, 7.253);
+  assert.strictEqual(normalized.legs.length, 3);
+  assert.deepEqual(normalized.legs.map(leg => leg.sport), ['tennis', 'soccer', 'tennis']);
+  assert.deepEqual(normalized.legs.map(leg => leg.periodOrPhase), ['3-й сет', 'Перерва', '1-й сет']);
+  assert.deepEqual(normalized.legs.map(leg => leg.statusSource), ['coupon', 'coupon', 'coupon']);
+  assert.deepEqual(normalized.legs.map(leg => leg.statusText), ['Лайв', 'Лайв', 'Лайв']);
+});
+
 test('invalid scanner response returns localized actionable error metadata', () => {
   const failure = buildScannerFailureResponse('schema_validation', ['legs', 'totalOdds']);
   assert.strictEqual(
