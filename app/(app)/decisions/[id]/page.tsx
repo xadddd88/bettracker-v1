@@ -266,6 +266,15 @@ export default async function DecisionDetailPage({
                         <div className="font-medium">{leg.legLabel} / {leg.sportLabel}</div>
                         <div className="text-amber-100/75 mt-0.5">{leg.eventName}</div>
                         <div className="text-amber-100/75">{leg.marketType}{leg.selection ? ` / ${leg.selection}` : ''}</div>
+                        {leg.periodOrPhase && (
+                          <div className="text-amber-100/75">{trustView.locale === 'uk' ? 'Період / фаза' : 'Period / phase'}: {leg.periodOrPhase}</div>
+                        )}
+                        {leg.statusSourceLabel && (
+                          <div className="text-amber-100/75">{trustView.locale === 'uk' ? 'Джерело статусу' : 'Status source'}: {leg.statusSourceLabel}</div>
+                        )}
+                        {leg.odds != null && (
+                          <div className="text-amber-100/75">{trustView.locale === 'uk' ? 'Коефіцієнт' : 'Odds'}: {leg.odds}</div>
+                        )}
                         <div className="mt-1 text-amber-200/80">{leg.fixtureStatusLabel} · {leg.supportLabel} · {leg.actionabilityLabel}</div>
                         <ul className="list-disc pl-4 mt-0.5 text-amber-200/80">
                           {leg.missingData.map(item => <li key={item}>{item}</li>)}
