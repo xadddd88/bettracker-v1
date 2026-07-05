@@ -351,5 +351,242 @@ Statuses: `discovered`, `research_needed`, `watchlisted`, `converted_to_decision
 
 ---
 
-*Last updated: 2026-06-26*  
+## Decision #010 - Controlled Provider-Backed Fixture Writes
+**Date:** 2026-07-05
+**Proposed by:** CPO + Founder
+**Status:** Accepted and validated in production for M1.2.c.
+
+**Decision:** BetTracker may write provider-backed fixtures only through a controlled, operator-gated, one-provider / one-day workflow with a small fixture cap, immediate write-flag removal, and post-write idempotency verification.
+
+**Why:**
+- Fixture data is now needed as the foundation for future odds, results, enrichment, Scout, and Analyst improvements.
+- Provider fetches and writes can burn quota or create duplicate records if run broadly.
+- The first production write needed to prove the `canonical_fixtures` and `fixture_provider_links` path without touching odds, results, enrichment, cron, Scout, Analyst, or UI.
+
+**Validated M1.2.c scope:**
+- provider: `api_football`
+- date: `2026-12-31`
+- fetched fixtures: 2
+- first write inserted 2 canonical fixtures and 2 provider links
+- idempotency write inserted 0 and updated 2 canonical fixtures / 2 provider links
+- failed writes: 0
+- duplicate provider links: 0
+- mapping confidence: `exact`
+- mapping method: `provider_fixture_id`
+- write flag removed after validation; production `writeEnabled=false`
+
+**Consequences:**
+- Future fixture writes must use a fresh dry-run-selected scope and stay within the safety guard.
+- `SPORTS_FIXTURE_SYNC_WRITE_ENABLED` remains absent/off by default.
+- M1.3 odds snapshot work must begin as a design milestone before implementation because odds sync can create provider cost, rate-limit, storage, noise, and settlement-risk pressure.
+
+---
+
+## Decision #011 - Design-Gated Odds Snapshot Sync
+**Date:** 2026-07-05
+**Proposed by:** CPO + Founder
+**Status:** Accepted for design in PR #79. Implementation not started.
+
+**Decision:** M1.3 odds snapshot sync must be designed and accepted before any code, migrations, provider calls, cron, or odds writes are added. Odds v1 starts with a narrow API-Football / football-only scope and remains blocked from Scout, Analyst, UI, model probability, edge, and EV until a separate validation milestone proves the data is safe to use.
+
+**Why:**
+- Odds data can burn provider quota faster than fixture data.
+- Odds snapshots can grow storage quickly if cadence, fixtures, markets, bookmakers, and retention are not capped first.
+- Provider market labels and bookmaker IDs are not safe for downstream use until normalized through a market catalog.
+- Unverified odds must not create false precision or betting signals in Analyst.
+- M1.2.c proved controlled fixture writes only; it did not validate odds ingestion, odds quality, or user-facing odds consumption.
+
+**Initial design constraints:**
+- provider v1: `api_football`
+- sport v1: football only
+- execution v1: manual dry-run first, no cron
+- write enablement: separate odds write gate in a future implementation PR, off by default
+- max run scope, max snapshots per fixture/day, bookmaker allowlist, retention, and quota budget must be defined before implementation
+- raw provider odds payloads must never be surfaced in user-facing responses or logs
+
+**Consequences:**
+- PR #79 is documentation/design only.
+- No odds ingestion code or migrations are allowed in PR #79.
+- Future M1.3 implementation must include safety guards, dry-run reporting, cap overflow behavior, tests, and a validation runbook before any controlled odds write.
+- Analyst and Scout must continue treating provider odds snapshots as unavailable until a later trust validation explicitly enables them.
+
+---
+
+## Decision #012 - Odds Endpoint Discovery Before Provider Calls
+**Date:** 2026-07-05
+**Proposed by:** CPO + Founder
+**Status:** Accepted and completed via PR #80. Production provider odds calls not started.
+
+**Decision:** M1.3 must begin with a read-only odds endpoint discovery and dry-run planner. Production API-Football odds provider calls remain blocked until the exact endpoint, request shape, and quota/request cost are documented and accepted. Odds writes remain blocked until a later controlled write milestone.
+
+**Why:**
+- The official API-Football documentation was not accessible from the Codex runtime because the public documentation hosts returned a browser challenge.
+- Endpoint shape and request cost must be treated as unconfirmed until verified from provider docs/account by an operator.
+- A safe implementation can still validate local gating, pre-match eligibility, bookmaker allowlist behavior, sanitized reporting, and non-use rules without calling providers.
+- This keeps the old false-precision failure class closed: unverified odds data must not become a model probability, edge, EV, Scout signal, or Analyst recommendation.
+
+**PR #80 constraints:**
+- no odds writes
+- no migrations
+- no production provider odds calls
+- no Supabase writes
+- no cron
+- no Scout, Analyst, or UI usage
+- `SPORTS_FIXTURE_SYNC_WRITE_ENABLED` remains absent/off
+- `SPORTS_ODDS_SYNC_WRITE_ENABLED` is not added/enabled
+
+**Consequences:**
+- PR #80 may add a pure read-only planner and tests for blocked provider calls, fixture eligibility, empty bookmaker allowlist, sanitized discovery reports, and no raw payload/token surfacing.
+- A future PR must confirm API-Football endpoint/request/cost before adding any real provider odds fetcher.
+- Bookmaker allowlist remains empty until dry-run discovery is reviewed and approved.
+
+---
+
+## Decision #013 - API-Football Odds Endpoint Confirmation Block
+**Date:** 2026-07-05
+**Proposed by:** CPO + Founder
+**Status:** Accepted via PR #81; superseded for planning by PR #82 provider evidence. Provider odds calls remain not started.
+
+**Decision:** BetTracker will not proceed to a production API-Football odds dry-run until the exact odds endpoint, request shape, bookmaker/market discovery shape, and quota/request cost are confirmed from the API-Football/API-Sports account or official documentation.
+
+**Why:**
+- The official API-Football/API-Sports documentation hosts returned a browser challenge to the Codex runtime again.
+- PR #80 intentionally added only a read-only planner and treats endpoint/request/cost as unconfirmed.
+- Odds requests can burn provider quota and can later become betting signals, so inferred endpoint names or third-party snippets are not enough.
+- The current API-Football account plan cost is not stored in the repo and was not available to Codex.
+
+**PR #81 confirmation result before PR #82 evidence:**
+- exact odds endpoint: not confirmed
+- request parameters: not confirmed
+- bookmaker discovery shape: not confirmed
+- market/bet discovery shape: not confirmed
+- whether `match_winner` / 1X2 can be requested directly: not confirmed
+- quota/request cost: not confirmed
+- decision to proceed to production odds dry-run: blocked
+
+**Scope controls:**
+- no production provider odds call
+- no odds write
+- no migration
+- no API route
+- no Supabase write
+- no env change
+- no Scout, Analyst, or UI change
+- `SPORTS_ODDS_SYNC_WRITE_ENABLED` not added/enabled
+
+**Consequences:**
+- PR #81 records a blocked confirmation state, not an implementation unblock.
+- A later unblock PR must provide sanitized operator-side evidence from the API-Football/API-Sports account or official docs.
+- Only after that evidence is accepted may BetTracker plan a read-only production odds dry-run against known canonical fixture IDs.
+
+---
+
+## Decision #014 - API-Football Odds Provider Evidence Captured
+**Date:** 2026-07-05
+**Proposed by:** CPO + Founder
+**Status:** Accepted via PR #82. Provider evidence captured; production provider odds calls not started.
+
+**Decision:** BetTracker accepts sanitized operator-side and docs-sourced evidence for API-Football odds endpoint shape, quota model, bookmaker discovery shape, mapping discovery shape, response schema, and `Match Winner` market mapping. PR #82 remains evidence-only and does not run a production odds dry-run.
+
+**Confirmed evidence:**
+- base URL: `https://v3.football.api-sports.io`
+- auth header: `x-apisports-key`
+- status endpoint: `GET /status`
+- observed plan: `Free`
+- observed daily request limit: `100`
+- quota model: one HTTP call / page counts as one request against plan quota
+- no endpoint-specific weighted `/odds` cost identified
+- daily and per-minute request limits apply
+- odds endpoint: `GET /odds`
+- request parameters shown: `fixture`, `league`, `season`, `date`, `bookmaker`, `bet`, `page`
+- mixed request filters are supported
+- pagination is supported through `page`
+- odds pagination size is 10 results per page
+- bookmaker endpoint path: `GET /odds/bookmakers`
+- bookmaker discovery response uses standard wrapper plus `response[].id` and `response[].name`
+- mapping endpoint path: `GET /odds/mapping`
+- mapping response uses standard wrapper plus `league`, `fixture`, and `update`
+- pre-match bet catalog path: `GET /odds/bets`
+- `Match Winner` / 1X2 provider bet id: `1`
+- `Match Winner` values: `Home`, `Draw`, `Away`
+- odds response shape includes `fixture`, `league`, `update`, `bookmakers`, `bets`, `values`, and decimal-string `odd`
+
+**Still required before any production provider odds call:**
+- separate CPO approval for a read-only dry-run scope
+- exact canonical fixture IDs and exact API-Football provider links for that scope
+- request budget, including pagination
+- sanitized runtime report expectations
+- confirmation that odds remain non-user-facing
+- BetTracker canonical pre-match eligibility gate must stay authoritative unless a later runtime result proves provider-side pre-match filtering is sufficient
+
+**Risk decision:**
+```txt
+endpoint/cost evidence blocker: addressed for planning
+production odds dry-run: NOT STARTED
+next action: separate CPO-approved read-only dry-run scope
+```
+
+**Scope controls:**
+- no provider odds call from BetTracker production
+- no odds write
+- no migration
+- no API route
+- no Supabase write
+- no env change
+- no Scout, Analyst, or UI odds usage
+- `SPORTS_ODDS_SYNC_WRITE_ENABLED` not added/enabled
+
+**Consequences:**
+- PR #82 is evidence-only and does not run runtime provider calls.
+- A later CPO-approved step must select the dry-run fixtures, request budget, and sanitized report before any production provider odds call.
+- The likely future dry-run shape is `GET /odds?fixture={api_football_provider_fixture_id}&bet=1`, counting each page as one request.
+
+---
+
+## Decision #015 - Read-Only Odds Dry-Run Scope Before Provider Call
+**Date:** 2026-07-05
+**Proposed by:** CPO + Founder
+**Status:** Draft PR #83. Scope approval only; production provider odds call not started.
+
+**Decision:** The first API-Football odds runtime step must be scoped and approved before any provider call. PR #83 selects a single primary exact-linked fixture candidate and a fallback candidate, defines the request shape, request budget, pagination guardrail, sanitized report, and stop conditions. It does not run the provider call.
+
+**Proposed PR #83 scope:**
+- provider: `api_football`
+- market: `Match Winner / 1X2`
+- provider bet id: `1`
+- primary provider fixture id: `1576052`
+- fallback provider fixture id: `1576053`
+- future request shape, if separately approved: `GET /odds?fixture=1576052&bet=1`
+- variant: A only
+- max provider requests: 1
+- hard stop: `paging.total > 1`
+
+**Required gates before runtime:**
+- fixture remains `scheduled`
+- `kickoff_at` is known
+- `kickoff_at > now + 15 minutes`
+- exact `api_football` provider link exists
+- provider fixture id matches the merged PR #83 scope
+- no odds write flag is present
+- odds remain non-user-facing
+
+**Scope controls:**
+- no provider odds call in PR #83
+- no odds write
+- no migration
+- no API route
+- no Supabase write
+- no env change
+- no Scout, Analyst, or UI odds usage
+- no model probability, implied probability, edge, EV, recommendation, or betting signal
+- `SPORTS_ODDS_SYNC_WRITE_ENABLED` not added/enabled
+
+**Consequences:**
+- M1.3 can proceed to a separately approved read-only runtime dry-run after PR #83 is merged.
+- Any fallback call, page 2 fetch, broader fixture scope, odds write, or user-facing odds use requires separate approval.
+- The old false-precision failure class remains closed: odds discovery must not become a probability, edge, EV, or recommendation.
+
+---
+
+*Last updated: 2026-07-05*
 *Owner: All (each role contributes)*

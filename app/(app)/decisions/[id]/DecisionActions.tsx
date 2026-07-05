@@ -9,23 +9,44 @@ import { bucketOdds, bucketStake } from '@/lib/analytics/buckets'
 import RiskEvaluator from '@/components/risk/RiskEvaluator'
 
 interface Props {
-  decisionId:  string
+  decisionId: string
   offeredOdds: number | null
+  canPlaceBet?: boolean
+  canWatch?: boolean
+  labels?: {
+    placeBet?: string
+    watch?: string
+    skip?: string
+    checkRisk?: string
+    cancel?: string
+    stakePrompt?: string
+    invalidStake?: string
+    helper?: string
+  }
 }
 
-export default function DecisionActions({ decisionId, offeredOdds }: Props) {
+export default function DecisionActions({
+  decisionId,
+  offeredOdds,
+  canPlaceBet = true,
+  canWatch = true,
+  labels,
+}: Props) {
   const supabase = createClient()
-  const router   = useRouter()
+  const router = useRouter()
 
-  const [saving,     setSaving]     = useState(false)
-  const [error,      setError]      = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [stakeInput, setStakeInput] = useState('')
-  const [showStake,  setShowStake]  = useState(false)
-  const [showRisk,   setShowRisk]   = useState(false)
+  const [showStake, setShowStake] = useState(false)
+  const [showRisk, setShowRisk] = useState(false)
 
   function handleRiskCheck() {
     const stake = parseFloat(stakeInput)
-    if (!stake || stake <= 0) { setError('Enter a valid stake amount'); return }
+    if (!stake || stake <= 0) {
+      setError(labels?.invalidStake ?? 'Enter a valid stake amount')
+      return
+    }
     setError('')
     setShowRisk(true)
   }
@@ -36,16 +57,16 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
     setError('')
     try {
       trackClientEvent(EVENTS.BET_PLACE_CLICKED, {
-        decision_id:  decisionId,
-        from_page:    'decision_detail',
+        decision_id: decisionId,
+        from_page: 'decision_detail',
         stake_bucket: bucketStake(stake),
-        odds_bucket:  offeredOdds != null ? bucketOdds(offeredOdds) : null,
+        odds_bucket: offeredOdds != null ? bucketOdds(offeredOdds) : null,
         is_ai_linked: true,
       })
 
       const { data: betData, error: betErr } = await supabase.rpc('place_bet_from_decision', {
         p_decision_id: decisionId,
-        p_stake:       stake,
+        p_stake: stake,
       })
       if (betErr) {
         const isDuplicate = betErr.code === '23505' || betErr.message?.includes('duplicate') || betErr.message?.includes('already placed')
@@ -58,15 +79,15 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
       }
       const betPayload = betData as { bet_id?: string } | null
       trackClientEvent(EVENTS.BET_PLACE_SUCCEEDED, {
-        bet_id:       betPayload?.bet_id,
-        decision_id:  decisionId,
-        bet_type:     'single',
-        source:       'decision_detail',
+        bet_id: betPayload?.bet_id,
+        decision_id: decisionId,
+        bet_type: 'single',
+        source: 'decision_detail',
         stake_bucket: bucketStake(stake),
-        odds_bucket:  offeredOdds != null ? bucketOdds(offeredOdds) : null,
+        odds_bucket: offeredOdds != null ? bucketOdds(offeredOdds) : null,
         is_ai_linked: true,
-        is_parlay:    false,
-        legs_count:   1,
+        is_parlay: false,
+        legs_count: 1,
       })
       trackClientEvent(EVENTS.DECISION_ACTION_PLACED, { decision_id: decisionId, from_page: 'decision_detail' })
       router.refresh()
@@ -84,7 +105,7 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
     setError('')
     try {
       const { error: actionErr } = await supabase.rpc('update_decision_action', {
-        p_decision_id:  decisionId,
+        p_decision_id: decisionId,
         p_final_action: action,
       })
       if (actionErr) throw new Error(actionErr.message || actionErr.details || JSON.stringify(actionErr))
@@ -104,7 +125,6 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Risk evaluator — shown after stake is entered */}
       {showStake && showRisk && (
         <RiskEvaluator
           stake={parseFloat(stakeInput)}
@@ -115,60 +135,65 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
         />
       )}
 
-      {/* Stake input */}
       {showStake && !showRisk && (
         <div className="card border border-indigo-800 flex flex-col gap-3">
           <p className="text-sm text-gray-300">
-            Enter stake amount{offeredOdds ? ` (odds: ${offeredOdds})` : ''}:
+            {labels?.stakePrompt ?? 'Enter stake amount'}{offeredOdds ? ` (odds: ${offeredOdds})` : ''}:
           </p>
           <input
             className="input"
-            type="number" step="0.01" min="0.01" placeholder="100"
+            type="number"
+            step="0.01"
+            min="0.01"
+            placeholder="100"
             value={stakeInput}
             onChange={e => { setStakeInput(e.target.value); setError('') }}
             autoFocus
           />
           <div className="flex gap-2">
             <button className="btn-primary flex-1" onClick={handleRiskCheck} disabled={saving}>
-              Check Risk
+              {labels?.checkRisk ?? 'Check Risk'}
             </button>
             <button className="btn-ghost" onClick={() => { setShowStake(false); setStakeInput('') }}>
-              Cancel
+              {labels?.cancel ?? 'Cancel'}
             </button>
           </div>
         </div>
       )}
 
-      {/* Initial action buttons */}
       {!showStake && (
         <div className="flex gap-3">
-          <button
-            className="btn-primary flex-1"
-            onClick={() => {
-              trackClientEvent(EVENTS.DECISION_ACTION_PLACE_CLICKED, {
-                decision_id: decisionId,
-                odds_bucket: offeredOdds != null ? bucketOdds(offeredOdds) : null,
-                from_page:   'decision_detail',
-              })
-              setShowStake(true)
-            }}
-            disabled={saving}
-          >
-            ✅ Place Bet
-          </button>
-          <button
-            className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50"
-            onClick={() => handleAction('watchlisted')}
-            disabled={saving}
-          >
-            👁 Watch
-          </button>
+          {canPlaceBet && (
+            <button
+              className="btn-primary flex-1"
+              onClick={() => {
+                trackClientEvent(EVENTS.DECISION_ACTION_PLACE_CLICKED, {
+                  decision_id: decisionId,
+                  odds_bucket: offeredOdds != null ? bucketOdds(offeredOdds) : null,
+                  from_page: 'decision_detail',
+                })
+                setShowStake(true)
+              }}
+              disabled={saving}
+            >
+              {labels?.placeBet ?? 'Place Bet'}
+            </button>
+          )}
+          {canWatch && (
+            <button
+              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50"
+              onClick={() => handleAction('watchlisted')}
+              disabled={saving}
+            >
+              {labels?.watch ?? 'Watch'}
+            </button>
+          )}
           <button
             className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50"
             onClick={() => handleAction('skipped')}
             disabled={saving}
           >
-            ✕ Skip
+            {labels?.skip ?? 'Skip'}
           </button>
         </div>
       )}
@@ -180,7 +205,7 @@ export default function DecisionActions({ decisionId, offeredOdds }: Props) {
       )}
 
       <p className="text-xs text-gray-600 text-center">
-        Skipping or watching is a valid decision — it will be saved to your history.
+        {labels?.helper ?? 'Skipping or watching is a valid decision - it will be saved to your history.'}
       </p>
     </div>
   )

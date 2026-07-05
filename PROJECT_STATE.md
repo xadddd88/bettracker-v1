@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current beta status.**
-> Last updated: 2026-07-01
+> Last updated: 2026-07-05
 
 ---
 
@@ -17,7 +17,7 @@
 | **Branch model** | Feature branches → PR → CPO accept → Dima merges |
 | **Current UI** | Stable dark UI + Ambient Theme live as-is |
 | **Ambient Theme** | Current version live in production — further Design v2 / premium event skin work is parked |
-| **Current phase** | Product Vision Gap / Beta v2 planning |
+| **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 read-only odds dry-run scope in draft PR #83; Product Vision Gap / Beta v2 planning continues |
 | **Active blockers** | None in current main — product vision gaps documented in PRODUCT_VISION_GAP.md |
 | **External beta invites** | Do not invite external beta users yet |
 
@@ -34,7 +34,60 @@
 | **Football** | Split strategy — API-Football / API-Sports Ultra (broad calendar/odds/results) + SportMonks (deep enrichment: xG, pressure, predictions, match facts) |
 | **Tennis** | API-Tennis Business (fixtures/odds/results/H2H, source of truth) |
 | **Security note** | `SPORTMONKS_TOKEN` rotation **complete** — token was rotated after briefly appearing in an open field; stored as a Vercel Sensitive env var. Redact SportMonks `api_token` in logs/errors. |
-| **Status** | Decision recorded — see `DATA_PROVIDER_DECISION.md`. Phase 1 technical plan exists in `PHASE_1_TECHNICAL_PLAN.md` (merged PR #63). No provider client, DB migration, or Scout v2 implementation started. Product Vision Beta remains NOT READY; external launch remains PAUSED. |
+| **Status** | Decision recorded — see `DATA_PROVIDER_DECISION.md`. Phase 1 technical plan exists in `PHASE_1_TECHNICAL_PLAN.md` (merged PR #63). M1.2 provider client and controlled fixture write validation completed; Scout v2 not started. Product Vision Beta remains NOT READY; external launch remains PAUSED. |
+
+---
+
+## 1b. Sports Fixture Data Foundation
+
+| Milestone | Status | Evidence |
+|---|---|---|
+| M1.2.b Fixture Sync Dry-Run | DONE | Production/preview dry-runs validated API-Football and API-Tennis fetch paths with write counters at 0. |
+| M1.2.c Fixture Write Safety Guard | DONE | `dryRun=false` requires one provider, one day, and a 25-fixture cap; production safety smoke returned expected `400` / `400` / `200` responses. |
+| M1.2.c Controlled Fixture Write Validation | DONE | Controlled scope `api_football` / `2026-12-31` fetched 2 fixtures; first write inserted 2 canonical fixtures and 2 provider links; idempotency write inserted 0 and updated 2/2; duplicate provider links = 0. |
+
+Final production state after validation:
+
+- `SPORTS_FIXTURE_SYNC_WRITE_ENABLED`: absent/off
+- `writeEnabled`: false
+- production alias: https://btdk.app
+- deployed commit: `ad8ce53645509fbc38697901045f05074e1e89d2`
+- no broad write, multi-provider write, or multi-day write was run
+- odds, results, SportMonks enrichment, cross-provider mapping, cron, Scout, Analyst, and UI remained untouched by M1.2.c
+
+M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery & Dry-Run Plan is DONE via PR #80. M1.3 API-Football Odds Endpoint & Cost Confirmation is DONE / BLOCKED via PR #81 and superseded for planning by PR #82 provider evidence. M1.3 Read-Only Odds Dry-Run Scope is in draft PR #83 as scope approval only. M1.3 odds writes, migrations, production provider odds calls, Scout, Analyst, and UI usage remain NOT STARTED.
+
+---
+
+## 1c. M1.3 Odds Snapshot Sync Design
+
+| Field | Value |
+|---|---|
+| **Status** | DESIGN DONE via PR #79; endpoint discovery / dry-run planning DONE via PR #80; endpoint/cost confirmation DONE / BLOCKED via PR #81; provider evidence DONE via PR #82; read-only dry-run scope in draft PR #83 |
+| **Implementation** | READ-ONLY PLANNER ONLY from PR #80; odds ingestion NOT STARTED |
+| **Odds ingestion** | NOT STARTED |
+| **Provider calls** | NOT RUN; production odds provider calls require a separate CPO-approved read-only dry-run scope |
+| **Migrations** | NOT ADDED |
+| **User-facing usage** | BLOCKED until separate validation milestone |
+| **Odds write flag** | `SPORTS_ODDS_SYNC_WRITE_ENABLED` not added/enabled |
+
+Design direction:
+
+- odds v1 starts with API-Football and football fixtures only
+- no cron or broad ingestion in the first implementation milestone
+- first implementation must be dry-run first, operator-gated, capped, and manually validated
+- odds snapshots must not feed Analyst, Scout, user-facing probability, edge, or EV until verified in a later trust milestone
+- storage, provider quota, market normalization, bookmaker scope, and retention must be accepted before any odds write
+- PR #80 added a read-only planner only; it never reports writes as allowed
+- PR #82 confirms docs-sourced `/odds`, fixture-specific request shape, pagination, cost model, bookmaker/mapping discovery shapes, `Match Winner` = bet id `1`, and sanitized odds response shape
+- PR #83 scopes the first read-only production odds dry-run candidate: `GET /odds?fixture=1576052&bet=1`, Variant A only, max 1 provider request, stop if `paging.total > 1`
+- production provider odds calls remain not started until PR #83 is merged and the runtime dry-run receives separate CPO approval
+
+Reference: `docs/sports-odds-snapshot-sync-m1-3-design.md`
+PR #80 planning reference: `docs/sports-odds-endpoint-discovery-m1-3.md`
+PR #81 confirmation reference: `docs/api-football-odds-endpoint-confirmation-m1-3.md`
+PR #82 evidence reference: `docs/api-football-odds-provider-evidence-m1-3.md`
+PR #83 scope reference: `docs/sports-odds-read-only-dry-run-scope-m1-3.md`
 
 ---
 
@@ -59,6 +112,18 @@
 | #52 | CSP `Report-Only` header + `/api/csp-report` violation endpoint — live, collecting violations in Vercel runtime logs |
 | #55 | `npm audit` lockfile hygiene — 4 in-range patch updates (`@supabase/supabase-js`, `postcss`, `posthog-js`, `posthog-node`); 2 moderate postcss vulns in Next.js nested deps accepted as non-exploitable; `lucide-react` 1.22.0 verified current, no update needed |
 | #58 | Analytics taxonomy — `from` → `from_page` in Quick Settle `bet_settle_clicked` payload; live $1 settle test confirmed `from_page: 'quick_settle'` received in PostHog, old `from` property absent |
+| #72 | M1.2.b Fixture Sync Dry-Run - provider fixture sync route, sanitized dry-run reports, operator auth, no write mode |
+| #73 | Analysis Quality Gate - blocked false precision for insufficient-data / unsupported mixed-sport Analyst outputs |
+| #74 | Analyst Trust UX Patch - localized blocked Analyst surfaces, share/PDF builders, and Ukrainian exact-coupon smoke |
+| #75 | Decision Surfaces Trust Patch - localized saved decision list/detail/share/PDF surfaces, including legacy unpriced rows |
+| #76 | Live Coupon Parser & Actionability Gate - scanner upload path preserves live coupon legs, sports, phases, and actionability |
+| #77 | M1.2.c Fixture Write Safety Guard - one-provider / one-day / 25-fixture write cap before controlled validation |
+| #78 | M1.2.c Controlled Fixture Write Validation Record - documentation/status record only; no runtime code |
+| #79 | M1.3 Odds Snapshot Sync Design - design-only odds snapshot plan with pre-match, quota, bookmaker, market catalog, and non-use gates |
+| #80 | M1.3 Odds Endpoint Discovery & Dry-Run Plan - read-only planner, endpoint/cost gates, sanitized reporting, no odds writes or provider calls |
+| #81 | M1.3 API-Football Odds Endpoint & Cost Confirmation - docs/status confirmation block; endpoint/cost not available from Codex runtime |
+| #82 | M1.3 API-Football Odds Provider Evidence - docs/status evidence record; no runtime provider calls or writes |
+| #83 | M1.3 Read-Only Odds Dry-Run Scope - scope approval only; selects provider fixture `1576052` primary and does not run provider calls |
 
 ---
 
@@ -103,6 +168,7 @@
 - Do NOT do visual redesign
 - Do NOT merge any PR without explicit CPO ACCEPT
 - Do NOT open new code PRs unless a blocker appears in current main
+- Do NOT start M1.3 odds ingestion, provider odds calls, or migrations until endpoint/request/cost are confirmed and explicitly accepted
 
 ---
 

@@ -8,6 +8,16 @@ import { EVENTS } from '@/lib/analytics/events'
 import { bucketOdds, bucketStake } from '@/lib/analytics/buckets'
 import RiskEvaluator from '@/components/risk/RiskEvaluator'
 import { Camera, Loader2, Eye, X, CheckCircle, Search } from 'lucide-react'
+import {
+  buildAnalystTrustView,
+  localizeAnalystTrustSport,
+  renderAnalystTrustShareText,
+  renderPricingSummaryLine,
+  shouldShowPricingStats,
+  type AnalysisLegQualityInput,
+  type AnalysisQualityGateResult,
+  type AnalystTrustView,
+} from '@/lib/ai/analysis-quality-gate'
 
 // ─── Image helper ─────────────────────────────────────────────
 function fileToBase64(file: File): Promise<{ data: string; media_type: string }> {
@@ -35,15 +45,17 @@ interface Analysis {
   decision_id:      string
   analysis_run_id?: string | null
   // AI output (server-corrected)
-  model_probability:   number
-  implied_probability: number
-  edge_percent:        number
+  model_probability:   number | null
+  implied_probability: number | null
+  edge_percent:        number | null
   confidence_score:    number
   risk_level:          RiskLevel
   recommendation:      Recommendation
   reasoning:           string
   factors:             Factor[]
   disclaimer:          string
+  quality_gate?:       AnalysisQualityGateResult | null
+  trust_view?:         AnalystTrustView | null
   // Input echoed back from server
   sport:           string
   event_name:      string
@@ -53,6 +65,37 @@ interface Analysis {
   offered_odds:    number
   bookmaker:       string | null
   output_language: string
+}
+
+function escapeHtml(value: string | number | null | undefined): string {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch] ?? ch))
+}
+
+function getAnalysisTrustView(a: Analysis): AnalystTrustView | null {
+  if (a.trust_view) return a.trust_view
+  if (!a.quality_gate) return null
+  return buildAnalystTrustView({
+    qualityGate:  a.quality_gate,
+    locale:       a.output_language,
+    eventName:    a.event_name,
+    marketType:   a.market_type,
+    selection:    a.selection,
+    rawReasoning: a.reasoning,
+    rawFactors:   a.factors,
+  })
+}
+
+function localizedRiskLabel(risk: RiskLevel, fallback: string, trustView: AnalystTrustView | null): string {
+  if (trustView?.locale !== 'uk') return fallback
+  if (risk === 'high') return 'Високий ризик'
+  if (risk === 'medium') return 'Середній ризик'
+  return 'Низький ризик'
 }
 
 // ─── Constants ────────────────────────────────────────────────
@@ -154,10 +197,12 @@ export default function AIAnalystPage() {
   const [stakeStr,   setStakeStr]   = useState('')
   const [showStake,  setShowStake]  = useState(false)
   const [showRisk,   setShowRisk]   = useState(false)
+  const [couponLegs, setCouponLegs] = useState<AnalysisLegQualityInput[] | null>(null)
 
   function setField(k: string, v: string) {
     setForm(f => ({ ...f, [k]: v }))
     setErrors(e => ({ ...e, [k]: '' }))
+    if (['event_name', 'market_type', 'selection', 'odds'].includes(k)) setCouponLegs(null)
   }
 
   // ── Scanner ────────────────────────────────────────────────
@@ -183,6 +228,7 @@ export default function AIAnalystPage() {
         odds:        d.odds != null ? String(d.odds) : prev.odds,
         bookmaker:   d.bookmaker   ?? prev.bookmaker,
       }))
+      setCouponLegs(Array.isArray(d.legs) && d.legs.length > 0 ? d.legs : null)
       if (SPORTS_LIST.includes(d.sport)) setSport(d.sport as Sport)
       setScanMsg('\u2705 Coupon scanned \u2014 review and analyze')
     } catch {
@@ -232,6 +278,7 @@ export default function AIAnalystPage() {
           bookmaker:       form.bookmaker.trim() || undefined,
           notes:           form.notes.trim() || undefined,
           output_language: locale,
+          legs:            couponLegs ?? undefined,
         }),
       })
       const json = await res.json()
@@ -256,7 +303,7 @@ export default function AIAnalystPage() {
     } finally {
       setAnalyzing(false)
     }
-  }, [sport, locale, form, scoutId])
+  }, [sport, locale, form, scoutId, couponLegs])
 
   // ── Act on already-persisted decision ─────────────────────
   // Decision is created immediately by /api/ai/analyst.
@@ -350,11 +397,55 @@ export default function AIAnalystPage() {
   const downloadPDF = useCallback(() => {
     if (!analysis) return
     const a = analysis
+    const trustView = getAnalysisTrustView(a)
     const recLabels: Record<string, string> = { bet: 'BET', skip: 'SKIP', watch: 'WATCH', no_value: 'NO VALUE' }
-    const factorsHtml = a.factors.map(f =>
-      `<tr><td>${f.name}</td><td style="text-align:center;font-weight:bold;color:${f.score>0?'#22c55e':f.score<0?'#ef4444':'#9ca3af'}">${f.score>0?'+':''}${f.score}</td><td style="color:#9ca3af;font-size:12px">${f.detail}</td></tr>`
+    const showPricing = shouldShowPricingStats({
+      qualityGate:        a.quality_gate,
+      modelProbability:   a.model_probability,
+      impliedProbability: a.implied_probability,
+      edgePercent:        a.edge_percent,
+    })
+    const gateChecklistHtml = trustView?.legs.map(leg =>
+      `<li><strong>${escapeHtml(leg.legLabel)} (${escapeHtml(leg.sportLabel)})</strong><ul>${
+        [
+          leg.eventName,
+          leg.periodOrPhase ? `${trustView?.locale === 'uk' ? 'Період / фаза' : 'Period / phase'}: ${leg.periodOrPhase}` : null,
+          leg.statusSourceLabel ? `${trustView?.locale === 'uk' ? 'Джерело статусу' : 'Status source'}: ${leg.statusSourceLabel}` : null,
+          leg.odds != null ? `${trustView?.locale === 'uk' ? 'Коефіцієнт' : 'Odds'}: ${leg.odds}` : null,
+          `${leg.fixtureStatusLabel} · ${leg.supportLabel} · ${leg.actionabilityLabel}`,
+          ...leg.missingData,
+        ].filter(Boolean).map(item => `<li>${escapeHtml(item)}</li>`).join('')
+      }</ul></li>`
+    ).join('') ?? ''
+    const pricingHtml = showPricing
+      ? `<div class="grid">
+  <div class="stat"><div class="stat-label">Model probability</div><div class="stat-value">${a.model_probability?.toFixed(1)}%</div></div>
+  <div class="stat"><div class="stat-label">Implied probability</div><div class="stat-value">${a.implied_probability?.toFixed(1)}%</div></div>
+  <div class="stat"><div class="stat-label">Edge</div><div class="stat-value" style="color:${(a.edge_percent ?? 0)>=0?'#16a34a':'#dc2626'}">${(a.edge_percent ?? 0)>=0?'+':''}${a.edge_percent?.toFixed(1)}%</div></div>
+</div>`
+      : `<div class="quality-gate">
+  <div class="gate-kicker">${escapeHtml(trustView?.riskWarningLabel ?? 'Risk warning')}</div>
+  <div class="gate-label">${escapeHtml(trustView?.label ?? a.quality_gate?.label ?? 'INSUFFICIENT DATA')}</div>
+  <div class="gate-support">${escapeHtml(trustView?.supportLabel ?? a.quality_gate?.supportLabel ?? 'Unsupported / partially supported bet')}</div>
+  <div class="gate-score">${escapeHtml(trustView?.dataCoverageLabel ?? 'Data coverage')}: ${trustView?.dataCoverageScore ?? a.quality_gate?.dataCoverageScore ?? 0}/100</div>
+  ${trustView?.safeExplanation ? `<div class="gate-support">${escapeHtml(trustView.safeExplanation)}</div>` : ''}
+  ${gateChecklistHtml ? `<div class="gate-missing-title">${escapeHtml(trustView?.missingDataChecklistLabel ?? 'Missing data checklist')}</div><ul class="gate-missing">${gateChecklistHtml}</ul>` : ''}
+</div>`
+    const displayFactors = trustView && !showPricing ? trustView.displayFactors : a.factors
+    const factorsHtml = displayFactors.map(f =>
+      `<tr><td>${escapeHtml(f.name)}</td><td style="text-align:center;font-weight:bold;color:${f.score>0?'#22c55e':f.score<0?'#ef4444':'#9ca3af'}">${f.score>0?'+':''}${f.score}</td><td style="color:#9ca3af;font-size:12px">${escapeHtml(f.detail)}</td></tr>`
     ).join('')
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>AI Analysis \u2014 ${a.event_name}</title>
+    const blockedTrustView = trustView && !showPricing ? trustView : null
+    const localizedPdf = blockedTrustView?.locale === 'uk'
+    const pdfTitle = blockedTrustView ? blockedTrustView.pdfHeader : 'AI Analysis'
+    const factorHeader = localizedPdf ? 'Фактор' : 'Factor'
+    const scoreHeader = localizedPdf ? 'Бал' : 'Score'
+    const detailHeader = localizedPdf ? 'Деталі' : 'Detail'
+    const generatedLabel = blockedTrustView ? blockedTrustView.generatedLabel : 'Generated'
+    const footerLabel = blockedTrustView ? blockedTrustView.pdfFooter : 'Analysis is for informational purposes only'
+    const metaSport = blockedTrustView ? localizeAnalystTrustSport(a.sport, blockedTrustView.locale) : a.sport.toUpperCase()
+    const disclaimerText = blockedTrustView ? blockedTrustView.uiDisclaimer : a.disclaimer
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(pdfTitle)} \u2014 ${escapeHtml(a.event_name)}</title>
 <style>
   body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:20px;color:#111;background:#fff}
   h1{font-size:22px;margin-bottom:4px}
@@ -363,6 +454,12 @@ export default function AIAnalystPage() {
   .stat{background:#f8f8f8;padding:12px;border-radius:8px;text-align:center}
   .stat-label{font-size:11px;color:#888;margin-bottom:4px}
   .stat-value{font-size:22px;font-weight:700}
+  .quality-gate{background:#fff7ed;border:1px solid #fed7aa;padding:14px;border-radius:8px;margin:16px 0}
+  .gate-kicker{font-size:11px;color:#9a3412;text-transform:uppercase;font-weight:700;letter-spacing:.04em}
+  .gate-label{font-size:18px;font-weight:800;color:#9a3412;margin-top:4px}
+  .gate-support,.gate-score{font-size:12px;color:#7c2d12;margin-top:4px}
+  .gate-missing-title{font-size:12px;font-weight:700;color:#7c2d12;margin-top:10px}
+  .gate-missing{font-size:12px;color:#7c2d12;margin-top:4px;padding-left:18px}
   .rec{display:inline-block;padding:4px 12px;border-radius:6px;font-weight:700;font-size:14px;background:#f0f0f0;margin-bottom:12px}
   .reasoning{background:#f8f8f8;padding:14px;border-radius:8px;margin:12px 0;line-height:1.6}
   table{width:100%;border-collapse:collapse;margin-top:12px}
@@ -372,19 +469,15 @@ export default function AIAnalystPage() {
   .footer{margin-top:24px;font-size:11px;color:#bbb;text-align:center}
   @media print{body{margin:20px}}
 </style></head><body>
-<h1>${a.event_name}</h1>
-<div class="meta">${a.sport.toUpperCase()} \u00B7 ${a.market_type}${a.selection?' \u00B7 '+a.selection:''} \u00B7 @${a.offered_odds}${a.bookmaker?' \u00B7 '+a.bookmaker:''}</div>
-<div class="rec">${recLabels[a.recommendation]??a.recommendation}</div>
-<div class="grid">
-  <div class="stat"><div class="stat-label">Model probability</div><div class="stat-value">${a.model_probability.toFixed(1)}%</div></div>
-  <div class="stat"><div class="stat-label">Implied probability</div><div class="stat-value">${a.implied_probability.toFixed(1)}%</div></div>
-  <div class="stat"><div class="stat-label">Edge</div><div class="stat-value" style="color:${a.edge_percent>=0?'#16a34a':'#dc2626'}">${a.edge_percent>=0?'+':''}${a.edge_percent.toFixed(1)}%</div></div>
-</div>
-<div class="reasoning">${a.reasoning}</div>
-${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
-<h3 style="margin-top:20px;font-size:14px">Factor Analysis</h3>
-<table><thead><tr><th>Factor</th><th>Score</th><th>Detail</th></tr></thead><tbody>${factorsHtml}</tbody></table>
-<div class="footer">BetTracker AI \u00B7 Generated ${new Date().toLocaleDateString()} \u00B7 Analysis is for informational purposes only</div>
+<h1>${escapeHtml(a.event_name)}</h1>
+<div class="meta">${escapeHtml(metaSport)} \u00B7 ${escapeHtml(a.market_type)}${a.selection?' \u00B7 '+escapeHtml(a.selection):''} \u00B7 @${a.offered_odds}${a.bookmaker?' \u00B7 '+escapeHtml(a.bookmaker):''}</div>
+<div class="rec">${escapeHtml(showPricing ? recLabels[a.recommendation]??a.recommendation : trustView?.label ?? recLabels[a.recommendation]??a.recommendation)}</div>
+${pricingHtml}
+<div class="reasoning">${escapeHtml(trustView && !showPricing ? trustView.displayReasoning : a.reasoning)}</div>
+${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:''}
+<h3 style="margin-top:20px;font-size:14px">${escapeHtml(trustView?.factorAnalysisLabel ?? 'Factor Analysis')}</h3>
+<table><thead><tr><th>${escapeHtml(factorHeader)}</th><th>${escapeHtml(scoreHeader)}</th><th>${escapeHtml(detailHeader)}</th></tr></thead><tbody>${factorsHtml}</tbody></table>
+<div class="footer">BetTracker AI \u00B7 ${escapeHtml(generatedLabel)} ${new Date().toLocaleDateString()} \u00B7 ${escapeHtml(footerLabel)}</div>
 </body></html>`
     const win = window.open('', '_blank')
     if (!win) return
@@ -399,32 +492,60 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
   const handleShare = useCallback(async () => {
     if (!analysis) return
     const a = analysis
+    const trustView = getAnalysisTrustView(a)
     const recLabels: Record<string, string> = { bet: '\u2705 BET', skip: '\u2715 SKIP', watch: '\uD83D\uDC41 WATCH', no_value: '\u274C NO VALUE' }
-    const text = [
-      `\uD83D\uDCCA AI Analysis \u2014 ${a.event_name}`,
-      `${a.sport.toUpperCase()} \u00B7 ${a.market_type}${a.selection?' \u00B7 '+a.selection:''} \u00B7 @${a.offered_odds}`,
-      ``,
-      `Recommendation: ${recLabels[a.recommendation]??a.recommendation}`,
-      `Model prob: ${a.model_probability.toFixed(1)}% | Implied: ${a.implied_probability.toFixed(1)}% | Edge: ${a.edge_percent>=0?'+':''}${a.edge_percent.toFixed(1)}%`,
-      `Confidence: ${a.confidence_score}/100 | Risk: ${a.risk_level}`,
-      ``,
-      a.reasoning,
-      a.disclaimer?`\n\u26A0\uFE0F ${a.disclaimer}`:'',
-      ``,
-      `via BetTracker AI`,
-    ].filter(Boolean).join('\n')
+    const showPricing = shouldShowPricingStats({
+      qualityGate:        a.quality_gate,
+      modelProbability:   a.model_probability,
+      impliedProbability: a.implied_probability,
+      edgePercent:        a.edge_percent,
+    })
+    const text = trustView && !showPricing
+      ? renderAnalystTrustShareText(trustView, {
+        eventName:   a.event_name,
+        sport:       a.sport,
+        marketType:  a.market_type,
+        selection:   a.selection,
+        offeredOdds: a.offered_odds,
+        bookmaker:   a.bookmaker,
+      })
+      : [
+        `\uD83D\uDCCA AI Analysis \u2014 ${a.event_name}`,
+        `${a.sport.toUpperCase()} \u00B7 ${a.market_type}${a.selection?' \u00B7 '+a.selection:''} \u00B7 @${a.offered_odds}`,
+        ``,
+        `Recommendation: ${recLabels[a.recommendation]??a.recommendation}`,
+        renderPricingSummaryLine({
+          qualityGate:        a.quality_gate,
+          modelProbability:   a.model_probability,
+          impliedProbability: a.implied_probability,
+          edgePercent:        a.edge_percent,
+        }),
+        `${trustView?.confidenceLabel ?? 'Confidence'}: ${a.confidence_score}/100 | Risk: ${a.risk_level}`,
+        ``,
+        a.reasoning,
+        a.disclaimer?`\n\u26A0\uFE0F ${a.disclaimer}`:'',
+        ``,
+        `via BetTracker AI`,
+      ].filter(Boolean).join('\n')
     await navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }, [analysis])
 
   const a = analysis
+  const trustView = a ? getAnalysisTrustView(a) : null
+  const pricingVisible = a ? shouldShowPricingStats({
+    qualityGate:        a.quality_gate,
+    modelProbability:   a.model_probability,
+    impliedProbability: a.implied_probability,
+    edgePercent:        a.edge_percent,
+  }) : false
 
   return (
     <div className="max-w-2xl flex flex-col gap-6" onPaste={handlePaste}>
       <div>
         <h1 className="text-2xl font-bold text-white">AI Analyst</h1>
-        <p className="text-sm text-gray-500 mt-1">Enter match details or scan a coupon to get probability, edge, and risk analysis.</p>
+        <p className="text-sm text-gray-500 mt-1">Enter match details or scan a coupon to get risk, coverage, and priced analysis when supported.</p>
       </div>
 
       {/* ── Scout pre-fill indicator ───────────────────────── */}
@@ -588,50 +709,115 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
           {(() => {
             const rec = REC_CONFIG[a.recommendation]
             const risk = RISK_CONFIG[a.risk_level]
+            const gate = a.quality_gate ?? null
+            const trust = trustView
+            const showPricing = shouldShowPricingStats({
+              qualityGate:        gate,
+              modelProbability:   a.model_probability,
+              impliedProbability: a.implied_probability,
+              edgePercent:        a.edge_percent,
+            })
             const recDetail: Record<Recommendation, string> = {
               bet:      'Edge detected — AI sees value at these odds.',
               watch:    'Uncertain — monitor for odds movement or new info.',
               skip:     'No meaningful edge found at current odds.',
               no_value: 'AI does not recommend this market.',
             }
+            const disclaimerText = trust && !showPricing ? trust.uiDisclaimer : a.disclaimer
             return (
               <div className={`card border ${rec.bg} flex flex-col gap-3`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <span className={`text-lg font-bold ${rec.color}`}>{rec.label}</span>
-                    <p className="text-xs text-gray-500 mt-0.5">{recDetail[a.recommendation]}</p>
+                    <span className={`text-lg font-bold ${showPricing ? rec.color : 'text-amber-300'}`}>
+                      {showPricing ? rec.label : trust?.label ?? gate?.label ?? 'INSUFFICIENT DATA'}
+                    </span>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {showPricing ? recDetail[a.recommendation] : trust?.supportLabel ?? gate?.supportLabel ?? 'Unsupported / partially supported bet'}
+                    </p>
                   </div>
+                  {showPricing ? (
                   <div className="text-right shrink-0">
                     <span className={`text-xs font-medium ${risk.color}`}>{risk.label}</span>
                     <p className="text-[10px] text-gray-600 mt-0.5">edge · confidence · market</p>
                   </div>
+                  ) : (
+                    <div className="text-right shrink-0">
+                      <span className={`text-xs font-medium ${risk.color}`}>{localizedRiskLabel(a.risk_level, risk.label, trust)}</span>
+                      <p className="text-[10px] text-gray-600 mt-0.5">{trust ? `${trust.riskWarningLabel} / ${trust.dataCoverageLabel}` : 'risk warning / data coverage'}</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Probabilities */}
+                {showPricing ? (
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div>
                     <div className="text-xs text-gray-500 mb-0.5">Model prob.</div>
-                    <div className="text-xl font-bold text-white">{a.model_probability.toFixed(1)}%</div>
+                    <div className="text-xl font-bold text-white">{a.model_probability?.toFixed(1)}%</div>
                     <div className="text-[10px] text-gray-600 mt-0.5">AI win estimate</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500 mb-0.5">Implied</div>
-                    <div className="text-xl font-bold text-gray-300">{a.implied_probability.toFixed(1)}%</div>
+                    <div className="text-xl font-bold text-gray-300">{a.implied_probability?.toFixed(1)}%</div>
                     <div className="text-[10px] text-gray-600 mt-0.5">From your odds</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500 mb-0.5">Edge</div>
-                    <div className={`text-xl font-bold ${a.edge_percent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {a.edge_percent >= 0 ? '+' : ''}{a.edge_percent.toFixed(1)}%
+                    <div className={`text-xl font-bold ${(a.edge_percent ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {(a.edge_percent ?? 0) >= 0 ? '+' : ''}{a.edge_percent?.toFixed(1)}%
                     </div>
                     <div className="text-[10px] text-gray-600 mt-0.5">Model minus implied</div>
                   </div>
                 </div>
+                ) : gate && (
+                  <div className="rounded-lg border border-amber-900/70 bg-amber-950/25 px-3 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-amber-300">{trust?.riskWarningLabel ?? 'Risk warning'}</div>
+                        <div className="text-sm text-amber-100 mt-0.5">{trust?.supportLabel ?? gate.supportLabel}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-amber-400">{trust?.dataCoverageLabel ?? 'Data coverage'}</div>
+                        <div className="text-lg font-bold text-amber-100">{gate.dataCoverageScore}/100</div>
+                      </div>
+                    </div>
+                    {trust?.safeExplanation && (
+                      <p className="text-xs text-amber-100/90 mt-3">{trust.safeExplanation}</p>
+                    )}
+                    {trust && trust.legs.length > 0 ? (
+                      <div className="mt-3">
+                        <div className="text-xs font-medium text-amber-300 mb-1">{trust.missingDataChecklistLabel}</div>
+                        <div className="flex flex-col gap-2">
+                          {trust.legs.map(leg => (
+                            <div key={`${leg.legLabel}-${leg.sport}-${leg.legNumber}`} className="text-xs text-amber-100/90 rounded border border-amber-900/40 px-2 py-2">
+                              <div className="font-medium">{leg.legLabel} / {leg.sportLabel}</div>
+                              <div className="text-amber-100/75 mt-0.5">{leg.eventName}</div>
+                              <div className="text-amber-100/75">{leg.marketType}{leg.selection ? ` / ${leg.selection}` : ''}</div>
+                              {leg.periodOrPhase && (
+                                <div className="text-amber-100/75">{trust.locale === 'uk' ? 'Період / фаза' : 'Period / phase'}: {leg.periodOrPhase}</div>
+                              )}
+                              {leg.statusSourceLabel && (
+                                <div className="text-amber-100/75">{trust.locale === 'uk' ? 'Джерело статусу' : 'Status source'}: {leg.statusSourceLabel}</div>
+                              )}
+                              {leg.odds != null && (
+                                <div className="text-amber-100/75">{trust.locale === 'uk' ? 'Коефіцієнт' : 'Odds'}: {leg.odds}</div>
+                              )}
+                              <div className="mt-1 text-amber-200/80">{leg.fixtureStatusLabel} · {leg.supportLabel} · {leg.actionabilityLabel}</div>
+                              <ul className="list-disc pl-4 mt-0.5 text-amber-200/80">
+                                {leg.missingData.map(item => <li key={item}>{item}</li>)}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
 
                 {/* Confidence */}
                 <div>
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-500">Confidence</span>
+                    <span className="text-gray-500">{trust?.confidenceLabel ?? 'Confidence'}</span>
                     <span className="text-gray-300">{a.confidence_score}/100</span>
                   </div>
                   <div className="bg-gray-800 rounded-full h-1.5">
@@ -640,15 +826,19 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
                       style={{ width: `${a.confidence_score}%` }}
                     />
                   </div>
-                  <div className="text-[10px] text-gray-600 mt-1">How certain the model is in its estimate</div>
+                  <div className="text-[10px] text-gray-600 mt-1">
+                    {trust?.locale === 'uk'
+                      ? 'Обережна впевненість без розрахунку ціни'
+                      : 'How certain the model is in its estimate'}
+                  </div>
                 </div>
 
                 {/* Reasoning */}
-                <p className="text-sm text-gray-300 leading-relaxed">{a.reasoning}</p>
+                <p className="text-sm text-gray-300 leading-relaxed">{trust && !showPricing ? trust.displayReasoning : a.reasoning}</p>
 
                 {/* Disclaimer */}
-                {a.disclaimer && (
-                  <p className="text-xs text-gray-500 border-t border-gray-700 pt-2 mt-1">{a.disclaimer}</p>
+                {disclaimerText && (
+                  <p className="text-xs text-gray-500 border-t border-gray-700 pt-2 mt-1">{disclaimerText}</p>
                 )}
               </div>
             )
@@ -656,8 +846,8 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
 
           {/* Factors */}
           <div className="card flex flex-col gap-2">
-            <h3 className="text-sm font-semibold text-gray-300 mb-1">Factor Analysis</h3>
-            {a.factors.map((f, i) => (
+            <h3 className="text-sm font-semibold text-gray-300 mb-1">{trustView?.factorAnalysisLabel ?? 'Factor Analysis'}</h3>
+            {(trustView && !pricingVisible ? trustView.displayFactors : a.factors).map((f, i) => (
               <div key={i} className="py-1.5 border-b border-gray-800 last:border-0">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-200">{f.name}</span>
@@ -674,14 +864,14 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
               onClick={downloadPDF}
               className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 flex items-center justify-center gap-1.5"
             >
-              \uD83D\uDCC4 Download PDF
+              \uD83D\uDCC4 {trustView?.downloadPdfLabel ?? 'Download PDF'}
             </button>
             <button
               onClick={handleShare}
               className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm font-medium transition-colors border border-gray-700 flex items-center justify-center gap-1.5"
               style={{ color: copied ? '#4ade80' : '#9ca3af' }}
             >
-              {copied ? '\u2705 Copied!' : '\uD83D\uDD17 Copy to share'}
+              {copied ? `\u2705 ${trustView?.copiedLabel ?? 'Copied!'}` : `\uD83D\uDD17 ${trustView?.copyToShareLabel ?? 'Copy to share'}`}
             </button>
           </div>
 
@@ -738,7 +928,7 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
           )}
 
           <div className="flex gap-3">
-            {!showStake && (
+            {pricingVisible && (trustView?.showPlaceBet ?? true) && !showStake && (
               <button
                 className="btn-primary flex-1 flex items-center justify-center gap-1.5"
                 onClick={() => {
@@ -755,25 +945,31 @@ ${a.disclaimer?`<div class="disclaimer">${a.disclaimer}</div>`:''}
                 }}
                 disabled={saving}
               >
-                <CheckCircle size={14} strokeWidth={2} /> Place Bet
+                <CheckCircle size={14} strokeWidth={2} /> {trustView?.placeBetLabel ?? 'Place Bet'}
               </button>
             )}
-            <button
-              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
-              onClick={() => handleAction('watchlisted')}
-              disabled={saving}
-            >
-              <Eye size={14} strokeWidth={2} /> Watch
-            </button>
+            {trustView?.showWatch !== false && (
+              <button
+                className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                onClick={() => handleAction('watchlisted')}
+                disabled={saving}
+              >
+                <Eye size={14} strokeWidth={2} /> {trustView?.watchLabel ?? 'Watch'}
+              </button>
+            )}
             <button
               className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
               onClick={() => handleAction('skipped')}
               disabled={saving}
             >
-              <X size={14} strokeWidth={2} /> Skip
+              <X size={14} strokeWidth={2} /> {trustView?.skipLabel ?? 'Skip'}
             </button>
           </div>
-          <p className="text-xs text-gray-600 text-center">Skipping or watching is a valid decision — it will be saved to your history.</p>
+          <p className="text-xs text-gray-600 text-center">
+            {trustView?.locale === 'uk'
+              ? 'Пропуск або спостереження буде збережено в історії рішень.'
+              : 'Skipping or watching is a valid decision — it will be saved to your history.'}
+          </p>
         </div>
       )}
     </div>

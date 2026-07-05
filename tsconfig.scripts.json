@@ -7,9 +7,17 @@
     "resolveJsonModule": true,
     "strict": true,
     "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": { "@/*": ["./*"] },
     "outDir": "build/provider-smoke",
     "rootDir": ".",
     "noEmit": false
   },
-  "include": ["lib/providers/**/*.ts", "lib/env.ts", "scripts/provider-smoke.ts"]
+  "include": [
+    "app/api/admin/sports/fixtures/sync/route.ts",
+    "lib/ai/**/*.ts",
+    "lib/providers/**/*.ts",
+    "lib/env.ts",
+    "scripts/provider-smoke.ts"
+  ]
 }
