@@ -1,6 +1,6 @@
 # M1.3 API-Football Odds Provider Evidence
 
-Status: draft PR #82 / partial evidence captured / production odds dry-run still blocked
+Status: draft PR #82 / provider evidence captured / production odds dry-run not started
 
 Last updated: 2026-07-05
 
@@ -31,7 +31,7 @@ Not allowed:
 
 ## Evidence Sources
 
-Evidence was provided by the operator from API-Football/API-Sports account/docs on 2026-07-05.
+Evidence was provided by the operator from API-Football/API-Sports account/docs and official pricing / guide pages on 2026-07-05.
 
 Sanitization rules applied:
 
@@ -40,6 +40,12 @@ Sanitization rules applied:
 - no raw provider payload stored in this document
 - no secret query parameter copied
 - the full odds response sample was reduced to schema and market mapping summaries only
+
+Operator-provided reference URLs for docs-sourced evidence:
+
+- `https://www.api-football.com/pricing`
+- `https://www.api-football.com/news/post/how-to-get-started-with-api-football-the-complete-beginners-guide`
+- `https://www.api-football.com/documentation-v3`
 
 ## Confirmed Base And Auth
 
@@ -86,7 +92,22 @@ plan: Free
 limit_day: 100
 ```
 
-This confirms the daily request limit shape. It does not by itself prove the odds endpoint cost per HTTP request.
+Operator-provided pricing / guide evidence confirms the cost model for M1.3 planning:
+
+- API-Football counts API usage as requests against the plan quota.
+- No weighted per-endpoint odds cost was identified in the docs-sourced evidence.
+- Treat each HTTP call, including each paginated `page`, as one request against the daily quota.
+- Free plan daily quota is 100 requests.
+- Higher public plan examples observed: Pro 7,500 / day, Ultra 75,000 / day, Mega 150,000 / day.
+- Daily quota and per-minute limits both matter.
+- Remaining request counters are exposed through response headers such as request-limit / rate-limit remaining fields.
+- When the daily quota is exhausted, no overage billing is expected; the API stops serving more requests until quota resets.
+
+Operational implication:
+
+```txt
+estimated requests = number of HTTP calls, including pagination
+```
 
 ## Odds Endpoint
 
@@ -125,6 +146,11 @@ Confirmed behavior:
 - date odds request is supported
 - docs explicitly allow mixing available parameters
 - pagination is present through the `page` parameter
+- odds responses are paginated at 10 results per page
+- each extra page is a separate API request
+- pre-match odds history is limited to the provider's documented recent window
+- odds are generally available only in a provider-defined pre-match window before kickoff
+- odds are updated on the provider's documented cadence, not continuously
 
 ## Odds Response Shape
 
@@ -231,9 +257,41 @@ Confirmed bookmaker discovery endpoint path:
 GET /odds/bookmakers
 ```
 
-Still missing:
+Docs-sourced bookmaker discovery request shape:
 
-- sanitized `GET /odds/bookmakers` response shape
+```txt
+GET /odds/bookmakers
+GET /odds/bookmakers?id={bookmaker_id}
+GET /odds/bookmakers?search={bookmaker_name_fragment}
+```
+
+Sanitized response shape:
+
+```txt
+get
+parameters
+errors
+results
+paging.current
+paging.total
+response[]
+```
+
+Each `response[]` item contains:
+
+```txt
+response[].id
+response[].name
+```
+
+Operational notes:
+
+- endpoint is reference/catalog style, not odds snapshot storage
+- bookmaker list changes slowly enough for manual or daily cache planning
+- approved bookmaker allowlist remains empty until a later CPO-approved dry-run review
+
+Still missing before writes, but not before read-only dry-run planning:
+
 - whether bookmaker IDs are stable across seasons/leagues
 - approved bookmaker allowlist for writes
 
@@ -245,54 +303,94 @@ Confirmed mapping endpoint path:
 GET /odds/mapping
 ```
 
-Still missing:
+Docs-sourced mapping response shape:
 
-- sanitized `GET /odds/mapping` response shape
+```txt
+get
+parameters
+errors
+results
+paging.current
+paging.total
+response[]
+```
+
+Each `response[]` item contains:
+
+```txt
+league.id
+league.season
+fixture.id
+fixture.date
+fixture.timestamp
+update
+```
+
+Interpretation:
+
+- `/odds/mapping` identifies fixtures that have available pre-match odds mappings.
+- It is a discovery/mapping endpoint, not the odds values endpoint.
+- The field required to connect mapping output to BetTracker provider links is `fixture.id`.
+- The provider update timestamp is `update`.
+
+Confirmed pre-match bet catalog endpoint:
+
+```txt
+GET /odds/bets
+```
+
+This is distinct from live odds catalog endpoints such as:
+
+```txt
+GET /odds/live/bets
+```
+
+Live odds endpoints remain out of scope for M1.3 v1.
+
+Still missing before writes, but not before read-only dry-run planning:
+
 - whether `/odds/mapping` covers all bets or only supported odds mappings
-- whether `GET /odds/bets` exists separately in the current docs/account plan
 
 ## Remaining Unknowns
 
-These blockers remain before any production odds dry-run:
+These blockers remain before any production odds write or user-facing odds usage:
 
-1. exact quota/request cost for `GET /odds`
-2. whether one `GET /odds` HTTP call costs exactly one daily request on the current plan
-3. rate-limit behavior beyond the observed daily limit
-4. sanitized `GET /odds/bookmakers` response shape
-5. sanitized `GET /odds/mapping` response shape
-6. whether a fixture request without `bookmaker` returns multiple bookmakers
-7. whether a fixture request with `bet=1` returns all available bookmakers for Match Winner
-8. whether odds returned by `/odds` are pre-match only, or whether BetTracker must rely entirely on its canonical fixture pre-match gate
-9. whether the Free plan can access current/future fixture odds for the controlled validation scope
+1. exact controlled production dry-run scope
+2. exact canonical fixture IDs and API-Football provider links for the dry-run
+3. whether the selected fixture request with `bet=1` returns enough bookmaker coverage
+4. whether the selected current/future fixture odds are available on the current account plan
+5. whether API-Football guarantees pre-match-only odds in all cases, or whether BetTracker must rely entirely on its canonical fixture pre-match gate
+6. approved bookmaker allowlist for any later write milestone
+7. storage schema and retention approval before odds writes
+
+For read-only dry-run planning, the endpoint/cost/bookmaker/mapping evidence blocker is now addressed by docs-sourced evidence. The dry-run itself still requires separate CPO approval and must not be executed by this PR.
 
 ## Risk Decision
 
-Evidence is sufficient to update the endpoint/request/response design, but not sufficient to run production provider odds calls.
+Evidence is sufficient to update the endpoint/request/response/cost design and plan a tightly scoped read-only production odds dry-run.
 
-Current decision:
+Current runtime decision:
 
 ```txt
-allowed to proceed to read-only production odds dry-run: NO
+production odds dry-run executed by PR #82: NO
+provider odds calls from BetTracker production: NOT RUN
 ```
 
-Required next evidence before unblock:
+Required next approval before any production provider odds call:
 
 ```txt
-cost per /odds HTTP request
-bookmaker discovery response shape
-mapping discovery response shape
-exact controlled dry-run scope
+CPO-approved read-only dry-run scope using known canonical fixture IDs
 ```
 
 ## Safe Future Candidate
 
-Once the remaining blockers are accepted, the likely read-only dry-run shape is:
+Once the separate runtime dry-run scope is accepted, the likely read-only dry-run shape is:
 
 ```txt
 GET /odds?fixture={api_football_provider_fixture_id}&bet=1
 ```
 
-But this must remain blocked until the next CPO-approved milestone.
+The request budget must count one request per page.
 
 ## Current BetTracker State
 
