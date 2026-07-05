@@ -1,12 +1,13 @@
 # M1.3 Read-Only Odds Dry-Run Scope
 
-Status: draft PR #83 / scope approval only / provider call not run
+Status: DONE via PR #83 / scope approval only / provider call not run
 
 Last updated: 2026-07-05
 
 ## Scope
 
 PR #83 records the exact scope for the first API-Football read-only odds dry-run.
+PR #84 implements the protected read-only route/helper for this scope, but still does not run the production provider call.
 
 Allowed:
 
@@ -233,7 +234,7 @@ It must not answer:
 SPORTS_FIXTURE_SYNC_WRITE_ENABLED: absent/off
 SPORTS_ODDS_SYNC_WRITE_ENABLED: not added/enabled
 fixture write mode: off
-odds provider calls from production: not run by PR #83
+odds provider calls from production: not run by PR #83 or PR #84 implementation
 odds writes: not run
 Supabase writes: not run
 Scout/Analyst/UI odds usage: not started
@@ -244,7 +245,7 @@ production odds dry-run: not run by PR #83
 
 PR #83 is a scope-approval PR only.
 
-If merged and CPO separately approves the runtime step, the first provider call may be:
+PR #84 may implement the protected runtime path for this exact scope. After PR #84 is merged/deployed and CPO separately approves the runtime step, the first provider call may be:
 
 ```txt
 GET /odds?fixture=1576052&bet=1

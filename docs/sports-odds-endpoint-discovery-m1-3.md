@@ -319,6 +319,6 @@ PR #83 does not:
 - add `SPORTS_ODDS_SYNC_WRITE_ENABLED`
 - use odds in Scout, Analyst, or UI
 
-Runtime remains blocked until PR #83 is merged and CPO separately approves the first read-only production odds dry-run.
+Runtime remains blocked until the PR #84 protected read-only path is merged/deployed and CPO separately approves the first read-only production odds dry-run.
 
 Reference: `docs/sports-odds-read-only-dry-run-scope-m1-3.md`
