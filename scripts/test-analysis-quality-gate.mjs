@@ -34,6 +34,12 @@ const buildAnalystDecisionSurfaceView = qualityGateModule.buildAnalystDecisionSu
 }));
 const renderAnalystDecisionSurfaceShareText = qualityGateModule.renderAnalystDecisionSurfaceShareText ?? (() => 'MISSING DECISION SHARE RENDERER');
 const renderAnalystDecisionSurfacePdfText = qualityGateModule.renderAnalystDecisionSurfacePdfText ?? (() => 'MISSING DECISION PDF RENDERER');
+const scannerModule = require(path.join(buildDir, 'lib/ai/coupon-scanner.js'));
+const {
+  parseScannerVisionResult,
+  normalizeLooseCouponExtraction,
+  buildScannerFailureResponse,
+} = scannerModule;
 
 let passed = 0;
 let failed = 0;
@@ -244,6 +250,85 @@ function buildExactSavedDecisionFixture() {
     trustView,
   };
 }
+
+const exactLiveScannerText = [
+  'Лайв',
+  '3-й сет, Тейлор Фріц - Лоренцо Сонего',
+  'Переможець',
+  'Тейлор Фріц',
+  '1.19',
+  'Лайв',
+  'Перерва, Канада - Марокко',
+  'Результат матчу',
+  'Марокко',
+  '2.65',
+  'Лайв',
+  '1-й сет, Френсіс Тіафо - Олександр Бублик',
+  'Переможець',
+  'Олександр Бублик',
+  '2.30',
+  'Кількість результатів',
+  '3',
+  'Загальний коефіцієнт',
+  '7.253',
+].join('\n');
+
+console.log('\nScanner Coupon Normalization checks\n');
+
+test('scanner vision response wrapped in markdown code fence still parses', () => {
+  const raw = `Here is the extracted coupon:\n\n\`\`\`json\n{"rawText":"${exactLiveScannerText.replace(/\n/g, '\\n')}","couponType":"express","totalOdds":7.253,"legs":[]}\n\`\`\``;
+  const parsed = parseScannerVisionResult(raw);
+  assert.strictEqual(parsed.couponType, 'express');
+  assert.strictEqual(parsed.totalOdds, 7.253);
+  assert.ok(parsed.rawText.includes('Тейлор Фріц'));
+});
+
+test('scanner vision response with prose and JSON still parses', () => {
+  const raw = `I found a live coupon. Use this object:\n{"rawText":"${exactLiveScannerText.replace(/\n/g, '\\n')}","couponType":"express","totalOdds":7.253,"warnings":["low contrast"]}\nTrailing note.`;
+  const parsed = parseScannerVisionResult(raw);
+  assert.strictEqual(parsed.couponType, 'express');
+  assert.deepEqual(parsed.warnings, ['low contrast']);
+});
+
+test('exact live coupon text normalizes to three live legs with coupon status source', () => {
+  const normalized = normalizeLooseCouponExtraction({
+    rawText: exactLiveScannerText,
+    couponType: 'express',
+    totalOdds: 7.253,
+    warnings: [],
+  });
+
+  assert.strictEqual(normalized.market_type, 'Експрес (3 ноги)');
+  assert.strictEqual(normalized.odds, 7.253);
+  assert.strictEqual(normalized.selection, 'Тейлор Фріц + Марокко + Олександр Бублик');
+  assert.strictEqual(normalized.legs.length, 3);
+
+  assert.deepEqual(normalized.legs.map(leg => leg.sport), ['tennis', 'soccer', 'tennis']);
+  assert.deepEqual(normalized.legs.map(leg => leg.isLive), [true, true, true]);
+  assert.deepEqual(normalized.legs.map(leg => leg.periodOrPhase), ['3-й сет', 'Перерва', '1-й сет']);
+  assert.deepEqual(normalized.legs.map(leg => leg.statusSource), ['coupon', 'coupon', 'coupon']);
+  assert.deepEqual(normalized.legs.map(leg => leg.eventName), [
+    'Тейлор Фріц - Лоренцо Сонего',
+    'Канада - Марокко',
+    'Френсіс Тіафо - Олександр Бублик',
+  ]);
+  assert.deepEqual(normalized.legs.map(leg => leg.selection), [
+    'Тейлор Фріц',
+    'Марокко',
+    'Олександр Бублик',
+  ]);
+  assert.deepEqual(normalized.legs.map(leg => leg.odds), [1.19, 2.65, 2.3]);
+});
+
+test('invalid scanner response returns localized actionable error metadata', () => {
+  const failure = buildScannerFailureResponse('schema_validation', ['legs', 'totalOdds']);
+  assert.strictEqual(
+    failure.error,
+    'Не вдалося розпізнати купон. Спробуйте чіткіший скрин або введіть дані вручну.'
+  );
+  assert.strictEqual(failure.scannerParseStage, 'schema_validation');
+  assert.deepEqual(failure.missingFields, ['legs', 'totalOdds']);
+});
 
 console.log('\nAnalysis Quality Gate checks\n');
 

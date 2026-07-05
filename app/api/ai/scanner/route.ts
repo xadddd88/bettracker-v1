@@ -3,6 +3,12 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
+import {
+  buildScannerFailureResponse,
+  normalizeLooseCouponExtraction,
+  parseScannerVisionResult,
+  type ScannerParseStage,
+} from '@/lib/ai/coupon-scanner'
 
 // ─── Constants ───────────────────────────────────────────────
 const ALLOWED_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const
@@ -15,6 +21,32 @@ Read ALL text EXACTLY character-by-character as shown in the image. Do NOT guess
 The coupon may be a SINGLE bet or an EXPRESS/PARLAY (multiple legs combined).
 
 Return ONLY a valid JSON object — no explanation, no markdown, no code fences.
+
+Prefer this loose extraction contract. The server will normalize it deterministically:
+{
+  "rawText": "all visible coupon text preserving line order",
+  "couponType": "single|express|parlay|unknown",
+  "totalOdds": 7.253,
+  "warnings": [],
+  "legs": [
+    {
+      "rawText": "exact visible text for this leg",
+      "eventName": "team/player names for this leg without the live phase prefix",
+      "marketType": "market shown for this leg, or null",
+      "selection": "selected outcome for this leg",
+      "odds": 1.19,
+      "sport": "soccer|tennis|cs2|basketball|ice_hockey|mma|other|null",
+      "isLive": true,
+      "periodOrPhase": "3-й сет / Перерва / 1-й сет / null",
+      "statusText": "visible status text, or null",
+      "scoreText": "visible score, or null",
+      "statusSource": "coupon|unknown",
+      "statusConfidence": 0.95
+    }
+  ]
+}
+
+Legacy final schema is still accepted:
 
 Required format:
 {
@@ -54,6 +86,16 @@ Rules:
 - Infer sport per leg; do not blindly apply the dominant sport to every leg
 - If a leg visibly says Лайв, Live, In-play, 1-й сет, 2-й сет, 3-й сет, Перерва, or Halftime, set isLive=true and statusSource="coupon"
 - Return ONLY the JSON object, nothing else`
+
+function shouldExposeScannerDebug() {
+  return process.env.NODE_ENV !== 'production' || process.env.VERCEL_ENV === 'preview'
+}
+
+function scannerFailurePayload(stage: ScannerParseStage, missingFields: string[] = []) {
+  const failure = buildScannerFailureResponse(stage, missingFields)
+  if (shouldExposeScannerDebug()) return failure
+  return { error: failure.error }
+}
 
 // ─── Schemas ─────────────────────────────────────────────────
 const requestSchema = z.object({
@@ -141,7 +183,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 512,
+        max_tokens: 900,
         messages: [{
           role: 'user',
           content: [
@@ -160,32 +202,35 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await response.json()
-    raw = data.content?.[0]?.text ?? ''
+    raw = data.content
+      ?.filter((block: { type?: string; text?: string }) => block.type === 'text' && block.text)
+      .map((block: { text: string }) => block.text)
+      .at(-1) ?? ''
   } catch (err) {
     console.error('[scanner] fetch error:', err)
     await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'unknown' })
     return NextResponse.json({ error: 'Scanner request failed' }, { status: 500 })
   }
 
-  // Strip markdown fences if model wrapped output
-  const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim()
-
-  // Parse JSON
-  let jsonData: unknown
+  // Parse loose scanner output, then normalize to the strict app schema.
+  let normalizedData: unknown
   try {
-    jsonData = JSON.parse(cleaned)
-  } catch {
-    console.error('[scanner] JSON parse failed:', raw)
+    normalizedData = normalizeLooseCouponExtraction(parseScannerVisionResult(raw))
+  } catch (err) {
+    const stage = (err as { scannerParseStage?: ScannerParseStage }).scannerParseStage ?? 'normalization'
+    const missingFields = (err as { missingFields?: string[] }).missingFields ?? []
+    console.error('[scanner] parse/normalization failed:', { stage, missingFields })
     await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'parse_failed' })
-    return NextResponse.json({ error: 'Could not parse scanner result' }, { status: 500 })
+    return NextResponse.json(scannerFailurePayload(stage, missingFields), { status: 422 })
   }
 
   // Validate shape with Zod
-  const validated = scanOutputSchema.safeParse(jsonData)
+  const validated = scanOutputSchema.safeParse(normalizedData)
   if (!validated.success) {
-    console.error('[scanner] Output schema mismatch:', jsonData)
+    const missingFields = validated.error.issues.map(issue => issue.path.join('.') || issue.message)
+    console.error('[scanner] Output schema mismatch:', missingFields)
     await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'schema_mismatch' })
-    return NextResponse.json({ error: 'Unexpected scanner output format' }, { status: 500 })
+    return NextResponse.json(scannerFailurePayload('schema_validation', missingFields), { status: 422 })
   }
 
   // Remap legacy sport values to canonical SportCode
