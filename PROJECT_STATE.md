@@ -17,7 +17,7 @@
 | **Branch model** | Feature branches → PR → CPO accept → Dima merges |
 | **Current UI** | Stable dark UI + Ambient Theme live as-is |
 | **Ambient Theme** | Current version live in production — further Design v2 / premium event skin work is parked |
-| **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 odds provider evidence captured in draft PR #82; Product Vision Gap / Beta v2 planning continues |
+| **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 read-only odds dry-run scope in draft PR #83; Product Vision Gap / Beta v2 planning continues |
 | **Active blockers** | None in current main — product vision gaps documented in PRODUCT_VISION_GAP.md |
 | **External beta invites** | Do not invite external beta users yet |
 
@@ -55,7 +55,7 @@ Final production state after validation:
 - no broad write, multi-provider write, or multi-day write was run
 - odds, results, SportMonks enrichment, cross-provider mapping, cron, Scout, Analyst, and UI remained untouched by M1.2.c
 
-M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery & Dry-Run Plan is DONE via PR #80. M1.3 API-Football Odds Endpoint & Cost Confirmation is DONE / BLOCKED via PR #81 and superseded for planning by draft PR #82 provider evidence. M1.3 odds writes, migrations, production provider odds calls, Scout, Analyst, and UI usage remain NOT STARTED.
+M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery & Dry-Run Plan is DONE via PR #80. M1.3 API-Football Odds Endpoint & Cost Confirmation is DONE / BLOCKED via PR #81 and superseded for planning by PR #82 provider evidence. M1.3 Read-Only Odds Dry-Run Scope is in draft PR #83 as scope approval only. M1.3 odds writes, migrations, production provider odds calls, Scout, Analyst, and UI usage remain NOT STARTED.
 
 ---
 
@@ -63,7 +63,7 @@ M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery 
 
 | Field | Value |
 |---|---|
-| **Status** | DESIGN DONE via PR #79; endpoint discovery / dry-run planning DONE via PR #80; endpoint/cost confirmation DONE / BLOCKED via PR #81; provider evidence captured in draft PR #82 |
+| **Status** | DESIGN DONE via PR #79; endpoint discovery / dry-run planning DONE via PR #80; endpoint/cost confirmation DONE / BLOCKED via PR #81; provider evidence DONE via PR #82; read-only dry-run scope in draft PR #83 |
 | **Implementation** | READ-ONLY PLANNER ONLY from PR #80; odds ingestion NOT STARTED |
 | **Odds ingestion** | NOT STARTED |
 | **Provider calls** | NOT RUN; production odds provider calls require a separate CPO-approved read-only dry-run scope |
@@ -80,12 +80,14 @@ Design direction:
 - storage, provider quota, market normalization, bookmaker scope, and retention must be accepted before any odds write
 - PR #80 added a read-only planner only; it never reports writes as allowed
 - PR #82 confirms docs-sourced `/odds`, fixture-specific request shape, pagination, cost model, bookmaker/mapping discovery shapes, `Match Winner` = bet id `1`, and sanitized odds response shape
-- production provider odds calls remain not started and require a separate CPO-approved read-only dry-run scope
+- PR #83 scopes the first read-only production odds dry-run candidate: `GET /odds?fixture=1576052&bet=1`, Variant A only, max 1 provider request, stop if `paging.total > 1`
+- production provider odds calls remain not started until PR #83 is merged and the runtime dry-run receives separate CPO approval
 
 Reference: `docs/sports-odds-snapshot-sync-m1-3-design.md`
 PR #80 planning reference: `docs/sports-odds-endpoint-discovery-m1-3.md`
 PR #81 confirmation reference: `docs/api-football-odds-endpoint-confirmation-m1-3.md`
 PR #82 evidence reference: `docs/api-football-odds-provider-evidence-m1-3.md`
+PR #83 scope reference: `docs/sports-odds-read-only-dry-run-scope-m1-3.md`
 
 ---
 
@@ -120,6 +122,8 @@ PR #82 evidence reference: `docs/api-football-odds-provider-evidence-m1-3.md`
 | #79 | M1.3 Odds Snapshot Sync Design - design-only odds snapshot plan with pre-match, quota, bookmaker, market catalog, and non-use gates |
 | #80 | M1.3 Odds Endpoint Discovery & Dry-Run Plan - read-only planner, endpoint/cost gates, sanitized reporting, no odds writes or provider calls |
 | #81 | M1.3 API-Football Odds Endpoint & Cost Confirmation - docs/status confirmation block; endpoint/cost not available from Codex runtime |
+| #82 | M1.3 API-Football Odds Provider Evidence - docs/status evidence record; no runtime provider calls or writes |
+| #83 | M1.3 Read-Only Odds Dry-Run Scope - scope approval only; selects provider fixture `1576052` primary and does not run provider calls |
 
 ---
 
