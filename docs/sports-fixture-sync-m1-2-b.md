@@ -1,6 +1,6 @@
 # M1.2.b Fixture Sync Runbook
 
-Status: draft for PR review
+Status: M1.2.b dry-run and M1.2.c controlled fixture write validation complete
 
 ## Scope
 
@@ -108,7 +108,7 @@ For a new provider fixture, the sync inserts a canonical fixture and then insert
 
 ## M1.2.c write safety guard
 
-`SPORTS_FIXTURE_SYNC_WRITE_ENABLED` remains absent/off until an explicit controlled write validation window.
+`SPORTS_FIXTURE_SYNC_WRITE_ENABLED` remains absent/off except during an explicit controlled write validation window.
 
 The write path is intentionally narrower than dry-run:
 
@@ -123,10 +123,86 @@ Dry-run behavior is unchanged:
 - date ranges up to the existing 7-day safety limit remain allowed
 - write counters must remain 0
 
+## M1.2.c controlled write validation record
+
+Completed on 2026-07-05 against production.
+
+Controlled scope:
+
+- provider: `api_football`
+- date: `2026-12-31`
+- `competitionIds`: none
+- fetched fixtures: 2
+
+Final dry-run before write:
+
+- `success`: true
+- `dryRun`: true
+- `writeEnabled`: false
+- `operatorConfirmed`: false
+- fetched: 2
+- all write counters: 0
+- `SPORTS_FIXTURE_SYNC_WRITE_ENABLED`: absent
+
+Temporary write window:
+
+1. `SPORTS_FIXTURE_SYNC_WRITE_ENABLED=true` was added to Vercel Production.
+2. Production was redeployed.
+3. A dry-run confirmed `writeEnabled=true`, fetched 2, and all write counters remained 0.
+4. Only the selected one-provider / one-day scope was written.
+5. The same write was repeated once for idempotency.
+6. `SPORTS_FIXTURE_SYNC_WRITE_ENABLED` was removed immediately afterward.
+7. Production was redeployed and a final dry-run confirmed `writeEnabled=false`.
+
+First controlled write:
+
+- `syncRunId`: `fixture-sync-2026-07-05T11-45-41-382Z-a7th02gl`
+- `dryRun`: false
+- `writeEnabled`: true
+- `operatorConfirmed`: true
+- fetched: 2
+- `insertedCanonicalFixtures`: 2
+- `updatedCanonicalFixtures`: 0
+- `insertedProviderLinks`: 2
+- `updatedProviderLinks`: 0
+- `failedWrites`: 0
+
+Idempotency write:
+
+- `syncRunId`: `fixture-sync-2026-07-05T11-46-00-677Z-sd7qzxxb`
+- fetched: 2
+- `insertedCanonicalFixtures`: 0
+- `updatedCanonicalFixtures`: 2
+- `insertedProviderLinks`: 0
+- `updatedProviderLinks`: 2
+- `failedWrites`: 0
+
+Supabase verification:
+
+- `fixture_provider_links`: 2
+- linked `canonical_fixtures`: 2
+- `provider_fixture_id` present: 2/2
+- `mapping_confidence = 'exact'`: 2/2
+- `mapping_method = 'provider_fixture_id'`: 2/2
+- `sync_run_id` present: 2/2
+- duplicate provider links: 0
+- raw provider payload selected or surfaced in the report: no
+
+Final production state:
+
+- `SPORTS_FIXTURE_SYNC_WRITE_ENABLED`: absent/off
+- `writeEnabled`: false
+- production deployment: `dpl_GiZatcrRAdxaT9ru1QdDSM95BdGP`
+- production alias: https://btdk.app
+- deployed commit: `ad8ce53645509fbc38697901045f05074e1e89d2`
+
+No broad write, multi-provider write, or multi-day write was run. Odds, results, SportMonks enrichment, cross-provider mapping, cron, Scout, Analyst, and UI remained out of scope.
+
 ## Safety notes
 
 - No provider token is returned in API responses.
 - No raw provider payload is returned from dry-run responses.
 - Provider request URLs are sanitized through the existing provider error path.
 - The route is `nodejs` runtime only because it uses Node crypto for timing-safe token comparison.
-- Keep `SPORTS_FIXTURE_SYNC_WRITE_ENABLED` absent/off until the controlled M1.2.c write test is explicitly approved.
+- Keep `SPORTS_FIXTURE_SYNC_WRITE_ENABLED` absent/off until a future controlled write test is explicitly approved.
+- Do not run additional fixture writes without a fresh selected scope, dry-run confirmation, temporary write window, idempotency check, Supabase verification, and immediate write-flag removal.
