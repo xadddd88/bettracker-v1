@@ -458,6 +458,45 @@ await testAsync('odds discovery empty bookmaker allowlist prevents write mode', 
   }
 });
 
+await testAsync('odds discovery planner never reports writes allowed in M1.3 discovery mode', async () => {
+  const { runOddsEndpointDiscoveryDryRun } = require(path.join(buildDir, 'lib/providers/odds-discovery.js'));
+  const originalWriteEnabled = process.env.SPORTS_ODDS_SYNC_WRITE_ENABLED;
+
+  process.env.SPORTS_ODDS_SYNC_WRITE_ENABLED = 'true';
+
+  try {
+    const report = await runOddsEndpointDiscoveryDryRun({
+      provider: 'api_football',
+      market: 'match_winner',
+      dryRun: false,
+      operatorConfirm: 'WRITE_ODDS_SNAPSHOT_M1_3',
+      now: '2026-12-31T17:00:00Z',
+      endpointDocumentation: documentedOddsEndpoint(),
+      fixtures: [oddsFixture()],
+      bookmakerAllowlist: [{ providerBookmakerId: '8', name: 'Fixture Book' }],
+      fetchProviderOdds: async () => [
+        {
+          providerFixtureId: '12345',
+          bookmakers: [{ providerBookmakerId: '8', name: 'Fixture Book' }],
+          markets: [{ providerMarketId: '1', name: 'Match Winner' }],
+        },
+      ],
+    });
+
+    assert.equal(report.write.allowed, false);
+    assert.equal(report.write.writeSkipped, true);
+    assert.ok(
+      report.write.blockedReasons.includes('odds writes are not implemented in M1.3 discovery planner')
+    );
+  } finally {
+    if (originalWriteEnabled === undefined) {
+      delete process.env.SPORTS_ODDS_SYNC_WRITE_ENABLED;
+    } else {
+      process.env.SPORTS_ODDS_SYNC_WRITE_ENABLED = originalWriteEnabled;
+    }
+  }
+});
+
 await testAsync('odds discovery dry-run returns sanitized bookmaker and market coverage', async () => {
   const { runOddsEndpointDiscoveryDryRun } = require(path.join(buildDir, 'lib/providers/odds-discovery.js'));
 

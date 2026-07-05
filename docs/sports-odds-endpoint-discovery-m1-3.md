@@ -68,6 +68,19 @@ The planner is pure and read-only. It does not:
 - expose raw provider payloads
 - use odds in Analyst or Scout
 
+The planner must never report writes as allowed in PR #80:
+
+```txt
+write.allowed = false
+write.writeSkipped = true
+```
+
+For every `dryRun=false` request, the planner must include this sanitized blocked reason:
+
+```txt
+odds writes are not implemented in M1.3 discovery planner
+```
+
 Future code may inject a provider odds fetcher only after endpoint/request/cost are documented and approved.
 
 ## Inputs
@@ -180,6 +193,7 @@ Covered by `npm.cmd run test:provider-safety`:
 - non-scheduled fixture blocked before provider calls
 - missing kickoff blocked before provider calls
 - empty bookmaker allowlist prevents write mode
+- `dryRun=false` with all future-looking write gates satisfied still reports `write.allowed=false`
 - dry-run returns sanitized bookmaker and market coverage
 - raw provider payload/token values are not surfaced
 - existing fixture sync safety behavior remains green
@@ -210,3 +224,5 @@ Before a real provider odds dry-run can run in production, a later PR/task must 
 - provider market ID/name shape
 
 Only then can BetTracker add a real provider fetcher and run an authorized read-only dry-run.
+
+Actual odds write validation belongs to a later PR after endpoint/cost, market mapping, bookmaker allowlist, and storage schema are explicitly accepted.

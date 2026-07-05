@@ -9,6 +9,7 @@ export const ODDS_PRE_KICKOFF_BUFFER_MINUTES = 15
 const ODDS_ENDPOINT_NOT_DOCUMENTED = 'api_football odds endpoint/request/cost is not documented'
 const FETCHER_NOT_CONFIGURED = 'provider odds fetcher is not configured'
 const EMPTY_BOOKMAKER_ALLOWLIST = 'approved bookmaker allowlist is empty'
+const DISCOVERY_WRITES_NOT_IMPLEMENTED = 'odds writes are not implemented in M1.3 discovery planner'
 const MINUTE_MS = 60 * 1000
 
 export interface OddsEndpointDocumentation {
@@ -197,6 +198,7 @@ export async function runOddsEndpointDiscoveryDryRun(
   if (params.dryRun) {
     writeBlockedReasons.push('dry-run mode')
   } else {
+    writeBlockedReasons.push(DISCOVERY_WRITES_NOT_IMPLEMENTED)
     if (!writeEnabled) writeBlockedReasons.push(`${ODDS_SYNC_WRITE_ENV} is not enabled`)
     if (!operatorConfirmed) writeBlockedReasons.push(`operator confirmation must be ${ODDS_SYNC_WRITE_CONFIRMATION}`)
     if ((params.bookmakerAllowlist ?? []).length === 0) writeBlockedReasons.push(EMPTY_BOOKMAKER_ALLOWLIST)
@@ -235,7 +237,6 @@ export async function runOddsEndpointDiscoveryDryRun(
   const oddsUnavailable = providerCallAllowed
     ? Math.max(eligibleProviderFixtureIds.length - oddsAvailable, 0)
     : 0
-  const writeAllowed = !params.dryRun && writeBlockedReasons.length === 0 && providerCallAllowed
 
   return {
     dryRun: params.dryRun,
@@ -256,7 +257,7 @@ export async function runOddsEndpointDiscoveryDryRun(
       blockedReasons: providerCallBlockedReasons,
     },
     write: {
-      allowed: writeAllowed,
+      allowed: false,
       writeSkipped: true,
       blockedReasons: writeBlockedReasons,
     },
