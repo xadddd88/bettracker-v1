@@ -236,17 +236,49 @@ do not proceed to read-only production odds dry-run until endpoint/request/cost 
 
 Reference: `docs/api-football-odds-endpoint-confirmation-m1-3.md`
 
-## Next Milestone After PR #81
+## PR #82 Provider Evidence Result
+
+PR #82 captures sanitized operator-side evidence after the initial PR #81 block.
+
+Partially confirmed:
+
+- `GET /odds`
+- `fixture`, `league`, `season`, `date`, `bookmaker`, `bet`, and `page` request parameters
+- fixture-specific odds request support
+- mixed request filters
+- pagination through `page`
+- `GET /odds/bookmakers` endpoint path
+- `GET /odds/mapping` endpoint path
+- `Match Winner` provider bet id `1`
+- `Match Winner` values `Home`, `Draw`, `Away`
+- odds response shape with fixture, league, update, bookmakers, bets, values, and decimal-string odds
+
+Still blocked:
+
+- exact quota/request cost for `GET /odds`
+- sanitized bookmaker discovery response shape
+- sanitized mapping discovery response shape
+- whether fixture requests without bookmaker filter return multiple bookmakers
+- whether API-Football guarantees pre-match-only odds
+
+Decision:
+
+```txt
+do not proceed to read-only production odds dry-run yet
+```
+
+Reference: `docs/api-football-odds-provider-evidence-m1-3.md`
+
+## Next Milestone After PR #82
 
 Before a real provider odds dry-run can run in production, a later PR/task must confirm:
 
-- exact API-Football odds endpoint
-- exact request shape
 - quota/request cost
 - whether request cost is per fixture, per fixture/market, or per bookmaker
-- endpoint support for fixture-specific pre-match 1X2 odds
-- provider bookmaker ID/name shape
-- provider market ID/name shape
+- sanitized bookmaker discovery response shape
+- sanitized mapping discovery response shape
+- whether fixture-specific `bet=1` requests return enough bookmaker coverage for a useful dry-run
+- whether pre-match-only is guaranteed by API-Football or only by BetTracker's canonical fixture gate
 
 Only then can BetTracker add a real provider fetcher and run an authorized read-only dry-run.
 

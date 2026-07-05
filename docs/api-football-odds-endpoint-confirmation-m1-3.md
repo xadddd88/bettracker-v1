@@ -1,6 +1,6 @@
 # M1.3 API-Football Odds Endpoint & Cost Confirmation
 
-Status: draft PR #81 / confirmation blocked
+Status: DONE / BLOCKED via PR #81; partially superseded by PR #82 evidence
 
 Last updated: 2026-07-05
 
@@ -28,9 +28,9 @@ Not allowed:
 - Scout, Analyst, or UI changes
 - M1.3 controlled odds write validation
 
-## Current Confirmation Result
+## PR #81 Confirmation Result
 
-The API-Football odds endpoint and cost are not confirmed from the Codex runtime.
+The API-Football odds endpoint and cost were not confirmed from the Codex runtime.
 
 Official documentation URLs checked:
 
@@ -51,7 +51,7 @@ Decision:
 blocked until an operator confirms endpoint, request shape, and quota cost from the API-Football/API-Sports account or official docs
 ```
 
-## Confirmed From Existing BetTracker Code
+## Confirmed From Existing BetTracker Code At PR #81
 
 The existing API-Football fixture adapter confirms only the already-used football API base and auth pattern for fixture/status work:
 
@@ -63,32 +63,72 @@ env var: API_FOOTBALL_KEY
 
 This does not confirm the odds endpoint, odds request shape, odds availability, bookmaker discovery shape, market discovery shape, or odds request cost.
 
+## PR #82 Partial Evidence Update
+
+After PR #81, the operator provided sanitized API-Football/API-Sports docs/account evidence.
+
+Now partially confirmed:
+
+- base URL: `https://v3.football.api-sports.io`
+- auth header: `x-apisports-key`
+- status endpoint shape: `GET /status`
+- observed plan: `Free`
+- observed daily request limit shape: `requests.limit_day = 100`
+- odds endpoint: `GET /odds`
+- odds request params shown in docs: `fixture`, `league`, `season`, `date`, `bookmaker`, `bet`, `page`
+- fixture-specific odds request supported: `GET /odds?fixture={fixture_id}`
+- mixed filters supported
+- pagination supported through `page`
+- mapping endpoint path: `GET /odds/mapping`
+- bookmaker endpoint path: `GET /odds/bookmakers`
+- `Match Winner` / 1X2 provider bet id: `1`
+- `Match Winner` values: `Home`, `Draw`, `Away`
+- odds response includes fixture, league, update timestamp, bookmakers, bets, values, and decimal-string odds
+
+Still not confirmed:
+
+- exact quota/request cost for `GET /odds`
+- whether one odds HTTP call consumes exactly one daily request
+- rate-limit behavior beyond daily limit
+- sanitized response shape for `GET /odds/bookmakers`
+- sanitized response shape for `GET /odds/mapping`
+- whether fixture requests without a bookmaker return multiple bookmakers
+- whether pre-match-only is guaranteed by API-Football, or must be enforced only by BetTracker's canonical fixture gate
+
+Reference: `docs/api-football-odds-provider-evidence-m1-3.md`
+
+Decision remains:
+
+```txt
+allowed to proceed to read-only production odds dry-run: NO
+```
+
 ## Required Confirmation Checklist
 
 The following fields remain required before any production odds provider call.
 
 | Field | Status | Required evidence |
 |---|---|---|
-| Exact odds endpoint | NOT CONFIRMED | Official docs/account page showing endpoint path |
-| Required auth method | PARTIALLY CONFIRMED | Existing fixture adapter uses `x-apisports-key`; odds endpoint must still be confirmed |
-| Required request parameters | NOT CONFIRMED | Official docs/account request schema |
-| Request granularity | NOT CONFIRMED | Whether odds are requested by fixture, league, date, bookmaker, bet/market, page, or a combination |
+| Exact odds endpoint | CONFIRMED | `GET /odds` |
+| Required auth method | CONFIRMED | `x-apisports-key` header |
+| Required request parameters | PARTIALLY CONFIRMED | `fixture`, `league`, `season`, `date`, `bookmaker`, `bet`, `page` |
+| Request granularity | PARTIALLY CONFIRMED | fixture, league/season, date, bookmaker, bet, mixed filters, page |
 | Quota/request cost | NOT CONFIRMED | Current API-Football/API-Sports account plan cost per request |
-| Multiple bookmakers per request | NOT CONFIRMED | Official response/request docs |
-| Multiple markets per request | NOT CONFIRMED | Official response/request docs |
-| Multiple fixtures per request | NOT CONFIRMED | Official response/request docs |
-| Fixture identifier field | NOT CONFIRMED | Official response schema |
-| Bookmaker id/name shape | NOT CONFIRMED | Official response schema or bookmaker discovery endpoint |
-| Bet/market id/name shape | NOT CONFIRMED | Official response schema or market/bet discovery endpoint |
-| Values/selections shape | NOT CONFIRMED | Official response schema |
-| Odds value shape | NOT CONFIRMED | Official response schema |
-| Provider update timestamp | NOT CONFIRMED | Official response schema |
-| Bookmaker discovery path | NOT CONFIRMED | Official endpoint and cost |
-| Market/bet discovery path | NOT CONFIRMED | Official endpoint and cost |
-| Direct `match_winner` / 1X2 request support | NOT CONFIRMED | Official market id/name and request filtering rules |
+| Multiple bookmakers per request | NOT CONFIRMED | Need fixture request without bookmaker filter |
+| Multiple markets per request | CONFIRMED | Odds response can include multiple `bets[]` for one bookmaker |
+| Multiple fixtures per request | PARTIALLY CONFIRMED | date and league/season request shapes exist; response count shape not yet validated for controlled scope |
+| Fixture identifier field | CONFIRMED | `response[].fixture.id` |
+| Bookmaker id/name shape | CONFIRMED | `bookmakers[].id`, `bookmakers[].name` |
+| Bet/market id/name shape | CONFIRMED | `bets[].id`, `bets[].name` |
+| Values/selections shape | CONFIRMED | `values[].value` |
+| Odds value shape | CONFIRMED | `values[].odd` as decimal string |
+| Provider update timestamp | CONFIRMED | `response[].update` |
+| Bookmaker discovery path | PARTIALLY CONFIRMED | `GET /odds/bookmakers`; response shape not confirmed |
+| Market/bet discovery path | PARTIALLY CONFIRMED | `GET /odds/mapping`; response shape not confirmed |
+| Direct `match_winner` / 1X2 request support | CONFIRMED | `bet=1`, `Match Winner`, values `Home` / `Draw` / `Away` |
 | Pre-match-only request support | NOT CONFIRMED | Official request filters or lifecycle rules |
 | Endpoint restrictions / plan limitations | NOT CONFIRMED | Current account plan or official docs |
-| Rate limits | NOT CONFIRMED | Current account plan or official docs |
+| Rate limits | PARTIALLY CONFIRMED | `/status` exposes `requests.limit_day`; observed limit `100`; per-endpoint cost still not confirmed |
 
 ## Risk Decision
 
