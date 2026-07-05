@@ -415,7 +415,7 @@ Statuses: `discovered`, `research_needed`, `watchlisted`, `converted_to_decision
 ## Decision #012 - Odds Endpoint Discovery Before Provider Calls
 **Date:** 2026-07-05
 **Proposed by:** CPO + Founder
-**Status:** Accepted for draft PR #80 planning. Production provider odds calls not started.
+**Status:** Accepted and completed via PR #80. Production provider odds calls not started.
 
 **Decision:** M1.3 must begin with a read-only odds endpoint discovery and dry-run planner. Production API-Football odds provider calls remain blocked until the exact endpoint, request shape, and quota/request cost are documented and accepted. Odds writes remain blocked until a later controlled write milestone.
 
@@ -439,6 +439,45 @@ Statuses: `discovered`, `research_needed`, `watchlisted`, `converted_to_decision
 - PR #80 may add a pure read-only planner and tests for blocked provider calls, fixture eligibility, empty bookmaker allowlist, sanitized discovery reports, and no raw payload/token surfacing.
 - A future PR must confirm API-Football endpoint/request/cost before adding any real provider odds fetcher.
 - Bookmaker allowlist remains empty until dry-run discovery is reviewed and approved.
+
+---
+
+## Decision #013 - API-Football Odds Endpoint Confirmation Block
+**Date:** 2026-07-05
+**Proposed by:** CPO + Founder
+**Status:** Draft PR #81; provider odds calls remain blocked.
+
+**Decision:** BetTracker will not proceed to a production API-Football odds dry-run until the exact odds endpoint, request shape, bookmaker/market discovery shape, and quota/request cost are confirmed from the API-Football/API-Sports account or official documentation.
+
+**Why:**
+- The official API-Football/API-Sports documentation hosts returned a browser challenge to the Codex runtime again.
+- PR #80 intentionally added only a read-only planner and treats endpoint/request/cost as unconfirmed.
+- Odds requests can burn provider quota and can later become betting signals, so inferred endpoint names or third-party snippets are not enough.
+- The current API-Football account plan cost is not stored in the repo and was not available to Codex.
+
+**Current confirmation result:**
+- exact odds endpoint: not confirmed
+- request parameters: not confirmed
+- bookmaker discovery shape: not confirmed
+- market/bet discovery shape: not confirmed
+- whether `match_winner` / 1X2 can be requested directly: not confirmed
+- quota/request cost: not confirmed
+- decision to proceed to production odds dry-run: blocked
+
+**Scope controls:**
+- no production provider odds call
+- no odds write
+- no migration
+- no API route
+- no Supabase write
+- no env change
+- no Scout, Analyst, or UI change
+- `SPORTS_ODDS_SYNC_WRITE_ENABLED` not added/enabled
+
+**Consequences:**
+- PR #81 records a blocked confirmation state, not an implementation unblock.
+- A later unblock PR must provide sanitized operator-side evidence from the API-Football/API-Sports account or official docs.
+- Only after that evidence is accepted may BetTracker plan a read-only production odds dry-run against known canonical fixture IDs.
 
 ---
 

@@ -17,7 +17,7 @@
 | **Branch model** | Feature branches → PR → CPO accept → Dima merges |
 | **Current UI** | Stable dark UI + Ambient Theme live as-is |
 | **Ambient Theme** | Current version live in production — further Design v2 / premium event skin work is parked |
-| **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 odds endpoint discovery / dry-run planning in draft PR #80; Product Vision Gap / Beta v2 planning continues |
+| **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 odds endpoint/cost confirmation in draft PR #81; Product Vision Gap / Beta v2 planning continues |
 | **Active blockers** | None in current main — product vision gaps documented in PRODUCT_VISION_GAP.md |
 | **External beta invites** | Do not invite external beta users yet |
 
@@ -55,7 +55,7 @@ Final production state after validation:
 - no broad write, multi-provider write, or multi-day write was run
 - odds, results, SportMonks enrichment, cross-provider mapping, cron, Scout, Analyst, and UI remained untouched by M1.2.c
 
-M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 odds writes, migrations, production provider odds calls, Scout, Analyst, and UI usage remain NOT STARTED.
+M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery & Dry-Run Plan is DONE via PR #80. M1.3 odds writes, migrations, production provider odds calls, Scout, Analyst, and UI usage remain NOT STARTED.
 
 ---
 
@@ -63,10 +63,10 @@ M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 odds writes, migrations,
 
 | Field | Value |
 |---|---|
-| **Status** | DESIGN DONE via PR #79; endpoint discovery / dry-run planning in draft PR #80 |
-| **Implementation** | READ-ONLY PLANNER ONLY in PR #80; odds ingestion NOT STARTED |
+| **Status** | DESIGN DONE via PR #79; endpoint discovery / dry-run planning DONE via PR #80; endpoint/cost confirmation blocked in draft PR #81 |
+| **Implementation** | READ-ONLY PLANNER ONLY from PR #80; odds ingestion NOT STARTED |
 | **Odds ingestion** | NOT STARTED |
-| **Provider calls** | NOT RUN |
+| **Provider calls** | NOT RUN; production odds provider calls blocked until endpoint/request/cost are confirmed from official docs/account |
 | **Migrations** | NOT ADDED |
 | **User-facing usage** | BLOCKED until separate validation milestone |
 | **Odds write flag** | `SPORTS_ODDS_SYNC_WRITE_ENABLED` not added/enabled |
@@ -78,10 +78,12 @@ Design direction:
 - first implementation must be dry-run first, operator-gated, capped, and manually validated
 - odds snapshots must not feed Analyst, Scout, user-facing probability, edge, or EV until verified in a later trust milestone
 - storage, provider quota, market normalization, bookmaker scope, and retention must be accepted before any odds write
-- production provider odds calls remain blocked until the exact API-Football odds endpoint, request shape, and quota/request cost are documented
+- PR #80 added a read-only planner only; it never reports writes as allowed
+- production provider odds calls remain blocked until the exact API-Football odds endpoint, request shape, and quota/request cost are documented from official docs/account evidence
 
 Reference: `docs/sports-odds-snapshot-sync-m1-3-design.md`
 PR #80 planning reference: `docs/sports-odds-endpoint-discovery-m1-3.md`
+PR #81 confirmation reference: `docs/api-football-odds-endpoint-confirmation-m1-3.md`
 
 ---
 
@@ -114,6 +116,7 @@ PR #80 planning reference: `docs/sports-odds-endpoint-discovery-m1-3.md`
 | #77 | M1.2.c Fixture Write Safety Guard - one-provider / one-day / 25-fixture write cap before controlled validation |
 | #78 | M1.2.c Controlled Fixture Write Validation Record - documentation/status record only; no runtime code |
 | #79 | M1.3 Odds Snapshot Sync Design - design-only odds snapshot plan with pre-match, quota, bookmaker, market catalog, and non-use gates |
+| #80 | M1.3 Odds Endpoint Discovery & Dry-Run Plan - read-only planner, endpoint/cost gates, sanitized reporting, no odds writes or provider calls |
 
 ---
 
@@ -158,7 +161,7 @@ PR #80 planning reference: `docs/sports-odds-endpoint-discovery-m1-3.md`
 - Do NOT do visual redesign
 - Do NOT merge any PR without explicit CPO ACCEPT
 - Do NOT open new code PRs unless a blocker appears in current main
-- Do NOT start M1.3 odds ingestion or migrations until the design PR is accepted
+- Do NOT start M1.3 odds ingestion, provider odds calls, or migrations until endpoint/request/cost are confirmed and explicitly accepted
 
 ---
 

@@ -1,12 +1,12 @@
 # M1.3 Odds Endpoint Discovery & Dry-Run Plan
 
-Status: draft PR #80 / read-only planner scaffold
+Status: DONE via PR #80 / read-only planner scaffold
 
 Last updated: 2026-07-05
 
 ## Scope
 
-PR #80 prepares M1.3 implementation without starting odds ingestion.
+PR #80 prepared M1.3 implementation without starting odds ingestion.
 
 Allowed in PR #80:
 
@@ -211,7 +211,32 @@ Scout/Analyst/UI odds usage: not started
 M1.3 controlled odds write validation: not started
 ```
 
-## Next Milestone After PR #80
+## PR #81 Endpoint/Cost Confirmation Result
+
+PR #81 attempted to confirm the official API-Football odds endpoint, request shape, bookmaker discovery shape, market discovery shape, and quota/request cost.
+
+Result:
+
+```txt
+confirmation blocked
+```
+
+Reason:
+
+- official API-Football/API-Sports documentation URLs returned a browser challenge to the Codex runtime
+- no provider account plan/cost information is present in the repo
+- no provider odds endpoint was called
+- no provider token was used
+
+Decision:
+
+```txt
+do not proceed to read-only production odds dry-run until endpoint/request/cost are confirmed by operator-side official docs or account evidence
+```
+
+Reference: `docs/api-football-odds-endpoint-confirmation-m1-3.md`
+
+## Next Milestone After PR #81
 
 Before a real provider odds dry-run can run in production, a later PR/task must confirm:
 
