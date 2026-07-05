@@ -200,6 +200,28 @@ function tennisPayload() {
   };
 }
 
+function oddsFixture(overrides = {}) {
+  return {
+    canonicalFixtureId: 'canonical-fixture-1',
+    sport: 'football',
+    status: 'scheduled',
+    kickoffAt: '2026-12-31T18:00:00Z',
+    provider: 'api_football',
+    providerFixtureId: '12345',
+    mappingConfidence: 'exact',
+    ...overrides,
+  };
+}
+
+function documentedOddsEndpoint(overrides = {}) {
+  return {
+    endpoint: 'https://v3.football.api-sports.io/odds',
+    requestShape: 'GET /odds?fixture=<providerFixtureId>&bet=match_winner',
+    quotaCostPerRequest: 1,
+    ...overrides,
+  };
+}
+
 console.log('\nProvider adapter safety checks (M1.2.b)\n');
 
 // ── 1. redactUrl — case-insensitive secret param redaction ──────────────
@@ -320,6 +342,192 @@ test('no NEXT_PUBLIC provider env vars referenced in lib/providers', () => {
     }
   })(providersDir);
   assert.deepEqual(offenders, [], `NEXT_PUBLIC referenced in: ${offenders.join(', ')}`);
+});
+
+// ── 4b. M1.3 odds endpoint discovery planner stays read-only/sanitized ─────
+await testAsync('odds discovery blocks provider calls when endpoint or cost is unknown', async () => {
+  const { runOddsEndpointDiscoveryDryRun } = require(path.join(buildDir, 'lib/providers/odds-discovery.js'));
+  let providerCalls = 0;
+
+  const report = await runOddsEndpointDiscoveryDryRun({
+    provider: 'api_football',
+    market: 'match_winner',
+    dryRun: true,
+    now: '2026-12-31T17:00:00Z',
+    endpointDocumentation: {
+      endpoint: null,
+      requestShape: null,
+      quotaCostPerRequest: null,
+    },
+    fixtures: [oddsFixture()],
+    fetchProviderOdds: async () => {
+      providerCalls++;
+      return [];
+    },
+  });
+
+  assert.equal(providerCalls, 0);
+  assert.equal(report.providerCall.allowed, false);
+  assert.ok(report.providerCall.blockedReasons.includes('api_football odds endpoint/request/cost is not documented'));
+  assert.equal(report.estimatedProviderRequests, 1);
+  assert.equal(report.totals.fixturesChecked, 1);
+  assert.equal(report.totals.providerLinksFound, 1);
+});
+
+await testAsync('odds discovery blocks non-scheduled fixtures before provider calls', async () => {
+  const { runOddsEndpointDiscoveryDryRun } = require(path.join(buildDir, 'lib/providers/odds-discovery.js'));
+  let providerCalls = 0;
+
+  const report = await runOddsEndpointDiscoveryDryRun({
+    provider: 'api_football',
+    market: 'match_winner',
+    dryRun: true,
+    now: '2026-12-31T17:00:00Z',
+    endpointDocumentation: documentedOddsEndpoint(),
+    fixtures: [oddsFixture({ status: 'live' })],
+    fetchProviderOdds: async () => {
+      providerCalls++;
+      return [];
+    },
+  });
+
+  assert.equal(providerCalls, 0);
+  assert.equal(report.fixtures[0].eligible, false);
+  assert.ok(report.fixtures[0].blockedReasons.includes('fixture status is not scheduled'));
+  assert.equal(report.providerCall.allowed, false);
+});
+
+await testAsync('odds discovery blocks missing kickoff before provider calls', async () => {
+  const { runOddsEndpointDiscoveryDryRun } = require(path.join(buildDir, 'lib/providers/odds-discovery.js'));
+  let providerCalls = 0;
+
+  const report = await runOddsEndpointDiscoveryDryRun({
+    provider: 'api_football',
+    market: 'match_winner',
+    dryRun: true,
+    now: '2026-12-31T17:00:00Z',
+    endpointDocumentation: documentedOddsEndpoint(),
+    fixtures: [oddsFixture({ kickoffAt: null })],
+    fetchProviderOdds: async () => {
+      providerCalls++;
+      return [];
+    },
+  });
+
+  assert.equal(providerCalls, 0);
+  assert.equal(report.fixtures[0].eligible, false);
+  assert.ok(report.fixtures[0].blockedReasons.includes('kickoff_at is missing'));
+  assert.equal(report.providerCall.allowed, false);
+});
+
+await testAsync('odds discovery empty bookmaker allowlist prevents write mode', async () => {
+  const { runOddsEndpointDiscoveryDryRun } = require(path.join(buildDir, 'lib/providers/odds-discovery.js'));
+  const originalWriteEnabled = process.env.SPORTS_ODDS_SYNC_WRITE_ENABLED;
+  let providerCalls = 0;
+
+  process.env.SPORTS_ODDS_SYNC_WRITE_ENABLED = 'true';
+
+  try {
+    const report = await runOddsEndpointDiscoveryDryRun({
+      provider: 'api_football',
+      market: 'match_winner',
+      dryRun: false,
+      operatorConfirm: 'WRITE_ODDS_SNAPSHOT_M1_3',
+      now: '2026-12-31T17:00:00Z',
+      endpointDocumentation: documentedOddsEndpoint(),
+      fixtures: [oddsFixture()],
+      bookmakerAllowlist: [],
+      fetchProviderOdds: async () => {
+        providerCalls++;
+        return [];
+      },
+    });
+
+    assert.equal(providerCalls, 0);
+    assert.equal(report.writeEnabled, true);
+    assert.equal(report.operatorConfirmed, true);
+    assert.equal(report.write.allowed, false);
+    assert.ok(report.write.blockedReasons.includes('approved bookmaker allowlist is empty'));
+    assert.equal(report.write.writeSkipped, true);
+  } finally {
+    if (originalWriteEnabled === undefined) {
+      delete process.env.SPORTS_ODDS_SYNC_WRITE_ENABLED;
+    } else {
+      process.env.SPORTS_ODDS_SYNC_WRITE_ENABLED = originalWriteEnabled;
+    }
+  }
+});
+
+await testAsync('odds discovery planner never reports writes allowed in M1.3 discovery mode', async () => {
+  const { runOddsEndpointDiscoveryDryRun } = require(path.join(buildDir, 'lib/providers/odds-discovery.js'));
+  const originalWriteEnabled = process.env.SPORTS_ODDS_SYNC_WRITE_ENABLED;
+
+  process.env.SPORTS_ODDS_SYNC_WRITE_ENABLED = 'true';
+
+  try {
+    const report = await runOddsEndpointDiscoveryDryRun({
+      provider: 'api_football',
+      market: 'match_winner',
+      dryRun: false,
+      operatorConfirm: 'WRITE_ODDS_SNAPSHOT_M1_3',
+      now: '2026-12-31T17:00:00Z',
+      endpointDocumentation: documentedOddsEndpoint(),
+      fixtures: [oddsFixture()],
+      bookmakerAllowlist: [{ providerBookmakerId: '8', name: 'Fixture Book' }],
+      fetchProviderOdds: async () => [
+        {
+          providerFixtureId: '12345',
+          bookmakers: [{ providerBookmakerId: '8', name: 'Fixture Book' }],
+          markets: [{ providerMarketId: '1', name: 'Match Winner' }],
+        },
+      ],
+    });
+
+    assert.equal(report.write.allowed, false);
+    assert.equal(report.write.writeSkipped, true);
+    assert.ok(
+      report.write.blockedReasons.includes('odds writes are not implemented in M1.3 discovery planner')
+    );
+  } finally {
+    if (originalWriteEnabled === undefined) {
+      delete process.env.SPORTS_ODDS_SYNC_WRITE_ENABLED;
+    } else {
+      process.env.SPORTS_ODDS_SYNC_WRITE_ENABLED = originalWriteEnabled;
+    }
+  }
+});
+
+await testAsync('odds discovery dry-run returns sanitized bookmaker and market coverage', async () => {
+  const { runOddsEndpointDiscoveryDryRun } = require(path.join(buildDir, 'lib/providers/odds-discovery.js'));
+
+  const report = await runOddsEndpointDiscoveryDryRun({
+    provider: 'api_football',
+    market: 'match_winner',
+    dryRun: true,
+    now: '2026-12-31T17:00:00Z',
+    endpointDocumentation: documentedOddsEndpoint(),
+    fixtures: [oddsFixture()],
+    fetchProviderOdds: async () => [
+      {
+        providerFixtureId: '12345',
+        bookmakers: [{ providerBookmakerId: '8', name: 'Fixture Book' }],
+        markets: [{ providerMarketId: '1', name: 'Match Winner' }],
+        rawProviderPayload: { token: 'SECRET_TOKEN', nested: { api_key: 'SECRET_API_KEY' } },
+      },
+    ],
+  });
+
+  assert.equal(report.dryRun, true);
+  assert.equal(report.writeEnabled, false);
+  assert.equal(report.totals.fixturesChecked, 1);
+  assert.equal(report.totals.providerLinksFound, 1);
+  assert.equal(report.totals.oddsAvailable, 1);
+  assert.equal(report.totals.oddsUnavailable, 0);
+  assert.deepEqual(report.discoveredBookmakers, [{ providerBookmakerId: '8', name: 'Fixture Book' }]);
+  assert.deepEqual(report.discoveredMarkets, [{ providerMarketId: '1', name: 'Match Winner' }]);
+  assert.equal(JSON.stringify(report).includes('SECRET_TOKEN'), false);
+  assert.equal(JSON.stringify(report).includes('SECRET_API_KEY'), false);
+  assert.equal(JSON.stringify(report).includes('rawProviderPayload'), false);
 });
 
 // ── 5. M1.2.b fixture fetch and dry-run behavior ─────────────────────────
