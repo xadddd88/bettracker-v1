@@ -236,17 +236,58 @@ do not proceed to read-only production odds dry-run until endpoint/request/cost 
 
 Reference: `docs/api-football-odds-endpoint-confirmation-m1-3.md`
 
-## Next Milestone After PR #81
+## PR #82 Provider Evidence Result
 
-Before a real provider odds dry-run can run in production, a later PR/task must confirm:
+PR #82 captures sanitized operator-side evidence after the initial PR #81 block.
 
-- exact API-Football odds endpoint
-- exact request shape
-- quota/request cost
-- whether request cost is per fixture, per fixture/market, or per bookmaker
-- endpoint support for fixture-specific pre-match 1X2 odds
-- provider bookmaker ID/name shape
-- provider market ID/name shape
+Confirmed for read-only dry-run planning:
+
+- `GET /odds`
+- `fixture`, `league`, `season`, `date`, `bookmaker`, `bet`, and `page` request parameters
+- fixture-specific odds request support
+- mixed request filters
+- pagination through `page`
+- `GET /odds/bookmakers` endpoint path
+- `GET /odds/mapping` endpoint path
+- `GET /odds/bets` pre-match bet catalog path
+- quota model: one HTTP call / page counts as one request against plan quota
+- no endpoint-specific weighted odds cost identified
+- bookmaker discovery shape: standard wrapper with `response[].id` and `response[].name`
+- mapping discovery shape: standard wrapper with `league`, `fixture`, and `update`
+- odds pagination: 10 results per page
+- `Match Winner` provider bet id `1`
+- `Match Winner` values `Home`, `Draw`, `Away`
+- odds response shape with fixture, league, update, bookmakers, bets, values, and decimal-string odds
+
+Still not started / requiring separate approval:
+
+- no production provider odds call has been made
+- no read-only production odds dry-run has been run
+- no selected canonical fixture scope has been approved
+- no odds write has been run
+- no user-facing odds usage has started
+- provider-side pre-match filtering must not replace BetTracker's canonical fixture eligibility gate
+
+Decision:
+
+```txt
+endpoint/cost evidence blocker addressed for planning
+do not run production odds dry-run without separate CPO-approved scope
+```
+
+Reference: `docs/api-football-odds-provider-evidence-m1-3.md`
+
+## Next Milestone After PR #82
+
+Before a real provider odds dry-run can run in production, a later PR/task must approve:
+
+- exact canonical fixture IDs and provider fixture links
+- exact request count budget, including pagination
+- dry-run endpoint shape, likely `GET /odds?fixture={api_football_provider_fixture_id}&bet=1`
+- sanitized report fields
+- no raw provider payload / token surfacing
+- confirmation that provider odds remain non-user-facing
+- decision on whether observed bookmaker coverage is enough for a later controlled odds write plan
 
 Only then can BetTracker add a real provider fetcher and run an authorized read-only dry-run.
 
