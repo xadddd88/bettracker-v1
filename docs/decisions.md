@@ -484,7 +484,7 @@ Statuses: `discovered`, `research_needed`, `watchlisted`, `converted_to_decision
 ## Decision #014 - API-Football Odds Provider Evidence Captured
 **Date:** 2026-07-05
 **Proposed by:** CPO + Founder
-**Status:** Draft PR #82. Provider evidence captured; production provider odds calls not started.
+**Status:** Accepted via PR #82. Provider evidence captured; production provider odds calls not started.
 
 **Decision:** BetTracker accepts sanitized operator-side and docs-sourced evidence for API-Football odds endpoint shape, quota model, bookmaker discovery shape, mapping discovery shape, response schema, and `Match Winner` market mapping. PR #82 remains evidence-only and does not run a production odds dry-run.
 
@@ -540,6 +540,51 @@ next action: separate CPO-approved read-only dry-run scope
 - PR #82 is evidence-only and does not run runtime provider calls.
 - A later CPO-approved step must select the dry-run fixtures, request budget, and sanitized report before any production provider odds call.
 - The likely future dry-run shape is `GET /odds?fixture={api_football_provider_fixture_id}&bet=1`, counting each page as one request.
+
+---
+
+## Decision #015 - Read-Only Odds Dry-Run Scope Before Provider Call
+**Date:** 2026-07-05
+**Proposed by:** CPO + Founder
+**Status:** Draft PR #83. Scope approval only; production provider odds call not started.
+
+**Decision:** The first API-Football odds runtime step must be scoped and approved before any provider call. PR #83 selects a single primary exact-linked fixture candidate and a fallback candidate, defines the request shape, request budget, pagination guardrail, sanitized report, and stop conditions. It does not run the provider call.
+
+**Proposed PR #83 scope:**
+- provider: `api_football`
+- market: `Match Winner / 1X2`
+- provider bet id: `1`
+- primary provider fixture id: `1576052`
+- fallback provider fixture id: `1576053`
+- future request shape, if separately approved: `GET /odds?fixture=1576052&bet=1`
+- variant: A only
+- max provider requests: 1
+- hard stop: `paging.total > 1`
+
+**Required gates before runtime:**
+- fixture remains `scheduled`
+- `kickoff_at` is known
+- `kickoff_at > now + 15 minutes`
+- exact `api_football` provider link exists
+- provider fixture id matches the merged PR #83 scope
+- no odds write flag is present
+- odds remain non-user-facing
+
+**Scope controls:**
+- no provider odds call in PR #83
+- no odds write
+- no migration
+- no API route
+- no Supabase write
+- no env change
+- no Scout, Analyst, or UI odds usage
+- no model probability, implied probability, edge, EV, recommendation, or betting signal
+- `SPORTS_ODDS_SYNC_WRITE_ENABLED` not added/enabled
+
+**Consequences:**
+- M1.3 can proceed to a separately approved read-only runtime dry-run after PR #83 is merged.
+- Any fallback call, page 2 fetch, broader fixture scope, odds write, or user-facing odds use requires separate approval.
+- The old false-precision failure class remains closed: odds discovery must not become a probability, edge, EV, or recommendation.
 
 ---
 

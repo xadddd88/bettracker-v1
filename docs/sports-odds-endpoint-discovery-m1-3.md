@@ -292,3 +292,33 @@ Before a real provider odds dry-run can run in production, a later PR/task must 
 Only then can BetTracker add a real provider fetcher and run an authorized read-only dry-run.
 
 Actual odds write validation belongs to a later PR after endpoint/cost, market mapping, bookmaker allowlist, and storage schema are explicitly accepted.
+
+## PR #83 Read-Only Dry-Run Scope
+
+PR #83 records the first approved-for-review scope before any production odds provider call.
+
+Scope:
+
+- primary provider fixture id: `1576052`
+- fallback provider fixture id: `1576053`
+- provider: `api_football`
+- market: `Match Winner / 1X2`
+- provider bet id: `1`
+- request shape: `GET /odds?fixture=1576052&bet=1`
+- variant: A only
+- max provider requests: 1
+- pagination guardrail: stop if `paging.total > 1`
+
+PR #83 does not:
+
+- run the provider call
+- add a route
+- add migrations
+- write Supabase rows
+- enable odds writes
+- add `SPORTS_ODDS_SYNC_WRITE_ENABLED`
+- use odds in Scout, Analyst, or UI
+
+Runtime remains blocked until PR #83 is merged and CPO separately approves the first read-only production odds dry-run.
+
+Reference: `docs/sports-odds-read-only-dry-run-scope-m1-3.md`

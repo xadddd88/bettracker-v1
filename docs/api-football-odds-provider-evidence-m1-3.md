@@ -1,12 +1,12 @@
 # M1.3 API-Football Odds Provider Evidence
 
-Status: draft PR #82 / provider evidence captured / production odds dry-run not started
+Status: DONE via PR #82 / provider evidence captured / production odds dry-run not started
 
 Last updated: 2026-07-05
 
 ## Scope
 
-PR #82 records sanitized operator-side API-Football odds evidence.
+PR #82 recorded sanitized operator-side API-Football odds evidence.
 
 Allowed:
 
@@ -382,6 +382,8 @@ Required next approval before any production provider odds call:
 CPO-approved read-only dry-run scope using known canonical fixture IDs
 ```
 
+PR #83 is the scope-approval step for the first candidate fixture and does not run the provider call.
+
 ## Safe Future Candidate
 
 Once the separate runtime dry-run scope is accepted, the likely read-only dry-run shape is:
@@ -402,5 +404,5 @@ odds provider calls from production: not run
 odds writes: not run
 Supabase writes: not run
 Scout/Analyst/UI odds usage: not started
-production odds dry-run: blocked
+production odds dry-run: not started; scoped by PR #83 before any runtime approval
 ```
