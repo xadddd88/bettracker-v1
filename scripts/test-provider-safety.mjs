@@ -78,6 +78,58 @@ async function readJsonResponse(response) {
   };
 }
 
+function withCompiledAlias(fn) {
+  const originalResolveFilename = Module._resolveFilename;
+
+  Module._resolveFilename = function resolveAlias(request, parent, isMain, options) {
+    if (request.startsWith('@/')) {
+      return originalResolveFilename.call(this, path.join(buildDir, request.slice(2)), parent, isMain, options);
+    }
+
+    return originalResolveFilename.call(this, request, parent, isMain, options);
+  };
+
+  return Promise.resolve()
+    .then(fn)
+    .finally(() => {
+      Module._resolveFilename = originalResolveFilename;
+    });
+}
+
+function clearCompiledFixtureSyncModules() {
+  for (const relPath of [
+    'app/api/admin/sports/fixtures/sync/route.js',
+    'lib/providers/fixture-sync.js',
+    'lib/supabase/admin.js',
+  ]) {
+    const compiledPath = path.join(buildDir, relPath);
+    try {
+      delete require.cache[require.resolve(compiledPath)];
+    } catch {
+      // Module may not have been loaded yet.
+    }
+  }
+}
+
+async function withFixtureSyncRoute(fn) {
+  return withCompiledAlias(async () => {
+    clearCompiledFixtureSyncModules();
+    const route = require(path.join(buildDir, 'app/api/admin/sports/fixtures/sync/route.js'));
+    return fn(route);
+  });
+}
+
+function authorizedFixtureSyncRequest(body) {
+  return new Request('https://example.test/api/admin/sports/fixtures/sync', {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer operator-token',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 function footballPayload() {
   return {
     errors: [],
@@ -103,6 +155,24 @@ function footballPayload() {
         },
       },
     ],
+  };
+}
+
+function footballPayloadMany(count) {
+  const base = footballPayload().response[0];
+  return {
+    errors: [],
+    response: Array.from({ length: count }, (_, index) => ({
+      ...base,
+      fixture: {
+        ...base.fixture,
+        id: 12000 + index,
+      },
+      teams: {
+        home: { id: 3300 + index, name: `Home ${index}` },
+        away: { id: 4400 + index, name: `Away ${index}` },
+      },
+    })),
   };
 }
 
@@ -309,6 +379,305 @@ await testAsync('fixture sync route rejects date ranges above the 7-day safety l
       delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
     } else {
       process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
+await testAsync('fixture sync route blocks multi-provider write attempts before provider fetch', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    throw new Error('provider fetch should not be called');
+  };
+
+  try {
+    await withFixtureSyncRoute(async ({ POST }) => {
+      const response = await POST(
+        authorizedFixtureSyncRequest({
+          providers: ['api_football', 'api_tennis'],
+          dateFrom: '2026-07-01',
+          dateTo: '2026-07-01',
+          dryRun: false,
+          operatorConfirm: 'WRITE_FIXTURE_SYNC_M1_2_B',
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 400);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.error, 'fixture write requires exactly one provider');
+      assert.equal(result.body.details, undefined);
+      assert.equal(fetchCalls, 0);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
+await testAsync('fixture sync route blocks multi-day write attempts before provider fetch', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    throw new Error('provider fetch should not be called');
+  };
+
+  try {
+    await withFixtureSyncRoute(async ({ POST }) => {
+      const response = await POST(
+        authorizedFixtureSyncRequest({
+          providers: ['api_football'],
+          dateFrom: '2026-07-01',
+          dateTo: '2026-07-02',
+          dryRun: false,
+          operatorConfirm: 'WRITE_FIXTURE_SYNC_M1_2_B',
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 400);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.error, 'fixture write requires a single-day date range');
+      assert.equal(result.body.details, undefined);
+      assert.equal(fetchCalls, 0);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
+await testAsync('fixture sync route blocks write cap overflow before Supabase write', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const originalWriteEnabled = process.env.SPORTS_FIXTURE_SYNC_WRITE_ENABLED;
+  const originalServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  let fetchCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  process.env.SPORTS_FIXTURE_SYNC_WRITE_ENABLED = 'true';
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    return jsonResponse(footballPayloadMany(26));
+  };
+
+  try {
+    await withFixtureSyncRoute(async ({ POST }) => {
+      const response = await POST(
+        authorizedFixtureSyncRequest({
+          providers: ['api_football'],
+          dateFrom: '2026-07-01',
+          dateTo: '2026-07-01',
+          dryRun: false,
+          operatorConfirm: 'WRITE_FIXTURE_SYNC_M1_2_B',
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 400);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.error, 'fixture write safety cap exceeded');
+      assert.equal(result.body.details, undefined);
+      assert.equal(fetchCalls, 1);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+    if (originalWriteEnabled === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_WRITE_ENABLED;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_WRITE_ENABLED = originalWriteEnabled;
+    }
+    if (originalServiceRole === undefined) {
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    } else {
+      process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceRole;
+    }
+  }
+});
+
+await testAsync('fixture sync route keeps dry-run multi-provider behavior within the 7-day limit', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async (url) => {
+    const rawUrl = String(url);
+    if (rawUrl.includes('api-tennis')) return jsonResponse(tennisPayload());
+    return jsonResponse(footballPayload());
+  };
+
+  try {
+    await withFixtureSyncRoute(async ({ POST }) => {
+      const response = await POST(
+        authorizedFixtureSyncRequest({
+          providers: ['api_football', 'api_tennis'],
+          dateFrom: '2026-07-01',
+          dateTo: '2026-07-01',
+          dryRun: true,
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, true);
+      assert.equal(result.body.report.dryRun, true);
+      assert.equal(result.body.report.totals.fetched, 2);
+      assert.equal(result.body.report.totals.insertedCanonicalFixtures, 0);
+      assert.equal(result.body.report.totals.insertedProviderLinks, 0);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
+await testAsync('fixture sync route keeps dry-run multi-day behavior within the 7-day limit', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const observedUrls = [];
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async (url) => {
+    observedUrls.push(String(url));
+    return jsonResponse(footballPayload());
+  };
+
+  try {
+    await withFixtureSyncRoute(async ({ POST }) => {
+      const response = await POST(
+        authorizedFixtureSyncRequest({
+          providers: ['api_football'],
+          dateFrom: '2026-07-01',
+          dateTo: '2026-07-07',
+          dryRun: true,
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, true);
+      assert.equal(result.body.report.dryRun, true);
+      assert.equal(result.body.report.totals.fetched, 7);
+      assert.equal(observedUrls.length, 7);
+      assert.equal(result.body.report.totals.insertedCanonicalFixtures, 0);
+      assert.equal(result.body.report.totals.insertedProviderLinks, 0);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
+await testAsync('runFixtureSync writes a small batch only when all write gates are satisfied', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWriteEnabled = process.env.SPORTS_FIXTURE_SYNC_WRITE_ENABLED;
+  const adminPath = path.join(buildDir, 'lib/supabase/admin.js');
+  const fixtureSyncPath = path.join(buildDir, 'lib/providers/fixture-sync.js');
+  const calls = [];
+
+  process.env.SPORTS_FIXTURE_SYNC_WRITE_ENABLED = 'true';
+  globalThis.fetch = async () => jsonResponse(footballPayload());
+
+  clearCompiledFixtureSyncModules();
+  require.cache[require.resolve(adminPath)] = {
+    id: adminPath,
+    filename: adminPath,
+    loaded: true,
+    exports: {
+      createAdminClient() {
+        calls.push({ op: 'createAdminClient' });
+        return {
+          from(table) {
+            const builder = {
+              select(columns) {
+                calls.push({ table, op: 'select', columns });
+                return builder;
+              },
+              eq(column, value) {
+                calls.push({ table, op: 'eq', column, value });
+                return builder;
+              },
+              async maybeSingle() {
+                calls.push({ table, op: 'maybeSingle' });
+                return { data: null, error: null };
+              },
+              insert(payload) {
+                calls.push({ table, op: 'insert', payload });
+                if (table === 'canonical_fixtures') return builder;
+                return { error: null };
+              },
+              async single() {
+                calls.push({ table, op: 'single' });
+                return { data: { id: 'fixture-1' }, error: null };
+              },
+              update(payload) {
+                calls.push({ table, op: 'update', payload });
+                return builder;
+              },
+            };
+            return builder;
+          },
+        };
+      },
+    },
+  };
+
+  try {
+    const { runFixtureSync } = require(fixtureSyncPath);
+    const report = await runFixtureSync({
+      providers: ['api_football'],
+      dateFrom: '2026-07-01',
+      dateTo: '2026-07-01',
+      dryRun: false,
+      operatorConfirm: 'WRITE_FIXTURE_SYNC_M1_2_B',
+    });
+
+    assert.equal(report.dryRun, false);
+    assert.equal(report.writeEnabled, true);
+    assert.equal(report.operatorConfirmed, true);
+    assert.equal(report.totals.fetched, 1);
+    assert.equal(report.totals.insertedCanonicalFixtures, 1);
+    assert.equal(report.totals.insertedProviderLinks, 1);
+    assert.equal(calls.filter((call) => call.op === 'createAdminClient').length, 1);
+    assert.equal(calls.some((call) => call.table === 'canonical_fixtures' && call.op === 'insert'), true);
+    assert.equal(calls.some((call) => call.table === 'fixture_provider_links' && call.op === 'insert'), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearCompiledFixtureSyncModules();
+    if (originalWriteEnabled === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_WRITE_ENABLED;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_WRITE_ENABLED = originalWriteEnabled;
     }
   }
 });

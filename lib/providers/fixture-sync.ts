@@ -4,6 +4,14 @@ import { ApiTennisAdapter } from './adapters/api-tennis'
 import type { CanonicalFixtureDraft, FixtureSyncAdapter, FixtureStatus, ProviderMeta } from './types'
 
 export const FIXTURE_SYNC_WRITE_CONFIRMATION = 'WRITE_FIXTURE_SYNC_M1_2_B'
+export const FIXTURE_SYNC_WRITE_MAX_FIXTURES = 25
+
+export class FixtureWriteSafetyError extends Error {
+  constructor(message = 'fixture write safety cap exceeded') {
+    super(message)
+    this.name = 'FixtureWriteSafetyError'
+  }
+}
 
 export type FixtureSyncProvider = 'api_football' | 'api_tennis'
 
@@ -235,6 +243,9 @@ export async function runFixtureSync(params: FixtureSyncParams): Promise<Fixture
 
     const summary = summarize(provider, fixtures)
     if (shouldWrite) {
+      if (fixtures.length > FIXTURE_SYNC_WRITE_MAX_FIXTURES) {
+        throw new FixtureWriteSafetyError()
+      }
       summary.wrote = await writeFixtures(provider, fixtures, syncRunId)
     }
     providerSummaries.push(summary)

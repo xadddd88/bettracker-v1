@@ -106,9 +106,27 @@ For a new provider fixture, the sync inserts a canonical fixture and then insert
 - `mapping_method = 'provider_fixture_id'`
 - `sync_run_id = <generated sync run id>`
 
+## M1.2.c write safety guard
+
+`SPORTS_FIXTURE_SYNC_WRITE_ENABLED` remains absent/off until an explicit controlled write validation window.
+
+The write path is intentionally narrower than dry-run:
+
+1. Write requests must include exactly one provider.
+2. Write requests must be for exactly one day (`dateFrom === dateTo`).
+3. Write requests are capped at 25 fetched fixtures.
+4. If fetched fixtures exceed the cap, the route returns `400` with `"fixture write safety cap exceeded"` and writes nothing.
+
+Dry-run behavior is unchanged:
+
+- multiple providers remain allowed
+- date ranges up to the existing 7-day safety limit remain allowed
+- write counters must remain 0
+
 ## Safety notes
 
 - No provider token is returned in API responses.
 - No raw provider payload is returned from dry-run responses.
 - Provider request URLs are sanitized through the existing provider error path.
 - The route is `nodejs` runtime only because it uses Node crypto for timing-safe token comparison.
+- Keep `SPORTS_FIXTURE_SYNC_WRITE_ENABLED` absent/off until the controlled M1.2.c write test is explicitly approved.

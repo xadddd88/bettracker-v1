@@ -2,7 +2,11 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { ProviderError } from '@/lib/providers/errors'
-import { FIXTURE_SYNC_WRITE_CONFIRMATION, runFixtureSync } from '@/lib/providers/fixture-sync'
+import {
+  FIXTURE_SYNC_WRITE_CONFIRMATION,
+  FixtureWriteSafetyError,
+  runFixtureSync,
+} from '@/lib/providers/fixture-sync'
 
 export const runtime = 'nodejs'
 
@@ -10,6 +14,8 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD'
 const DAY_MS = 24 * 60 * 60 * 1000
 const MAX_FIXTURE_SYNC_RANGE_DAYS = 7
 const DATE_RANGE_LIMIT_ERROR = 'date range exceeds M1.2.b safety limit of 7 days'
+const WRITE_SINGLE_PROVIDER_ERROR = 'fixture write requires exactly one provider'
+const WRITE_SINGLE_DAY_ERROR = 'fixture write requires a single-day date range'
 
 const fixtureSyncBodySchema = z
   .object({
@@ -89,6 +95,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: DATE_RANGE_LIMIT_ERROR }, { status: 400 })
     }
 
+    if (!parsed.data.dryRun) {
+      const requestedProviderCount = parsed.data.providers?.length ?? 2
+      if (requestedProviderCount !== 1) {
+        return NextResponse.json({ success: false, error: WRITE_SINGLE_PROVIDER_ERROR }, { status: 400 })
+      }
+
+      if (parsed.data.dateFrom !== parsed.data.dateTo) {
+        return NextResponse.json({ success: false, error: WRITE_SINGLE_DAY_ERROR }, { status: 400 })
+      }
+    }
+
     const report = await runFixtureSync(parsed.data)
 
     return NextResponse.json({
@@ -102,6 +119,10 @@ export async function POST(req: NextRequest) {
         { success: false, error: error.message, provider: error.provider, kind: error.kind },
         { status: providerErrorStatus(error) }
       )
+    }
+
+    if (error instanceof FixtureWriteSafetyError) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 })
     }
 
     console.error('[fixture-sync] unhandled error:', error instanceof Error ? error.name : 'unknown')
