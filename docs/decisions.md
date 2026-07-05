@@ -382,5 +382,35 @@ Statuses: `discovered`, `research_needed`, `watchlisted`, `converted_to_decision
 
 ---
 
+## Decision #011 - Design-Gated Odds Snapshot Sync
+**Date:** 2026-07-05
+**Proposed by:** CPO + Founder
+**Status:** Accepted for design in PR #79. Implementation not started.
+
+**Decision:** M1.3 odds snapshot sync must be designed and accepted before any code, migrations, provider calls, cron, or odds writes are added. Odds v1 starts with a narrow API-Football / football-only scope and remains blocked from Scout, Analyst, UI, model probability, edge, and EV until a separate validation milestone proves the data is safe to use.
+
+**Why:**
+- Odds data can burn provider quota faster than fixture data.
+- Odds snapshots can grow storage quickly if cadence, fixtures, markets, bookmakers, and retention are not capped first.
+- Provider market labels and bookmaker IDs are not safe for downstream use until normalized through a market catalog.
+- Unverified odds must not create false precision or betting signals in Analyst.
+- M1.2.c proved controlled fixture writes only; it did not validate odds ingestion, odds quality, or user-facing odds consumption.
+
+**Initial design constraints:**
+- provider v1: `api_football`
+- sport v1: football only
+- execution v1: manual dry-run first, no cron
+- write enablement: separate odds write gate in a future implementation PR, off by default
+- max run scope, max snapshots per fixture/day, bookmaker allowlist, retention, and quota budget must be defined before implementation
+- raw provider odds payloads must never be surfaced in user-facing responses or logs
+
+**Consequences:**
+- PR #79 is documentation/design only.
+- No odds ingestion code or migrations are allowed in PR #79.
+- Future M1.3 implementation must include safety guards, dry-run reporting, cap overflow behavior, tests, and a validation runbook before any controlled odds write.
+- Analyst and Scout must continue treating provider odds snapshots as unavailable until a later trust validation explicitly enables them.
+
+---
+
 *Last updated: 2026-07-05*
 *Owner: All (each role contributes)*

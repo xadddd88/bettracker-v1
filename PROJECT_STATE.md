@@ -17,7 +17,7 @@
 | **Branch model** | Feature branches → PR → CPO accept → Dima merges |
 | **Current UI** | Stable dark UI + Ambient Theme live as-is |
 | **Ambient Theme** | Current version live in production — further Design v2 / premium event skin work is parked |
-| **Current phase** | M1.2 provider-backed fixture foundation complete; Product Vision Gap / Beta v2 planning continues |
+| **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 odds snapshot sync is in design only; Product Vision Gap / Beta v2 planning continues |
 | **Active blockers** | None in current main — product vision gaps documented in PRODUCT_VISION_GAP.md |
 | **External beta invites** | Do not invite external beta users yet |
 
@@ -55,7 +55,30 @@ Final production state after validation:
 - no broad write, multi-provider write, or multi-day write was run
 - odds, results, SportMonks enrichment, cross-provider mapping, cron, Scout, Analyst, and UI remained untouched by M1.2.c
 
-M1.3 Odds Snapshot Sync Design is NOT STARTED. Do not start M1.3 implementation without a separate design PR.
+M1.3 Odds Snapshot Sync Design is documented in draft PR #79. M1.3 implementation, odds ingestion, migrations, provider calls, Scout, Analyst, and UI usage remain NOT STARTED.
+
+---
+
+## 1c. M1.3 Odds Snapshot Sync Design
+
+| Field | Value |
+|---|---|
+| **Status** | DESIGN ONLY - draft PR #79 |
+| **Implementation** | NOT STARTED |
+| **Odds ingestion** | NOT STARTED |
+| **Provider calls** | NOT RUN |
+| **Migrations** | NOT ADDED |
+| **User-facing usage** | BLOCKED until separate validation milestone |
+
+Design direction:
+
+- odds v1 starts with API-Football and football fixtures only
+- no cron or broad ingestion in the first implementation milestone
+- first implementation must be dry-run first, operator-gated, capped, and manually validated
+- odds snapshots must not feed Analyst, Scout, user-facing probability, edge, or EV until verified in a later trust milestone
+- storage, provider quota, market normalization, bookmaker scope, and retention must be accepted before any odds write
+
+Reference: `docs/sports-odds-snapshot-sync-m1-3-design.md`
 
 ---
 
@@ -86,6 +109,7 @@ M1.3 Odds Snapshot Sync Design is NOT STARTED. Do not start M1.3 implementation 
 | #75 | Decision Surfaces Trust Patch - localized saved decision list/detail/share/PDF surfaces, including legacy unpriced rows |
 | #76 | Live Coupon Parser & Actionability Gate - scanner upload path preserves live coupon legs, sports, phases, and actionability |
 | #77 | M1.2.c Fixture Write Safety Guard - one-provider / one-day / 25-fixture write cap before controlled validation |
+| #78 | M1.2.c Controlled Fixture Write Validation Record - documentation/status record only; no runtime code |
 
 ---
 
@@ -130,6 +154,7 @@ M1.3 Odds Snapshot Sync Design is NOT STARTED. Do not start M1.3 implementation 
 - Do NOT do visual redesign
 - Do NOT merge any PR without explicit CPO ACCEPT
 - Do NOT open new code PRs unless a blocker appears in current main
+- Do NOT start M1.3 odds ingestion or migrations until the design PR is accepted
 
 ---
 
