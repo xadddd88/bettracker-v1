@@ -412,5 +412,35 @@ Statuses: `discovered`, `research_needed`, `watchlisted`, `converted_to_decision
 
 ---
 
+## Decision #012 - Odds Endpoint Discovery Before Provider Calls
+**Date:** 2026-07-05
+**Proposed by:** CPO + Founder
+**Status:** Accepted for draft PR #80 planning. Production provider odds calls not started.
+
+**Decision:** M1.3 must begin with a read-only odds endpoint discovery and dry-run planner. Production API-Football odds provider calls remain blocked until the exact endpoint, request shape, and quota/request cost are documented and accepted. Odds writes remain blocked until a later controlled write milestone.
+
+**Why:**
+- The official API-Football documentation was not accessible from the Codex runtime because the public documentation hosts returned a browser challenge.
+- Endpoint shape and request cost must be treated as unconfirmed until verified from provider docs/account by an operator.
+- A safe implementation can still validate local gating, pre-match eligibility, bookmaker allowlist behavior, sanitized reporting, and non-use rules without calling providers.
+- This keeps the old false-precision failure class closed: unverified odds data must not become a model probability, edge, EV, Scout signal, or Analyst recommendation.
+
+**PR #80 constraints:**
+- no odds writes
+- no migrations
+- no production provider odds calls
+- no Supabase writes
+- no cron
+- no Scout, Analyst, or UI usage
+- `SPORTS_FIXTURE_SYNC_WRITE_ENABLED` remains absent/off
+- `SPORTS_ODDS_SYNC_WRITE_ENABLED` is not added/enabled
+
+**Consequences:**
+- PR #80 may add a pure read-only planner and tests for blocked provider calls, fixture eligibility, empty bookmaker allowlist, sanitized discovery reports, and no raw payload/token surfacing.
+- A future PR must confirm API-Football endpoint/request/cost before adding any real provider odds fetcher.
+- Bookmaker allowlist remains empty until dry-run discovery is reviewed and approved.
+
+---
+
 *Last updated: 2026-07-05*
 *Owner: All (each role contributes)*
