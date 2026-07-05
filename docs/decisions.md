@@ -351,5 +351,36 @@ Statuses: `discovered`, `research_needed`, `watchlisted`, `converted_to_decision
 
 ---
 
-*Last updated: 2026-06-26*  
+## Decision #010 - Controlled Provider-Backed Fixture Writes
+**Date:** 2026-07-05
+**Proposed by:** CPO + Founder
+**Status:** Accepted and validated in production for M1.2.c.
+
+**Decision:** BetTracker may write provider-backed fixtures only through a controlled, operator-gated, one-provider / one-day workflow with a small fixture cap, immediate write-flag removal, and post-write idempotency verification.
+
+**Why:**
+- Fixture data is now needed as the foundation for future odds, results, enrichment, Scout, and Analyst improvements.
+- Provider fetches and writes can burn quota or create duplicate records if run broadly.
+- The first production write needed to prove the `canonical_fixtures` and `fixture_provider_links` path without touching odds, results, enrichment, cron, Scout, Analyst, or UI.
+
+**Validated M1.2.c scope:**
+- provider: `api_football`
+- date: `2026-12-31`
+- fetched fixtures: 2
+- first write inserted 2 canonical fixtures and 2 provider links
+- idempotency write inserted 0 and updated 2 canonical fixtures / 2 provider links
+- failed writes: 0
+- duplicate provider links: 0
+- mapping confidence: `exact`
+- mapping method: `provider_fixture_id`
+- write flag removed after validation; production `writeEnabled=false`
+
+**Consequences:**
+- Future fixture writes must use a fresh dry-run-selected scope and stay within the safety guard.
+- `SPORTS_FIXTURE_SYNC_WRITE_ENABLED` remains absent/off by default.
+- M1.3 odds snapshot work must begin as a design milestone before implementation because odds sync can create provider cost, rate-limit, storage, noise, and settlement-risk pressure.
+
+---
+
+*Last updated: 2026-07-05*
 *Owner: All (each role contributes)*
