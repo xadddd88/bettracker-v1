@@ -1,12 +1,12 @@
 # M1.3 Read-Only Odds Dry-Run Implementation
 
-Status: draft PR #84 / implementation only / production provider call not run
+Status: draft PR #85 / implementation only / production provider call not run
 
 Last updated: 2026-07-05
 
 ## Scope
 
-PR #84 implements the protected read-only runtime path approved by PR #83.
+PR #85 implements the protected read-only runtime path approved by PR #83. GitHub assigned this implementation as PR #85 because PR #84 already exists.
 
 Allowed:
 
@@ -19,7 +19,7 @@ Allowed:
 
 Not allowed:
 
-- production provider odds call during PR #84 implementation or validation
+- production provider odds call during PR #85 implementation or validation
 - odds writes
 - Supabase writes
 - migrations
@@ -52,6 +52,18 @@ provider bet id: 1
 request shape: GET /odds?fixture=1576052&bet=1
 page: 1 only
 max provider requests: 1
+operatorConfirm: RUN_READ_ONLY_ODDS_DRY_RUN_M1_3
+```
+
+Required request body:
+
+```json
+{
+  "dryRun": true,
+  "providerFixtureId": "1576052",
+  "betId": 1,
+  "operatorConfirm": "RUN_READ_ONLY_ODDS_DRY_RUN_M1_3"
+}
 ```
 
 ## Pre-Flight Gates
@@ -131,6 +143,9 @@ Covered by `npm.cmd run test:provider-safety`:
 - `paging.total > 1` stops after page 1
 - sanitized report contains no token, raw payload, odds prices, or betting-signal fields
 - route requires operator authorization before Supabase/provider calls
+- route rejects empty body before Supabase/provider calls
+- route rejects missing or wrong `operatorConfirm` before Supabase/provider calls
+- route accepts the exact approved request body under mocks and still makes at most one provider call
 - no Supabase writes happen
 - existing fixture sync and discovery planner safety tests remain green
 
@@ -146,7 +161,7 @@ Additional required PR validation:
 SPORTS_FIXTURE_SYNC_WRITE_ENABLED: absent/off
 SPORTS_ODDS_SYNC_WRITE_ENABLED: not added/enabled
 fixture write mode: off
-production provider odds call: not run by PR #84
+production provider odds call: not run by PR #85
 odds writes: not run
 Supabase writes: not run
 Scout/Analyst/UI odds usage: not started
@@ -154,11 +169,10 @@ Scout/Analyst/UI odds usage: not started
 
 ## Decision
 
-PR #84 implements the approved read-only dry-run path, but it does not execute the production provider call.
+PR #85 implements the approved read-only dry-run path, but it does not execute the production provider call.
 
-After PR #84 is reviewed, merged, and deployed, the actual runtime step still requires separate CPO approval before calling:
+After PR #85 is reviewed, merged, and deployed, the actual runtime step still requires separate CPO approval before calling:
 
 ```txt
 GET /odds?fixture=1576052&bet=1
 ```
-

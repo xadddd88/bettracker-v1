@@ -582,7 +582,7 @@ next action: separate CPO-approved read-only dry-run scope
 - `SPORTS_ODDS_SYNC_WRITE_ENABLED` not added/enabled
 
 **Consequences:**
-- M1.3 can proceed to a separately approved read-only runtime dry-run after PR #84 is merged and deployed.
+- M1.3 can proceed to a separately approved read-only runtime dry-run after PR #85 is merged and deployed.
 - Any fallback call, page 2 fetch, broader fixture scope, odds write, or user-facing odds use requires separate approval.
 - The old false-precision failure class remains closed: odds discovery must not become a probability, edge, EV, or recommendation.
 
@@ -591,17 +591,18 @@ next action: separate CPO-approved read-only dry-run scope
 ## Decision #016 - Read-Only Odds Dry-Run Implementation Before Runtime Call
 **Date:** 2026-07-05
 **Proposed by:** CPO + Founder
-**Status:** Draft PR #84. Implementation only; production provider odds call not started.
+**Status:** Draft PR #85. Implementation only; production provider odds call not started. GitHub assigned this implementation as PR #85 because PR #84 already exists.
 
-**Decision:** BetTracker may add a protected admin-only read-only odds dry-run route and server helper for the PR #83 scope, but the production API-Football provider call remains blocked until PR #84 is reviewed, merged, deployed, and separately approved.
+**Decision:** BetTracker may add a protected admin-only read-only odds dry-run route and server helper for the PR #83 scope, but the production API-Football provider call remains blocked until PR #85 is reviewed, merged, deployed, and separately approved.
 
-**Implemented PR #84 scope:**
+**Implemented PR #85 scope:**
 - route: `POST /api/admin/sports/odds/dry-run`
 - provider: `api_football`
 - primary provider fixture id: `1576052`
 - market: `Match Winner / 1X2`
 - provider bet id: `1`
 - request shape: `GET /odds?fixture=1576052&bet=1`
+- required runtime confirmation: `RUN_READ_ONLY_ODDS_DRY_RUN_M1_3`
 - variant: A only
 - max provider requests: 1
 - page 1 only
@@ -619,7 +620,7 @@ next action: separate CPO-approved read-only dry-run scope
 - `kickoff_at > now + 15 minutes`
 
 **Scope controls:**
-- no provider odds call during PR #84 implementation/validation
+- no provider odds call during PR #85 implementation/validation
 - no odds write
 - no migration
 - no Supabase write
@@ -629,7 +630,7 @@ next action: separate CPO-approved read-only dry-run scope
 - no model probability, implied probability, edge, EV, recommendation, or betting signal
 
 **Consequences:**
-- PR #84 can be tested with mocked provider responses and read-only Supabase mocks.
+- PR #85 can be tested with mocked provider responses and read-only Supabase mocks.
 - The route must require operator authorization and keep `API_FOOTBALL_KEY` server-side only.
 - A failing pre-flight must block the provider call.
 - A successful pre-flight may attempt exactly one page-1 provider request only after separate runtime approval.

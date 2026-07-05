@@ -11,11 +11,15 @@ import {
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export const runtime = 'nodejs'
+const READ_ONLY_ODDS_DRY_RUN_CONFIRMATION = 'RUN_READ_ONLY_ODDS_DRY_RUN_M1_3'
+const READ_ONLY_ODDS_DRY_RUN_CONFIRMATION_ERROR =
+  'read-only odds dry-run requires explicit operator confirmation'
 
 const oddsDryRunBodySchema = z.object({
-  dryRun: z.literal(true).optional(),
-  providerFixtureId: z.literal(READ_ONLY_ODDS_PROVIDER_FIXTURE_ID).optional(),
-  betId: z.literal(READ_ONLY_ODDS_BET_ID).optional(),
+  dryRun: z.literal(true),
+  providerFixtureId: z.literal(READ_ONLY_ODDS_PROVIDER_FIXTURE_ID),
+  betId: z.literal(READ_ONLY_ODDS_BET_ID),
+  operatorConfirm: z.string().min(1),
 }).strict()
 
 function getBearerToken(req: NextRequest): string | null {
@@ -54,6 +58,16 @@ function providerErrorStatus(error: ProviderError): number {
   return 502
 }
 
+function hasApprovedStaticScope(rawBody: unknown): boolean {
+  if (!rawBody || typeof rawBody !== 'object') return false
+  const body = rawBody as Record<string, unknown>
+  return (
+    body.dryRun === true &&
+    body.providerFixtureId === READ_ONLY_ODDS_PROVIDER_FIXTURE_ID &&
+    body.betId === READ_ONLY_ODDS_BET_ID
+  )
+}
+
 export async function POST(req: NextRequest) {
   const unauthorized = authorize(req)
   if (unauthorized) return unauthorized
@@ -63,8 +77,22 @@ export async function POST(req: NextRequest) {
     const parsed = oddsDryRunBodySchema.safeParse(rawBody)
 
     if (!parsed.success) {
+      if (hasApprovedStaticScope(rawBody)) {
+        return NextResponse.json(
+          { success: false, error: READ_ONLY_ODDS_DRY_RUN_CONFIRMATION_ERROR },
+          { status: 400 }
+        )
+      }
+
       return NextResponse.json(
         { success: false, error: 'Invalid input', details: parsed.error.flatten() },
+        { status: 400 }
+      )
+    }
+
+    if (parsed.data.operatorConfirm !== READ_ONLY_ODDS_DRY_RUN_CONFIRMATION) {
+      return NextResponse.json(
+        { success: false, error: READ_ONLY_ODDS_DRY_RUN_CONFIRMATION_ERROR },
         { status: 400 }
       )
     }
