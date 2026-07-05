@@ -100,6 +100,8 @@ These later markets require explicit market catalog mapping before downstream us
 
 The first implementation must use a bookmaker allowlist.
 
+The default bookmaker allowlist is empty until provider bookmaker IDs and names are discovered in dry-run and approved.
+
 Initial cap:
 
 ```txt
@@ -112,6 +114,8 @@ The implementation PR must record:
 - provider bookmaker display name
 - internal bookmaker code, if available
 - whether the bookmaker is allowed for snapshot writes
+
+Dry-run may report discovered provider bookmaker IDs, provider bookmaker names, and available markets. Write mode may write only approved bookmaker IDs and names, with no more than 3 approved bookmakers per market.
 
 If bookmaker IDs are unavailable or unstable, the first implementation must stop at dry-run reporting and must not write odds snapshots.
 
@@ -132,6 +136,35 @@ Future cadence must be accepted separately. Candidate future cadence:
 - at most 1 to 3 snapshots per fixture per day
 - no polling in the final 15 minutes before kickoff until live/late-line semantics are designed
 - no in-play/live odds ingestion until a separate live-odds design exists
+
+## Pre-Match Eligibility Gate
+
+Odds v1 writes are allowed only for pre-match scheduled fixtures.
+
+Before any odds write, every selected fixture must satisfy:
+
+```txt
+canonical_fixtures.status = scheduled
+kickoff_at is known
+kickoff_at > now + safety buffer
+minimum pre-kickoff safety buffer: 15 minutes
+```
+
+The implementation must block odds writes for:
+
+- live fixtures
+- finished fixtures
+- cancelled fixtures
+- abandoned fixtures
+- postponed fixtures
+- retired fixtures
+- walkover fixtures
+- unknown status
+- missing `kickoff_at`
+- already-started fixtures
+- fixtures inside the pre-kickoff safety buffer
+
+No live or in-play odds ingestion is allowed in M1.3.
 
 ## Provider Quota Protection
 
@@ -168,7 +201,9 @@ The run report must not include:
 
 ## Provider Cost Model
 
-The implementation PR must document the exact API-Football odds endpoint cost before any provider call is run in production.
+The implementation PR must document the exact API-Football odds endpoint, request shape, and quota/request cost before any production provider odds call is run.
+
+No production provider odds call is allowed until that endpoint, request shape, and cost are documented in the implementation PR.
 
 Until the endpoint cost is confirmed from the provider plan, BetTracker should use the conservative estimate:
 
@@ -187,6 +222,7 @@ The run must stop before provider calls when:
 - estimated requests exceed the configured per-run cap
 - estimated requests exceed the remaining daily operator budget
 - the provider plan cost is unknown
+- the endpoint cost or request shape is unknown
 - the endpoint would require live odds polling
 
 The first implementation should include these configurable limits:
@@ -222,6 +258,25 @@ Baseline v1 estimate:
 ```
 
 If the chosen provider returns odds in a shape where a row represents the market instead of the selection, the implementation PR must adjust this estimate before write approval.
+
+## Fixture And Odds Availability
+
+Known canonical fixture IDs and exact API-Football provider links are required for odds v1.
+
+Odds availability is not assumed. The M1.2.c controlled fixture write proved that selected fixtures can be linked to API-Football; it did not prove that API-Football provides odds for those fixtures.
+
+If selected fixtures have no provider odds, the first implementation should stop at a dry-run coverage report and skip writes.
+
+The dry-run coverage report should distinguish:
+
+```txt
+fixtures found
+provider links found
+odds unavailable
+write skipped
+```
+
+No empty, inferred, placeholder, or ambiguous odds snapshots should be written.
 
 ## Append-Only Snapshot Behavior
 
@@ -299,18 +354,22 @@ First implementation may write only mapped markets. Unmapped markets must be blo
 
 The first odds write must require all gates:
 
-1. separate odds write env flag is enabled, for example `SPORTS_ODDS_SYNC_WRITE_ENABLED=true`
+1. separate odds write env flag is enabled: `SPORTS_ODDS_SYNC_WRITE_ENABLED=true`
 2. operator token is valid
 3. request has `dryRun=false`
-4. request has an explicit odds operator confirmation string
+4. request has the explicit odds operator confirmation string: `WRITE_ODDS_SNAPSHOT_M1_3`
 5. exactly one provider
 6. known canonical fixture IDs only
-7. fixture count within cap
-8. market count within cap
-9. bookmaker count within cap
-10. daily snapshot cap not exceeded
-11. market catalog mapping exists and is allowed
-12. dry-run for the exact scope passed first
+7. exact API-Football provider links exist
+8. fixture odds availability is confirmed
+9. every fixture passes the pre-match eligibility gate
+10. fixture count within cap
+11. market count within cap
+12. bookmaker count within cap
+13. approved bookmaker allowlist is non-empty for the selected market
+14. daily snapshot cap not exceeded
+15. market catalog mapping exists and is allowed
+16. dry-run for the exact scope passed first
 
 The fixture write flag must not be reused for odds writes:
 
@@ -326,13 +385,19 @@ The first implementation PR after this design must include tests for:
 
 - dry-run returns sanitized odds counts with no writes
 - write attempt is blocked when the odds write flag is absent
+- write attempt is blocked without `WRITE_ODDS_SNAPSHOT_M1_3`
 - multi-provider odds write attempt is blocked
 - fixture count above cap is blocked before provider writes
+- non-scheduled, unknown, live, finished, cancelled, postponed, abandoned, retired, walkover, missing-kickoff, already-started, or safety-buffer fixtures are blocked
+- fixtures with no available provider odds stop at dry-run coverage and write nothing
 - market count above cap is blocked
 - bookmaker count above cap is blocked
+- empty bookmaker allowlist blocks writes
+- unapproved bookmakers are reported in dry-run but blocked from write
 - unmapped market is blocked from write
 - daily snapshot cap is enforced
 - cap overflow writes nothing
+- unknown API-Football odds endpoint cost or request shape blocks production provider calls
 - raw provider payload is not returned
 - provider token and secret query params are not surfaced
 - exact repeated write does not create duplicates
@@ -392,8 +457,15 @@ Before implementation, CPO must approve:
 - max snapshots per fixture/day
 - normalized snapshot retention
 - raw payload retention, if any
-- exact odds write confirmation string
 - exact implementation milestone name after PR #79
+
+Fixed implementation names:
+
+```txt
+odds write flag: SPORTS_ODDS_SYNC_WRITE_ENABLED
+odds confirmation string: WRITE_ODDS_SNAPSHOT_M1_3
+fixture write flag remains separate: SPORTS_FIXTURE_SYNC_WRITE_ENABLED
+```
 
 ## Current Production State
 
