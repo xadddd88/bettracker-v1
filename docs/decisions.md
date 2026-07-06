@@ -691,7 +691,7 @@ next action: separate CPO-approved read-only dry-run scope
 ## Decision #018 - Bookmaker and Mapping Discovery Scope Before Reference Calls
 **Date:** 2026-07-06
 **Proposed by:** CPO + Founder
-**Status:** Draft PR #88. Scope approval only; provider calls not run.
+**Status:** Scope accepted via PR #88. Implementation merged via PR #92. First runtime result is partial / safe.
 
 **Decision:** After the first fixture-specific read-only odds dry-run returned `oddsAvailable=false`, the next safer M1.3 step is reference discovery scope approval for bookmaker and mapping endpoints, not a new near-term fixture odds call or any write path.
 
@@ -748,7 +748,8 @@ next action: separate CPO-approved read-only dry-run scope
 
 **Consequences:**
 - PR #88 may document and seek approval for the reference discovery scope only.
-- Runtime bookmaker/mapping discovery remains blocked until PR #88 is reviewed, merged, deployed if needed, and separately approved for execution.
+- Runtime bookmaker/mapping discovery required separate approval after PR #88 and PR #92.
+- The first separately approved runtime discovery attempted `/odds/bookmakers` only and stopped before `/odds/mapping` on the response-shape guard.
 - Any future implementation must keep raw provider payloads, tokens, account details, odds prices, and betting signals out of responses, logs, docs, and user-facing surfaces.
 
 ---
@@ -801,6 +802,65 @@ The map is not an implementation milestone. It does not supersede the current M1
 - Any Analyst, Scout, UI, or pricing work must check against FP-001 before use.
 
 Reference: `docs/data-coverage-fp001-map.md`
+
+---
+
+## Decision #022 - Bookmaker Discovery Partial Safe Result
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Accepted as partial / safe evidence. Mapping discovery not run. Full bookmaker/mapping discovery not done.
+
+**Decision:** BetTracker accepts the first production bookmaker/mapping reference discovery result as safe partial evidence, not as a completed discovery milestone.
+
+**Approved runtime scope:**
+- endpoint: `POST https://btdk.app/api/admin/sports/odds/reference-discovery`
+- provider: `api_football`
+- scope: `bookmaker_mapping_reference`
+- endpoints: `/odds/bookmakers`, `/odds/mapping`
+- max provider requests: 2
+- page 1 only
+- stop if `paging.total > 1`
+- stop if response shape differs from expected evidence
+- no odds values endpoint
+- no fixture-specific odds endpoint
+
+**Result:**
+- HTTP status: 200
+- `success=false`
+- `dryRun=true`
+- `estimatedProviderRequests=2`
+- `actualProviderRequests=1`
+- `writeSkipped=true`
+- `paginationOverflow=false`
+- stop reason: `provider response shape differs from expected evidence for /odds/bookmakers`
+- `/odds/bookmakers.requestAttempted=true`
+- `/odds/bookmakers.paging.current=1`
+- `/odds/bookmakers.paging.total=1`
+- `/odds/bookmakers.resultsCount=33`
+- `/odds/bookmakers.responseShapeValid=false`
+- discovered bookmaker count: 32, as reported by sanitized output
+- `/odds/mapping.requestAttempted=false`
+- `mappingCoverage=[]`
+
+**Interpretation:**
+- The bookmaker endpoint is reachable.
+- The endpoint returned bookmaker ids/names in sanitized output.
+- The protected route correctly returned `success=false` because a guardrail stop reason was present.
+- The route correctly stopped before `/odds/mapping`.
+- This is safe partial discovery, not full successful discovery.
+- No page 2, odds values endpoint, or fixture-specific odds endpoint was called.
+- No raw provider payload, API key, operator token, account data, odds prices, probability, implied probability, edge, EV, recommendation, Scout signal, Analyst signal, UI signal, betting signal, or Supabase write surfaced.
+
+**Consequences:**
+- M1.3 Bookmaker Discovery is `PARTIAL / SAFE`.
+- M1.3 Mapping Discovery is `NOT RUN`.
+- M1.3 Bookmaker & Mapping Discovery is `NOT DONE`.
+- `SPORTS_ODDS_SYNC_WRITE_ENABLED` remains not added/enabled.
+- M1.3 odds writes, storage, Scout usage, Analyst usage, UI usage, and betting signals remain not started.
+- Any further provider call, including rerunning `/odds/bookmakers` or calling `/odds/mapping`, requires separate CPO approval.
+- FP-001 remains active: reference discovery does not unlock probability, edge, EV, recommendation, or betting signal generation.
+
+Reference: `docs/sports-odds-bookmaker-mapping-discovery-result-m1-3.md`
 
 ---
 
