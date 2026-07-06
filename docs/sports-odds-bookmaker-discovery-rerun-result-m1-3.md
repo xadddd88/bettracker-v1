@@ -1,4 +1,4 @@
-# M1.3 Bookmaker & Mapping Discovery Result
+# M1.3 Bookmaker Discovery Rerun Result
 
 Status: PARTIAL / SAFE
 
@@ -6,13 +6,7 @@ Last updated: 2026-07-06
 
 ## Scope
 
-This document records the first separately approved production reference discovery run after PR #92 merged and deployed.
-
-A later separately approved rerun after PR #94 is recorded in:
-
-```txt
-docs/sports-odds-bookmaker-discovery-rerun-result-m1-3.md
-```
+This document records the separately approved production reference discovery rerun after PR #94 merged the bookmaker discovery shape adapter.
 
 Approved production route:
 
@@ -70,7 +64,7 @@ Endpoint result:
   resultsCount: 33
   paginationOverflow: false
   responseShapeValid: false
-  discoveredBookmakers count: 32, as reported by sanitized output
+  discoveredBookmakers count: 32
 
 /odds/mapping:
   requestAttempted: false
@@ -80,23 +74,26 @@ Endpoint result:
 
 ## Bookmaker Output
 
-The sanitized runtime output reported 32 discovered bookmaker entries.
+The sanitized runtime summary reported 32 discovered bookmaker entries.
 
-This status record intentionally does not reconstruct or invent individual bookmaker ids/names that were not supplied with the approved result summary. If this record is expanded later, only sanitized pairs may be added:
+The individual sanitized bookmaker id/name list was not included in the supplied result record for this PR. This document therefore does not reconstruct, infer, or add bookmaker entries.
+
+If the exact sanitized runtime list is supplied later, only exact pairs from that runtime output may be appended in this shape:
 
 ```txt
 providerBookmakerId
 name
 ```
 
-No raw provider payload or account-level provider data may be added.
+No raw provider payload, account-level provider data, token, secret parameter, or odds price may be added.
 
 ## Interpretation
 
-- The bookmaker endpoint is reachable.
-- The endpoint returned bookmaker ids/names in sanitized output.
+- `/odds/bookmakers` is reachable.
+- Bookmaker extraction succeeded for 32 sanitized id/name pairs.
+- At least one reported row likely has unexpected or malformed shape, so the endpoint shape remains not clean.
 - The route correctly marked the result as `success=false` because `stopReasons` was non-empty.
-- The route correctly stopped before `/odds/mapping` because the bookmaker response shape did not match expected evidence.
+- The route correctly stopped before `/odds/mapping`.
 - This is a safe partial discovery, not a full successful discovery.
 - No page 2 was requested.
 - No odds values endpoint was called.
@@ -124,13 +121,13 @@ The run did not surface or create:
 - betting signal
 - Supabase writes
 
-## Current State After Run
+## Current State After Rerun
 
 ```txt
 M1.3 Bookmaker Discovery: PARTIAL / SAFE
 M1.3 Mapping Discovery: NOT RUN
 M1.3 Bookmaker & Mapping Discovery: NOT DONE
-M1.3 Bookmaker Discovery Shape Adapter: PARTIAL / NEEDS FOLLOW-UP after PR #94 rerun
+M1.3 Bookmaker Discovery Shape Adapter: PARTIAL / NEEDS FOLLOW-UP
 M1.3 odds writes: NOT STARTED
 SPORTS_ODDS_SYNC_WRITE_ENABLED: NOT ADDED / NOT ENABLED
 Scout / Analyst / UI odds usage: NOT STARTED
@@ -156,9 +153,9 @@ Check against FP-001 before any future feature uses bookmaker, mapping, market, 
 
 ## Next Gate
 
-Any further runtime provider call requires separate CPO approval.
+M1.3 Bookmaker & Mapping Discovery remains not done.
 
-This includes:
+Any further runtime provider call requires separate CPO approval. This includes:
 
 - rerunning `/odds/bookmakers`
 - calling `/odds/mapping`

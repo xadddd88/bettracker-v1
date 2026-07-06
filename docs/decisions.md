@@ -864,5 +864,71 @@ Reference: `docs/sports-odds-bookmaker-mapping-discovery-result-m1-3.md`
 
 ---
 
+## Decision #023 - Bookmaker Discovery Rerun Remains Partial / Safe
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Accepted as partial / safe evidence. Mapping discovery not run. Full bookmaker/mapping discovery not done.
+
+**Decision:** BetTracker accepts the post-PR #94 production bookmaker discovery rerun as safe partial evidence, not as a completed discovery milestone. PR #94 improved the sanitizer for flat and wrapped bookmaker rows, but the rerun still stopped on the bookmaker response-shape guard before `/odds/mapping`.
+
+**Approved runtime scope:**
+- endpoint: `POST https://btdk.app/api/admin/sports/odds/reference-discovery`
+- provider: `api_football`
+- scope: `bookmaker_mapping_reference`
+- endpoints: `/odds/bookmakers`, `/odds/mapping`
+- max provider requests: 2
+- page 1 only
+- stop if `paging.total > 1`
+- stop if response shape differs from expected evidence
+- no odds values endpoint
+- no fixture-specific odds endpoint
+
+**Result:**
+- HTTP status: 200
+- `success=false`
+- `dryRun=true`
+- `estimatedProviderRequests=2`
+- `actualProviderRequests=1`
+- `writeSkipped=true`
+- `paginationOverflow=false`
+- stop reason: `provider response shape differs from expected evidence for /odds/bookmakers`
+- `/odds/bookmakers.requestAttempted=true`
+- `/odds/bookmakers.paging.current=1`
+- `/odds/bookmakers.paging.total=1`
+- `/odds/bookmakers.resultsCount=33`
+- `/odds/bookmakers.responseShapeValid=false`
+- discovered bookmaker count: 32
+- `/odds/mapping.requestAttempted=false`
+- `mappingCoverage=[]`
+
+**Interpretation:**
+- `/odds/bookmakers` is reachable.
+- Bookmaker extraction succeeded for 32 sanitized id/name pairs.
+- At least one reported row likely has unexpected or malformed shape, so the endpoint shape remains not clean.
+- The protected route correctly returned `success=false` because a guardrail stop reason was present.
+- The route correctly stopped before `/odds/mapping`.
+- This is safe partial discovery, not full successful discovery.
+- No page 2, odds values endpoint, or fixture-specific odds endpoint was called.
+- No raw provider payload, API key, operator token, account data, odds prices, probability, implied probability, edge, EV, recommendation, Scout signal, Analyst signal, UI signal, betting signal, or Supabase write surfaced.
+
+**Bookmaker list handling:**
+- The supplied rerun summary includes the discovered bookmaker count but does not include the individual sanitized id/name list.
+- BetTracker must not reconstruct or invent bookmaker ids/names in documentation.
+- If the exact sanitized runtime list is supplied later, only exact `providerBookmakerId` / `name` pairs from that runtime output may be appended.
+
+**Consequences:**
+- M1.3 Bookmaker Discovery is `PARTIAL / SAFE`.
+- M1.3 Mapping Discovery is `NOT RUN`.
+- M1.3 Bookmaker & Mapping Discovery is `NOT DONE`.
+- M1.3 Bookmaker Discovery Shape Adapter is `PARTIAL / NEEDS FOLLOW-UP`.
+- `SPORTS_ODDS_SYNC_WRITE_ENABLED` remains not added/enabled.
+- M1.3 odds writes, storage, Scout usage, Analyst usage, UI usage, and betting signals remain not started.
+- Any further provider call, including rerunning `/odds/bookmakers` or calling `/odds/mapping`, requires separate CPO approval.
+- FP-001 remains active: reference discovery does not unlock probability, edge, EV, recommendation, or betting signal generation.
+
+Reference: `docs/sports-odds-bookmaker-discovery-rerun-result-m1-3.md`
+
+---
+
 *Last updated: 2026-07-06*
 *Owner: All (each role contributes)*
