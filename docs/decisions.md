@@ -688,5 +688,28 @@ next action: separate CPO-approved read-only dry-run scope
 
 ---
 
+## Decision #019 - FP-001 False Precision Regression Case
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Accepted. Regression case recorded in `docs/analysis-trust-regression-cases.md`.
+
+**Decision:** BetTracker will treat the legacy AI Analysis PDF from 2026-07-04 as regression case `FP-001 - Legacy False Precision Analysis`.
+
+The legacy PDF showed `SOCCER`, `NO VALUE`, `Model probability 28.0%`, `Implied probability 45.5%`, and `Edge -17.4%` while also admitting that live injuries, team news, recent form updates, current line movement, and tennis-specific model support were missing. It also used pseudo-precise probability language such as `45.45%` and `25-30%` without verified per-leg model inputs.
+
+**Rule:** No incomplete provider discovery, odds snapshot, bookmaker mapping, market mapping, or Analyst/Scout feature may produce model probability, implied probability, edge, EV, recommendation, Place Bet visibility, Scout score, or betting signal unless required model inputs and trust gates are satisfied.
+
+**Consequences:**
+- Reference discovery is not a betting signal.
+- Odds availability is not model probability.
+- Odds snapshots are not edge.
+- Bookmaker odds are not recommendations.
+- Line movement cannot be shown as value until a separate trust validation milestone approves it.
+- Any future odds, market, bookmaker, Scout, Analyst, or user-facing recommendation work must be checked against FP-001 before merge.
+
+Reference: `docs/analysis-trust-regression-cases.md`
+
+---
+
 *Last updated: 2026-07-06*
 *Owner: All (each role contributes)*
