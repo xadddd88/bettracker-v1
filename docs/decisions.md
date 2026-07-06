@@ -1175,5 +1175,56 @@ Reference: `docs/sports-odds-canonical-fixture-first-mapping-scope-m1-3.md`
 
 ---
 
+## Decision #028 - Canonical-Fixture-First Mapping Page-1 Comparison Result
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Result record. No runtime provider calls.
+
+**Context:** PR #101 defined the canonical-fixture-first strategy: compare existing sanitized `/odds/mapping` page-1 coverage against known BetTracker provider fixture IDs before any broader crawl.
+
+Known BetTracker provider fixture IDs:
+- `1576052`
+- `1576053`
+
+Comparison source:
+- already captured sanitized runtime output from the latest reference discovery run
+- no provider call
+- no `/odds/mapping` rerun
+- no page 2 fetch
+
+Existing `/odds/mapping` page-1 result:
+- `paging.current=1`
+- `paging.total=11`
+- `resultsCount=100`
+- `mappingCoverage count=100`
+- page 2 was not requested
+- odds values endpoint was not called
+- fixture-specific odds endpoint was not called
+- no writes occurred
+- no betting signal surfaced
+
+**Result:**
+- `provider_fixture_id=1576052` is NOT present in existing page-1 mapping coverage.
+- `provider_fixture_id=1576053` is NOT present in existing page-1 mapping coverage.
+- Canonical-fixture-first page-1 check result: `DONE / NOT FOUND`.
+
+**Interpretation:**
+- This is not an integration failure.
+- The known controlled fixtures are not covered on page 1 of the global mapping response.
+- `/odds/mapping` page 2+ remains blocked.
+- Full mapping crawl remains blocked.
+- Mapping coverage does not unlock probability, edge, EV, recommendations, Scout/Analyst/UI, Place Bet, or betting signals.
+
+**Next decision:**
+- Do not auto-fetch page 2.
+- Do not crawl pages 2-11.
+- Evaluate whether API-Football supports a filtered `/odds/mapping` request or whether mapping exploration should stop for now.
+
+**FP-001:** Mapping page-1 not-found status is technical reference evidence only. It is not probability, implied probability, edge, EV, recommendation, Scout signal, Analyst signal, UI signal, or betting signal.
+
+Reference: `docs/sports-odds-canonical-fixture-first-mapping-page1-result-m1-3.md`
+
+---
+
 *Last updated: 2026-07-06*
 *Owner: All (each role contributes)*

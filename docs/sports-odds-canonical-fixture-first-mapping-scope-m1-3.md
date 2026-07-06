@@ -180,6 +180,20 @@ The next approved step is documentation/status only:
 Compare existing sanitized page-1 mappingCoverage against provider_fixture_id 1576052 and 1576053 if that sanitized report is available.
 ```
 
+Result reference:
+
+```txt
+docs/sports-odds-canonical-fixture-first-mapping-page1-result-m1-3.md
+```
+
+The page-1 comparison result is:
+
+```txt
+DONE / NOT FOUND
+```
+
+Neither `provider_fixture_id=1576052` nor `provider_fixture_id=1576053` was present in the existing sanitized page-1 mapping coverage.
+
 If the existing sanitized report is unavailable or does not include the known fixture IDs, do not call the provider automatically. Open a separate scope that documents:
 
 - selected provider-supported filter, if any
