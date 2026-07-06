@@ -1080,5 +1080,55 @@ Reference: `docs/sports-odds-bookmaker-mapping-discovery-rerun-result-m1-3.md`
 
 ---
 
+## Decision #026 - Mapping Pagination Strategy Before Page 2 Calls
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Strategy only. Runtime page 2+ calls not approved.
+
+**Context:** The latest approved reference discovery after PR #98 reached `/odds/mapping` page 1 and stopped correctly on the approved page-1 guardrail.
+
+Known result:
+- `actualProviderRequests=2`
+- `/odds/bookmakers` returned page 1 with `paging.total=1`, `resultsCount=33`, and `responseShapeValid=true`.
+- Bookmaker diagnostics: `bookmakerRowsTotal=33`, `validBookmakerRows=32`, `partialBookmakerRows=1`, and `nonFatalWarnings=["bookmaker row missing name"]`.
+- `/odds/mapping` returned page 1 with `paging.total=11`, `resultsCount=100`, and `responseShapeValid=true`.
+- `paginationOverflow=true`.
+- Stop reason: `provider pagination total exceeds approved page-1 budget for /odds/mapping`.
+- Page 2 was not requested.
+- Odds values endpoint was not called.
+- Fixture-specific odds endpoint was not called.
+- No writes, raw payload, odds prices, probability, edge, EV, recommendation, Scout/Analyst/UI signal, or betting signal surfaced.
+
+**Decision:** Do not auto-fetch remaining mapping pages. Define and accept a mapping pagination strategy before any page 2+ runtime call.
+
+**Options to evaluate:**
+- Option A: Stop at page 1 sample only.
+- Option B: Controlled full mapping discovery pages 1-11.
+- Option C: Narrowed mapping discovery using provider-supported filters if available.
+- Option D: Canonical-fixture-first mapping discovery relevant to BetTracker's known canonical fixtures.
+
+**Request budget framing:**
+- Page 1 sample only: 0 additional requests.
+- Full current mapping: 10 additional requests.
+- Narrowed or filtered mapping: TBD after provider evidence.
+
+**Risk controls:**
+- Provider quota usage must be explicitly budgeted.
+- Response size and irrelevant league/season noise must be bounded.
+- Stale mapping risk must be acknowledged.
+- Mapping reference data has no direct user value until later validated storage and trust gates exist.
+- FP-001 remains active: mapping reference availability does not unlock probability, implied probability, edge, EV, recommendation, Place Bet, Scout score, Analyst pricing, UI signals, or betting signals.
+
+**Consequences:**
+- M1.3 Mapping Discovery remains `PARTIAL / SAFE`.
+- M1.3 Bookmaker & Mapping Discovery remains `PARTIAL / SAFE / NOT DONE`.
+- Page 2+ calls remain blocked.
+- Odds writes, storage, Scout usage, Analyst usage, UI usage, and betting signals remain not started.
+- The next approved step must be a separate implementation/runtime scope after CPO accepts a request budget and filtering strategy.
+
+Reference: `docs/sports-odds-mapping-pagination-strategy-m1-3.md`
+
+---
+
 *Last updated: 2026-07-06*
 *Owner: All (each role contributes)*
