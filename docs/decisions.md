@@ -1226,5 +1226,49 @@ Reference: `docs/sports-odds-canonical-fixture-first-mapping-page1-result-m1-3.m
 
 ---
 
+## Decision #029 - Filtered Mapping Support Evidence
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Evidence only. Runtime provider calls not approved.
+
+**Context:** PR #102 recorded that provider fixture IDs `1576052` and `1576053` were not present in the existing `/odds/mapping` page-1 mapping coverage. `/odds/mapping` page 1 had `paging.total=11`, and page 2+ remains blocked.
+
+**Evidence source:** Existing sanitized operator-side provider evidence from `docs/api-football-odds-provider-evidence-m1-3.md`. No provider call was made for this decision.
+
+**Confirmed for `/odds/mapping`:**
+- endpoint path: `GET /odds/mapping`
+- response fields: `paging.current`, `paging.total`, `response[]`
+- response mapping fields: `league.id`, `league.season`, `fixture.id`, `fixture.date`, `fixture.timestamp`, `update`
+
+**Not confirmed for `/odds/mapping`:**
+- `fixture` request filter
+- `league` request filter
+- `season` request filter
+- `date` request filter
+- `bookmaker` request filter
+- `bet` request filter
+- exact `page` request parameter shape
+- any other narrowing parameter
+
+**Important distinction:** `GET /odds` supports fixture, league, season, date, bookmaker, bet, and page parameters. That does not prove those same filters are supported by `GET /odds/mapping`.
+
+**Decision:**
+- Filtered `/odds/mapping` runtime is not approved.
+- Do not call `/odds/mapping?fixture=1576052` unless future sanitized provider evidence confirms the fixture filter.
+- Do not call unconfirmed league/season/date/bookmaker/bet mapping filters.
+- Do not call `/odds/mapping?page=2`.
+- Keep full page crawl blocked.
+
+**Future branch:**
+- If future sanitized provider evidence confirms a fixture filter, a later scope may propose `GET /odds/mapping?fixture=1576052`, page 1 only, max 1 request, sanitized report only.
+- If future evidence confirms league/season filters but not fixture filters, a later scope must justify request budget and relevance before runtime.
+- If no useful filters are confirmed, mapping exploration should remain stopped or require a separate explicit CPO-approved full-crawl budget.
+
+**FP-001:** Filtered mapping support evidence does not unlock probability, implied probability, edge, EV, recommendation, Place Bet, Scout score, Analyst signal, UI signal, or betting signal.
+
+Reference: `docs/sports-odds-filtered-mapping-support-evidence-m1-3.md`
+
+---
+
 *Last updated: 2026-07-06*
 *Owner: All (each role contributes)*

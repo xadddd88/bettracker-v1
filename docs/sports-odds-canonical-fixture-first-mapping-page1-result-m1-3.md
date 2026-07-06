@@ -123,4 +123,18 @@ Next safe decision:
 Evaluate whether API-Football supports a filtered /odds/mapping request, or stop mapping exploration for now.
 ```
 
+Evidence reference:
+
+```txt
+docs/sports-odds-filtered-mapping-support-evidence-m1-3.md
+```
+
+Current evidence result:
+
+```txt
+Filtered /odds/mapping runtime is not approved.
+Existing sanitized evidence confirms GET /odds/mapping only.
+Fixture, league, season, date, bookmaker, bet, and exact page request parameters are not confirmed for /odds/mapping.
+```
+
 Any future runtime provider call requires a separate CPO-approved scope with explicit request shape, budget, stop conditions, sanitized report fields, and FP-001 check.
