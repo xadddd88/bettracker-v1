@@ -1179,6 +1179,55 @@ await testAsync('bookmaker/mapping discovery reports bookmaker row diagnostics f
   assert.equal(bookmakerEndpoint.responseShapeValid, true);
 });
 
+await testAsync('bookmaker/mapping discovery treats missing bookmaker name as non-fatal and continues to mapping', async () => {
+  const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
+  const requests = [];
+
+  const report = await runBookmakerMappingDiscovery({
+    fetchProviderReference: async (request) => {
+      requests.push(request);
+      if (request.endpoint === 'bookmakers') {
+        return oddsBookmakersPayload({
+          results: 3,
+          response: [
+            { id: 6, name: 'Bwin' },
+            { id: 99 },
+            { bookmaker: { id: 8, name: 'Bet365' } },
+          ],
+        });
+      }
+      if (request.endpoint === 'mapping') return oddsMappingPayload();
+      throw new Error(`unexpected endpoint ${request.endpoint}`);
+    },
+  });
+
+  const bookmakerEndpoint = report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers');
+  assert.deepEqual(requests, [{ endpoint: 'bookmakers' }, { endpoint: 'mapping' }]);
+  assert.equal(report.actualProviderRequests, 2);
+  assert.deepEqual(report.stopReasons, []);
+  assert.ok(report.nonFatalWarnings.includes('bookmaker row missing name'));
+  assert.equal(bookmakerEndpoint.responseShapeValid, true);
+  assert.equal(bookmakerEndpoint.bookmakerRowsTotal, 3);
+  assert.equal(bookmakerEndpoint.validBookmakerRows, 2);
+  assert.equal(bookmakerEndpoint.invalidBookmakerRows, 0);
+  assert.equal(bookmakerEndpoint.partialBookmakerRows, 1);
+  assert.deepEqual(bookmakerEndpoint.invalidBookmakerRowReasons, []);
+  assert.deepEqual(bookmakerEndpoint.partialBookmakerRowReasons, ['missing name']);
+  assert.ok(bookmakerEndpoint.nonFatalWarnings.includes('bookmaker row missing name'));
+  assert.deepEqual(report.discoveredBookmakers, [
+    { providerBookmakerId: '6', name: 'Bwin' },
+    { providerBookmakerId: '8', name: 'Bet365' },
+  ]);
+  assert.equal(report.discoveredBookmakers.some((bookmaker) => bookmaker.providerBookmakerId === '99'), false);
+  assert.deepEqual(report.mappingCoverage, [
+    {
+      league: { id: '39', season: '2026' },
+      fixture: { id: '1576052' },
+      update: '2026-07-05T12:00:00+00:00',
+    },
+  ]);
+});
+
 await testAsync('bookmaker/mapping discovery reports generic invalid bookmaker row diagnostics', async () => {
   const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
 
@@ -1203,8 +1252,11 @@ await testAsync('bookmaker/mapping discovery reports generic invalid bookmaker r
   const bookmakerEndpoint = report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers');
   assert.equal(bookmakerEndpoint.bookmakerRowsTotal, 5);
   assert.equal(bookmakerEndpoint.validBookmakerRows, 1);
-  assert.equal(bookmakerEndpoint.invalidBookmakerRows, 4);
-  assert.ok(bookmakerEndpoint.invalidBookmakerRowReasons.includes('missing name'));
+  assert.equal(bookmakerEndpoint.invalidBookmakerRows, 3);
+  assert.equal(bookmakerEndpoint.partialBookmakerRows, 1);
+  assert.ok(bookmakerEndpoint.partialBookmakerRowReasons.includes('missing name'));
+  assert.ok(bookmakerEndpoint.nonFatalWarnings.includes('bookmaker row missing name'));
+  assert.equal(bookmakerEndpoint.invalidBookmakerRowReasons.includes('missing name'), false);
   assert.ok(bookmakerEndpoint.invalidBookmakerRowReasons.includes('missing id'));
   assert.ok(bookmakerEndpoint.invalidBookmakerRowReasons.includes('non-object row'));
   assert.ok(bookmakerEndpoint.invalidBookmakerRowReasons.includes('unsupported wrapper shape'));
@@ -1218,7 +1270,7 @@ await testAsync('bookmaker/mapping discovery reports generic invalid bookmaker r
   }
 });
 
-await testAsync('bookmaker/mapping discovery keeps malformed bookmaker rows invalid', async () => {
+await testAsync('bookmaker/mapping discovery keeps missing-id bookmaker rows fatal', async () => {
   const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
   const requests = [];
 
@@ -1228,7 +1280,7 @@ await testAsync('bookmaker/mapping discovery keeps malformed bookmaker rows inva
       return actualOddsBookmakersPayload({
         response: [
           { id: 6, name: 'Bwin' },
-          { bookmaker: { id: 8 } },
+          { bookmaker: { name: 'NoId' } },
         ],
       });
     },
@@ -1237,6 +1289,7 @@ await testAsync('bookmaker/mapping discovery keeps malformed bookmaker rows inva
   assert.deepEqual(requests, [{ endpoint: 'bookmakers' }]);
   assert.equal(report.actualProviderRequests, 1);
   assert.equal(report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers').responseShapeValid, false);
+  assert.ok(report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers').invalidBookmakerRowReasons.includes('missing id'));
   assert.ok(report.stopReasons.includes('provider response shape differs from expected evidence for /odds/bookmakers'));
   assert.equal(report.endpoints.find((endpoint) => endpoint.endpoint === 'mapping').requestAttempted, false);
 });
@@ -1469,6 +1522,74 @@ await testAsync('bookmaker/mapping discovery route accepts exact approved body u
           fixture: { id: '1576052' },
           update: '2026-07-05T12:00:00+00:00',
         },
+      ]);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+    if (originalFootballKey === undefined) {
+      delete process.env.API_FOOTBALL_KEY;
+    } else {
+      process.env.API_FOOTBALL_KEY = originalFootballKey;
+    }
+  }
+});
+
+await testAsync('bookmaker/mapping discovery route returns success true for non-fatal missing-name warnings', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const originalFootballKey = process.env.API_FOOTBALL_KEY;
+  const observedUrls = [];
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  process.env.API_FOOTBALL_KEY = 'dummy-football';
+  globalThis.fetch = async (url, init = {}) => {
+    observedUrls.push(String(url));
+    assert.equal(init.headers['x-apisports-key'], 'dummy-football');
+    const parsedUrl = new URL(String(url));
+    assert.equal(parsedUrl.searchParams.get('page'), null);
+    if (parsedUrl.pathname === '/odds/bookmakers') {
+      return jsonResponse(oddsBookmakersPayload({
+        results: 3,
+        response: [
+          { id: 6, name: 'Bwin' },
+          { id: 99 },
+          { bookmaker: { id: 8, name: 'Bet365' } },
+        ],
+      }));
+    }
+    if (parsedUrl.pathname === '/odds/mapping') return jsonResponse(oddsMappingPayload());
+    throw new Error(`unexpected provider path: ${parsedUrl.pathname}`);
+  };
+
+  try {
+    await withOddsReferenceDiscoveryRoute(async ({ POST }) => {
+      const response = await POST(
+        authorizedOddsReferenceDiscoveryRequest({
+          dryRun: true,
+          endpoints: ['bookmakers', 'mapping'],
+          maxProviderRequests: 2,
+          operatorConfirm: 'RUN_BOOKMAKER_MAPPING_DISCOVERY_M1_3',
+        })
+      );
+      const result = await readJsonResponse(response);
+      const bookmakerEndpoint = result.body.report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers');
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, true);
+      assert.equal(result.body.report.actualProviderRequests, 2);
+      assert.equal(observedUrls.length, 2);
+      assert.deepEqual(result.body.report.stopReasons, []);
+      assert.ok(result.body.report.nonFatalWarnings.includes('bookmaker row missing name'));
+      assert.equal(bookmakerEndpoint.responseShapeValid, true);
+      assert.equal(bookmakerEndpoint.partialBookmakerRows, 1);
+      assert.deepEqual(result.body.report.discoveredBookmakers, [
+        { providerBookmakerId: '6', name: 'Bwin' },
+        { providerBookmakerId: '8', name: 'Bet365' },
       ]);
     });
   } finally {

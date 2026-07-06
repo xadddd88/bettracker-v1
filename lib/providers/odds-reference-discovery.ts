@@ -31,6 +31,9 @@ export interface OddsReferenceDiscoveryEndpointReport {
   validBookmakerRows: number | null
   invalidBookmakerRows: number | null
   invalidBookmakerRowReasons: string[]
+  partialBookmakerRows: number | null
+  partialBookmakerRowReasons: string[]
+  nonFatalWarnings: string[]
 }
 
 export interface OddsReferenceDiscoveryBookmaker {
@@ -61,6 +64,7 @@ export interface BookmakerMappingDiscoveryReport {
   mappingCoverage: OddsReferenceDiscoveryMapping[]
   paginationOverflow: boolean
   stopReasons: string[]
+  nonFatalWarnings: string[]
 }
 
 export interface RunBookmakerMappingDiscoveryParams {
@@ -83,6 +87,9 @@ function emptyEndpointReport(endpoint: OddsReferenceDiscoveryEndpoint): OddsRefe
     validBookmakerRows: null,
     invalidBookmakerRows: null,
     invalidBookmakerRowReasons: [],
+    partialBookmakerRows: null,
+    partialBookmakerRowReasons: [],
+    nonFatalWarnings: [],
   }
 }
 
@@ -103,6 +110,7 @@ function emptyReport(): BookmakerMappingDiscoveryReport {
     mappingCoverage: [],
     paginationOverflow: false,
     stopReasons: [],
+    nonFatalWarnings: [],
   }
 }
 
@@ -162,14 +170,29 @@ function sanitizeBookmakers(rows: unknown[]): {
   validBookmakerRows: number
   invalidBookmakerRows: number
   invalidBookmakerRowReasons: string[]
+  partialBookmakerRows: number
+  partialBookmakerRowReasons: string[]
+  nonFatalWarnings: string[]
 } {
   const bookmakers: OddsReferenceDiscoveryBookmaker[] = []
   const invalidBookmakerRowReasons: string[] = []
+  const partialBookmakerRowReasons: string[] = []
+  const nonFatalWarnings: string[] = []
   let validBookmakerRows = 0
+  let partialBookmakerRows = 0
 
   const recordInvalidRow = (reason: string) => {
     if (!invalidBookmakerRowReasons.includes(reason)) {
       invalidBookmakerRowReasons.push(reason)
+    }
+  }
+  const recordPartialRow = (reason: string, warning: string) => {
+    partialBookmakerRows += 1
+    if (!partialBookmakerRowReasons.includes(reason)) {
+      partialBookmakerRowReasons.push(reason)
+    }
+    if (!nonFatalWarnings.includes(warning)) {
+      nonFatalWarnings.push(warning)
     }
   }
 
@@ -197,7 +220,7 @@ function sanitizeBookmakers(rows: unknown[]): {
       continue
     }
     if (!name) {
-      recordInvalidRow('missing name')
+      recordPartialRow('missing name', 'bookmaker row missing name')
       continue
     }
 
@@ -205,7 +228,7 @@ function sanitizeBookmakers(rows: unknown[]): {
     bookmakers.push({ providerBookmakerId, name })
   }
 
-  const invalidBookmakerRows = rows.length - validBookmakerRows
+  const invalidBookmakerRows = rows.length - validBookmakerRows - partialBookmakerRows
 
   return {
     bookmakers: uniqueBy(bookmakers, (bookmaker) => `${bookmaker.providerBookmakerId}:${bookmaker.name}`),
@@ -214,6 +237,9 @@ function sanitizeBookmakers(rows: unknown[]): {
     validBookmakerRows,
     invalidBookmakerRows,
     invalidBookmakerRowReasons,
+    partialBookmakerRows,
+    partialBookmakerRowReasons,
+    nonFatalWarnings,
   }
 }
 
@@ -313,6 +339,9 @@ export async function runBookmakerMappingDiscovery(
     let validBookmakerRows: number | null = null
     let invalidBookmakerRows: number | null = null
     let invalidBookmakerRowReasons: string[] = []
+    let partialBookmakerRows: number | null = null
+    let partialBookmakerRowReasons: string[] = []
+    let nonFatalWarnings: string[] = []
 
     if (endpoint === 'bookmakers') {
       const sanitized = sanitizeBookmakers(envelope.rows)
@@ -322,6 +351,9 @@ export async function runBookmakerMappingDiscovery(
       validBookmakerRows = sanitized.validBookmakerRows
       invalidBookmakerRows = sanitized.invalidBookmakerRows
       invalidBookmakerRowReasons = sanitized.invalidBookmakerRowReasons
+      partialBookmakerRows = sanitized.partialBookmakerRows
+      partialBookmakerRowReasons = sanitized.partialBookmakerRowReasons
+      nonFatalWarnings = sanitized.nonFatalWarnings
     } else {
       const sanitized = sanitizeMapping(envelope.rows)
       mappingCoverage = sanitized.mappingCoverage
@@ -340,6 +372,9 @@ export async function runBookmakerMappingDiscovery(
       validBookmakerRows,
       invalidBookmakerRows,
       invalidBookmakerRowReasons,
+      partialBookmakerRows,
+      partialBookmakerRowReasons,
+      nonFatalWarnings,
     }
 
     const stopReasons = [...report.stopReasons]
@@ -364,6 +399,10 @@ export async function runBookmakerMappingDiscovery(
       ),
       paginationOverflow: report.paginationOverflow || paginationOverflow,
       stopReasons,
+      nonFatalWarnings: uniqueBy(
+        [...report.nonFatalWarnings, ...nonFatalWarnings],
+        (warning) => warning
+      ),
     }
   }
 
