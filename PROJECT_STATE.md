@@ -17,7 +17,7 @@
 | **Branch model** | Feature branches → PR → CPO accept → Dima merges |
 | **Current UI** | Stable dark UI + Ambient Theme live as-is |
 | **Ambient Theme** | Current version live in production — further Design v2 / premium event skin work is parked |
-| **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 read-only odds dry-run executed safely with no odds coverage and no writes; bookmaker/mapping discovery rerun after PR #98 is partial/safe and stopped on mapping pagination guard; canonical-fixture-first page-1 mapping comparison is DONE / NOT FOUND; filtered mapping support evidence is DONE / FILTERED RUNTIME BLOCKED; M1.3 mapping exploration is PAUSED; M1.2.e football enrichment design is in review; Product Vision Gap / Beta v2 planning continues |
+| **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 read-only odds dry-run executed safely with no odds coverage and no writes; bookmaker/mapping discovery rerun after PR #98 is partial/safe and stopped on mapping pagination guard; canonical-fixture-first page-1 mapping comparison is DONE / NOT FOUND; filtered mapping support evidence is DONE / FILTERED RUNTIME BLOCKED; M1.3 mapping exploration is PAUSED; M1.2.e football enrichment design is DONE; M1.2.e endpoint evidence is in review; Product Vision Gap / Beta v2 planning continues |
 | **Active blockers** | None in current main — product vision gaps documented in PRODUCT_VISION_GAP.md |
 | **External beta invites** | Do not invite external beta users yet |
 
@@ -57,7 +57,7 @@ Final production state after validation:
 
 M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery & Dry-Run Plan is DONE via PR #80. M1.3 API-Football Odds Endpoint & Cost Confirmation is DONE / BLOCKED via PR #81 and superseded for planning by PR #82 provider evidence. M1.3 Read-Only Odds Dry-Run Scope is DONE via PR #83. M1.3 Read-Only Odds Dry-Run Implementation is MERGED via PR #85. M1.3 Read-Only Odds Dry-Run is EXECUTED / SAFE: one approved production request returned `oddsAvailable=false`, no pagination overflow, no raw payload, no odds prices, no writes, and no betting signal. M1.3 Bookmaker & Mapping Discovery Scope is DONE via PR #88. M1.3 Bookmaker & Mapping Discovery Read-Only Implementation is MERGED via PR #92. M1.3 Bookmaker Discovery after PR #98 is SAFE / PARTIAL WARNING: `/odds/bookmakers` returned 33 rows, 32 valid sanitized bookmaker id/name pairs, and 1 non-fatal missing-name warning. M1.3 Mapping Discovery after PR #98 is PARTIAL / SAFE: `/odds/mapping` page 1 returned 100 mapping rows with `paging.total=11`, and the route stopped correctly because page 2 is not approved. M1.3 Bookmaker & Mapping Discovery is PARTIAL / SAFE / NOT DONE. M1.3 Mapping Pagination Strategy is DONE via PR #100: page 2+ calls remain blocked until a separate CPO-approved budget and filtering strategy exists. M1.3 Canonical-Fixture-First Mapping Discovery Scope is DONE via PR #101. M1.3 Canonical-Fixture-First Page-1 Comparison is DONE / NOT FOUND: provider fixture IDs `1576052` and `1576053` were not present in existing sanitized page-1 mapping coverage. M1.3 Filtered Mapping Support Evidence is DONE / FILTERED RUNTIME BLOCKED: current sanitized evidence confirms `GET /odds/mapping` but does not confirm fixture, league, season, date, bookmaker, bet, or page request parameters for `/odds/mapping`. M1.3 Mapping Exploration is PAUSED: page 2+, full mapping crawl, and filtered mapping runtime remain blocked until stronger provider evidence or a separate full-crawl budget strategy is accepted. M1.3 odds writes, migrations, Scout, Analyst, and UI usage remain NOT STARTED.
 
-M1.2.e Football Enrichment Design is in review. It is documentation/design only: no runtime code, migrations, provider calls, Supabase writes, env flags, Scout/Analyst/UI changes, Place Bet unlock, probability, edge, EV, recommendation, or betting signal. It designs the future football enrichment path for injuries/suspensions, lineups, team news, event-state freshness, and provider-backed recent form while keeping endpoint evidence, read-only dry-run, schema/write design, controlled write validation, and trust validation as separate future milestones.
+M1.2.e Football Enrichment Design is DONE via PR #105. M1.2.e Football Enrichment Endpoint Evidence is in review. It is documentation/status evidence only: no runtime code, migrations, provider calls, Supabase writes, env flags, Scout/Analyst/UI changes, Place Bet unlock, probability, edge, EV, recommendation, or betting signal. The evidence track documents sanitized provider endpoint evidence for injuries/suspensions, lineups, team news, event-state freshness, and provider-backed recent form while keeping read-only dry-run, schema/write design, controlled write validation, and trust validation as separate future milestones.
 
 ---
 
@@ -116,6 +116,7 @@ M1.3 canonical-fixture-first page-1 result reference: `docs/sports-odds-canonica
 M1.3 filtered mapping support evidence reference: `docs/sports-odds-filtered-mapping-support-evidence-m1-3.md`
 M1.3 mapping exploration pause reference: `docs/sports-odds-mapping-exploration-pause-m1-3.md`
 M1.2.e football enrichment design reference: `docs/sports-football-enrichment-m1-2-e-design.md`
+M1.2.e football enrichment endpoint evidence reference: `docs/sports-football-enrichment-endpoint-evidence-m1-2-e.md`
 
 ---
 
@@ -191,7 +192,7 @@ M1.2.e football enrichment design reference: `docs/sports-football-enrichment-m1
 - Do NOT launch publicly
 - Do NOT continue Ambient Theme / Design v2
 - Do NOT start Scout v2 (until data provider decision)
-- Do NOT start M1.2.e football enrichment implementation; design only is in review
+- Do NOT start M1.2.e football enrichment implementation; endpoint evidence is in review and no runtime provider call is approved
 - Do NOT start i18n
 - Do NOT start legal pages
 - Do NOT start broad security hardening

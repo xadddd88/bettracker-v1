@@ -1361,5 +1361,42 @@ Reference: `docs/sports-football-enrichment-m1-2-e-design.md`
 
 ---
 
+## Decision #033 - M1.2.e Football Enrichment Endpoint Evidence
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Documentation/status evidence only. Runtime provider calls, writes, migrations, env flags, and downstream usage are not approved.
+
+**Numbering note:** Decision #032 is reserved by the parallel open M1.3 API-Football `/odds/mapping` filter evidence track. This decision uses #033 to avoid renumbering conflicts across concurrent documentation PRs.
+
+**Context:** M1.2.e Football Enrichment Design is DONE. No football enrichment implementation has started. Before any enrichment provider call, BetTracker needs sanitized endpoint evidence for injuries/suspensions, lineups, team news, event-state freshness, and provider-backed recent form.
+
+**Decision:** BetTracker will treat SportMonks fixture-by-ID as the preferred candidate family for a future first read-only football enrichment dry-run, conditional on a selected canonical football fixture having an exact/high SportMonks provider link and CPO approving a one-request runtime scope.
+
+**Confirmed SportMonks evidence:**
+- `GET https://api.sportmonks.com/v3/football/fixtures/{ID}` is fixture-scoped and provider docs mark pagination as `NO`.
+- Fixture response examples include fixture identifiers, `state_id`, `starting_at`, `result_info`, `has_odds`, `has_premium_odds`, and `starting_at_timestamp`.
+- Fixture-by-ID include options include state, lineups, events/timeline, statistics, prematch/postmatch news, metadata, sidelined, formations, scores, xG fixture, pressure, expected lineups, match facts, and related enrichment families.
+- `GET /v3/football/fixtures/latest` and `GET /v3/football/livescores/inplay` exist but are broader than a one-fixture first dry-run.
+- SportMonks pre-match news and expected-lineup endpoints exist, but they are broad/team-scoped or subscription-sensitive and require separate scope.
+- SportMonks sidelined entity evidence exists, but runtime usage should be through an approved endpoint/include scope.
+
+**API-Football evidence stance:** API-Football remains a candidate provider, but enrichment endpoint path, request parameters, response shape, quota/request cost, rate limits, plan availability, and freshness semantics are not confirmed by this PR. API-Football enrichment runtime remains blocked until operator-side sanitized docs/account evidence is captured.
+
+**Blocked endpoints:**
+- API-Football enrichment endpoints until endpoint/cost/plan evidence is confirmed.
+- Broad SportMonks latest-updated, inplay, and news feeds until request budget and sanitized report scope are accepted.
+- Premium expected lineups until plan availability and team/fixture relevance are confirmed.
+- Any prediction, value, advice, or betting-signal-adjacent endpoint.
+
+**Safest initial future scope:** one canonical football fixture, one exact/high SportMonks provider fixture link, `GET /v3/football/fixtures/{ID}`, max one provider request, no pagination, approved include set only, sanitized report only, no writes, no raw payload, and no Scout/Analyst/UI usage.
+
+**Trust rules:** Endpoint availability does not unlock model probability. Injuries, suspensions, lineups, team news, event-state fields, xG, pressure, match facts, or recent form facts do not become recommendations by themselves. Missing or stale enrichment keeps Analyst gated.
+
+**FP-001:** Football enrichment endpoint evidence does not unlock probability, implied probability, edge, EV, recommendation, Place Bet, Scout score, Analyst signal, UI signal, or betting signal. Check against FP-001 before any downstream use.
+
+Reference: `docs/sports-football-enrichment-endpoint-evidence-m1-2-e.md`
+
+---
+
 *Last updated: 2026-07-06*
 *Owner: All (each role contributes)*
