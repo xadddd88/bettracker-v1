@@ -1270,5 +1270,47 @@ Reference: `docs/sports-odds-filtered-mapping-support-evidence-m1-3.md`
 
 ---
 
+## Decision #030 - Mapping Exploration Pause & Handoff
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Pause / handoff. Runtime provider calls not approved.
+
+**Context:** The M1.3 mapping path reached the current evidence boundary:
+
+- `/odds/mapping` page 1 returned 100 rows.
+- `paging.total=11`.
+- Page 2 was not requested.
+- Full crawl pages 2-11 would require 10 additional provider requests.
+- `provider_fixture_id=1576052` was NOT PRESENT in page-1 mapping coverage.
+- `provider_fixture_id=1576053` was NOT PRESENT in page-1 mapping coverage.
+- Filtered `/odds/mapping` request parameters are not confirmed.
+- Page 2+ remains blocked.
+- Full mapping crawl remains blocked.
+
+**Decision:** Pause M1.3 mapping exploration for now.
+
+**Record:**
+- M1.3 Mapping Pagination Strategy: `DONE`.
+- M1.3 Canonical-Fixture-First Page-1 Check: `DONE / NOT FOUND`.
+- M1.3 Filtered Mapping Support Evidence: `DONE / FILTERED RUNTIME BLOCKED`.
+- M1.3 Mapping Exploration: `PAUSED`.
+- `/odds/mapping` page 2+: `BLOCKED`.
+- Full mapping crawl: `BLOCKED`.
+- Filtered `/odds/mapping` runtime: `NOT APPROVED`.
+- Odds writes: `NOT STARTED`.
+- Scout/Analyst/UI odds usage: `NOT STARTED`.
+- Betting signals: `NOT STARTED`.
+
+**Next unblock:**
+- Obtain stronger provider docs/account evidence that `/odds/mapping` supports useful filters, such as `fixture`, `league`/`season`, `date`, `bookmaker`, `bet`, or another narrowing parameter.
+- Or open a separate CPO-approved full-crawl budget strategy.
+- No runtime call is approved before one of those is accepted.
+
+**FP-001:** Mapping exploration pause does not unlock probability, implied probability, edge, EV, recommendation, Place Bet, Scout score, Analyst signal, UI signal, or betting signal.
+
+Reference: `docs/sports-odds-mapping-exploration-pause-m1-3.md`
+
+---
+
 *Last updated: 2026-07-06*
 *Owner: All (each role contributes)*
