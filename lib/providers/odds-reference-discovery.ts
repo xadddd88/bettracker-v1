@@ -27,6 +27,10 @@ export interface OddsReferenceDiscoveryEndpointReport {
   resultsCount: number
   paginationOverflow: boolean
   responseShapeValid: boolean
+  bookmakerRowsTotal: number | null
+  validBookmakerRows: number | null
+  invalidBookmakerRows: number | null
+  invalidBookmakerRowReasons: string[]
 }
 
 export interface OddsReferenceDiscoveryBookmaker {
@@ -75,7 +79,15 @@ function emptyEndpointReport(endpoint: OddsReferenceDiscoveryEndpoint): OddsRefe
     resultsCount: 0,
     paginationOverflow: false,
     responseShapeValid: true,
+    bookmakerRowsTotal: null,
+    validBookmakerRows: null,
+    invalidBookmakerRows: null,
+    invalidBookmakerRowReasons: [],
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
 function emptyReport(): BookmakerMappingDiscoveryReport {
@@ -146,34 +158,62 @@ function parseEnvelope(payload: unknown): {
 function sanitizeBookmakers(rows: unknown[]): {
   bookmakers: OddsReferenceDiscoveryBookmaker[]
   responseShapeValid: boolean
+  bookmakerRowsTotal: number
+  validBookmakerRows: number
+  invalidBookmakerRows: number
+  invalidBookmakerRowReasons: string[]
 } {
   const bookmakers: OddsReferenceDiscoveryBookmaker[] = []
-  let responseShapeValid = true
+  const invalidBookmakerRowReasons: string[] = []
+  let validBookmakerRows = 0
+
+  const recordInvalidRow = (reason: string) => {
+    if (!invalidBookmakerRowReasons.includes(reason)) {
+      invalidBookmakerRowReasons.push(reason)
+    }
+  }
 
   for (const row of rows) {
-    if (!row || typeof row !== 'object') {
-      responseShapeValid = false
+    if (!isRecord(row)) {
+      recordInvalidRow('non-object row')
       continue
     }
 
-    const record = row as Record<string, unknown>
-    const bookmakerRecord = record.bookmaker && typeof record.bookmaker === 'object'
-      ? record.bookmaker as Record<string, unknown>
-      : record
+    const record = row
+    let bookmakerRecord = record
+    if ('bookmaker' in record) {
+      if (!isRecord(record.bookmaker)) {
+        recordInvalidRow('unsupported wrapper shape')
+        continue
+      }
+      bookmakerRecord = record.bookmaker
+    }
+
     const providerBookmakerId = toStringOrNull(bookmakerRecord.id)
     const name = toStringOrNull(bookmakerRecord.name)
 
-    if (!providerBookmakerId || !name) {
-      responseShapeValid = false
+    if (!providerBookmakerId) {
+      recordInvalidRow('missing id')
+      continue
+    }
+    if (!name) {
+      recordInvalidRow('missing name')
       continue
     }
 
+    validBookmakerRows += 1
     bookmakers.push({ providerBookmakerId, name })
   }
 
+  const invalidBookmakerRows = rows.length - validBookmakerRows
+
   return {
     bookmakers: uniqueBy(bookmakers, (bookmaker) => `${bookmaker.providerBookmakerId}:${bookmaker.name}`),
-    responseShapeValid,
+    responseShapeValid: invalidBookmakerRows === 0,
+    bookmakerRowsTotal: rows.length,
+    validBookmakerRows,
+    invalidBookmakerRows,
+    invalidBookmakerRowReasons,
   }
 }
 
@@ -269,11 +309,19 @@ export async function runBookmakerMappingDiscovery(
     let discoveredBookmakers: OddsReferenceDiscoveryBookmaker[] = []
     let mappingCoverage: OddsReferenceDiscoveryMapping[] = []
     let responseShapeValid = envelope.responseShapeValid
+    let bookmakerRowsTotal: number | null = null
+    let validBookmakerRows: number | null = null
+    let invalidBookmakerRows: number | null = null
+    let invalidBookmakerRowReasons: string[] = []
 
     if (endpoint === 'bookmakers') {
       const sanitized = sanitizeBookmakers(envelope.rows)
       discoveredBookmakers = sanitized.bookmakers
       responseShapeValid = responseShapeValid && sanitized.responseShapeValid
+      bookmakerRowsTotal = sanitized.bookmakerRowsTotal
+      validBookmakerRows = sanitized.validBookmakerRows
+      invalidBookmakerRows = sanitized.invalidBookmakerRows
+      invalidBookmakerRowReasons = sanitized.invalidBookmakerRowReasons
     } else {
       const sanitized = sanitizeMapping(envelope.rows)
       mappingCoverage = sanitized.mappingCoverage
@@ -288,6 +336,10 @@ export async function runBookmakerMappingDiscovery(
       resultsCount: envelope.rows.length,
       paginationOverflow,
       responseShapeValid,
+      bookmakerRowsTotal,
+      validBookmakerRows,
+      invalidBookmakerRows,
+      invalidBookmakerRowReasons,
     }
 
     const stopReasons = [...report.stopReasons]

@@ -1160,6 +1160,64 @@ await testAsync('bookmaker/mapping discovery accepts actual wrapped bookmaker ro
   ]);
 });
 
+await testAsync('bookmaker/mapping discovery reports bookmaker row diagnostics for valid rows', async () => {
+  const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
+
+  const report = await runBookmakerMappingDiscovery({
+    fetchProviderReference: async (request) => {
+      if (request.endpoint === 'bookmakers') return actualOddsBookmakersPayload();
+      if (request.endpoint === 'mapping') return oddsMappingPayload();
+      throw new Error(`unexpected endpoint ${request.endpoint}`);
+    },
+  });
+
+  const bookmakerEndpoint = report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers');
+  assert.equal(bookmakerEndpoint.bookmakerRowsTotal, 3);
+  assert.equal(bookmakerEndpoint.validBookmakerRows, 3);
+  assert.equal(bookmakerEndpoint.invalidBookmakerRows, 0);
+  assert.deepEqual(bookmakerEndpoint.invalidBookmakerRowReasons, []);
+  assert.equal(bookmakerEndpoint.responseShapeValid, true);
+});
+
+await testAsync('bookmaker/mapping discovery reports generic invalid bookmaker row diagnostics', async () => {
+  const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
+
+  const report = await runBookmakerMappingDiscovery({
+    fetchProviderReference: async (request) => {
+      if (request.endpoint === 'bookmakers') {
+        return oddsBookmakersPayload({
+          results: 5,
+          response: [
+            { id: 6, name: 'Bwin' },
+            { bookmaker: { id: 8 } },
+            { bookmaker: { name: 'NoId' } },
+            'bad-row',
+            { bookmaker: null },
+          ],
+        });
+      }
+      throw new Error(`unexpected endpoint ${request.endpoint}`);
+    },
+  });
+
+  const bookmakerEndpoint = report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers');
+  assert.equal(bookmakerEndpoint.bookmakerRowsTotal, 5);
+  assert.equal(bookmakerEndpoint.validBookmakerRows, 1);
+  assert.equal(bookmakerEndpoint.invalidBookmakerRows, 4);
+  assert.ok(bookmakerEndpoint.invalidBookmakerRowReasons.includes('missing name'));
+  assert.ok(bookmakerEndpoint.invalidBookmakerRowReasons.includes('missing id'));
+  assert.ok(bookmakerEndpoint.invalidBookmakerRowReasons.includes('non-object row'));
+  assert.ok(bookmakerEndpoint.invalidBookmakerRowReasons.includes('unsupported wrapper shape'));
+  assert.equal(bookmakerEndpoint.responseShapeValid, false);
+  assert.ok(report.stopReasons.includes('provider response shape differs from expected evidence for /odds/bookmakers'));
+  assert.equal(report.endpoints.find((endpoint) => endpoint.endpoint === 'mapping').requestAttempted, false);
+
+  const serialized = JSON.stringify(bookmakerEndpoint);
+  for (const forbidden of ['bad-row', 'NoId', 'rawProviderPayload', 'token', '"odd"', 'price', 'probability', 'edge', 'EV']) {
+    assert.equal(serialized.includes(forbidden), false, `forbidden diagnostic artifact leaked: ${forbidden}`);
+  }
+});
+
 await testAsync('bookmaker/mapping discovery keeps malformed bookmaker rows invalid', async () => {
   const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
   const requests = [];
