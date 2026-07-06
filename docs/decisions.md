@@ -930,5 +930,70 @@ Reference: `docs/sports-odds-bookmaker-discovery-rerun-result-m1-3.md`
 
 ---
 
+## Decision #024 - Bookmaker Missing Name Handling Policy
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Proposed design policy. Implementation not started.
+
+**Decision:** BetTracker should use Hybrid mode for API-Football bookmaker rows where `providerBookmakerId` exists but bookmaker `name` is missing.
+
+**Options evaluated:**
+- Strict mode: missing name remains fatal and stops discovery.
+- Tolerant mode: missing name becomes nullable or unknown and discovery continues without downstream restrictions.
+- Hybrid mode: missing name is non-fatal for reference discovery but blocked for allowlist, writes, Scout, Analyst, UI, and betting signals.
+
+**Recommended policy:**
+- Missing bookmaker name should not block reference discovery from continuing to `/odds/mapping` when it is the only bookmaker-row issue.
+- The row may be counted only as partial sanitized diagnostics.
+- `providerBookmakerId` may be counted.
+- `name` remains `null` or `UNKNOWN_PROVIDER_BOOKMAKER`.
+- The report includes a warning: `bookmaker row missing name`.
+- Top-level `success=false` should be reserved for fatal guardrails, not non-fatal partial bookmaker warnings.
+- Mapping can run if only non-fatal partial bookmaker warnings are present and all other approved discovery guardrails pass.
+
+**Downstream restrictions:**
+Partial bookmaker rows are not eligible for:
+- bookmaker allowlist
+- odds writes
+- odds storage
+- market catalog mapping
+- Scout usage
+- Analyst usage
+- UI usage
+- probability
+- implied probability
+- edge
+- EV
+- recommendation
+- Place Bet
+- betting signal
+
+**Fatal guardrails remain fatal:**
+- non-object row
+- unsupported wrapper shape
+- missing provider bookmaker id
+- pagination overflow
+- envelope/response shape mismatch
+- raw payload exposure
+- odds price exposure
+- probability, edge, EV, recommendation, Scout signal, Analyst signal, UI signal, or betting signal generation
+
+**Scope controls:**
+- Documentation/design only.
+- No runtime code.
+- No provider calls.
+- No reference discovery rerun.
+- No odds writes.
+- No Supabase writes.
+- No migrations or env flags.
+- No Scout, Analyst, or UI changes.
+- No betting signals.
+
+**FP-001:** This policy does not unlock pricing or betting signals. Partial bookmaker rows remain technical diagnostics only. Check against FP-001 before implementation or downstream use.
+
+Reference: `docs/sports-odds-bookmaker-missing-name-policy-m1-3.md`
+
+---
+
 *Last updated: 2026-07-06*
 *Owner: All (each role contributes)*

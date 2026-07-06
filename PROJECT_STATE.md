@@ -55,7 +55,7 @@ Final production state after validation:
 - no broad write, multi-provider write, or multi-day write was run
 - odds, results, SportMonks enrichment, cross-provider mapping, cron, Scout, Analyst, and UI remained untouched by M1.2.c
 
-M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery & Dry-Run Plan is DONE via PR #80. M1.3 API-Football Odds Endpoint & Cost Confirmation is DONE / BLOCKED via PR #81 and superseded for planning by PR #82 provider evidence. M1.3 Read-Only Odds Dry-Run Scope is DONE via PR #83. M1.3 Read-Only Odds Dry-Run Implementation is MERGED via PR #85. M1.3 Read-Only Odds Dry-Run is EXECUTED / SAFE: one approved production request returned `oddsAvailable=false`, no pagination overflow, no raw payload, no odds prices, no writes, and no betting signal. M1.3 Bookmaker & Mapping Discovery Scope is DONE via PR #88. M1.3 Bookmaker & Mapping Discovery Read-Only Implementation is MERGED via PR #92. M1.3 Bookmaker Discovery is PARTIAL / SAFE: the approved production reference discovery and the post-PR #94 rerun each made 1 provider request to `/odds/bookmakers`, returned sanitized bookmaker ids/names, and stopped before `/odds/mapping` because the bookmaker response shape differed from expected evidence. M1.3 Mapping Discovery is NOT RUN, M1.3 Bookmaker & Mapping Discovery is NOT DONE, and M1.3 Bookmaker Discovery Shape Adapter is PARTIAL / NEEDS FOLLOW-UP. M1.3 odds writes, migrations, Scout, Analyst, and UI usage remain NOT STARTED.
+M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery & Dry-Run Plan is DONE via PR #80. M1.3 API-Football Odds Endpoint & Cost Confirmation is DONE / BLOCKED via PR #81 and superseded for planning by PR #82 provider evidence. M1.3 Read-Only Odds Dry-Run Scope is DONE via PR #83. M1.3 Read-Only Odds Dry-Run Implementation is MERGED via PR #85. M1.3 Read-Only Odds Dry-Run is EXECUTED / SAFE: one approved production request returned `oddsAvailable=false`, no pagination overflow, no raw payload, no odds prices, no writes, and no betting signal. M1.3 Bookmaker & Mapping Discovery Scope is DONE via PR #88. M1.3 Bookmaker & Mapping Discovery Read-Only Implementation is MERGED via PR #92. M1.3 Bookmaker Discovery is PARTIAL / SAFE: the approved production reference discovery and the post-PR #94 rerun each made 1 provider request to `/odds/bookmakers`, returned sanitized bookmaker ids/names, and stopped before `/odds/mapping` because the bookmaker response shape differed from expected evidence. PR #96 diagnostics narrowed the remaining issue to a missing bookmaker name, and PR #97 proposes a docs-only Hybrid policy: missing name is non-fatal for reference discovery but blocked for allowlist, writes, Scout, Analyst, UI, and betting signals. M1.3 Mapping Discovery is NOT RUN, M1.3 Bookmaker & Mapping Discovery is NOT DONE, and M1.3 Bookmaker Discovery Shape Adapter is PARTIAL / NEEDS FOLLOW-UP. M1.3 odds writes, migrations, Scout, Analyst, and UI usage remain NOT STARTED.
 
 ---
 
@@ -87,6 +87,7 @@ Design direction:
 - PR #92 implements the protected read-only reference discovery route for that scope
 - the first approved production reference discovery run is PARTIAL / SAFE: `/odds/bookmakers` was attempted once, returned sanitized bookmaker ids/names, and stopped before `/odds/mapping` because the bookmaker response shape differed from expected evidence
 - the post-PR #94 approved reference discovery rerun is also PARTIAL / SAFE: `/odds/bookmakers` was attempted once, returned 32 sanitized bookmaker id/name pairs, and stopped before `/odds/mapping` because at least one row still differed from expected evidence
+- PR #96 diagnostics identified the remaining bookmaker issue as one `missing name` row; PR #97 proposes a Hybrid missing-name policy for later implementation, with no runtime/provider/write changes
 - further production provider odds calls require separate CPO approval
 
 Reference: `docs/sports-odds-snapshot-sync-m1-3-design.md`
@@ -99,6 +100,7 @@ M1.3 read-only dry-run result reference: `docs/sports-odds-read-only-dry-run-res
 PR #88 bookmaker/mapping scope reference: `docs/sports-odds-bookmaker-mapping-discovery-scope-m1-3.md`
 M1.3 bookmaker/mapping discovery result reference: `docs/sports-odds-bookmaker-mapping-discovery-result-m1-3.md`
 M1.3 bookmaker discovery rerun result reference: `docs/sports-odds-bookmaker-discovery-rerun-result-m1-3.md`
+M1.3 bookmaker missing-name policy reference: `docs/sports-odds-bookmaker-missing-name-policy-m1-3.md`
 
 ---
 
