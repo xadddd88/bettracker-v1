@@ -92,6 +92,7 @@ No raw provider payload, account-level provider data, token, secret parameter, o
 - `/odds/bookmakers` is reachable.
 - Bookmaker extraction succeeded for 32 sanitized id/name pairs.
 - At least one reported row likely has unexpected or malformed shape, so the endpoint shape remains not clean.
+- PR #96 diagnostics later narrowed the issue to one non-clean bookmaker row with `invalidBookmakerRowReasons=["missing name"]`.
 - The route correctly marked the result as `success=false` because `stopReasons` was non-empty.
 - The route correctly stopped before `/odds/mapping`.
 - This is a safe partial discovery, not a full successful discovery.
@@ -128,6 +129,7 @@ M1.3 Bookmaker Discovery: PARTIAL / SAFE
 M1.3 Mapping Discovery: NOT RUN
 M1.3 Bookmaker & Mapping Discovery: NOT DONE
 M1.3 Bookmaker Discovery Shape Adapter: PARTIAL / NEEDS FOLLOW-UP
+M1.3 Bookmaker Missing Name Handling Policy: PROPOSED / DESIGN ONLY
 M1.3 odds writes: NOT STARTED
 SPORTS_ODDS_SYNC_WRITE_ENABLED: NOT ADDED / NOT ENABLED
 Scout / Analyst / UI odds usage: NOT STARTED
@@ -166,3 +168,26 @@ Any further runtime provider call requires separate CPO approval. This includes:
 - adding env flags
 - using bookmaker or mapping data in Scout, Analyst, or UI
 - generating probability, implied probability, edge, EV, recommendation, or betting signals
+
+## Missing Name Policy Link
+
+PR #97 proposes a docs-only Hybrid policy for bookmaker rows where `providerBookmakerId` exists but `name` is missing.
+
+The proposed policy keeps missing names non-fatal for reference discovery only, while blocking partial bookmaker rows from:
+
+- bookmaker allowlist
+- odds writes
+- odds storage
+- market catalog mapping
+- Scout usage
+- Analyst usage
+- UI usage
+- probability
+- implied probability
+- edge
+- EV
+- recommendation
+- Place Bet
+- betting signal
+
+Reference: `docs/sports-odds-bookmaker-missing-name-policy-m1-3.md`
