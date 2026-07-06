@@ -1312,5 +1312,54 @@ Reference: `docs/sports-odds-mapping-exploration-pause-m1-3.md`
 
 ---
 
+## Decision #031 - M1.2.e Football Enrichment Design
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Design only. Implementation, provider calls, migrations, writes, and downstream usage not approved.
+
+**Context:** M1.3 mapping exploration is paused. FP-001 data coverage mapping identifies football enrichment as a future path for closing several football-specific missing-data gaps, but no enrichment implementation has started.
+
+**Decision:** BetTracker will design M1.2.e football enrichment before implementation. The design covers provider-backed football enrichment gaps only:
+
+- injuries / suspensions
+- lineups / starting elevens
+- team news
+- event-state freshness
+- recent form inputs, if provider-backed and licensed
+
+**Provider candidates:** API-Football, SportMonks, or another already paid/licensed provider explicitly approved by CPO. Scraping, unlicensed third-party data, and user-provided third-party context are not provider truth.
+
+**Evidence required before provider calls:**
+- endpoint path
+- request params
+- response shape
+- quota/request cost
+- rate limits
+- freshness/update semantics
+- plan availability
+
+**Storage stance:** The existing `football_enrichment` table exists from migrations 013/014, but its current SportMonks-linked latest-state schema must not be assumed sufficient for injuries, suspensions, lineups, team news, event-state freshness, or recent form without schema review.
+
+**Trust rules:**
+- enrichment availability does not unlock model probability by itself
+- injuries, suspensions, lineups, and team news do not become recommendations
+- missing or stale enrichment must keep Analyst gated
+- enrichment remains non-user-facing until a later trust validation milestone
+
+**Safety gates:**
+- endpoint evidence PR
+- read-only dry-run PR
+- schema/write design PR
+- controlled write validation PR
+- trust validation PR
+
+**Non-use:** No Scout/Analyst/UI usage, no Place Bet unlock, no probability, no implied probability, no edge, no EV, no recommendation, and no betting signal are approved by this design.
+
+**FP-001:** M1.2.e can eventually help close football provider-layer gaps around injuries, team news, event-state freshness, and recent form. It does not close Analyst-layer requirements such as calibrated probability, edge, EV, sport-specific model support, or per-leg model input validation by itself.
+
+Reference: `docs/sports-football-enrichment-m1-2-e-design.md`
+
+---
+
 *Last updated: 2026-07-06*
 *Owner: All (each role contributes)*
