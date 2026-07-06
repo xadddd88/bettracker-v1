@@ -1312,5 +1312,59 @@ Reference: `docs/sports-odds-mapping-exploration-pause-m1-3.md`
 
 ---
 
+## Decision #032 - API-Football /odds/mapping Filter Evidence
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Evidence only. Runtime provider calls not approved.
+
+**Numbering note:** Decision #031 is reserved by the open M1.2.e Football Enrichment Design PR. This decision uses #032 to avoid renumbering conflicts when parallel documentation PRs are merged.
+
+**Context:** M1.3 mapping exploration is paused because `/odds/mapping` page 1 returned 100 rows with `paging.total=11`, page 2 was not requested, provider fixture IDs `1576052` and `1576053` were not present in page-1 mapping coverage, and filtered `/odds/mapping` runtime is not approved.
+
+**Evidence source:** Existing sanitized API-Football / API-Sports docs/account evidence and current M1.3 mapping docs. No provider endpoint was called for this decision. A non-interactive public docs check for `https://www.api-football.com/documentation-v3` returned a JavaScript/cookie browser challenge and did not expose extractable documentation content, so it adds no positive evidence for mapping filters.
+
+**Confirmed for `/odds`:**
+- `fixture`
+- `league`
+- `season`
+- `date`
+- `bookmaker`
+- `bet`
+- `page`
+
+**Confirmed for `/odds/mapping`:**
+- request shape: `GET /odds/mapping`
+- response pagination fields: `paging.current`, `paging.total`
+- response mapping fields: `league.id`, `league.season`, `fixture.id`, `fixture.date`, `fixture.timestamp`, `update`
+
+**Not confirmed for `/odds/mapping`:**
+- `fixture` filter
+- `league` filter
+- `season` filter
+- `date` filter
+- `bookmaker` filter
+- `bet` filter
+- exact `page` request parameter shape
+- any other narrowing parameter
+
+**Decision:**
+- Do not call `/odds/mapping?fixture=1576052`.
+- Do not call `/odds/mapping?fixture=1576053`.
+- Do not call unconfirmed league, season, date, bookmaker, or bet filters on `/odds/mapping`.
+- Do not call `/odds/mapping?page=2`.
+- Do not crawl pages 2-11.
+- Keep mapping exploration paused until stronger official provider docs/account evidence confirms useful `/odds/mapping` filters or a separate CPO-approved full-crawl budget strategy exists.
+
+**Future branch:**
+- If fixture filter support is confirmed later, a separate scope may propose `GET /odds/mapping?fixture=1576052`, page 1 only, max 1 request, sanitized report only.
+- If only league/season filters are confirmed, a later scope must justify budget and relevance.
+- If no useful filters are confirmed, mapping exploration remains paused or requires separate full-crawl budget approval.
+
+**FP-001:** Mapping filter evidence does not unlock probability, implied probability, edge, EV, recommendation, Place Bet, Scout score, Analyst signal, UI signal, or betting signal.
+
+Reference: `docs/sports-odds-mapping-filter-evidence-m1-3.md`
+
+---
+
 *Last updated: 2026-07-06*
 *Owner: All (each role contributes)*

@@ -92,6 +92,25 @@ Mapping exploration can resume only after one of these is accepted:
 
 No runtime call is approved before one of those exists.
 
+## Filter Evidence Update
+
+Additional documentation/status evidence is recorded in `docs/sports-odds-mapping-filter-evidence-m1-3.md`.
+
+Current evidence status:
+
+```txt
+fixture filter: NOT CONFIRMED
+league filter: NOT CONFIRMED
+season filter: NOT CONFIRMED
+date filter: NOT CONFIRMED
+bookmaker filter: NOT CONFIRMED
+bet filter: NOT CONFIRMED
+exact page request shape: NOT CONFIRMED
+filtered /odds/mapping runtime: NOT APPROVED
+```
+
+The pause boundary is unchanged: no `/odds/mapping` runtime filters, page 2, or pages 2-11 crawl is approved.
+
 ## FP-001 Guardrail
 
 Mapping pause or mapping availability does not unlock:
@@ -129,3 +148,4 @@ Related references:
 - `docs/sports-odds-canonical-fixture-first-mapping-scope-m1-3.md`
 - `docs/sports-odds-canonical-fixture-first-mapping-page1-result-m1-3.md`
 - `docs/sports-odds-filtered-mapping-support-evidence-m1-3.md`
+- `docs/sports-odds-mapping-filter-evidence-m1-3.md`
