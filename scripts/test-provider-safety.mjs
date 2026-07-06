@@ -361,6 +361,18 @@ function oddsBookmakersPayload(overrides = {}) {
   };
 }
 
+function actualOddsBookmakersPayload(overrides = {}) {
+  return oddsBookmakersPayload({
+    results: 3,
+    response: [
+      { id: 6, name: 'Bwin' },
+      { bookmaker: { id: 8, name: 'Bet365' } },
+      { id: '11', name: '1xBet' },
+    ],
+    ...overrides,
+  });
+}
+
 function oddsMappingPayload(overrides = {}) {
   return {
     get: 'odds/mapping',
@@ -1122,6 +1134,53 @@ await testAsync('bookmaker/mapping discovery helper makes one request per approv
       update: '2026-07-05T12:00:00+00:00',
     },
   ]);
+});
+
+await testAsync('bookmaker/mapping discovery accepts actual wrapped bookmaker rows as valid shape', async () => {
+  const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
+  const requests = [];
+
+  const report = await runBookmakerMappingDiscovery({
+    fetchProviderReference: async (request) => {
+      requests.push(request);
+      if (request.endpoint === 'bookmakers') return actualOddsBookmakersPayload();
+      if (request.endpoint === 'mapping') return oddsMappingPayload();
+      throw new Error(`unexpected endpoint ${request.endpoint}`);
+    },
+  });
+
+  assert.deepEqual(requests, [{ endpoint: 'bookmakers' }, { endpoint: 'mapping' }]);
+  assert.equal(report.actualProviderRequests, 2);
+  assert.deepEqual(report.stopReasons, []);
+  assert.equal(report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers').responseShapeValid, true);
+  assert.deepEqual(report.discoveredBookmakers, [
+    { providerBookmakerId: '6', name: 'Bwin' },
+    { providerBookmakerId: '8', name: 'Bet365' },
+    { providerBookmakerId: '11', name: '1xBet' },
+  ]);
+});
+
+await testAsync('bookmaker/mapping discovery keeps malformed bookmaker rows invalid', async () => {
+  const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
+  const requests = [];
+
+  const report = await runBookmakerMappingDiscovery({
+    fetchProviderReference: async (request) => {
+      requests.push(request);
+      return actualOddsBookmakersPayload({
+        response: [
+          { id: 6, name: 'Bwin' },
+          { bookmaker: { id: 8 } },
+        ],
+      });
+    },
+  });
+
+  assert.deepEqual(requests, [{ endpoint: 'bookmakers' }]);
+  assert.equal(report.actualProviderRequests, 1);
+  assert.equal(report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers').responseShapeValid, false);
+  assert.ok(report.stopReasons.includes('provider response shape differs from expected evidence for /odds/bookmakers'));
+  assert.equal(report.endpoints.find((endpoint) => endpoint.endpoint === 'mapping').requestAttempted, false);
 });
 
 await testAsync('bookmaker/mapping discovery stops after page 1 on pagination overflow', async () => {

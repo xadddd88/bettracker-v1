@@ -157,8 +157,11 @@ function sanitizeBookmakers(rows: unknown[]): {
     }
 
     const record = row as Record<string, unknown>
-    const providerBookmakerId = toStringOrNull(record.id)
-    const name = toStringOrNull(record.name)
+    const bookmakerRecord = record.bookmaker && typeof record.bookmaker === 'object'
+      ? record.bookmaker as Record<string, unknown>
+      : record
+    const providerBookmakerId = toStringOrNull(bookmakerRecord.id)
+    const name = toStringOrNull(bookmakerRecord.name)
 
     if (!providerBookmakerId || !name) {
       responseShapeValid = false
