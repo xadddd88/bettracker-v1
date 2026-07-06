@@ -1,12 +1,12 @@
 # M1.3 Read-Only Odds Dry-Run Implementation
 
-Status: draft PR #85 / implementation only / production provider call not run
+Status: PR #85 merged / read-only runtime path implemented / first production dry-run executed safely
 
-Last updated: 2026-07-05
+Last updated: 2026-07-06
 
 ## Scope
 
-PR #85 implements the protected read-only runtime path approved by PR #83. GitHub assigned this implementation as PR #85 because PR #84 already exists.
+PR #85 implements the protected read-only runtime path approved by PR #83. GitHub assigned this implementation as PR #85 because PR #84 already exists. The first separately approved production dry-run was executed after PR #85 merged and is recorded here plus in `docs/sports-odds-read-only-dry-run-result-m1-3.md`.
 
 Allowed:
 
@@ -155,13 +155,66 @@ Additional required PR validation:
 - `npm.cmd run test:analysis-quality-gate`
 - `npm.cmd run build` with dummy public Supabase env
 
+## Production Read-Only Dry-Run Result
+
+Approved production route:
+
+```txt
+POST https://btdk.app/api/admin/sports/odds/dry-run
+```
+
+Approved body:
+
+```json
+{
+  "dryRun": true,
+  "providerFixtureId": "1576052",
+  "betId": 1,
+  "operatorConfirm": "RUN_READ_ONLY_ODDS_DRY_RUN_M1_3"
+}
+```
+
+Sanitized result:
+
+```txt
+status: 200
+success: true
+dryRun: true
+provider: api_football
+providerFixtureId: 1576052
+market: match_winner
+betId: 1
+preflight.passed: true
+requestAttempted: true
+estimatedProviderRequests: 1
+actualProviderRequests: 1
+paging.current: 1
+paging.total: 1
+oddsAvailable: false
+discoveredBookmakers: []
+discoveredMarkets: []
+valuesPresent: false
+paginationOverflow: false
+stopReasons: []
+writeSkipped: true
+```
+
+Interpretation:
+
+- Pre-flight passed.
+- Exactly one provider request was executed.
+- API-Football returned no odds coverage for fixture `1576052` / `bet=1`.
+- No page 2 was requested.
+- No writes occurred.
+- No raw payload, token, odds prices, probability, implied probability, edge, EV, recommendation, Scout/Analyst/UI signal, or betting signal surfaced.
+
 ## Current Runtime State
 
 ```txt
 SPORTS_FIXTURE_SYNC_WRITE_ENABLED: absent/off
 SPORTS_ODDS_SYNC_WRITE_ENABLED: not added/enabled
 fixture write mode: off
-production provider odds call: not run by PR #85
+production provider odds dry-run: executed once, safely, with oddsAvailable=false
 odds writes: not run
 Supabase writes: not run
 Scout/Analyst/UI odds usage: not started
@@ -169,9 +222,9 @@ Scout/Analyst/UI odds usage: not started
 
 ## Decision
 
-PR #85 implements the approved read-only dry-run path, but it does not execute the production provider call.
+PR #85 implements the approved read-only dry-run path. The separately approved production read-only dry-run executed safely and found no odds coverage for the selected fixture/market.
 
-After PR #85 is reviewed, merged, and deployed, the actual runtime step still requires separate CPO approval before calling:
+Any further runtime step still requires separate CPO approval before calling API-Football again, including fallback fixtures, page 2, broader scopes, writes, or downstream Scout/Analyst/UI usage.
 
 ```txt
 GET /odds?fixture=1576052&bet=1
