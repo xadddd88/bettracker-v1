@@ -176,6 +176,12 @@ Before any page 2+ calls, open a separate mapping pagination strategy/scope. Tha
 - storage and non-use constraints
 - FP-001 guardrails
 
+Strategy reference:
+
+```txt
+docs/sports-odds-mapping-pagination-strategy-m1-3.md
+```
+
 Any further runtime provider call requires separate CPO approval. This includes:
 
 - rerunning `/odds/bookmakers`
