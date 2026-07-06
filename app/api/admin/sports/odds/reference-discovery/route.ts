@@ -97,10 +97,11 @@ export async function POST(req: NextRequest) {
     }
 
     const report = await runBookmakerMappingDiscovery()
+    const clean = report.stopReasons.length === 0
 
     return NextResponse.json(
       {
-        success: true,
+        success: clean,
         report,
       },
       { status: 200 }

@@ -1369,6 +1369,116 @@ await testAsync('bookmaker/mapping discovery route accepts exact approved body u
   }
 });
 
+await testAsync('bookmaker/mapping discovery route returns success false on pagination overflow', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const originalFootballKey = process.env.API_FOOTBALL_KEY;
+  const observedUrls = [];
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  process.env.API_FOOTBALL_KEY = 'dummy-football';
+  globalThis.fetch = async (url, init = {}) => {
+    observedUrls.push(String(url));
+    assert.equal(init.headers['x-apisports-key'], 'dummy-football');
+    return jsonResponse(oddsBookmakersPayload({ paging: { current: 1, total: 2 } }));
+  };
+
+  try {
+    await withOddsReferenceDiscoveryRoute(async ({ POST }) => {
+      const response = await POST(
+        authorizedOddsReferenceDiscoveryRequest({
+          dryRun: true,
+          endpoints: ['bookmakers', 'mapping'],
+          maxProviderRequests: 2,
+          operatorConfirm: 'RUN_BOOKMAKER_MAPPING_DISCOVERY_M1_3',
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.report.paginationOverflow, true);
+      assert.equal(result.body.report.actualProviderRequests, 1);
+      assert.equal(observedUrls.length, 1);
+      assert.ok(
+        result.body.report.stopReasons.includes(
+          'provider pagination total exceeds approved page-1 budget for /odds/bookmakers'
+        )
+      );
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+    if (originalFootballKey === undefined) {
+      delete process.env.API_FOOTBALL_KEY;
+    } else {
+      process.env.API_FOOTBALL_KEY = originalFootballKey;
+    }
+  }
+});
+
+await testAsync('bookmaker/mapping discovery route returns success false on invalid response shape', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const originalFootballKey = process.env.API_FOOTBALL_KEY;
+  const observedUrls = [];
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  process.env.API_FOOTBALL_KEY = 'dummy-football';
+  globalThis.fetch = async (url, init = {}) => {
+    observedUrls.push(String(url));
+    assert.equal(init.headers['x-apisports-key'], 'dummy-football');
+    const parsedUrl = new URL(String(url));
+    if (parsedUrl.pathname === '/odds/bookmakers') return jsonResponse(oddsBookmakersPayload());
+    if (parsedUrl.pathname === '/odds/mapping') {
+      return jsonResponse(oddsMappingPayload({
+        response: [{ league: { id: 39, season: 2026 }, fixture: {}, update: null }],
+      }));
+    }
+    throw new Error(`unexpected provider path: ${parsedUrl.pathname}`);
+  };
+
+  try {
+    await withOddsReferenceDiscoveryRoute(async ({ POST }) => {
+      const response = await POST(
+        authorizedOddsReferenceDiscoveryRequest({
+          dryRun: true,
+          endpoints: ['bookmakers', 'mapping'],
+          maxProviderRequests: 2,
+          operatorConfirm: 'RUN_BOOKMAKER_MAPPING_DISCOVERY_M1_3',
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.report.actualProviderRequests, 2);
+      assert.equal(observedUrls.length, 2);
+      assert.ok(
+        result.body.report.stopReasons.includes(
+          'provider response shape differs from expected evidence for /odds/mapping'
+        )
+      );
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+    if (originalFootballKey === undefined) {
+      delete process.env.API_FOOTBALL_KEY;
+    } else {
+      process.env.API_FOOTBALL_KEY = originalFootballKey;
+    }
+  }
+});
+
 process.env.API_FOOTBALL_KEY = 'dummy-football';
 process.env.API_TENNIS_KEY = 'dummy-tennis';
 process.env.SPORTMONKS_TOKEN = 'dummy-sportmonks';
