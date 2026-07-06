@@ -591,7 +591,7 @@ next action: separate CPO-approved read-only dry-run scope
 ## Decision #016 - Read-Only Odds Dry-Run Implementation Before Runtime Call
 **Date:** 2026-07-05
 **Proposed by:** CPO + Founder
-**Status:** Draft PR #85. Implementation only; production provider odds call not started. GitHub assigned this implementation as PR #85 because PR #84 already exists.
+**Status:** Accepted and merged via PR #85. Runtime dry-run executed separately after merge; odds writes and downstream usage not started. GitHub assigned this implementation as PR #85 because PR #84 already exists.
 
 **Decision:** BetTracker may add a protected admin-only read-only odds dry-run route and server helper for the PR #83 scope, but the production API-Football provider call remains blocked until PR #85 is reviewed, merged, deployed, and separately approved.
 
@@ -630,7 +630,7 @@ next action: separate CPO-approved read-only dry-run scope
 - no model probability, implied probability, edge, EV, recommendation, or betting signal
 
 **Consequences:**
-- PR #85 can be tested with mocked provider responses and read-only Supabase mocks.
+- PR #85 was tested with mocked provider responses and read-only Supabase mocks.
 - The route must require operator authorization and keep `API_FOOTBALL_KEY` server-side only.
 - A failing pre-flight must block the provider call.
 - A successful pre-flight may attempt exactly one page-1 provider request only after separate runtime approval.
@@ -638,5 +638,55 @@ next action: separate CPO-approved read-only dry-run scope
 
 ---
 
-*Last updated: 2026-07-05*
+## Decision #017 - First Read-Only Odds Dry-Run Result
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Executed / safe. Result recorded via PR #86. Odds writes not started.
+
+**Decision:** BetTracker accepts the first production API-Football read-only odds dry-run result as safe evidence. The run consumed exactly one approved provider request, returned no odds coverage for the selected fixture and market, and produced only a sanitized coverage report.
+
+**Approved runtime scope:**
+- endpoint: `POST https://btdk.app/api/admin/sports/odds/dry-run`
+- provider: `api_football`
+- provider fixture id: `1576052`
+- market: `match_winner`
+- provider bet id: `1`
+- internal provider request shape: `GET /odds?fixture=1576052&bet=1`
+- max provider requests: 1
+- page 1 only
+
+**Result:**
+- HTTP status: 200
+- `success=true`
+- `preflight.passed=true`
+- `requestAttempted=true`
+- `paging.current=1`
+- `paging.total=1`
+- `oddsAvailable=false`
+- `discoveredBookmakers=[]`
+- `discoveredMarkets=[]`
+- `valuesPresent=false`
+- `paginationOverflow=false`
+- `estimatedProviderRequests=1`
+- `actualProviderRequests=1`
+- `stopReasons=[]`
+- `writeSkipped=true`
+
+**Interpretation:**
+- Pre-flight passed against the exact provider link and canonical fixture.
+- Exactly one provider request was executed.
+- API-Football returned no odds coverage for fixture `1576052` / `bet=1`.
+- No page 2 was requested.
+- No odds write, Supabase write, migration, or env flag was used.
+- No raw provider payload, token, odds price, probability, implied probability, edge, EV, recommendation, Scout signal, Analyst signal, or UI signal surfaced.
+
+**Consequences:**
+- M1.3 read-only odds dry-run is `EXECUTED / SAFE`.
+- `SPORTS_ODDS_SYNC_WRITE_ENABLED` remains not added/enabled.
+- M1.3 odds writes remain `NOT STARTED`.
+- Any further provider odds call, fallback fixture call, page 2 fetch, odds write, storage work, or user-facing odds usage requires separate CPO approval.
+
+---
+
+*Last updated: 2026-07-06*
 *Owner: All (each role contributes)*
