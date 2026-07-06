@@ -776,5 +776,33 @@ Reference: `docs/analysis-trust-regression-cases.md`
 
 ---
 
+## Decision #021 - FP-001 Data Coverage Map
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Accepted as a roadmap aid. Documentation only; implementation not started.
+
+**Decision:** BetTracker will maintain an FP-001 data coverage map that connects each missing requirement from the legacy false-precision analysis to provider candidates, canonical storage targets, milestones, status, and blockers.
+
+The map is not an implementation milestone. It does not supersede the current M1.3 bookmaker/mapping discovery path, does not start M1.2.e football enrichment, and does not authorize provider calls, odds writes, Supabase writes, Scout usage, Analyst usage, UI changes, or betting signals.
+
+**Mapped requirements:**
+- provider-backed odds / line movement
+- live status / event state
+- team news / lineups
+- injuries / suspensions
+- sport-specific model support
+- per-leg model inputs
+
+**Conclusions:**
+- Football can eventually close several FP-001 gaps using existing paid providers, but only after endpoint evidence, read-only dry-runs, write gates, and trust validation.
+- Tennis remains unsupported for pricing until a deep tennis provider, tennis enrichment storage, and tennis-specific model support exist.
+- Sport-specific model support and per-leg model inputs are Analyst-layer requirements, not data purchases alone.
+- Reference discovery and provider availability do not unlock betting signals.
+- Any Analyst, Scout, UI, or pricing work must check against FP-001 before use.
+
+Reference: `docs/data-coverage-fp001-map.md`
+
+---
+
 *Last updated: 2026-07-06*
 *Owner: All (each role contributes)*
