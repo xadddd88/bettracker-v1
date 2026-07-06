@@ -776,5 +776,33 @@ Reference: `docs/analysis-trust-regression-cases.md`
 
 ---
 
+## Decision #020 - Third-Party Manual Context Policy
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Accepted as a docs-only policy. Runtime implementation not started.
+
+**Decision:** BetTracker will treat Flashscore and similar sports websites as unapproved automated data providers. User-provided links, screenshots, excerpts, copied text, or OCR output from those sources may be used only as manual context labeled `user_provided_third_party_context`.
+
+Flashscore Terms of Use describe the site as personal-use only, restrict commercial use, protect database content, restrict automated requests, and restrict embedding, aggregating, scraping, or recreating site content without consent. BetTracker must therefore not scrape, crawl, aggregate, embed, recreate, or automate requests against Flashscore or similar sites.
+
+**Rule:** Manual third-party context is not provider-backed truth and must not unlock model probability, implied probability, edge, EV, recommendation, Place Bet, Scout score, or any betting signal. Provider-backed truth must come from licensed APIs or explicitly approved first-party/manual user inputs with separate product treatment.
+
+**FP-001 check:**
+- Reference discovery is not a betting signal.
+- Odds availability is not model probability.
+- Odds snapshot is not edge.
+- Bookmaker odds are not recommendations.
+- Line movement cannot be shown as value until separately validated.
+- Third-party manual context is not provider-backed truth.
+
+**Consequences:**
+- Future features that accept third-party links, screenshots, OCR output, or copied text must label them as `user_provided_third_party_context`.
+- Such context may help identify what the user is discussing, but it cannot populate fixtures, odds, scores, injuries, line movement, standings, or market data.
+- Any exception requires separate CPO approval and legal/compliance review before implementation.
+
+Reference: `docs/third-party-manual-context-policy.md`
+
+---
+
 *Last updated: 2026-07-06*
 *Owner: All (each role contributes)*
