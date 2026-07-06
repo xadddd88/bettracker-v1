@@ -17,7 +17,7 @@
 | **Branch model** | Feature branches → PR → CPO accept → Dima merges |
 | **Current UI** | Stable dark UI + Ambient Theme live as-is |
 | **Ambient Theme** | Current version live in production — further Design v2 / premium event skin work is parked |
-| **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 read-only odds dry-run executed safely with no odds coverage and no writes; bookmaker/mapping discovery rerun after PR #98 is partial/safe and stopped on mapping pagination guard; mapping pagination strategy is being defined before any page 2+ calls; Product Vision Gap / Beta v2 planning continues |
+| **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 read-only odds dry-run executed safely with no odds coverage and no writes; bookmaker/mapping discovery rerun after PR #98 is partial/safe and stopped on mapping pagination guard; canonical-fixture-first mapping scope is being defined before any page 2+ calls; Product Vision Gap / Beta v2 planning continues |
 | **Active blockers** | None in current main — product vision gaps documented in PRODUCT_VISION_GAP.md |
 | **External beta invites** | Do not invite external beta users yet |
 
@@ -55,7 +55,7 @@ Final production state after validation:
 - no broad write, multi-provider write, or multi-day write was run
 - odds, results, SportMonks enrichment, cross-provider mapping, cron, Scout, Analyst, and UI remained untouched by M1.2.c
 
-M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery & Dry-Run Plan is DONE via PR #80. M1.3 API-Football Odds Endpoint & Cost Confirmation is DONE / BLOCKED via PR #81 and superseded for planning by PR #82 provider evidence. M1.3 Read-Only Odds Dry-Run Scope is DONE via PR #83. M1.3 Read-Only Odds Dry-Run Implementation is MERGED via PR #85. M1.3 Read-Only Odds Dry-Run is EXECUTED / SAFE: one approved production request returned `oddsAvailable=false`, no pagination overflow, no raw payload, no odds prices, no writes, and no betting signal. M1.3 Bookmaker & Mapping Discovery Scope is DONE via PR #88. M1.3 Bookmaker & Mapping Discovery Read-Only Implementation is MERGED via PR #92. M1.3 Bookmaker Discovery after PR #98 is SAFE / PARTIAL WARNING: `/odds/bookmakers` returned 33 rows, 32 valid sanitized bookmaker id/name pairs, and 1 non-fatal missing-name warning. M1.3 Mapping Discovery after PR #98 is PARTIAL / SAFE: `/odds/mapping` page 1 returned 100 mapping rows with `paging.total=11`, and the route stopped correctly because page 2 is not approved. M1.3 Bookmaker & Mapping Discovery is PARTIAL / SAFE / NOT DONE. M1.3 Mapping Pagination Strategy is in docs/status planning: page 2+ calls remain blocked until a separate CPO-approved budget and filtering strategy exists. M1.3 odds writes, migrations, Scout, Analyst, and UI usage remain NOT STARTED.
+M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery & Dry-Run Plan is DONE via PR #80. M1.3 API-Football Odds Endpoint & Cost Confirmation is DONE / BLOCKED via PR #81 and superseded for planning by PR #82 provider evidence. M1.3 Read-Only Odds Dry-Run Scope is DONE via PR #83. M1.3 Read-Only Odds Dry-Run Implementation is MERGED via PR #85. M1.3 Read-Only Odds Dry-Run is EXECUTED / SAFE: one approved production request returned `oddsAvailable=false`, no pagination overflow, no raw payload, no odds prices, no writes, and no betting signal. M1.3 Bookmaker & Mapping Discovery Scope is DONE via PR #88. M1.3 Bookmaker & Mapping Discovery Read-Only Implementation is MERGED via PR #92. M1.3 Bookmaker Discovery after PR #98 is SAFE / PARTIAL WARNING: `/odds/bookmakers` returned 33 rows, 32 valid sanitized bookmaker id/name pairs, and 1 non-fatal missing-name warning. M1.3 Mapping Discovery after PR #98 is PARTIAL / SAFE: `/odds/mapping` page 1 returned 100 mapping rows with `paging.total=11`, and the route stopped correctly because page 2 is not approved. M1.3 Bookmaker & Mapping Discovery is PARTIAL / SAFE / NOT DONE. M1.3 Mapping Pagination Strategy is DONE via PR #100: page 2+ calls remain blocked until a separate CPO-approved budget and filtering strategy exists. M1.3 Canonical-Fixture-First Mapping Discovery Scope is in docs/status planning: compare known provider fixture IDs `1576052` and `1576053` against existing page-1 mapping coverage before any broader mapping crawl. M1.3 odds writes, migrations, Scout, Analyst, and UI usage remain NOT STARTED.
 
 ---
 
@@ -63,7 +63,7 @@ M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery 
 
 | Field | Value |
 |---|---|
-| **Status** | DESIGN DONE via PR #79; endpoint discovery / dry-run planning DONE via PR #80; endpoint/cost confirmation DONE / BLOCKED via PR #81; provider evidence DONE via PR #82; read-only dry-run scope DONE via PR #83; read-only dry-run implementation MERGED via PR #85; production read-only dry-run EXECUTED / SAFE; bookmaker/mapping discovery scope DONE via PR #88; reference discovery implementation MERGED via PR #92; post-PR #98 production bookmaker discovery SAFE / PARTIAL WARNING; mapping discovery PARTIAL / SAFE; bookmaker/mapping discovery PARTIAL / SAFE / NOT DONE; mapping pagination strategy in docs/status planning |
+| **Status** | DESIGN DONE via PR #79; endpoint discovery / dry-run planning DONE via PR #80; endpoint/cost confirmation DONE / BLOCKED via PR #81; provider evidence DONE via PR #82; read-only dry-run scope DONE via PR #83; read-only dry-run implementation MERGED via PR #85; production read-only dry-run EXECUTED / SAFE; bookmaker/mapping discovery scope DONE via PR #88; reference discovery implementation MERGED via PR #92; post-PR #98 production bookmaker discovery SAFE / PARTIAL WARNING; mapping discovery PARTIAL / SAFE; bookmaker/mapping discovery PARTIAL / SAFE / NOT DONE; mapping pagination strategy DONE via PR #100; canonical-fixture-first mapping scope in docs/status planning |
 | **Implementation** | READ-ONLY PLANNER from PR #80; protected read-only dry-run path merged via PR #85; odds ingestion NOT STARTED |
 | **Odds ingestion** | NOT STARTED |
 | **Provider calls** | One approved read-only production call executed for `GET /odds?fixture=1576052&bet=1`; no odds coverage returned. Approved reference discovery requests executed for `/odds/bookmakers`, including post-PR #94 and post-PR #98 reruns. The post-PR #98 rerun also executed `/odds/mapping` page 1, returned `paging.total=11`, and stopped before page 2. Any further provider call requires separate CPO approval |
@@ -90,6 +90,7 @@ Design direction:
 - PR #96 diagnostics identified the remaining bookmaker issue as one `missing name` row; PR #97 accepted a Hybrid missing-name policy, and PR #98 implemented it with mocked tests
 - the post-PR #98 approved reference discovery rerun is PARTIAL / SAFE / NOT DONE: `/odds/bookmakers` is now shape-valid with one non-fatal missing-name warning, `/odds/mapping` ran page 1, and discovery stopped because `/odds/mapping` reported `paging.total=11` while page 2 is not approved
 - do not auto-fetch remaining mapping pages; mapping pagination strategy must be accepted before any page 2+ calls
+- canonical-fixture-first mapping discovery should compare known provider fixture IDs `1576052` and `1576053` against existing page-1 mapping coverage before any global page 2+ crawl
 - further production provider odds calls require separate CPO approval
 
 Reference: `docs/sports-odds-snapshot-sync-m1-3-design.md`
@@ -105,6 +106,7 @@ M1.3 bookmaker discovery rerun result reference: `docs/sports-odds-bookmaker-dis
 M1.3 bookmaker missing-name policy reference: `docs/sports-odds-bookmaker-missing-name-policy-m1-3.md`
 M1.3 bookmaker/mapping discovery rerun result reference: `docs/sports-odds-bookmaker-mapping-discovery-rerun-result-m1-3.md`
 M1.3 mapping pagination strategy reference: `docs/sports-odds-mapping-pagination-strategy-m1-3.md`
+M1.3 canonical-fixture-first mapping scope reference: `docs/sports-odds-canonical-fixture-first-mapping-scope-m1-3.md`
 
 ---
 

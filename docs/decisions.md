@@ -1130,5 +1130,50 @@ Reference: `docs/sports-odds-mapping-pagination-strategy-m1-3.md`
 
 ---
 
+## Decision #027 - Canonical-Fixture-First Mapping Discovery Scope
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Scope only. Runtime provider calls not approved.
+
+**Context:** PR #100 established that `/odds/mapping` page 1 returned 100 rows with `paging.total=11`. Full current mapping discovery would require 10 additional provider requests and is not automatically approved.
+
+Known BetTracker provider fixture IDs:
+- `1576052`
+- `1576053`
+
+**Decision:** Before any additional `/odds/mapping` calls, BetTracker will use a canonical-fixture-first strategy. The next scope prioritizes matching known provider fixture IDs against existing sanitized page-1 mapping coverage instead of crawling all 11 mapping pages by default.
+
+**Strategy:**
+- Do not crawl all 11 mapping pages by default.
+- First compare existing page-1 mapping coverage against `provider_fixture_id=1576052` and `provider_fixture_id=1576053`.
+- If either known fixture appears in existing page-1 mapping coverage, record coverage as found without more provider calls.
+- If neither appears, evaluate whether API-Football supports filterable mapping discovery.
+- Do not fetch page 2+ without separate approval.
+- Do not use mapping coverage as a betting signal.
+
+**Request budget framing:**
+- Zero additional requests: compare existing page-1 result only.
+- Narrow or filtered request: TBD after provider filter evidence.
+- Full crawl pages 2-11: blocked.
+
+**Stop conditions:**
+- Page 2+ is not approved.
+- Full crawl is not approved.
+- No user-facing odds usage is approved.
+- No probability, implied probability, edge, EV, recommendation, Scout signal, Analyst signal, UI signal, Place Bet permission, or betting signal is approved.
+
+**FP-001:** Mapping reference coverage is not model probability, edge, EV, recommendation, or Scout/Analyst signal. Reference availability does not close FP-001 data gaps by itself.
+
+**Consequences:**
+- M1.3 Mapping Discovery remains `PARTIAL / SAFE`.
+- M1.3 Bookmaker & Mapping Discovery remains `PARTIAL / SAFE / NOT DONE`.
+- Page 2+ calls remain blocked.
+- Odds writes, Supabase writes, Scout usage, Analyst usage, UI usage, and betting signals remain not started.
+- The next runtime step, if any, requires a separate CPO-approved scope.
+
+Reference: `docs/sports-odds-canonical-fixture-first-mapping-scope-m1-3.md`
+
+---
+
 *Last updated: 2026-07-06*
 *Owner: All (each role contributes)*
