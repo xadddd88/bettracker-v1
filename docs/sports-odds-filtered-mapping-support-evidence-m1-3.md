@@ -233,7 +233,15 @@ Mapping reference evidence is technical only. It does not prove odds coverage, f
 
 ## Next Step
 
-The next step is not runtime.
+The selected next step is not runtime.
+
+Mapping exploration is paused for now.
+
+Pause reference:
+
+```txt
+docs/sports-odds-mapping-exploration-pause-m1-3.md
+```
 
 Possible next safe actions:
 
