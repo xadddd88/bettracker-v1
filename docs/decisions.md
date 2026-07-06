@@ -995,5 +995,90 @@ Reference: `docs/sports-odds-bookmaker-missing-name-policy-m1-3.md`
 
 ---
 
+## Decision #025 - Bookmaker and Mapping Discovery Rerun Remains Partial / Safe
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Accepted as partial / safe evidence. Full bookmaker/mapping discovery not done.
+
+**Context:** After PR #98 implemented Hybrid missing-name handling, a separately approved production reference discovery rerun used the protected read-only route:
+
+```txt
+POST https://btdk.app/api/admin/sports/odds/reference-discovery
+```
+
+Approved body:
+
+```json
+{
+  "dryRun": true,
+  "endpoints": ["bookmakers", "mapping"],
+  "maxProviderRequests": 2,
+  "operatorConfirm": "RUN_BOOKMAKER_MAPPING_DISCOVERY_M1_3"
+}
+```
+
+**Decision:** Record the rerun as safe partial discovery, not as full discovery completion.
+
+**Result:**
+- HTTP status: 200
+- `success=false`
+- `dryRun=true`
+- provider: `api_football`
+- scope: `bookmaker_mapping_reference`
+- `estimatedProviderRequests=2`
+- `actualProviderRequests=2`
+- `writeSkipped=true`
+- `paginationOverflow=true`
+- stop reason: `provider pagination total exceeds approved page-1 budget for /odds/mapping`
+
+**Bookmaker endpoint:**
+- `/odds/bookmakers.requestAttempted=true`
+- `paging.current=1`
+- `paging.total=1`
+- `resultsCount=33`
+- `paginationOverflow=false`
+- `responseShapeValid=true`
+- `bookmakerRowsTotal=33`
+- `validBookmakerRows=32`
+- `invalidBookmakerRows=0`
+- `invalidBookmakerRowReasons=[]`
+- `partialBookmakerRows=1`
+- `partialBookmakerRowReasons=["missing name"]`
+- `nonFatalWarnings=["bookmaker row missing name"]`
+- discovered bookmaker count: 32
+
+**Mapping endpoint:**
+- `/odds/mapping.requestAttempted=true`
+- `paging.current=1`
+- `paging.total=11`
+- `resultsCount=100`
+- `paginationOverflow=true`
+- `responseShapeValid=true`
+- `mappingCoverage count=100`
+- page 2 was not requested because it was not approved
+
+**Interpretation:**
+- PR #98 missing-name handling worked.
+- Bookmaker discovery is now safe with one partial warning.
+- Mapping discovery ran and returned page 1 successfully.
+- The protected route correctly returned `success=false` because `/odds/mapping` reported `paging.total=11`, which exceeds the approved page-1 budget.
+- This is partial safe discovery, not full successful discovery.
+- No page 2, odds values endpoint, or fixture-specific odds endpoint was called.
+- No raw provider payload, API key, operator token, account data, odds prices, probability, implied probability, edge, EV, recommendation, Scout signal, Analyst signal, UI signal, betting signal, or Supabase write surfaced.
+
+**Consequences:**
+- M1.3 Bookmaker Discovery is `SAFE / PARTIAL WARNING`.
+- M1.3 Mapping Discovery is `PARTIAL / SAFE`.
+- M1.3 Bookmaker & Mapping Discovery is `PARTIAL / SAFE / NOT DONE`.
+- `SPORTS_ODDS_SYNC_WRITE_ENABLED` remains not added/enabled.
+- M1.3 odds writes, storage, Scout usage, Analyst usage, UI usage, and betting signals remain not started.
+- Do not auto-fetch remaining mapping pages.
+- Open a separate mapping pagination strategy/scope before any page 2+ calls.
+- FP-001 remains active: reference discovery does not unlock probability, edge, EV, recommendation, or betting signal generation.
+
+Reference: `docs/sports-odds-bookmaker-mapping-discovery-rerun-result-m1-3.md`
+
+---
+
 *Last updated: 2026-07-06*
 *Owner: All (each role contributes)*

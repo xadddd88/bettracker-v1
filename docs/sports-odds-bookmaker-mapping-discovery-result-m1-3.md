@@ -14,6 +14,12 @@ A later separately approved rerun after PR #94 is recorded in:
 docs/sports-odds-bookmaker-discovery-rerun-result-m1-3.md
 ```
 
+A later separately approved rerun after PR #98 missing-name handling is recorded in:
+
+```txt
+docs/sports-odds-bookmaker-mapping-discovery-rerun-result-m1-3.md
+```
+
 Approved production route:
 
 ```txt
@@ -131,6 +137,7 @@ M1.3 Bookmaker Discovery: PARTIAL / SAFE
 M1.3 Mapping Discovery: NOT RUN
 M1.3 Bookmaker & Mapping Discovery: NOT DONE
 M1.3 Bookmaker Discovery Shape Adapter: PARTIAL / NEEDS FOLLOW-UP after PR #94 rerun
+Latest post-PR #98 result: Bookmaker Discovery SAFE / PARTIAL WARNING; Mapping Discovery PARTIAL / SAFE; Bookmaker & Mapping Discovery PARTIAL / SAFE / NOT DONE
 M1.3 odds writes: NOT STARTED
 SPORTS_ODDS_SYNC_WRITE_ENABLED: NOT ADDED / NOT ENABLED
 Scout / Analyst / UI odds usage: NOT STARTED
