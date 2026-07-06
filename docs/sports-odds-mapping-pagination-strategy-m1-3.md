@@ -272,3 +272,20 @@ Before any page 2+ calls, open a separate implementation/runtime scope that incl
 - FP-001 check
 
 Do not merge or run that future scope without CPO approval.
+
+## Canonical-Fixture-First Follow-Up
+
+The selected immediate follow-up is documentation/status scope for a canonical-fixture-first approach.
+
+Reference:
+
+```txt
+docs/sports-odds-canonical-fixture-first-mapping-scope-m1-3.md
+```
+
+That scope keeps page 2+ blocked and prioritizes comparing existing page-1 `mappingCoverage` against known BetTracker provider fixture IDs:
+
+```txt
+1576052
+1576053
+```
