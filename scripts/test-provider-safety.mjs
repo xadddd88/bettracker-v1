@@ -119,6 +119,59 @@ async function withFixtureSyncRoute(fn) {
   });
 }
 
+function clearCompiledOddsDryRunModules() {
+  for (const relPath of [
+    'app/api/admin/sports/odds/dry-run/route.js',
+    'lib/providers/odds-dry-run.js',
+    'lib/supabase/admin.js',
+  ]) {
+    const compiledPath = path.join(buildDir, relPath);
+    try {
+      delete require.cache[require.resolve(compiledPath)];
+    } catch {
+      // Module may not have been loaded yet.
+    }
+  }
+}
+
+async function withOddsDryRunRoute(fn) {
+  return withCompiledAlias(async () => {
+    clearCompiledOddsDryRunModules();
+    const route = require(path.join(buildDir, 'app/api/admin/sports/odds/dry-run/route.js'));
+    return fn(route);
+  });
+}
+
+async function withOddsDryRunRouteAndAdminMock(adminExports, fn) {
+  return withCompiledAlias(async () => {
+    clearCompiledOddsDryRunModules();
+    const adminPath = path.join(buildDir, 'lib/supabase/admin.js');
+    require.cache[require.resolve(adminPath)] = {
+      id: adminPath,
+      filename: adminPath,
+      loaded: true,
+      exports: adminExports,
+    };
+    const route = require(path.join(buildDir, 'app/api/admin/sports/odds/dry-run/route.js'));
+    try {
+      return await fn(route);
+    } finally {
+      clearCompiledOddsDryRunModules();
+    }
+  });
+}
+
+function authorizedOddsDryRunRequest(body) {
+  return new Request('https://example.test/api/admin/sports/odds/dry-run', {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer operator-token',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 function authorizedFixtureSyncRequest(body) {
   return new Request('https://example.test/api/admin/sports/fixtures/sync', {
     method: 'POST',
@@ -218,6 +271,110 @@ function documentedOddsEndpoint(overrides = {}) {
     endpoint: 'https://v3.football.api-sports.io/odds',
     requestShape: 'GET /odds?fixture=<providerFixtureId>&bet=match_winner',
     quotaCostPerRequest: 1,
+    ...overrides,
+  };
+}
+
+function oddsProviderPayload(overrides = {}) {
+  return {
+    get: 'odds',
+    parameters: { fixture: '1576052', bet: '1' },
+    errors: [],
+    results: 1,
+    paging: { current: 1, total: 1 },
+    response: [
+      {
+        fixture: { id: 1576052 },
+        update: '2026-07-05T12:00:00+00:00',
+        bookmakers: [
+          {
+            id: 6,
+            name: 'Bwin',
+            bets: [
+              {
+                id: 1,
+                name: 'Match Winner',
+                values: [
+                  { value: 'Home', odd: '2.00' },
+                  { value: 'Draw', odd: '3.25' },
+                  { value: 'Away', odd: '4.10' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function createOddsDryRunSupabaseMock({ link, fixture }) {
+  const calls = [];
+  const mutations = [];
+
+  return {
+    calls,
+    mutations,
+    client: {
+      from(table) {
+        const filters = [];
+        const builder = {
+          select(columns) {
+            calls.push({ table, op: 'select', columns });
+            return builder;
+          },
+          eq(column, value) {
+            calls.push({ table, op: 'eq', column, value });
+            filters.push({ column, value });
+            return builder;
+          },
+          async maybeSingle() {
+            calls.push({ table, op: 'maybeSingle', filters: [...filters] });
+            if (table === 'fixture_provider_links') return { data: link, error: null };
+            if (table === 'canonical_fixtures') return { data: fixture, error: null };
+            return { data: null, error: null };
+          },
+          insert(payload) {
+            mutations.push({ table, op: 'insert', payload });
+            throw new Error('odds dry-run must not insert');
+          },
+          update(payload) {
+            mutations.push({ table, op: 'update', payload });
+            throw new Error('odds dry-run must not update');
+          },
+          upsert(payload) {
+            mutations.push({ table, op: 'upsert', payload });
+            throw new Error('odds dry-run must not upsert');
+          },
+          delete() {
+            mutations.push({ table, op: 'delete' });
+            throw new Error('odds dry-run must not delete');
+          },
+        };
+        return builder;
+      },
+    },
+  };
+}
+
+function exactOddsProviderLink(overrides = {}) {
+  return {
+    id: 'provider-link-1',
+    canonical_fixture_id: 'canonical-fixture-1',
+    provider: 'api_football',
+    provider_fixture_id: '1576052',
+    mapping_confidence: 'exact',
+    ...overrides,
+  };
+}
+
+function scheduledFootballFixture(overrides = {}) {
+  return {
+    id: 'canonical-fixture-1',
+    sport: 'football',
+    status: 'scheduled',
+    kickoff_at: '2026-12-31T18:00:00Z',
     ...overrides,
   };
 }
@@ -530,7 +687,338 @@ await testAsync('odds discovery dry-run returns sanitized bookmaker and market c
   assert.equal(JSON.stringify(report).includes('rawProviderPayload'), false);
 });
 
+// ── 4c. M1.3 read-only odds dry-run implementation stays scoped/safe ───────
+await testAsync('read-only odds dry-run pre-flight failure blocks provider call', async () => {
+  const { runReadOnlyOddsDryRun } = require(path.join(buildDir, 'lib/providers/odds-dry-run.js'));
+  const supabase = createOddsDryRunSupabaseMock({
+    link: exactOddsProviderLink(),
+    fixture: scheduledFootballFixture({ status: 'live' }),
+  });
+  let providerCalls = 0;
+
+  const report = await runReadOnlyOddsDryRun({
+    supabase: supabase.client,
+    now: '2026-12-31T17:00:00Z',
+    fetchProviderOdds: async () => {
+      providerCalls++;
+      return oddsProviderPayload();
+    },
+  });
+
+  assert.equal(providerCalls, 0);
+  assert.equal(report.requestAttempted, false);
+  assert.equal(report.actualProviderRequests, 0);
+  assert.equal(report.preflight.passed, false);
+  assert.ok(report.preflight.blockedReasons.includes('canonical fixture status is not scheduled'));
+  assert.deepEqual(supabase.mutations, []);
+});
+
+await testAsync('read-only odds dry-run successful pre-flight allows exactly one provider call', async () => {
+  const { runReadOnlyOddsDryRun } = require(path.join(buildDir, 'lib/providers/odds-dry-run.js'));
+  const supabase = createOddsDryRunSupabaseMock({
+    link: exactOddsProviderLink(),
+    fixture: scheduledFootballFixture(),
+  });
+  const providerRequests = [];
+
+  const report = await runReadOnlyOddsDryRun({
+    supabase: supabase.client,
+    now: '2026-12-31T17:00:00Z',
+    fetchProviderOdds: async (request) => {
+      providerRequests.push(request);
+      return oddsProviderPayload();
+    },
+  });
+
+  assert.equal(providerRequests.length, 1);
+  assert.deepEqual(providerRequests[0], { providerFixtureId: '1576052', betId: 1, page: 1 });
+  assert.equal(report.requestAttempted, true);
+  assert.equal(report.actualProviderRequests, 1);
+  assert.equal(report.estimatedProviderRequests, 1);
+  assert.deepEqual(report.paging, { current: 1, total: 1 });
+  assert.equal(report.oddsAvailable, true);
+  assert.deepEqual(report.discoveredBookmakers, [{ providerBookmakerId: '6', name: 'Bwin' }]);
+  assert.deepEqual(report.discoveredMarkets, [{ providerMarketId: '1', name: 'Match Winner' }]);
+  assert.equal(report.valuesPresent, true);
+  assert.equal(report.paginationOverflow, false);
+  assert.deepEqual(supabase.mutations, []);
+});
+
+await testAsync('read-only odds dry-run stops after page 1 when provider reports more pages', async () => {
+  const { runReadOnlyOddsDryRun } = require(path.join(buildDir, 'lib/providers/odds-dry-run.js'));
+  const supabase = createOddsDryRunSupabaseMock({
+    link: exactOddsProviderLink(),
+    fixture: scheduledFootballFixture(),
+  });
+  let providerCalls = 0;
+
+  const report = await runReadOnlyOddsDryRun({
+    supabase: supabase.client,
+    now: '2026-12-31T17:00:00Z',
+    fetchProviderOdds: async () => {
+      providerCalls++;
+      return oddsProviderPayload({ paging: { current: 1, total: 2 } });
+    },
+  });
+
+  assert.equal(providerCalls, 1);
+  assert.equal(report.actualProviderRequests, 1);
+  assert.deepEqual(report.paging, { current: 1, total: 2 });
+  assert.equal(report.paginationOverflow, true);
+  assert.ok(report.stopReasons.includes('provider pagination total exceeds approved page-1 budget'));
+});
+
+await testAsync('read-only odds dry-run report contains no token, raw payload, odds prices, or betting-signal fields', async () => {
+  const { runReadOnlyOddsDryRun } = require(path.join(buildDir, 'lib/providers/odds-dry-run.js'));
+  const supabase = createOddsDryRunSupabaseMock({
+    link: exactOddsProviderLink(),
+    fixture: scheduledFootballFixture(),
+  });
+
+  const report = await runReadOnlyOddsDryRun({
+    supabase: supabase.client,
+    now: '2026-12-31T17:00:00Z',
+    fetchProviderOdds: async () => oddsProviderPayload({
+      secret: 'SECRET_PROVIDER_TOKEN',
+      rawProviderPayload: { apiKey: 'SECRET_API_KEY' },
+      response: [
+        {
+          fixture: { id: 1576052 },
+          edge_percent: -17.4,
+          model_probability: 28,
+          bookmakers: [
+            {
+              id: 6,
+              name: 'Bwin',
+              bets: [
+                {
+                  id: 1,
+                  name: 'Match Winner',
+                  values: [
+                    { value: 'Home', odd: '2.00' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  const serialized = JSON.stringify(report);
+  for (const forbidden of [
+    'SECRET_PROVIDER_TOKEN',
+    'SECRET_API_KEY',
+    'rawProviderPayload',
+    'model_probability',
+    'modelProbability',
+    'implied_probability',
+    'impliedProbability',
+    'edge_percent',
+    'edge',
+    'EV',
+    'ev',
+    '2.00',
+    '17.4',
+    '28',
+  ]) {
+    assert.equal(serialized.includes(forbidden), false, `forbidden artifact leaked: ${forbidden}`);
+  }
+  assert.equal(report.valuesPresent, true);
+  assert.deepEqual(supabase.mutations, []);
+});
+
+await testAsync('read-only odds dry-run route requires operator authorization before Supabase/provider calls', async () => {
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+
+  try {
+    await withOddsDryRunRoute(async ({ POST }) => {
+      const response = await POST(
+        new Request('https://example.test/api/admin/sports/odds/dry-run', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ dryRun: true }),
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 401);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.error, 'Unauthorized');
+    });
+  } finally {
+    clearCompiledOddsDryRunModules();
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
 // ── 5. M1.2.b fixture fetch and dry-run behavior ─────────────────────────
+await testAsync('read-only odds dry-run route rejects empty body before Supabase/provider calls', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+  let adminCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    throw new Error('provider fetch should not be called');
+  };
+
+  try {
+    await withOddsDryRunRouteAndAdminMock(
+      {
+        createAdminClient() {
+          adminCalls++;
+          throw new Error('Supabase should not be touched');
+        },
+      },
+      async ({ POST }) => {
+        const response = await POST(authorizedOddsDryRunRequest({}));
+        const result = await readJsonResponse(response);
+
+        assert.equal(result.status, 400);
+        assert.equal(result.body.success, false);
+        assert.equal(result.body.error, 'Invalid input');
+        assert.equal(adminCalls, 0);
+        assert.equal(fetchCalls, 0);
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
+await testAsync('read-only odds dry-run route rejects missing or wrong runtime confirmation before Supabase/provider calls', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+  let adminCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    throw new Error('provider fetch should not be called');
+  };
+
+  try {
+    await withOddsDryRunRouteAndAdminMock(
+      {
+        createAdminClient() {
+          adminCalls++;
+          throw new Error('Supabase should not be touched');
+        },
+      },
+      async ({ POST }) => {
+        for (const body of [
+          { dryRun: true, providerFixtureId: '1576052', betId: 1 },
+          {
+            dryRun: true,
+            providerFixtureId: '1576052',
+            betId: 1,
+            operatorConfirm: 'WRONG_CONFIRMATION',
+          },
+        ]) {
+          const response = await POST(authorizedOddsDryRunRequest(body));
+          const result = await readJsonResponse(response);
+
+          assert.equal(result.status, 400);
+          assert.equal(result.body.success, false);
+          assert.equal(
+            result.body.error,
+            'read-only odds dry-run requires explicit operator confirmation'
+          );
+        }
+
+        assert.equal(adminCalls, 0);
+        assert.equal(fetchCalls, 0);
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
+await testAsync('read-only odds dry-run route accepts exact approved body and makes at most one provider call under mocks', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const originalFootballKey = process.env.API_FOOTBALL_KEY;
+  const supabase = createOddsDryRunSupabaseMock({
+    link: exactOddsProviderLink(),
+    fixture: scheduledFootballFixture(),
+  });
+  let providerCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  process.env.API_FOOTBALL_KEY = 'dummy-football';
+  globalThis.fetch = async (url, init = {}) => {
+    providerCalls++;
+    const parsedUrl = new URL(String(url));
+    assert.equal(parsedUrl.pathname, '/odds');
+    assert.equal(parsedUrl.searchParams.get('fixture'), '1576052');
+    assert.equal(parsedUrl.searchParams.get('bet'), '1');
+    assert.equal(parsedUrl.searchParams.get('page'), null);
+    assert.equal(init.headers['x-apisports-key'], 'dummy-football');
+    return jsonResponse(oddsProviderPayload());
+  };
+
+  try {
+    await withOddsDryRunRouteAndAdminMock(
+      {
+        createAdminClient() {
+          return supabase.client;
+        },
+      },
+      async ({ POST }) => {
+        const response = await POST(
+          authorizedOddsDryRunRequest({
+            dryRun: true,
+            providerFixtureId: '1576052',
+            betId: 1,
+            operatorConfirm: 'RUN_READ_ONLY_ODDS_DRY_RUN_M1_3',
+          })
+        );
+        const result = await readJsonResponse(response);
+
+        assert.equal(result.status, 200);
+        assert.equal(result.body.success, true);
+        assert.equal(result.body.report.requestAttempted, true);
+        assert.equal(result.body.report.actualProviderRequests, 1);
+        assert.equal(providerCalls, 1);
+        assert.deepEqual(supabase.mutations, []);
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+    if (originalFootballKey === undefined) {
+      delete process.env.API_FOOTBALL_KEY;
+    } else {
+      process.env.API_FOOTBALL_KEY = originalFootballKey;
+    }
+  }
+});
+
 process.env.API_FOOTBALL_KEY = 'dummy-football';
 process.env.API_TENNIS_KEY = 'dummy-tennis';
 process.env.SPORTMONKS_TOKEN = 'dummy-sportmonks';
