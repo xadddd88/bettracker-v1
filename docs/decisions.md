@@ -641,7 +641,7 @@ next action: separate CPO-approved read-only dry-run scope
 ## Decision #017 - First Read-Only Odds Dry-Run Result
 **Date:** 2026-07-06
 **Proposed by:** CPO + Founder
-**Status:** Executed / safe. Result recorded via PR #86. Odds writes not started.
+**Status:** Executed / safe. Result recorded via PR #87. Odds writes not started. GitHub assigned the result record as PR #87 because PR #86 already existed.
 
 **Decision:** BetTracker accepts the first production API-Football read-only odds dry-run result as safe evidence. The run consumed exactly one approved provider request, returned no odds coverage for the selected fixture and market, and produced only a sanitized coverage report.
 
@@ -685,6 +685,71 @@ next action: separate CPO-approved read-only dry-run scope
 - `SPORTS_ODDS_SYNC_WRITE_ENABLED` remains not added/enabled.
 - M1.3 odds writes remain `NOT STARTED`.
 - Any further provider odds call, fallback fixture call, page 2 fetch, odds write, storage work, or user-facing odds usage requires separate CPO approval.
+
+---
+
+## Decision #018 - Bookmaker and Mapping Discovery Scope Before Reference Calls
+**Date:** 2026-07-06
+**Proposed by:** CPO + Founder
+**Status:** Draft PR #88. Scope approval only; provider calls not run.
+
+**Decision:** After the first fixture-specific read-only odds dry-run returned `oddsAvailable=false`, the next safer M1.3 step is reference discovery scope approval for bookmaker and mapping endpoints, not a new near-term fixture odds call or any write path.
+
+**Why:**
+- The first dry-run proved the protected route, pre-flight, provider-call budget, sanitized report, and no-write behavior.
+- The selected fixture is scheduled for `2026-12-31`, roughly 178 days away at the time of the dry-run, so missing odds coverage is expected and not an integration defect.
+- Fixture-specific odds coverage may be sparse far ahead of kickoff.
+- Bookmaker and mapping reference discovery can validate provider reference shapes without exposing odds prices or creating betting signals.
+- Reference discovery still consumes provider quota, so it requires scope approval, a fixed request budget, and pagination stop conditions before runtime.
+
+**Approved discovery scope proposal:**
+- `GET /odds/bookmakers`
+- `GET /odds/mapping`
+- max provider requests: 2 total
+- page 1 only for each endpoint
+- stop if `paging.total > 1` on either endpoint
+- no pagination crawling
+- no page 2
+- no odds values endpoint
+- no fixture-specific odds call
+
+**Sanitized report fields:**
+- request attempted per endpoint
+- endpoint name
+- `paging.current`
+- `paging.total`
+- results count
+- discovered bookmaker ids/names from `/odds/bookmakers`
+- mapping coverage fields from `/odds/mapping`:
+  - `league.id`
+  - `league.season`
+  - `fixture.id`
+  - `update`
+
+**Stop conditions:**
+- estimated provider requests exceed 2
+- `paging.total > 1`
+- response shape differs from accepted provider evidence
+- raw provider payload would be exposed
+- report attempts to include odds prices, probability, implied probability, edge, EV, recommendation, Scout signal, Analyst signal, UI signal, or any betting signal
+
+**Scope controls:**
+- no runtime code
+- no migration
+- no API route
+- no provider call in PR #88
+- no odds dry-run rerun
+- no odds write
+- no Supabase write
+- no env change
+- no `SPORTS_ODDS_SYNC_WRITE_ENABLED`
+- no Scout, Analyst, or UI changes
+- no model probability, implied probability, edge, EV, recommendation, or betting signal
+
+**Consequences:**
+- PR #88 may document and seek approval for the reference discovery scope only.
+- Runtime bookmaker/mapping discovery remains blocked until PR #88 is reviewed, merged, deployed if needed, and separately approved for execution.
+- Any future implementation must keep raw provider payloads, tokens, account details, odds prices, and betting signals out of responses, logs, docs, and user-facing surfaces.
 
 ---
 

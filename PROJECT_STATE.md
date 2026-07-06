@@ -17,7 +17,7 @@
 | **Branch model** | Feature branches → PR → CPO accept → Dima merges |
 | **Current UI** | Stable dark UI + Ambient Theme live as-is |
 | **Ambient Theme** | Current version live in production — further Design v2 / premium event skin work is parked |
-| **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 read-only odds dry-run executed safely with no odds coverage and no writes; Product Vision Gap / Beta v2 planning continues |
+| **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 read-only odds dry-run executed safely with no odds coverage and no writes; bookmaker/mapping discovery scope pending in draft PR #88; Product Vision Gap / Beta v2 planning continues |
 | **Active blockers** | None in current main — product vision gaps documented in PRODUCT_VISION_GAP.md |
 | **External beta invites** | Do not invite external beta users yet |
 
@@ -55,7 +55,7 @@ Final production state after validation:
 - no broad write, multi-provider write, or multi-day write was run
 - odds, results, SportMonks enrichment, cross-provider mapping, cron, Scout, Analyst, and UI remained untouched by M1.2.c
 
-M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery & Dry-Run Plan is DONE via PR #80. M1.3 API-Football Odds Endpoint & Cost Confirmation is DONE / BLOCKED via PR #81 and superseded for planning by PR #82 provider evidence. M1.3 Read-Only Odds Dry-Run Scope is DONE via PR #83. M1.3 Read-Only Odds Dry-Run Implementation is MERGED via PR #85. M1.3 Read-Only Odds Dry-Run is EXECUTED / SAFE: one approved production request returned `oddsAvailable=false`, no pagination overflow, no raw payload, no odds prices, no writes, and no betting signal. M1.3 odds writes, migrations, Scout, Analyst, and UI usage remain NOT STARTED.
+M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery & Dry-Run Plan is DONE via PR #80. M1.3 API-Football Odds Endpoint & Cost Confirmation is DONE / BLOCKED via PR #81 and superseded for planning by PR #82 provider evidence. M1.3 Read-Only Odds Dry-Run Scope is DONE via PR #83. M1.3 Read-Only Odds Dry-Run Implementation is MERGED via PR #85. M1.3 Read-Only Odds Dry-Run is EXECUTED / SAFE: one approved production request returned `oddsAvailable=false`, no pagination overflow, no raw payload, no odds prices, no writes, and no betting signal. M1.3 Bookmaker & Mapping Discovery Scope is in draft PR #88 as documentation/status scope approval only; no bookmaker/mapping provider calls have been run. M1.3 odds writes, migrations, Scout, Analyst, and UI usage remain NOT STARTED.
 
 ---
 
@@ -63,10 +63,10 @@ M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery 
 
 | Field | Value |
 |---|---|
-| **Status** | DESIGN DONE via PR #79; endpoint discovery / dry-run planning DONE via PR #80; endpoint/cost confirmation DONE / BLOCKED via PR #81; provider evidence DONE via PR #82; read-only dry-run scope DONE via PR #83; read-only dry-run implementation MERGED via PR #85; production read-only dry-run EXECUTED / SAFE |
+| **Status** | DESIGN DONE via PR #79; endpoint discovery / dry-run planning DONE via PR #80; endpoint/cost confirmation DONE / BLOCKED via PR #81; provider evidence DONE via PR #82; read-only dry-run scope DONE via PR #83; read-only dry-run implementation MERGED via PR #85; production read-only dry-run EXECUTED / SAFE; bookmaker/mapping discovery scope in draft PR #88 |
 | **Implementation** | READ-ONLY PLANNER from PR #80; protected read-only dry-run path merged via PR #85; odds ingestion NOT STARTED |
 | **Odds ingestion** | NOT STARTED |
-| **Provider calls** | One approved read-only production call executed for `GET /odds?fixture=1576052&bet=1`; no odds coverage returned; any further provider call requires separate CPO approval |
+| **Provider calls** | One approved read-only production call executed for `GET /odds?fixture=1576052&bet=1`; no odds coverage returned; bookmaker/mapping discovery calls not run; any further provider call requires separate CPO approval |
 | **Migrations** | NOT ADDED |
 | **User-facing usage** | BLOCKED until separate validation milestone |
 | **Odds write flag** | `SPORTS_ODDS_SYNC_WRITE_ENABLED` not added/enabled |
@@ -83,6 +83,7 @@ Design direction:
 - PR #83 scopes the first read-only production odds dry-run candidate: `GET /odds?fixture=1576052&bet=1`, Variant A only, max 1 provider request, stop if `paging.total > 1`
 - PR #85 implements the protected read-only dry-run path
 - the first production read-only odds dry-run executed safely: status 200, pre-flight passed, one provider request, page 1 only, `paging.total=1`, `oddsAvailable=false`, no writes, and no betting signal
+- PR #88 scopes the next safer reference discovery step: `GET /odds/bookmakers` and `GET /odds/mapping`, max 2 provider requests total, page 1 only, stop if either `paging.total > 1`, no odds values endpoint, and no fixture-specific odds call
 - further production provider odds calls require separate CPO approval
 
 Reference: `docs/sports-odds-snapshot-sync-m1-3-design.md`
@@ -92,6 +93,7 @@ PR #82 evidence reference: `docs/api-football-odds-provider-evidence-m1-3.md`
 PR #83 scope reference: `docs/sports-odds-read-only-dry-run-scope-m1-3.md`
 PR #85 implementation reference: `docs/sports-odds-read-only-dry-run-implementation-m1-3.md`
 M1.3 read-only dry-run result reference: `docs/sports-odds-read-only-dry-run-result-m1-3.md`
+PR #88 bookmaker/mapping scope reference: `docs/sports-odds-bookmaker-mapping-discovery-scope-m1-3.md`
 
 ---
 
@@ -129,6 +131,7 @@ M1.3 read-only dry-run result reference: `docs/sports-odds-read-only-dry-run-res
 | #82 | M1.3 API-Football Odds Provider Evidence - docs/status evidence record; no runtime provider calls or writes |
 | #83 | M1.3 Read-Only Odds Dry-Run Scope - scope approval only; selects provider fixture `1576052` primary and does not run provider calls |
 | #85 | M1.3 Read-Only Odds Dry-Run Implementation - protected read-only route/helper with explicit confirmation; production provider call was not run by the PR itself |
+| #87 | M1.3 Read-Only Odds Dry-Run Result Record - documentation/status record for the one-call production dry-run result; no runtime code |
 
 ---
 
