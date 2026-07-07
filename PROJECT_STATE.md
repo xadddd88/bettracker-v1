@@ -251,6 +251,7 @@ Daily health-check (read-only, no PR unless blocker):
 - **Dima** merges only after explicit CPO ACCEPT
 - One task = one PR — no unrelated changes bundled
 - Manual Supabase migrations applied only after CPO accept + PR merged
+- Decision numbering governance reference: `docs/decision-ledger-numbering-governance.md`
 
 ---
 

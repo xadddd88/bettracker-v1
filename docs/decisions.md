@@ -1493,5 +1493,39 @@ Reference: `docs/sportmonks-canonical-fixture-mapping-scope-m1-2-e.md`
 
 ---
 
+## Decision #036 - Decision Ledger / Numbering Governance
+**Date:** 2026-07-07
+**Proposed by:** CPO + Founder
+**Status:** Documentation/status governance only. Runtime work, provider calls, migrations, writes, and downstream usage are not approved.
+
+**Context:** Multiple documentation PRs have been moving in parallel, and decision-number gaps/reservations created ambiguity. The current merged ledger contains Decision #018, leaves Decision #020 absent, records Decision #032 as reserved by the parallel M1.3 API-Football `/odds/mapping` filter evidence track, and has occupied Decisions #033 through #035.
+
+**Decision:** BetTracker will maintain a decision-ledger governance document that records occupied, reserved, missing, and next-planned decision numbers so future PRs do not guess.
+
+**Current governance state:**
+
+- Decision #018 exists.
+- Decision #020 is absent and must not be opportunistically backfilled.
+- Decision #032 is reserved for the parallel M1.3 API-Football `/odds/mapping` filter evidence track.
+- Decision #034 is occupied by M1.2.e Football Enrichment Read-Only Dry-Run Scope.
+- Decision #035 is occupied by M1.2.e.2 SportMonks Canonical Fixture Mapping Scope.
+- Decision #036 is occupied by this Decision Ledger / Numbering Governance entry.
+- Decision #037 is reserved for M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope after this ledger governance PR merges.
+
+**Rules:**
+
+- Scan `docs/decisions.md` and the decision ledger before assigning a new decision number.
+- Do not use placeholder decision numbers such as `#0XX`.
+- Do not close historical gaps such as Decision #020 without a dedicated governance decision.
+- Do not renumber historical decisions.
+- Parallel PRs that need decision numbers must reserve numbers explicitly in the ledger.
+- If a reserved decision is abandoned, a docs/status governance update must release or reassign it.
+
+**Non-use:** This governance decision does not approve runtime code, provider calls, migrations, Supabase writes, env flags, enrichment writes, Scout usage, Analyst usage, UI usage, Place Bet, probability, implied probability, edge, EV, recommendation, or betting signal.
+
+Reference: `docs/decision-ledger-numbering-governance.md`
+
+---
+
 *Last updated: 2026-07-07*
 *Owner: All (each role contributes)*
