@@ -19,7 +19,28 @@ jobs:
       - name: Run extractJsonObject tests
         run: node scripts/test-extract-json.mjs
 
-  # ── Job 2: Smoke tests against Vercel preview deployment ───────────────────
+  # ── Job 2: Provider safety + FP-001 quality gate regression suites ─────────
+  # Stubbed-network suites: no provider calls, no Supabase. These are the
+  # trust-layer regression guards (FP-001) — a PR that reintroduces pricing in
+  # blocked mode or leaks a provider token fails here.
+  safety-suites:
+    name: Provider safety & FP-001 quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Provider safety suite
+        run: npm run test:provider-safety
+      - name: Analysis quality gate (FP-001) suite
+        run: npm run test:analysis-quality-gate
+
+  # ── Job 3: Smoke tests against Vercel preview deployment ───────────────────
   smoke:
     name: Smoke tests on preview
     runs-on: ubuntu-latest
