@@ -2104,6 +2104,7 @@ await testAsync('ApiFootballAdapter.fetchFixtures fetches unfiltered ranges one 
       assert.equal(url.searchParams.get('from'), null);
       assert.equal(url.searchParams.get('to'), null);
       assert.equal(url.searchParams.get('league'), null);
+      assert.equal(url.searchParams.get('season'), null);
     }
   } finally {
     globalThis.fetch = originalFetch;
@@ -2125,6 +2126,7 @@ await testAsync('ApiFootballAdapter.fetchFixtures maps provider fixtures into ca
   try {
     const rows = await new ApiFootballAdapter().fetchFixtures({
       competitionIds: ['39'],
+      season: '2026',
       dateFrom: '2026-07-01',
       dateTo: '2026-07-02',
     });
@@ -2139,7 +2141,60 @@ await testAsync('ApiFootballAdapter.fetchFixtures maps provider fixtures into ca
     assert.ok(observedUrl.includes('from=2026-07-01'));
     assert.ok(observedUrl.includes('to=2026-07-02'));
     assert.ok(observedUrl.includes('league=39'));
+    assert.ok(observedUrl.includes('season=2026'));
     assert.equal(observedHeaders['x-apisports-key'], 'dummy-football');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('ApiFootballAdapter.fetchFixtures rejects league filter without season before any network call', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+  let fetchCalls = 0;
+
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    return jsonResponse({ errors: [], response: [] });
+  };
+
+  try {
+    await assert.rejects(
+      () =>
+        new ApiFootballAdapter().fetchFixtures({
+          competitionIds: ['39'],
+          dateFrom: '2026-08-15',
+          dateTo: '2026-08-15',
+        }),
+      (err) => err.name === 'ProviderError' && /season/.test(err.message)
+    );
+    assert.equal(fetchCalls, 0, 'must fail before any network call');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('ApiFootballAdapter.fetchFixtures stops on multi-page responses instead of silently truncating', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+
+  globalThis.fetch = async () =>
+    jsonResponse({ errors: [], response: [{}], paging: { current: 1, total: 3 } });
+
+  try {
+    await assert.rejects(
+      () =>
+        new ApiFootballAdapter().fetchFixtures({
+          competitionIds: ['39'],
+          season: '2026',
+          dateFrom: '2026-08-15',
+          dateTo: '2026-08-15',
+        }),
+      (err) =>
+        err.name === 'ProviderError' &&
+        /pagination overflow/.test(err.message) &&
+        /spans 3 pages/.test(err.message)
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

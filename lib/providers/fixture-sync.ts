@@ -22,6 +22,7 @@ export interface FixtureSyncParams {
   dateFrom: string
   dateTo: string
   competitionIds?: string[]
+  season?: string
   dryRun: boolean
   operatorConfirm?: string
 }
@@ -51,6 +52,7 @@ export interface FixtureSyncReport {
   operatorConfirmed: boolean
   dateFrom: string
   dateTo: string
+  season: string | null
   providers: FixtureSyncProviderSummary[]
   totals: {
     fetched: number
@@ -239,6 +241,7 @@ export async function runFixtureSync(params: FixtureSyncParams): Promise<Fixture
       competitionIds: params.competitionIds,
       dateFrom: params.dateFrom,
       dateTo: params.dateTo,
+      season: params.season,
     })
 
     const summary = summarize(provider, fixtures)
@@ -258,6 +261,7 @@ export async function runFixtureSync(params: FixtureSyncParams): Promise<Fixture
     operatorConfirmed,
     dateFrom: params.dateFrom,
     dateTo: params.dateTo,
+    season: params.season ?? null,
     providers: providerSummaries,
     totals: providerSummaries.reduce(
       (acc, provider) => {
