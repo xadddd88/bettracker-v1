@@ -136,14 +136,8 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
             </span>
           </>
         )}
-        {opp.model_probability != null && (
-          <>
-            <span className="text-gray-700">·</span>
-            <span className="text-[11px] text-gray-500">
-              Model {opp.model_probability.toFixed(1)}%
-            </span>
-          </>
-        )}
+        {/* FP-001: model_probability is never displayed — Scout candidates are
+            research leads without a verified data basis, not priced signals. */}
         {opp.match_date && (
           <>
             <span className="text-gray-700">·</span>
