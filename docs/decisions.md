@@ -1398,12 +1398,54 @@ Reference: `docs/sports-football-enrichment-endpoint-evidence-m1-2-e.md`
 
 ---
 
+## Decision #034 - M1.2.e Football Enrichment Read-Only Dry-Run Scope
+**Date:** 2026-07-07
+**Proposed by:** CPO + Founder
+**Status:** Scope/planning only. Runtime provider call not approved.
+
+**Context:** M1.2.e Football Enrichment Endpoint Evidence is DONE. M1.2.e.2 SportMonks Canonical Fixture Mapping Scope is DONE and records the current blocker: production `fixture_provider_links` has 2 `api_football` / exact rows and 0 `sportmonks` rows, and no exact/high SportMonks provider link exists for canonical fixture `1576052`.
+
+**Decision:** BetTracker will plan a future read-only football enrichment dry-run using SportMonks fixture-by-ID, but only under a separately approved runtime scope. Canonical-linked enrichment remains blocked until an exact/high SportMonks provider link exists.
+
+**Required future runtime scope:**
+- exactly one selected canonical football fixture for canonical-linked mode
+- exact/high SportMonks provider fixture link for canonical-linked mode
+- max one provider request unless a later CPO approval changes the budget
+- no pagination
+- no retry loop
+- no crawl
+- no fallback endpoint calls
+- approved include set only
+- sanitized report only
+- no raw payload persistence
+- no writes
+- no Scout/Analyst/UI usage
+- no probability, implied probability, edge, EV, recommendation, Place Bet, or betting signal
+
+**Dry-run distinction:**
+- SHAPE-ONLY / UNBOUND dry-run may validate SportMonks response shape using a native SportMonks fixture ID. It cannot write, attach to `canonical_fixture_id`, create or update `fixture_provider_links`, unlock `football_enrichment` writes, unlock Scout/Analyst/UI, or unlock probability, edge, EV, recommendation, Place Bet, or betting signal.
+- CANONICAL-LINKED dry-run requires an exact/high SportMonks provider link, selected canonical football fixture, approved include set, approved request budget, approved sanitized output shape, and explicit CPO runtime approval.
+
+**Hard pre-flight blocker:** Missing exact/high SportMonks provider link must abort before any provider call.
+
+**Include-set stance:** The first dry-run should start with the fixture base response only, with `state` include allowed only if separately approved as necessary for state/freshness validation. Lineups, injuries/sidelined, expected lineups, news, xG, pressure, statistics, events, timeline, match facts, predictions, and odds remain excluded unless explicitly approved in the future runtime checklist.
+
+**Failure handling:** Missing exact/high provider link, below-threshold mapping confidence, missing canonical fixture, non-football fixture, endpoint errors, auth/plan blocks, unexpected response shape, timeout, or network failure must produce sanitized blocked/error reports only. No retry is approved.
+
+**Freshness:** Future runtime must report whether provider freshness fields are available. Missing freshness fields keep downstream usage blocked. `collected_at` is not source freshness.
+
+**FP-001:** Endpoint/reference/enrichment evidence does not become probability, implied probability, edge, EV, recommendation, Place Bet, Scout score, Analyst signal, UI signal, or betting signal. Check against FP-001 before any downstream use.
+
+Reference: `docs/sports-football-enrichment-read-only-dry-run-scope-m1-2-e.md`
+
+---
+
 ## Decision #035 - M1.2.e.2 SportMonks Canonical Fixture Mapping Scope
 **Date:** 2026-07-07
 **Proposed by:** CPO + Founder
 **Status:** Documentation/status scope only. Runtime provider calls, writes, migrations, env flags, and downstream usage are not approved.
 
-**Numbering note:** Decision #034 is already used by the open draft PR #108 for M1.2.e Football Enrichment Read-Only Dry-Run Scope. Decision #020 remains intentionally untouched in this PR. Historical decisions are not renumbered.
+**Numbering note:** Decision #034 is used by the M1.2.e Football Enrichment Read-Only Dry-Run Scope track. Decision #020 remains intentionally untouched in this PR. Historical decisions are not renumbered.
 
 **Context:** M1.2.e Football Enrichment Endpoint Evidence is DONE via PR #107. SportMonks fixture-by-ID is the preferred future candidate family, but canonical-linked enrichment requires a SportMonks provider link that maps to a BetTracker canonical fixture.
 
