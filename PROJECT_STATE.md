@@ -18,7 +18,7 @@
 | **Current UI** | Stable dark UI + Ambient Theme live as-is |
 | **Ambient Theme** | Current version live in production — further Design v2 / premium event skin work is parked |
 | **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 read-only odds dry-run executed safely with no odds coverage and no writes; bookmaker/mapping discovery rerun after PR #98 is partial/safe and stopped on mapping pagination guard; canonical-fixture-first page-1 mapping comparison is DONE / NOT FOUND; filtered mapping support evidence is DONE / FILTERED RUNTIME BLOCKED; M1.3 mapping exploration is PAUSED; M1.2.e football enrichment design is DONE; M1.2.e endpoint evidence is DONE; M1.2.e.2 SportMonks canonical fixture mapping scope is in review; Product Vision Gap / Beta v2 planning continues |
-| **Active blockers** | None in current main — product vision gaps documented in PRODUCT_VISION_GAP.md |
+| **Active blockers** | Canonical-linked football enrichment is blocked until M1.2.e.2 establishes an exact/high SportMonks provider link. Runtime enrichment provider calls, writes, and downstream usage remain blocked. |
 | **External beta invites** | Do not invite external beta users yet |
 
 > **Note:** main is stable and frozen. No rollback needed. No urgent bugfix. Engineering shell is solid.
