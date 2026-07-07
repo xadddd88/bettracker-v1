@@ -14,6 +14,51 @@ import {
 const ALLOWED_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const
 const MAX_BASE64_CHARS = 10 * 1024 * 1024 // ~7.5 MB original image
 
+// ─── Rate limit (in-memory, same pattern as Analyst/Scout) ───
+// Each scan costs up to 2 Anthropic Vision calls (fallback retry), so this
+// route must not stay unthrottled. Redis-backed store remains a Sprint 3 item.
+const envInt = (key: string, def: number) => {
+  const n = parseInt(process.env[key] ?? '', 10)
+  return Number.isFinite(n) && n > 0 ? n : def
+}
+
+const rateLimitStore = new Map<string, { minute: number; day: number; minuteTs: number; dayTs: number }>()
+
+const RATE_LIMIT_PER_MINUTE = envInt('RATE_LIMIT_SCANNER_PER_MINUTE', 5)
+const RATE_LIMIT_PER_DAY    = envInt('RATE_LIMIT_SCANNER_PER_DAY', 30)
+
+function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now()
+  const minuteWindow = 60_000
+  const dayWindow    = 86_400_000
+
+  const entry = rateLimitStore.get(userId) ?? {
+    minute: 0, day: 0,
+    minuteTs: now, dayTs: now,
+  }
+
+  if (now - entry.minuteTs > minuteWindow) {
+    entry.minute = 0
+    entry.minuteTs = now
+  }
+  if (now - entry.dayTs > dayWindow) {
+    entry.day = 0
+    entry.dayTs = now
+  }
+
+  if (entry.minute >= RATE_LIMIT_PER_MINUTE) {
+    return { allowed: false, retryAfter: Math.ceil((entry.minuteTs + minuteWindow - now) / 1000) }
+  }
+  if (entry.day >= RATE_LIMIT_PER_DAY) {
+    return { allowed: false, retryAfter: Math.ceil((entry.dayTs + dayWindow - now) / 1000) }
+  }
+
+  entry.minute++
+  entry.day++
+  rateLimitStore.set(userId, entry)
+  return { allowed: true }
+}
+
 const SCAN_PROMPT = `You are a betting slip OCR expert. Analyze this screenshot of a betting coupon or slip.
 
 Read ALL text EXACTLY character-by-character as shown in the image. Do NOT guess or correct team names.
@@ -228,6 +273,14 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const rateCheck = checkRateLimit(user.id)
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: 'Too many scans — please wait before trying again' },
+      { status: 429, headers: { 'Retry-After': String(rateCheck.retryAfter ?? 60) } }
+    )
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY
