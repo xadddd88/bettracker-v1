@@ -295,8 +295,8 @@ Stop before Scout/Analyst/UI if:
 ## Current Status
 
 ```txt
-M1.2.e Football Enrichment Design — IN REVIEW
-M1.2.e endpoint evidence — NOT STARTED
+M1.2.e Football Enrichment Design — DONE
+M1.2.e endpoint evidence — IN REVIEW
 M1.2.e read-only dry-run — NOT STARTED
 M1.2.e schema/write design — NOT STARTED
 M1.2.e controlled write validation — NOT STARTED
