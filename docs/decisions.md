@@ -106,7 +106,7 @@
 ## Decision Template
 
 ```
-## Decision #XXX — [Title]
+## Decision #NNN — [Title]
 **Date:** YYYY-MM-DD  
 **Proposed by:** [CPO / Lead Engineer / CEO]  
 **Approved by:** [Who approved]  
