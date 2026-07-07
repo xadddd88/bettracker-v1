@@ -1629,5 +1629,26 @@ Reference: `docs/sportmonks-mapping-discovery-endpoint-evidence-m1-2-e-2-b-1.md`
 
 ---
 
+## Decision #041 - SportMonks Plan Coverage Gate Result & Discovery Re-Target
+**Date:** 2026-07-07
+**Proposed by:** CPO + Founder
+**Status:** Documentation/status only. Runtime provider calls, API routes, migrations, writes, env flags, and downstream usage are not approved.
+
+**Context:** Decision #040 left one gate OPEN: confirm in my.sportmonks.com that the subscription covers the discovery targets' league (Welsh Premier League / Cymru Premier). The founder verified the dashboard on 2026-07-07 (screenshots; zero API calls): plan is Football API **Starter** with 2,000 API calls (per entity per hour), 22 leagues via base + "17 Extra Leagues" add-on, plus Euro Club Tournaments / International Tournaments / World Cup 2026 add-ons. League IDs were captured (e.g. Scotland Premiership 501, Bundesliga 82, La Liga 564).
+
+**Gate result: FAILED.** Cymru Premier is not in the plan and is not offered in the dashboard league picker catalog at all, so it cannot be added on the current plan structure. Per Decision #040, fixtures-by-date returns only subscription leagues — discovery for the current Welsh targets would return a guaranteed false NOT FOUND.
+
+**Decision:** The mapping discovery track re-targets to a league covered by both providers: **England Premier League (primary)**, Scotland Premiership 501 (backup). The Welsh canonical fixtures and their `api_football` links remain in the database untouched; they stop being the discovery targets. Decision #037's guardrails, confidence rubric, and token-redaction rules remain fully in force; only its target selection is superseded by the sequence below.
+
+**Required sequence (each step separately approved):** (1) founder captures SportMonks league IDs for England PL/Championship from the dashboard; (2) separate CPO-approved API-Football read-only dry-run for one future EPL match date (also requires closing the API-Football plan/quota question left OPEN by Decision #039); (3) controlled fixture write, max 2 fixtures, per the M1.2.c precedent; (4) a decision records the new canonical discovery targets; (5) 2.5.b.2 read-only discovery implementation scope with the page-1 guardrail restated on `pagination.has_more`; (6) 2.5.b.3 separate CPO runtime approval.
+
+**Non-use:** This decision does not approve runtime code, provider calls (either provider), API routes, migrations, Supabase writes, provider-link writes, enrichment writes, env flags, Scout usage, Analyst usage, UI usage, Place Bet, probability, implied probability, edge, EV, recommendation, or betting signal.
+
+**FP-001:** Coverage evidence and re-targeting are identity/scope decisions only, not model probability, edge, EV, recommendation, or any betting signal.
+
+Reference: `docs/sportmonks-plan-coverage-gate-result-and-discovery-retarget-m1-2-e-2-b.md`
+
+---
+
 *Last updated: 2026-07-07*
 *Owner: All (each role contributes)*

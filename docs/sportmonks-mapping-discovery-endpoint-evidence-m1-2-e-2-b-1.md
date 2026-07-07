@@ -326,8 +326,10 @@ Endpoint evidence is not identity confidence, provider-link approval, enrichment
 ```txt
 M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope - DONE
 M1.2.e.2.b.1 Endpoint Evidence Scope - DONE
-M1.2.e.2.b.1 Endpoint Evidence Record - IN REVIEW (this document)
-Plan/league coverage confirmation in my.sportmonks.com - PENDING (founder)
+M1.2.e.2.b.1 Endpoint Evidence Record - DONE (Decision #040)
+Plan/league coverage gate - CLOSED: FAILED for Cymru Premier (Decision #041,
+  see docs/sportmonks-plan-coverage-gate-result-and-discovery-retarget-m1-2-e-2-b.md);
+  discovery re-targets to England Premier League
 2.5.b.2 read-only discovery implementation scope - NOT STARTED
 SportMonks provider calls - NOT RUN
 runtime request shape - NOT APPROVED
