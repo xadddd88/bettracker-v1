@@ -371,7 +371,7 @@ This PR does not provide runtime approval.
 ```txt
 M1.2.e Football Enrichment Endpoint Evidence - DONE
 M1.2.e.2 SportMonks Canonical Fixture Mapping Scope - DONE
-M1.2.e Football Enrichment Read-Only Dry-Run Scope - IN REVIEW
+M1.2.e Football Enrichment Read-Only Dry-Run Scope - DONE
 M1.2.e canonical-linked read-only dry-run - BLOCKED ON EXACT/HIGH SPORTMONKS PROVIDER LINK
 M1.2.e shape-only/unbound dry-run - NOT APPROVED
 runtime football enrichment provider calls - NOT RUN
