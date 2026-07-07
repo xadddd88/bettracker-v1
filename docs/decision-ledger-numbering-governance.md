@@ -28,8 +28,7 @@ The following decision numbers are currently occupied in `docs/decisions.md`:
 ```txt
 #001-#019
 #021-#031
-#033-#037
-#039
+#033-#039
 ```
 
 Known recent entries:
@@ -45,6 +44,7 @@ Known recent entries:
 | #035 | Occupied: M1.2.e.2 SportMonks Canonical Fixture Mapping Scope |
 | #036 | Occupied: Decision Ledger / Numbering Governance |
 | #037 | Occupied: M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope |
+| #038 | Occupied: M1.2.e.2.b.1 SportMonks Mapping Discovery Endpoint Evidence Scope |
 | #039 | Occupied: odds_snapshots_public Curated View Status Reconciliation & Working-Tree Hygiene |
 
 ### Missing
@@ -60,9 +60,8 @@ Decision #020 must not be filled opportunistically. Any future use of #020 requi
 | Decision | Reservation |
 | --- | --- |
 | #032 | Reserved by the parallel M1.3 API-Football `/odds/mapping` filter evidence track |
-| #038 | Reserved by the parallel M1.2.e.2.b.1 SportMonks Mapping Discovery Endpoint Evidence Scope track (PR #112) |
 
-The next free unreserved number is #040 unless a later docs/status governance PR records a new reservation.
+The #038 reservation recorded by Decision #039 is consumed by this PR: Decision #038 is now occupied. No next decision number is reserved by this PR. The next free unreserved number is #040 unless a later docs/status governance PR records a new reservation.
 
 ## Numbering Rules
 
@@ -125,3 +124,15 @@ The future scope does not approve:
 - betting signal
 
 FP-001 remains active. Mapping discovery is identity evidence only.
+
+## SportMonks Mapping Endpoint Evidence Scope Status
+
+Decision #038 is occupied by:
+
+```txt
+Decision #038 - M1.2.e.2.b.1 SportMonks Mapping Discovery Endpoint Evidence Scope
+```
+
+That evidence scope is docs/evidence only. It does not approve runtime, provider calls, API routes, migrations, provider-link writes, enrichment writes, env flags, Scout/Analyst/UI, or betting signals.
+
+The scope must confirm official docs/account evidence for fixtures by date versus fixtures between dates, exact endpoint paths, request parameters, supported filters, pagination, response shape, quota/request cost, rate limits, plan availability, and SportMonks `api_token` redaction requirements before any runtime proposal.
