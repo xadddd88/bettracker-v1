@@ -1510,7 +1510,7 @@ Reference: `docs/sportmonks-canonical-fixture-mapping-scope-m1-2-e.md`
 - Decision #034 is occupied by M1.2.e Football Enrichment Read-Only Dry-Run Scope.
 - Decision #035 is occupied by M1.2.e.2 SportMonks Canonical Fixture Mapping Scope.
 - Decision #036 is occupied by this Decision Ledger / Numbering Governance entry.
-- Decision #037 is reserved for M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope after this ledger governance PR merges.
+- Decision #037 is occupied by M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope.
 
 **Rules:**
 
@@ -1524,6 +1524,31 @@ Reference: `docs/sportmonks-canonical-fixture-mapping-scope-m1-2-e.md`
 **Non-use:** This governance decision does not approve runtime code, provider calls, migrations, Supabase writes, env flags, enrichment writes, Scout usage, Analyst usage, UI usage, Place Bet, probability, implied probability, edge, EV, recommendation, or betting signal.
 
 Reference: `docs/decision-ledger-numbering-governance.md`
+
+---
+
+## Decision #037 - M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope
+**Date:** 2026-07-07
+**Proposed by:** CPO + Founder
+**Status:** Documentation/status scope only. Runtime provider calls, provider-link writes, enrichment writes, migrations, env flags, and downstream usage are not approved.
+
+**Context:** M1.2.e.2 SportMonks Canonical Fixture Mapping Scope is DONE and records that production has 2 `api_football` / exact provider links and 0 `sportmonks` links. Canonical fixture `1576052` has no exact/high SportMonks provider link. Because SportMonks fixture-by-ID requires a known SportMonks ID, it cannot be used for discovery.
+
+**Decision:** BetTracker will define a read-only SportMonks mapping discovery scope before any SportMonks provider-link write or canonical-linked enrichment. Discovery must be based on canonical fixture data such as date, kickoff window, league/competition, season, participants/team names, and home/away assignment where available.
+
+**Discovery rule:** Discovery is not `GET /v3/football/fixtures/{ID}` because the SportMonks fixture ID is unknown. Candidate endpoint families such as fixtures by date or fixtures between dates require separate endpoint evidence before runtime.
+
+**Request guardrails:** Any future runtime scope must use max 2 provider requests, page 1 only, stop if `paging.total > 1`, no page 2, no crawl, no broad search, no fallback endpoint calls, and no retries without separate approval.
+
+**Token redaction:** SportMonks `api_token` is query-param based and must be redacted from logs, reports, Vercel, Sentry, docs, PR bodies, errors, URLs, screenshots, and console output. If redaction cannot be guaranteed, abort before provider call.
+
+**Confidence:** Only exact/high mapping confidence may become eligible for a later controlled provider-link write. Not-found, ambiguous, medium, needs_review, or failed results write zero rows and keep mapping blocked.
+
+**Non-use:** This decision does not approve runtime code, provider calls, provider-link writes, enrichment writes, migrations, Supabase writes, env flags, Scout usage, Analyst usage, UI usage, Place Bet, probability, implied probability, edge, EV, recommendation, or betting signal.
+
+**FP-001:** Mapping discovery is identity evidence only. It is not model probability, edge, EV, recommendation, Scout signal, Analyst signal, UI signal, or betting signal.
+
+Reference: `docs/sportmonks-mapping-discovery-scope-m1-2-e-2-b.md`
 
 ---
 
