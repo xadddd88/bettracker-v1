@@ -28,7 +28,7 @@ The following decision numbers are currently occupied in `docs/decisions.md`:
 ```txt
 #001-#019
 #021-#031
-#033-#040
+#033-#041
 ```
 
 Known recent entries:
@@ -47,6 +47,7 @@ Known recent entries:
 | #038 | Occupied: M1.2.e.2.b.1 SportMonks Mapping Discovery Endpoint Evidence Scope |
 | #039 | Occupied: odds_snapshots_public Curated View Status Reconciliation & Working-Tree Hygiene |
 | #040 | Occupied: M1.2.e.2.b.1 SportMonks Mapping Discovery Endpoint Evidence Record |
+| #041 | Occupied: SportMonks Plan Coverage Gate Result & Discovery Re-Target |
 
 ### Missing
 
@@ -62,7 +63,7 @@ Decision #020 must not be filled opportunistically. Any future use of #020 requi
 | --- | --- |
 | #032 | Reserved by the parallel M1.3 API-Football `/odds/mapping` filter evidence track |
 
-The #038 reservation recorded by Decision #039 was consumed when Decision #038 merged (PR #112). No next decision number is reserved by this PR. The next free unreserved number is #041 unless a later docs/status governance PR records a new reservation.
+The #038 reservation recorded by Decision #039 was consumed when Decision #038 merged (PR #112). No next decision number is reserved by this PR. The next free unreserved number is #042 unless a later docs/status governance PR records a new reservation.
 
 ## Numbering Rules
 
@@ -138,4 +139,6 @@ That evidence scope is docs/evidence only. It does not approve runtime, provider
 
 The scope must confirm official docs/account evidence for fixtures by date versus fixtures between dates, exact endpoint paths, request parameters, supported filters, pagination, response shape, quota/request cost, rate limits, plan availability, and SportMonks `api_token` redaction requirements before any runtime proposal.
 
-Decision #040 records the collected endpoint evidence in `docs/sportmonks-mapping-discovery-endpoint-evidence-m1-2-e-2-b-1.md`. Key runtime-relevant corrections: v3 pagination has no `total` field (guardrail must use `pagination.has_more` on page 1), the `timezone` parameter must be omitted so the date bucket stays UTC, and header-based `Authorization` auth keeps the token out of URLs. The plan/league-coverage gate (Welsh Premier League in the my.sportmonks.com subscription) remains OPEN and blocks runtime approval.
+Decision #040 records the collected endpoint evidence in `docs/sportmonks-mapping-discovery-endpoint-evidence-m1-2-e-2-b-1.md`. Key runtime-relevant corrections: v3 pagination has no `total` field (guardrail must use `pagination.has_more` on page 1), the `timezone` parameter must be omitted so the date bucket stays UTC, and header-based `Authorization` auth keeps the token out of URLs.
+
+Decision #041 closes the plan/league-coverage gate with result FAILED for Cymru Premier (not in the Starter plan and not offered in the league picker) and re-targets discovery to England Premier League (primary) / Scotland Premiership 501 (backup) via `docs/sportmonks-plan-coverage-gate-result-and-discovery-retarget-m1-2-e-2-b.md`. New discovery targets require a separately approved API-Football dry-run + controlled fixture write before the 2.5.b.2 discovery implementation scope.
