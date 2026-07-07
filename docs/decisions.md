@@ -1552,6 +1552,29 @@ Reference: `docs/sportmonks-mapping-discovery-scope-m1-2-e-2-b.md`
 
 ---
 
+## Decision #038 - M1.2.e.2.b.1 SportMonks Mapping Discovery Endpoint Evidence Scope
+**Date:** 2026-07-07
+**Proposed by:** CPO + Founder
+**Status:** Documentation/evidence scope only. Runtime provider calls, final runtime request shape, API routes, migrations, provider-link writes, enrichment writes, env flags, and downstream usage are not approved.
+
+**Context:** Decision #037 defines the future read-only SportMonks mapping discovery scope but keeps runtime blocked because the exact SportMonks endpoint evidence is not yet confirmed. Discovery must not use `GET /v3/football/fixtures/{ID}` because the SportMonks fixture ID is unknown.
+
+**Decision:** BetTracker will collect sanitized official SportMonks docs/account evidence before proposing any mapping discovery runtime. This evidence scope must compare the fixtures-by-date and fixtures-between-dates endpoint families and record the request parameters, filters, pagination, response shape, quota/request cost, rate limits, plan availability, and token-redaction requirements needed for a later runtime scope.
+
+**Runtime stance:** This decision does not approve a SportMonks call and does not propose a final runtime request shape. Any later runtime request must be a separate CPO-approved scope after endpoint evidence is documented.
+
+**Required evidence:** The evidence checklist must cover exact endpoint paths, supported filters, league/season server-side versus client-side filtering, pagination mechanism, exact total-equivalent field name, page size/per-page behavior, fixture ID field, participants availability, home/away markers, `starting_at` and timezone behavior, league/season/state fields, freshness/update fields, include syntax for participants, league, season, and state, quota/request cost, rate limits, plan availability, and `api_token` redaction requirements.
+
+**Token redaction:** SportMonks `api_token` must never appear in logs, Vercel, Sentry, reports, docs, PR body, copied URLs, errors, console output, or screenshots. Any URL must be shown only with `?api_token=[REDACTED]`.
+
+**Non-use:** This decision does not approve runtime code, provider calls, API routes, migrations, Supabase writes, provider-link writes, enrichment writes, env flags, Scout usage, Analyst usage, UI usage, Place Bet, probability, implied probability, edge, EV, recommendation, or betting signal.
+
+**FP-001:** Endpoint evidence is not identity confidence, model probability, edge, EV, recommendation, Scout signal, Analyst signal, UI signal, or betting signal.
+
+Reference: `docs/sportmonks-mapping-discovery-endpoint-evidence-scope-m1-2-e-2-b-1.md`
+
+---
+
 ## Decision #039 - odds_snapshots_public Curated View Status Reconciliation & Working-Tree Hygiene
 **Date:** 2026-07-07
 **Proposed by:** CPO + Founder
