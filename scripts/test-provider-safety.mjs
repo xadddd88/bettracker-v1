@@ -119,6 +119,96 @@ async function withFixtureSyncRoute(fn) {
   });
 }
 
+function clearCompiledOddsDryRunModules() {
+  for (const relPath of [
+    'app/api/admin/sports/odds/dry-run/route.js',
+    'lib/providers/odds-dry-run.js',
+    'lib/supabase/admin.js',
+  ]) {
+    const compiledPath = path.join(buildDir, relPath);
+    try {
+      delete require.cache[require.resolve(compiledPath)];
+    } catch {
+      // Module may not have been loaded yet.
+    }
+  }
+}
+
+async function withOddsDryRunRoute(fn) {
+  return withCompiledAlias(async () => {
+    clearCompiledOddsDryRunModules();
+    const route = require(path.join(buildDir, 'app/api/admin/sports/odds/dry-run/route.js'));
+    return fn(route);
+  });
+}
+
+async function withOddsDryRunRouteAndAdminMock(adminExports, fn) {
+  return withCompiledAlias(async () => {
+    clearCompiledOddsDryRunModules();
+    const adminPath = path.join(buildDir, 'lib/supabase/admin.js');
+    require.cache[require.resolve(adminPath)] = {
+      id: adminPath,
+      filename: adminPath,
+      loaded: true,
+      exports: adminExports,
+    };
+    const route = require(path.join(buildDir, 'app/api/admin/sports/odds/dry-run/route.js'));
+    try {
+      return await fn(route);
+    } finally {
+      clearCompiledOddsDryRunModules();
+    }
+  });
+}
+
+function clearCompiledOddsReferenceDiscoveryModules() {
+  for (const relPath of [
+    'app/api/admin/sports/odds/reference-discovery/route.js',
+    'lib/providers/odds-reference-discovery.js',
+  ]) {
+    const compiledPath = path.join(buildDir, relPath);
+    try {
+      delete require.cache[require.resolve(compiledPath)];
+    } catch {
+      // Module may not have been loaded yet.
+    }
+  }
+}
+
+async function withOddsReferenceDiscoveryRoute(fn) {
+  return withCompiledAlias(async () => {
+    clearCompiledOddsReferenceDiscoveryModules();
+    const route = require(path.join(buildDir, 'app/api/admin/sports/odds/reference-discovery/route.js'));
+    try {
+      return await fn(route);
+    } finally {
+      clearCompiledOddsReferenceDiscoveryModules();
+    }
+  });
+}
+
+function authorizedOddsDryRunRequest(body) {
+  return new Request('https://example.test/api/admin/sports/odds/dry-run', {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer operator-token',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+function authorizedOddsReferenceDiscoveryRequest(body) {
+  return new Request('https://example.test/api/admin/sports/odds/reference-discovery', {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer operator-token',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 function authorizedFixtureSyncRequest(body) {
   return new Request('https://example.test/api/admin/sports/fixtures/sync', {
     method: 'POST',
@@ -218,6 +308,155 @@ function documentedOddsEndpoint(overrides = {}) {
     endpoint: 'https://v3.football.api-sports.io/odds',
     requestShape: 'GET /odds?fixture=<providerFixtureId>&bet=match_winner',
     quotaCostPerRequest: 1,
+    ...overrides,
+  };
+}
+
+function oddsProviderPayload(overrides = {}) {
+  return {
+    get: 'odds',
+    parameters: { fixture: '1576052', bet: '1' },
+    errors: [],
+    results: 1,
+    paging: { current: 1, total: 1 },
+    response: [
+      {
+        fixture: { id: 1576052 },
+        update: '2026-07-05T12:00:00+00:00',
+        bookmakers: [
+          {
+            id: 6,
+            name: 'Bwin',
+            bets: [
+              {
+                id: 1,
+                name: 'Match Winner',
+                values: [
+                  { value: 'Home', odd: '2.00' },
+                  { value: 'Draw', odd: '3.25' },
+                  { value: 'Away', odd: '4.10' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function oddsBookmakersPayload(overrides = {}) {
+  return {
+    get: 'odds/bookmakers',
+    parameters: [],
+    errors: [],
+    results: 2,
+    paging: { current: 1, total: 1 },
+    response: [
+      { id: 6, name: 'Bwin' },
+      { id: 8, name: 'Bet365' },
+    ],
+    ...overrides,
+  };
+}
+
+function actualOddsBookmakersPayload(overrides = {}) {
+  return oddsBookmakersPayload({
+    results: 3,
+    response: [
+      { id: 6, name: 'Bwin' },
+      { bookmaker: { id: 8, name: 'Bet365' } },
+      { id: '11', name: '1xBet' },
+    ],
+    ...overrides,
+  });
+}
+
+function oddsMappingPayload(overrides = {}) {
+  return {
+    get: 'odds/mapping',
+    parameters: [],
+    errors: [],
+    results: 1,
+    paging: { current: 1, total: 1 },
+    response: [
+      {
+        league: { id: 39, season: 2026 },
+        fixture: { id: 1576052 },
+        update: '2026-07-05T12:00:00+00:00',
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function createOddsDryRunSupabaseMock({ link, fixture }) {
+  const calls = [];
+  const mutations = [];
+
+  return {
+    calls,
+    mutations,
+    client: {
+      from(table) {
+        const filters = [];
+        const builder = {
+          select(columns) {
+            calls.push({ table, op: 'select', columns });
+            return builder;
+          },
+          eq(column, value) {
+            calls.push({ table, op: 'eq', column, value });
+            filters.push({ column, value });
+            return builder;
+          },
+          async maybeSingle() {
+            calls.push({ table, op: 'maybeSingle', filters: [...filters] });
+            if (table === 'fixture_provider_links') return { data: link, error: null };
+            if (table === 'canonical_fixtures') return { data: fixture, error: null };
+            return { data: null, error: null };
+          },
+          insert(payload) {
+            mutations.push({ table, op: 'insert', payload });
+            throw new Error('odds dry-run must not insert');
+          },
+          update(payload) {
+            mutations.push({ table, op: 'update', payload });
+            throw new Error('odds dry-run must not update');
+          },
+          upsert(payload) {
+            mutations.push({ table, op: 'upsert', payload });
+            throw new Error('odds dry-run must not upsert');
+          },
+          delete() {
+            mutations.push({ table, op: 'delete' });
+            throw new Error('odds dry-run must not delete');
+          },
+        };
+        return builder;
+      },
+    },
+  };
+}
+
+function exactOddsProviderLink(overrides = {}) {
+  return {
+    id: 'provider-link-1',
+    canonical_fixture_id: 'canonical-fixture-1',
+    provider: 'api_football',
+    provider_fixture_id: '1576052',
+    mapping_confidence: 'exact',
+    ...overrides,
+  };
+}
+
+function scheduledFootballFixture(overrides = {}) {
+  return {
+    id: 'canonical-fixture-1',
+    sport: 'football',
+    status: 'scheduled',
+    kickoff_at: '2026-12-31T18:00:00Z',
     ...overrides,
   };
 }
@@ -530,7 +769,954 @@ await testAsync('odds discovery dry-run returns sanitized bookmaker and market c
   assert.equal(JSON.stringify(report).includes('rawProviderPayload'), false);
 });
 
+// ── 4c. M1.3 read-only odds dry-run implementation stays scoped/safe ───────
+await testAsync('read-only odds dry-run pre-flight failure blocks provider call', async () => {
+  const { runReadOnlyOddsDryRun } = require(path.join(buildDir, 'lib/providers/odds-dry-run.js'));
+  const supabase = createOddsDryRunSupabaseMock({
+    link: exactOddsProviderLink(),
+    fixture: scheduledFootballFixture({ status: 'live' }),
+  });
+  let providerCalls = 0;
+
+  const report = await runReadOnlyOddsDryRun({
+    supabase: supabase.client,
+    now: '2026-12-31T17:00:00Z',
+    fetchProviderOdds: async () => {
+      providerCalls++;
+      return oddsProviderPayload();
+    },
+  });
+
+  assert.equal(providerCalls, 0);
+  assert.equal(report.requestAttempted, false);
+  assert.equal(report.actualProviderRequests, 0);
+  assert.equal(report.preflight.passed, false);
+  assert.ok(report.preflight.blockedReasons.includes('canonical fixture status is not scheduled'));
+  assert.deepEqual(supabase.mutations, []);
+});
+
+await testAsync('read-only odds dry-run successful pre-flight allows exactly one provider call', async () => {
+  const { runReadOnlyOddsDryRun } = require(path.join(buildDir, 'lib/providers/odds-dry-run.js'));
+  const supabase = createOddsDryRunSupabaseMock({
+    link: exactOddsProviderLink(),
+    fixture: scheduledFootballFixture(),
+  });
+  const providerRequests = [];
+
+  const report = await runReadOnlyOddsDryRun({
+    supabase: supabase.client,
+    now: '2026-12-31T17:00:00Z',
+    fetchProviderOdds: async (request) => {
+      providerRequests.push(request);
+      return oddsProviderPayload();
+    },
+  });
+
+  assert.equal(providerRequests.length, 1);
+  assert.deepEqual(providerRequests[0], { providerFixtureId: '1576052', betId: 1, page: 1 });
+  assert.equal(report.requestAttempted, true);
+  assert.equal(report.actualProviderRequests, 1);
+  assert.equal(report.estimatedProviderRequests, 1);
+  assert.deepEqual(report.paging, { current: 1, total: 1 });
+  assert.equal(report.oddsAvailable, true);
+  assert.deepEqual(report.discoveredBookmakers, [{ providerBookmakerId: '6', name: 'Bwin' }]);
+  assert.deepEqual(report.discoveredMarkets, [{ providerMarketId: '1', name: 'Match Winner' }]);
+  assert.equal(report.valuesPresent, true);
+  assert.equal(report.paginationOverflow, false);
+  assert.deepEqual(supabase.mutations, []);
+});
+
+await testAsync('read-only odds dry-run stops after page 1 when provider reports more pages', async () => {
+  const { runReadOnlyOddsDryRun } = require(path.join(buildDir, 'lib/providers/odds-dry-run.js'));
+  const supabase = createOddsDryRunSupabaseMock({
+    link: exactOddsProviderLink(),
+    fixture: scheduledFootballFixture(),
+  });
+  let providerCalls = 0;
+
+  const report = await runReadOnlyOddsDryRun({
+    supabase: supabase.client,
+    now: '2026-12-31T17:00:00Z',
+    fetchProviderOdds: async () => {
+      providerCalls++;
+      return oddsProviderPayload({ paging: { current: 1, total: 2 } });
+    },
+  });
+
+  assert.equal(providerCalls, 1);
+  assert.equal(report.actualProviderRequests, 1);
+  assert.deepEqual(report.paging, { current: 1, total: 2 });
+  assert.equal(report.paginationOverflow, true);
+  assert.ok(report.stopReasons.includes('provider pagination total exceeds approved page-1 budget'));
+});
+
+await testAsync('read-only odds dry-run report contains no token, raw payload, odds prices, or betting-signal fields', async () => {
+  const { runReadOnlyOddsDryRun } = require(path.join(buildDir, 'lib/providers/odds-dry-run.js'));
+  const supabase = createOddsDryRunSupabaseMock({
+    link: exactOddsProviderLink(),
+    fixture: scheduledFootballFixture(),
+  });
+
+  const report = await runReadOnlyOddsDryRun({
+    supabase: supabase.client,
+    now: '2026-12-31T17:00:00Z',
+    fetchProviderOdds: async () => oddsProviderPayload({
+      secret: 'SECRET_PROVIDER_TOKEN',
+      rawProviderPayload: { apiKey: 'SECRET_API_KEY' },
+      response: [
+        {
+          fixture: { id: 1576052 },
+          edge_percent: -17.4,
+          model_probability: 28,
+          bookmakers: [
+            {
+              id: 6,
+              name: 'Bwin',
+              bets: [
+                {
+                  id: 1,
+                  name: 'Match Winner',
+                  values: [
+                    { value: 'Home', odd: '2.00' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  const serialized = JSON.stringify(report);
+  for (const forbidden of [
+    'SECRET_PROVIDER_TOKEN',
+    'SECRET_API_KEY',
+    'rawProviderPayload',
+    'model_probability',
+    'modelProbability',
+    'implied_probability',
+    'impliedProbability',
+    'edge_percent',
+    'edge',
+    'EV',
+    'ev',
+    '2.00',
+    '17.4',
+    '28',
+  ]) {
+    assert.equal(serialized.includes(forbidden), false, `forbidden artifact leaked: ${forbidden}`);
+  }
+  assert.equal(report.valuesPresent, true);
+  assert.deepEqual(supabase.mutations, []);
+});
+
+await testAsync('read-only odds dry-run route requires operator authorization before Supabase/provider calls', async () => {
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+
+  try {
+    await withOddsDryRunRoute(async ({ POST }) => {
+      const response = await POST(
+        new Request('https://example.test/api/admin/sports/odds/dry-run', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ dryRun: true }),
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 401);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.error, 'Unauthorized');
+    });
+  } finally {
+    clearCompiledOddsDryRunModules();
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
 // ── 5. M1.2.b fixture fetch and dry-run behavior ─────────────────────────
+await testAsync('read-only odds dry-run route rejects empty body before Supabase/provider calls', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+  let adminCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    throw new Error('provider fetch should not be called');
+  };
+
+  try {
+    await withOddsDryRunRouteAndAdminMock(
+      {
+        createAdminClient() {
+          adminCalls++;
+          throw new Error('Supabase should not be touched');
+        },
+      },
+      async ({ POST }) => {
+        const response = await POST(authorizedOddsDryRunRequest({}));
+        const result = await readJsonResponse(response);
+
+        assert.equal(result.status, 400);
+        assert.equal(result.body.success, false);
+        assert.equal(result.body.error, 'Invalid input');
+        assert.equal(adminCalls, 0);
+        assert.equal(fetchCalls, 0);
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
+await testAsync('read-only odds dry-run route rejects missing or wrong runtime confirmation before Supabase/provider calls', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+  let adminCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    throw new Error('provider fetch should not be called');
+  };
+
+  try {
+    await withOddsDryRunRouteAndAdminMock(
+      {
+        createAdminClient() {
+          adminCalls++;
+          throw new Error('Supabase should not be touched');
+        },
+      },
+      async ({ POST }) => {
+        for (const body of [
+          { dryRun: true, providerFixtureId: '1576052', betId: 1 },
+          {
+            dryRun: true,
+            providerFixtureId: '1576052',
+            betId: 1,
+            operatorConfirm: 'WRONG_CONFIRMATION',
+          },
+        ]) {
+          const response = await POST(authorizedOddsDryRunRequest(body));
+          const result = await readJsonResponse(response);
+
+          assert.equal(result.status, 400);
+          assert.equal(result.body.success, false);
+          assert.equal(
+            result.body.error,
+            'read-only odds dry-run requires explicit operator confirmation'
+          );
+        }
+
+        assert.equal(adminCalls, 0);
+        assert.equal(fetchCalls, 0);
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
+await testAsync('read-only odds dry-run route accepts exact approved body and makes at most one provider call under mocks', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const originalFootballKey = process.env.API_FOOTBALL_KEY;
+  const supabase = createOddsDryRunSupabaseMock({
+    link: exactOddsProviderLink(),
+    fixture: scheduledFootballFixture(),
+  });
+  let providerCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  process.env.API_FOOTBALL_KEY = 'dummy-football';
+  globalThis.fetch = async (url, init = {}) => {
+    providerCalls++;
+    const parsedUrl = new URL(String(url));
+    assert.equal(parsedUrl.pathname, '/odds');
+    assert.equal(parsedUrl.searchParams.get('fixture'), '1576052');
+    assert.equal(parsedUrl.searchParams.get('bet'), '1');
+    assert.equal(parsedUrl.searchParams.get('page'), null);
+    assert.equal(init.headers['x-apisports-key'], 'dummy-football');
+    return jsonResponse(oddsProviderPayload());
+  };
+
+  try {
+    await withOddsDryRunRouteAndAdminMock(
+      {
+        createAdminClient() {
+          return supabase.client;
+        },
+      },
+      async ({ POST }) => {
+        const response = await POST(
+          authorizedOddsDryRunRequest({
+            dryRun: true,
+            providerFixtureId: '1576052',
+            betId: 1,
+            operatorConfirm: 'RUN_READ_ONLY_ODDS_DRY_RUN_M1_3',
+          })
+        );
+        const result = await readJsonResponse(response);
+
+        assert.equal(result.status, 200);
+        assert.equal(result.body.success, true);
+        assert.equal(result.body.report.requestAttempted, true);
+        assert.equal(result.body.report.actualProviderRequests, 1);
+        assert.equal(providerCalls, 1);
+        assert.deepEqual(supabase.mutations, []);
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+    if (originalFootballKey === undefined) {
+      delete process.env.API_FOOTBALL_KEY;
+    } else {
+      process.env.API_FOOTBALL_KEY = originalFootballKey;
+    }
+  }
+});
+
+// ── 4d. M1.3 bookmaker/mapping reference discovery stays read-only/safe ─────
+await testAsync('bookmaker/mapping discovery helper makes one request per approved endpoint', async () => {
+  const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
+  const requests = [];
+
+  const report = await runBookmakerMappingDiscovery({
+    fetchProviderReference: async (request) => {
+      requests.push(request);
+      if (request.endpoint === 'bookmakers') return oddsBookmakersPayload();
+      if (request.endpoint === 'mapping') return oddsMappingPayload();
+      throw new Error(`unexpected endpoint ${request.endpoint}`);
+    },
+  });
+
+  assert.deepEqual(requests, [{ endpoint: 'bookmakers' }, { endpoint: 'mapping' }]);
+  assert.equal(report.dryRun, true);
+  assert.equal(report.provider, 'api_football');
+  assert.equal(report.estimatedProviderRequests, 2);
+  assert.equal(report.actualProviderRequests, 2);
+  assert.equal(report.writeSkipped, true);
+  assert.equal(report.paginationOverflow, false);
+  assert.deepEqual(report.stopReasons, []);
+  assert.deepEqual(report.discoveredBookmakers, [
+    { providerBookmakerId: '6', name: 'Bwin' },
+    { providerBookmakerId: '8', name: 'Bet365' },
+  ]);
+  assert.deepEqual(report.mappingCoverage, [
+    {
+      league: { id: '39', season: '2026' },
+      fixture: { id: '1576052' },
+      update: '2026-07-05T12:00:00+00:00',
+    },
+  ]);
+});
+
+await testAsync('bookmaker/mapping discovery accepts actual wrapped bookmaker rows as valid shape', async () => {
+  const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
+  const requests = [];
+
+  const report = await runBookmakerMappingDiscovery({
+    fetchProviderReference: async (request) => {
+      requests.push(request);
+      if (request.endpoint === 'bookmakers') return actualOddsBookmakersPayload();
+      if (request.endpoint === 'mapping') return oddsMappingPayload();
+      throw new Error(`unexpected endpoint ${request.endpoint}`);
+    },
+  });
+
+  assert.deepEqual(requests, [{ endpoint: 'bookmakers' }, { endpoint: 'mapping' }]);
+  assert.equal(report.actualProviderRequests, 2);
+  assert.deepEqual(report.stopReasons, []);
+  assert.equal(report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers').responseShapeValid, true);
+  assert.deepEqual(report.discoveredBookmakers, [
+    { providerBookmakerId: '6', name: 'Bwin' },
+    { providerBookmakerId: '8', name: 'Bet365' },
+    { providerBookmakerId: '11', name: '1xBet' },
+  ]);
+});
+
+await testAsync('bookmaker/mapping discovery reports bookmaker row diagnostics for valid rows', async () => {
+  const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
+
+  const report = await runBookmakerMappingDiscovery({
+    fetchProviderReference: async (request) => {
+      if (request.endpoint === 'bookmakers') return actualOddsBookmakersPayload();
+      if (request.endpoint === 'mapping') return oddsMappingPayload();
+      throw new Error(`unexpected endpoint ${request.endpoint}`);
+    },
+  });
+
+  const bookmakerEndpoint = report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers');
+  assert.equal(bookmakerEndpoint.bookmakerRowsTotal, 3);
+  assert.equal(bookmakerEndpoint.validBookmakerRows, 3);
+  assert.equal(bookmakerEndpoint.invalidBookmakerRows, 0);
+  assert.deepEqual(bookmakerEndpoint.invalidBookmakerRowReasons, []);
+  assert.equal(bookmakerEndpoint.responseShapeValid, true);
+});
+
+await testAsync('bookmaker/mapping discovery treats missing bookmaker name as non-fatal and continues to mapping', async () => {
+  const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
+  const requests = [];
+
+  const report = await runBookmakerMappingDiscovery({
+    fetchProviderReference: async (request) => {
+      requests.push(request);
+      if (request.endpoint === 'bookmakers') {
+        return oddsBookmakersPayload({
+          results: 3,
+          response: [
+            { id: 6, name: 'Bwin' },
+            { id: 99 },
+            { bookmaker: { id: 8, name: 'Bet365' } },
+          ],
+        });
+      }
+      if (request.endpoint === 'mapping') return oddsMappingPayload();
+      throw new Error(`unexpected endpoint ${request.endpoint}`);
+    },
+  });
+
+  const bookmakerEndpoint = report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers');
+  assert.deepEqual(requests, [{ endpoint: 'bookmakers' }, { endpoint: 'mapping' }]);
+  assert.equal(report.actualProviderRequests, 2);
+  assert.deepEqual(report.stopReasons, []);
+  assert.ok(report.nonFatalWarnings.includes('bookmaker row missing name'));
+  assert.equal(bookmakerEndpoint.responseShapeValid, true);
+  assert.equal(bookmakerEndpoint.bookmakerRowsTotal, 3);
+  assert.equal(bookmakerEndpoint.validBookmakerRows, 2);
+  assert.equal(bookmakerEndpoint.invalidBookmakerRows, 0);
+  assert.equal(bookmakerEndpoint.partialBookmakerRows, 1);
+  assert.deepEqual(bookmakerEndpoint.invalidBookmakerRowReasons, []);
+  assert.deepEqual(bookmakerEndpoint.partialBookmakerRowReasons, ['missing name']);
+  assert.ok(bookmakerEndpoint.nonFatalWarnings.includes('bookmaker row missing name'));
+  assert.deepEqual(report.discoveredBookmakers, [
+    { providerBookmakerId: '6', name: 'Bwin' },
+    { providerBookmakerId: '8', name: 'Bet365' },
+  ]);
+  assert.equal(report.discoveredBookmakers.some((bookmaker) => bookmaker.providerBookmakerId === '99'), false);
+  assert.deepEqual(report.mappingCoverage, [
+    {
+      league: { id: '39', season: '2026' },
+      fixture: { id: '1576052' },
+      update: '2026-07-05T12:00:00+00:00',
+    },
+  ]);
+});
+
+await testAsync('bookmaker/mapping discovery reports generic invalid bookmaker row diagnostics', async () => {
+  const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
+
+  const report = await runBookmakerMappingDiscovery({
+    fetchProviderReference: async (request) => {
+      if (request.endpoint === 'bookmakers') {
+        return oddsBookmakersPayload({
+          results: 5,
+          response: [
+            { id: 6, name: 'Bwin' },
+            { bookmaker: { id: 8 } },
+            { bookmaker: { name: 'NoId' } },
+            'bad-row',
+            { bookmaker: null },
+          ],
+        });
+      }
+      throw new Error(`unexpected endpoint ${request.endpoint}`);
+    },
+  });
+
+  const bookmakerEndpoint = report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers');
+  assert.equal(bookmakerEndpoint.bookmakerRowsTotal, 5);
+  assert.equal(bookmakerEndpoint.validBookmakerRows, 1);
+  assert.equal(bookmakerEndpoint.invalidBookmakerRows, 3);
+  assert.equal(bookmakerEndpoint.partialBookmakerRows, 1);
+  assert.ok(bookmakerEndpoint.partialBookmakerRowReasons.includes('missing name'));
+  assert.ok(bookmakerEndpoint.nonFatalWarnings.includes('bookmaker row missing name'));
+  assert.equal(bookmakerEndpoint.invalidBookmakerRowReasons.includes('missing name'), false);
+  assert.ok(bookmakerEndpoint.invalidBookmakerRowReasons.includes('missing id'));
+  assert.ok(bookmakerEndpoint.invalidBookmakerRowReasons.includes('non-object row'));
+  assert.ok(bookmakerEndpoint.invalidBookmakerRowReasons.includes('unsupported wrapper shape'));
+  assert.equal(bookmakerEndpoint.responseShapeValid, false);
+  assert.ok(report.stopReasons.includes('provider response shape differs from expected evidence for /odds/bookmakers'));
+  assert.equal(report.endpoints.find((endpoint) => endpoint.endpoint === 'mapping').requestAttempted, false);
+
+  const serialized = JSON.stringify(bookmakerEndpoint);
+  for (const forbidden of ['bad-row', 'NoId', 'rawProviderPayload', 'token', '"odd"', 'price', 'probability', 'edge', 'EV']) {
+    assert.equal(serialized.includes(forbidden), false, `forbidden diagnostic artifact leaked: ${forbidden}`);
+  }
+});
+
+await testAsync('bookmaker/mapping discovery keeps missing-id bookmaker rows fatal', async () => {
+  const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
+  const requests = [];
+
+  const report = await runBookmakerMappingDiscovery({
+    fetchProviderReference: async (request) => {
+      requests.push(request);
+      return actualOddsBookmakersPayload({
+        response: [
+          { id: 6, name: 'Bwin' },
+          { bookmaker: { name: 'NoId' } },
+        ],
+      });
+    },
+  });
+
+  assert.deepEqual(requests, [{ endpoint: 'bookmakers' }]);
+  assert.equal(report.actualProviderRequests, 1);
+  assert.equal(report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers').responseShapeValid, false);
+  assert.ok(report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers').invalidBookmakerRowReasons.includes('missing id'));
+  assert.ok(report.stopReasons.includes('provider response shape differs from expected evidence for /odds/bookmakers'));
+  assert.equal(report.endpoints.find((endpoint) => endpoint.endpoint === 'mapping').requestAttempted, false);
+});
+
+await testAsync('bookmaker/mapping discovery stops after page 1 on pagination overflow', async () => {
+  const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
+  const requests = [];
+
+  const report = await runBookmakerMappingDiscovery({
+    fetchProviderReference: async (request) => {
+      requests.push(request);
+      return oddsBookmakersPayload({ paging: { current: 1, total: 2 } });
+    },
+  });
+
+  assert.deepEqual(requests, [{ endpoint: 'bookmakers' }]);
+  assert.equal(report.actualProviderRequests, 1);
+  assert.equal(report.paginationOverflow, true);
+  assert.ok(report.stopReasons.includes('provider pagination total exceeds approved page-1 budget for /odds/bookmakers'));
+  assert.equal(report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers').requestAttempted, true);
+  assert.equal(report.endpoints.find((endpoint) => endpoint.endpoint === 'mapping').requestAttempted, false);
+});
+
+await testAsync('bookmaker/mapping discovery report contains no raw payload, token, odds prices, or betting-signal fields', async () => {
+  const { runBookmakerMappingDiscovery } = require(path.join(buildDir, 'lib/providers/odds-reference-discovery.js'));
+
+  const report = await runBookmakerMappingDiscovery({
+    fetchProviderReference: async (request) => {
+      if (request.endpoint === 'bookmakers') {
+        return oddsBookmakersPayload({
+          secret: 'SECRET_PROVIDER_TOKEN',
+          rawProviderPayload: { token: 'SECRET_RAW_TOKEN' },
+          response: [{ id: 6, name: 'Bwin', odd: '2.00', edge_percent: -17.4 }],
+        });
+      }
+      return oddsMappingPayload({
+        response: [
+          {
+            league: { id: 39, season: 2026 },
+            fixture: { id: 1576052 },
+            update: '2026-07-05T12:00:00+00:00',
+            odds: '2.00',
+            model_probability: 28,
+          },
+        ],
+      });
+    },
+  });
+
+  const serialized = JSON.stringify(report);
+  for (const forbidden of [
+    'SECRET_PROVIDER_TOKEN',
+    'SECRET_RAW_TOKEN',
+    'rawProviderPayload',
+    'model_probability',
+    'modelProbability',
+    'implied_probability',
+    'impliedProbability',
+    'edge_percent',
+    'edge',
+    'EV',
+    'ev',
+    '2.00',
+    '17.4',
+    '28',
+  ]) {
+    assert.equal(serialized.includes(forbidden), false, `forbidden artifact leaked: ${forbidden}`);
+  }
+});
+
+await testAsync('bookmaker/mapping discovery route requires operator authorization before provider calls', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    throw new Error('provider fetch should not be called');
+  };
+
+  try {
+    await withOddsReferenceDiscoveryRoute(async ({ POST }) => {
+      const response = await POST(
+        new Request('https://example.test/api/admin/sports/odds/reference-discovery', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ dryRun: true }),
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 401);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.error, 'Unauthorized');
+      assert.equal(fetchCalls, 0);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
+await testAsync('bookmaker/mapping discovery route rejects empty body before provider calls', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    throw new Error('provider fetch should not be called');
+  };
+
+  try {
+    await withOddsReferenceDiscoveryRoute(async ({ POST }) => {
+      const response = await POST(authorizedOddsReferenceDiscoveryRequest({}));
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 400);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.error, 'Invalid input');
+      assert.equal(fetchCalls, 0);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
+await testAsync('bookmaker/mapping discovery route rejects missing or wrong confirmation before provider calls', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    throw new Error('provider fetch should not be called');
+  };
+
+  try {
+    await withOddsReferenceDiscoveryRoute(async ({ POST }) => {
+      for (const body of [
+        {
+          dryRun: true,
+          endpoints: ['bookmakers', 'mapping'],
+          maxProviderRequests: 2,
+        },
+        {
+          dryRun: true,
+          endpoints: ['bookmakers', 'mapping'],
+          maxProviderRequests: 2,
+          operatorConfirm: 'WRONG_CONFIRMATION',
+        },
+      ]) {
+        const response = await POST(authorizedOddsReferenceDiscoveryRequest(body));
+        const result = await readJsonResponse(response);
+
+        assert.equal(result.status, 400);
+        assert.equal(result.body.success, false);
+        assert.equal(
+          result.body.error,
+          'bookmaker/mapping discovery requires explicit operator confirmation'
+        );
+      }
+
+      assert.equal(fetchCalls, 0);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
+await testAsync('bookmaker/mapping discovery route accepts exact approved body under mocks', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const originalFootballKey = process.env.API_FOOTBALL_KEY;
+  const observedUrls = [];
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  process.env.API_FOOTBALL_KEY = 'dummy-football';
+  globalThis.fetch = async (url, init = {}) => {
+    observedUrls.push(String(url));
+    assert.equal(init.headers['x-apisports-key'], 'dummy-football');
+    const parsedUrl = new URL(String(url));
+    assert.equal(parsedUrl.searchParams.get('page'), null);
+    if (parsedUrl.pathname === '/odds/bookmakers') return jsonResponse(oddsBookmakersPayload());
+    if (parsedUrl.pathname === '/odds/mapping') return jsonResponse(oddsMappingPayload());
+    throw new Error(`unexpected provider path: ${parsedUrl.pathname}`);
+  };
+
+  try {
+    await withOddsReferenceDiscoveryRoute(async ({ POST }) => {
+      const response = await POST(
+        authorizedOddsReferenceDiscoveryRequest({
+          dryRun: true,
+          endpoints: ['bookmakers', 'mapping'],
+          maxProviderRequests: 2,
+          operatorConfirm: 'RUN_BOOKMAKER_MAPPING_DISCOVERY_M1_3',
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, true);
+      assert.equal(result.body.report.actualProviderRequests, 2);
+      assert.equal(result.body.report.estimatedProviderRequests, 2);
+      assert.equal(observedUrls.length, 2);
+      assert.deepEqual(result.body.report.discoveredBookmakers, [
+        { providerBookmakerId: '6', name: 'Bwin' },
+        { providerBookmakerId: '8', name: 'Bet365' },
+      ]);
+      assert.deepEqual(result.body.report.mappingCoverage, [
+        {
+          league: { id: '39', season: '2026' },
+          fixture: { id: '1576052' },
+          update: '2026-07-05T12:00:00+00:00',
+        },
+      ]);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+    if (originalFootballKey === undefined) {
+      delete process.env.API_FOOTBALL_KEY;
+    } else {
+      process.env.API_FOOTBALL_KEY = originalFootballKey;
+    }
+  }
+});
+
+await testAsync('bookmaker/mapping discovery route returns success true for non-fatal missing-name warnings', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const originalFootballKey = process.env.API_FOOTBALL_KEY;
+  const observedUrls = [];
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  process.env.API_FOOTBALL_KEY = 'dummy-football';
+  globalThis.fetch = async (url, init = {}) => {
+    observedUrls.push(String(url));
+    assert.equal(init.headers['x-apisports-key'], 'dummy-football');
+    const parsedUrl = new URL(String(url));
+    assert.equal(parsedUrl.searchParams.get('page'), null);
+    if (parsedUrl.pathname === '/odds/bookmakers') {
+      return jsonResponse(oddsBookmakersPayload({
+        results: 3,
+        response: [
+          { id: 6, name: 'Bwin' },
+          { id: 99 },
+          { bookmaker: { id: 8, name: 'Bet365' } },
+        ],
+      }));
+    }
+    if (parsedUrl.pathname === '/odds/mapping') return jsonResponse(oddsMappingPayload());
+    throw new Error(`unexpected provider path: ${parsedUrl.pathname}`);
+  };
+
+  try {
+    await withOddsReferenceDiscoveryRoute(async ({ POST }) => {
+      const response = await POST(
+        authorizedOddsReferenceDiscoveryRequest({
+          dryRun: true,
+          endpoints: ['bookmakers', 'mapping'],
+          maxProviderRequests: 2,
+          operatorConfirm: 'RUN_BOOKMAKER_MAPPING_DISCOVERY_M1_3',
+        })
+      );
+      const result = await readJsonResponse(response);
+      const bookmakerEndpoint = result.body.report.endpoints.find((endpoint) => endpoint.endpoint === 'bookmakers');
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, true);
+      assert.equal(result.body.report.actualProviderRequests, 2);
+      assert.equal(observedUrls.length, 2);
+      assert.deepEqual(result.body.report.stopReasons, []);
+      assert.ok(result.body.report.nonFatalWarnings.includes('bookmaker row missing name'));
+      assert.equal(bookmakerEndpoint.responseShapeValid, true);
+      assert.equal(bookmakerEndpoint.partialBookmakerRows, 1);
+      assert.deepEqual(result.body.report.discoveredBookmakers, [
+        { providerBookmakerId: '6', name: 'Bwin' },
+        { providerBookmakerId: '8', name: 'Bet365' },
+      ]);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+    if (originalFootballKey === undefined) {
+      delete process.env.API_FOOTBALL_KEY;
+    } else {
+      process.env.API_FOOTBALL_KEY = originalFootballKey;
+    }
+  }
+});
+
+await testAsync('bookmaker/mapping discovery route returns success false on pagination overflow', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const originalFootballKey = process.env.API_FOOTBALL_KEY;
+  const observedUrls = [];
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  process.env.API_FOOTBALL_KEY = 'dummy-football';
+  globalThis.fetch = async (url, init = {}) => {
+    observedUrls.push(String(url));
+    assert.equal(init.headers['x-apisports-key'], 'dummy-football');
+    return jsonResponse(oddsBookmakersPayload({ paging: { current: 1, total: 2 } }));
+  };
+
+  try {
+    await withOddsReferenceDiscoveryRoute(async ({ POST }) => {
+      const response = await POST(
+        authorizedOddsReferenceDiscoveryRequest({
+          dryRun: true,
+          endpoints: ['bookmakers', 'mapping'],
+          maxProviderRequests: 2,
+          operatorConfirm: 'RUN_BOOKMAKER_MAPPING_DISCOVERY_M1_3',
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.report.paginationOverflow, true);
+      assert.equal(result.body.report.actualProviderRequests, 1);
+      assert.equal(observedUrls.length, 1);
+      assert.ok(
+        result.body.report.stopReasons.includes(
+          'provider pagination total exceeds approved page-1 budget for /odds/bookmakers'
+        )
+      );
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+    if (originalFootballKey === undefined) {
+      delete process.env.API_FOOTBALL_KEY;
+    } else {
+      process.env.API_FOOTBALL_KEY = originalFootballKey;
+    }
+  }
+});
+
+await testAsync('bookmaker/mapping discovery route returns success false on invalid response shape', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const originalFootballKey = process.env.API_FOOTBALL_KEY;
+  const observedUrls = [];
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  process.env.API_FOOTBALL_KEY = 'dummy-football';
+  globalThis.fetch = async (url, init = {}) => {
+    observedUrls.push(String(url));
+    assert.equal(init.headers['x-apisports-key'], 'dummy-football');
+    const parsedUrl = new URL(String(url));
+    if (parsedUrl.pathname === '/odds/bookmakers') return jsonResponse(oddsBookmakersPayload());
+    if (parsedUrl.pathname === '/odds/mapping') {
+      return jsonResponse(oddsMappingPayload({
+        response: [{ league: { id: 39, season: 2026 }, fixture: {}, update: null }],
+      }));
+    }
+    throw new Error(`unexpected provider path: ${parsedUrl.pathname}`);
+  };
+
+  try {
+    await withOddsReferenceDiscoveryRoute(async ({ POST }) => {
+      const response = await POST(
+        authorizedOddsReferenceDiscoveryRequest({
+          dryRun: true,
+          endpoints: ['bookmakers', 'mapping'],
+          maxProviderRequests: 2,
+          operatorConfirm: 'RUN_BOOKMAKER_MAPPING_DISCOVERY_M1_3',
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.report.actualProviderRequests, 2);
+      assert.equal(observedUrls.length, 2);
+      assert.ok(
+        result.body.report.stopReasons.includes(
+          'provider response shape differs from expected evidence for /odds/mapping'
+        )
+      );
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+    if (originalFootballKey === undefined) {
+      delete process.env.API_FOOTBALL_KEY;
+    } else {
+      process.env.API_FOOTBALL_KEY = originalFootballKey;
+    }
+  }
+});
+
 process.env.API_FOOTBALL_KEY = 'dummy-football';
 process.env.API_TENNIS_KEY = 'dummy-tennis';
 process.env.SPORTMONKS_TOKEN = 'dummy-sportmonks';

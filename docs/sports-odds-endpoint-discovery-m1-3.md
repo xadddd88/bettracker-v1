@@ -1,8 +1,8 @@
 # M1.3 Odds Endpoint Discovery & Dry-Run Plan
 
-Status: DONE via PR #80 / read-only planner scaffold
+Status: DONE via PR #80 / read-only planner scaffold; updated through PR #88 scope planning
 
-Last updated: 2026-07-05
+Last updated: 2026-07-06
 
 ## Scope
 
@@ -319,6 +319,80 @@ PR #83 does not:
 - add `SPORTS_ODDS_SYNC_WRITE_ENABLED`
 - use odds in Scout, Analyst, or UI
 
-Runtime remains blocked until PR #83 is merged and CPO separately approves the first read-only production odds dry-run.
+PR #85 later merged the protected read-only path. The separately approved first production odds dry-run ran against `GET /odds?fixture=1576052&bet=1` and returned `oddsAvailable=false` with exactly one provider request, page 1 only, no writes, no raw payload, no odds prices, and no betting signal.
 
 Reference: `docs/sports-odds-read-only-dry-run-scope-m1-3.md`
+
+## PR #87 Read-Only Dry-Run Result
+
+PR #87 records the first production read-only odds dry-run result.
+
+Result summary:
+
+- endpoint: `POST https://btdk.app/api/admin/sports/odds/dry-run`
+- internal provider request: `GET /odds?fixture=1576052&bet=1`
+- status: 200
+- pre-flight passed
+- actual provider requests: 1
+- `paging.current=1`
+- `paging.total=1`
+- `oddsAvailable=false`
+- `discoveredBookmakers=[]`
+- `discoveredMarkets=[]`
+- `valuesPresent=false`
+- `paginationOverflow=false`
+- `writeSkipped=true`
+
+Interpretation:
+
+- no odds coverage for fixture `1576052` / `bet=1`
+- no page 2 request
+- no odds write
+- no Supabase write
+- no raw provider payload, token, odds price, probability, edge, EV, recommendation, Scout/Analyst/UI signal, or betting signal surfaced
+
+The fixture is scheduled for `2026-12-31`, about 178 days away at runtime, so no odds coverage is expected and not treated as an integration defect.
+
+Reference: `docs/sports-odds-read-only-dry-run-result-m1-3.md`
+
+## PR #88 Bookmaker & Mapping Discovery Scope
+
+PR #88 scopes a future reference discovery step. It does not run provider calls.
+
+Proposed future endpoints:
+
+- `GET /odds/bookmakers`
+- `GET /odds/mapping`
+
+Budget:
+
+- max provider requests: 2 total
+- page 1 only for each endpoint
+- stop if `paging.total > 1` on either endpoint
+- no pagination crawling
+- no page 2
+- no odds values endpoint
+- no fixture-specific odds call
+
+Sanitized future report may include:
+
+- request attempted per endpoint
+- endpoint name
+- `paging.current`
+- `paging.total`
+- results count
+- bookmaker ids/names from `/odds/bookmakers`
+- mapping fields from `/odds/mapping`: `league.id`, `league.season`, `fixture.id`, `update`
+
+Still not allowed:
+
+- raw provider payload
+- tokens or account details
+- odds prices
+- odds writes
+- Supabase writes
+- migrations
+- Scout, Analyst, or UI usage
+- probability, implied probability, edge, EV, recommendation, or betting signal
+
+Reference: `docs/sports-odds-bookmaker-mapping-discovery-scope-m1-3.md`

@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current beta status.**
-> Last updated: 2026-07-05
+> Last updated: 2026-07-07
 
 ---
 
@@ -17,8 +17,8 @@
 | **Branch model** | Feature branches → PR → CPO accept → Dima merges |
 | **Current UI** | Stable dark UI + Ambient Theme live as-is |
 | **Ambient Theme** | Current version live in production — further Design v2 / premium event skin work is parked |
-| **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 read-only odds dry-run scope in draft PR #83; Product Vision Gap / Beta v2 planning continues |
-| **Active blockers** | None in current main — product vision gaps documented in PRODUCT_VISION_GAP.md |
+| **Current phase** | M1.2 provider-backed fixture foundation complete; M1.3 read-only odds dry-run executed safely with no odds coverage and no writes; bookmaker/mapping discovery rerun after PR #98 is partial/safe and stopped on mapping pagination guard; canonical-fixture-first page-1 mapping comparison is DONE / NOT FOUND; filtered mapping support evidence is DONE / FILTERED RUNTIME BLOCKED; M1.3 mapping exploration is PAUSED; M1.2.e football enrichment design is DONE; M1.2.e endpoint evidence is DONE; M1.2.e.2 SportMonks canonical fixture mapping scope is DONE; M1.2.e football enrichment read-only dry-run scope is DONE; M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope is in review; Product Vision Gap / Beta v2 planning continues |
+| **Active blockers** | Canonical-linked football enrichment is blocked because production has 0 SportMonks provider links and no exact/high SportMonks provider link for canonical fixture `1576052`. Runtime enrichment provider calls, writes, and downstream usage remain blocked. |
 | **External beta invites** | Do not invite external beta users yet |
 
 > **Note:** main is stable and frozen. No rollback needed. No urgent bugfix. Engineering shell is solid.
@@ -55,7 +55,28 @@ Final production state after validation:
 - no broad write, multi-provider write, or multi-day write was run
 - odds, results, SportMonks enrichment, cross-provider mapping, cron, Scout, Analyst, and UI remained untouched by M1.2.c
 
-M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery & Dry-Run Plan is DONE via PR #80. M1.3 API-Football Odds Endpoint & Cost Confirmation is DONE / BLOCKED via PR #81 and superseded for planning by PR #82 provider evidence. M1.3 Read-Only Odds Dry-Run Scope is in draft PR #83 as scope approval only. M1.3 odds writes, migrations, production provider odds calls, Scout, Analyst, and UI usage remain NOT STARTED.
+M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery & Dry-Run Plan is DONE via PR #80. M1.3 API-Football Odds Endpoint & Cost Confirmation is DONE / BLOCKED via PR #81 and superseded for planning by PR #82 provider evidence. M1.3 Read-Only Odds Dry-Run Scope is DONE via PR #83. M1.3 Read-Only Odds Dry-Run Implementation is MERGED via PR #85. M1.3 Read-Only Odds Dry-Run is EXECUTED / SAFE: one approved production request returned `oddsAvailable=false`, no pagination overflow, no raw payload, no odds prices, no writes, and no betting signal. M1.3 Bookmaker & Mapping Discovery Scope is DONE via PR #88. M1.3 Bookmaker & Mapping Discovery Read-Only Implementation is MERGED via PR #92. M1.3 Bookmaker Discovery after PR #98 is SAFE / PARTIAL WARNING: `/odds/bookmakers` returned 33 rows, 32 valid sanitized bookmaker id/name pairs, and 1 non-fatal missing-name warning. M1.3 Mapping Discovery after PR #98 is PARTIAL / SAFE: `/odds/mapping` page 1 returned 100 mapping rows with `paging.total=11`, and the route stopped correctly because page 2 is not approved. M1.3 Bookmaker & Mapping Discovery is PARTIAL / SAFE / NOT DONE. M1.3 Mapping Pagination Strategy is DONE via PR #100: page 2+ calls remain blocked until a separate CPO-approved budget and filtering strategy exists. M1.3 Canonical-Fixture-First Mapping Discovery Scope is DONE via PR #101. M1.3 Canonical-Fixture-First Page-1 Comparison is DONE / NOT FOUND: provider fixture IDs `1576052` and `1576053` were not present in existing sanitized page-1 mapping coverage. M1.3 Filtered Mapping Support Evidence is DONE / FILTERED RUNTIME BLOCKED: current sanitized evidence confirms `GET /odds/mapping` but does not confirm fixture, league, season, date, bookmaker, bet, or page request parameters for `/odds/mapping`. M1.3 Mapping Exploration is PAUSED: page 2+, full mapping crawl, and filtered mapping runtime remain blocked until stronger provider evidence or a separate full-crawl budget strategy is accepted. M1.3 odds writes, migrations, Scout, Analyst, and UI usage remain NOT STARTED.
+
+M1.2.e Football Enrichment Design is DONE via PR #105. M1.2.e Football Enrichment Endpoint Evidence is DONE via PR #107. M1.2.e.2 SportMonks Canonical Fixture Mapping Scope is DONE via PR #109. M1.2.e Football Enrichment Read-Only Dry-Run Scope is DONE via PR #108. Production DB has been verified by the operator/CPO: `fixture_provider_links` contains 2 `api_football` / exact rows and 0 `sportmonks` rows. Current blocker: no exact/high SportMonks provider link exists for canonical fixture `1576052`. Therefore: no SportMonks link -> no canonical enrichment; no canonical enrichment -> no write; no write -> no Analyst/Scout/UI. M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope is in review. It is documentation/status scope only: no runtime code, migrations, provider calls, Supabase writes, env flags, provider-link writes, enrichment writes, Scout/Analyst/UI changes, Place Bet unlock, probability, edge, EV, recommendation, or betting signal.
+
+M1.2.e.2 roadmap:
+
+- 2.5.a Mapping Scope / Evidence - docs only
+- 2.5.b Read-only mapping discovery - scope in review; runtime requires separate CPO approval
+- 2.5.c Controlled provider link write - only if exact/high confidence
+- 2.5.d Mapping validation record
+
+SportMonks enrichment dry-run distinction:
+
+- SHAPE-ONLY / UNBOUND dry-run may validate SportMonks response shape using a native SportMonks fixture ID, but it cannot write, cannot attach to a canonical fixture, and cannot unlock enrichment writes or Scout/Analyst/UI usage.
+- CANONICAL-LINKED dry-run requires an exact/high SportMonks provider link before enrichment can be tied to `canonical_fixture_id`; missing exact/high SportMonks provider link is a hard pre-flight blocker that must abort before any provider call.
+
+SportMonks mapping discovery scope:
+
+- Discovery is not SportMonks `GET /v3/football/fixtures/{ID}` because the SportMonks fixture ID is unknown.
+- Future mapping discovery must start from canonical fixture data: date, kickoff window, league/competition if available, participants/team names, season if available, and provider link state.
+- Candidate endpoint families are fixtures by date or fixtures between dates, but exact endpoint path, filters, pagination shape, response shape, quota/request cost, plan availability, and freshness semantics remain unconfirmed until endpoint evidence is recorded.
+- Future runtime guardrails remain: max 2 provider requests, page 1 only, stop if `paging.total > 1`, no page 2, no crawl, no broad search, no fallback endpoint calls, no retries without separate approval, and SportMonks `api_token` redacted from URLs/logs/reports/errors/docs/Vercel/Sentry/console output.
 
 ---
 
@@ -63,10 +84,10 @@ M1.3 Odds Snapshot Sync Design is DONE via PR #79. M1.3 Odds Endpoint Discovery 
 
 | Field | Value |
 |---|---|
-| **Status** | DESIGN DONE via PR #79; endpoint discovery / dry-run planning DONE via PR #80; endpoint/cost confirmation DONE / BLOCKED via PR #81; provider evidence DONE via PR #82; read-only dry-run scope in draft PR #83 |
-| **Implementation** | READ-ONLY PLANNER ONLY from PR #80; odds ingestion NOT STARTED |
+| **Status** | DESIGN DONE via PR #79; endpoint discovery / dry-run planning DONE via PR #80; endpoint/cost confirmation DONE / BLOCKED via PR #81; provider evidence DONE via PR #82; read-only dry-run scope DONE via PR #83; read-only dry-run implementation MERGED via PR #85; production read-only dry-run EXECUTED / SAFE; bookmaker/mapping discovery scope DONE via PR #88; reference discovery implementation MERGED via PR #92; post-PR #98 production bookmaker discovery SAFE / PARTIAL WARNING; mapping discovery PARTIAL / SAFE; bookmaker/mapping discovery PARTIAL / SAFE / NOT DONE; mapping pagination strategy DONE via PR #100; canonical-fixture-first mapping scope DONE via PR #101; page-1 comparison DONE / NOT FOUND; filtered mapping support evidence DONE / FILTERED RUNTIME BLOCKED; mapping exploration PAUSED |
+| **Implementation** | READ-ONLY PLANNER from PR #80; protected read-only dry-run path merged via PR #85; odds ingestion NOT STARTED |
 | **Odds ingestion** | NOT STARTED |
-| **Provider calls** | NOT RUN; production odds provider calls require a separate CPO-approved read-only dry-run scope |
+| **Provider calls** | One approved read-only production call executed for `GET /odds?fixture=1576052&bet=1`; no odds coverage returned. Approved reference discovery requests executed for `/odds/bookmakers`, including post-PR #94 and post-PR #98 reruns. The post-PR #98 rerun also executed `/odds/mapping` page 1, returned `paging.total=11`, and stopped before page 2. Any further provider call requires separate CPO approval |
 | **Migrations** | NOT ADDED |
 | **User-facing usage** | BLOCKED until separate validation milestone |
 | **Odds write flag** | `SPORTS_ODDS_SYNC_WRITE_ENABLED` not added/enabled |
@@ -81,13 +102,43 @@ Design direction:
 - PR #80 added a read-only planner only; it never reports writes as allowed
 - PR #82 confirms docs-sourced `/odds`, fixture-specific request shape, pagination, cost model, bookmaker/mapping discovery shapes, `Match Winner` = bet id `1`, and sanitized odds response shape
 - PR #83 scopes the first read-only production odds dry-run candidate: `GET /odds?fixture=1576052&bet=1`, Variant A only, max 1 provider request, stop if `paging.total > 1`
-- production provider odds calls remain not started until PR #83 is merged and the runtime dry-run receives separate CPO approval
+- PR #85 implements the protected read-only dry-run path
+- the first production read-only odds dry-run executed safely: status 200, pre-flight passed, one provider request, page 1 only, `paging.total=1`, `oddsAvailable=false`, no writes, and no betting signal
+- PR #88 scopes the next safer reference discovery step: `GET /odds/bookmakers` and `GET /odds/mapping`, max 2 provider requests total, page 1 only, stop if either `paging.total > 1`, no odds values endpoint, and no fixture-specific odds call
+- PR #92 implements the protected read-only reference discovery route for that scope
+- the first approved production reference discovery run is PARTIAL / SAFE: `/odds/bookmakers` was attempted once, returned sanitized bookmaker ids/names, and stopped before `/odds/mapping` because the bookmaker response shape differed from expected evidence
+- the post-PR #94 approved reference discovery rerun is also PARTIAL / SAFE: `/odds/bookmakers` was attempted once, returned 32 sanitized bookmaker id/name pairs, and stopped before `/odds/mapping` because at least one row still differed from expected evidence
+- PR #96 diagnostics identified the remaining bookmaker issue as one `missing name` row; PR #97 accepted a Hybrid missing-name policy, and PR #98 implemented it with mocked tests
+- the post-PR #98 approved reference discovery rerun is PARTIAL / SAFE / NOT DONE: `/odds/bookmakers` is now shape-valid with one non-fatal missing-name warning, `/odds/mapping` ran page 1, and discovery stopped because `/odds/mapping` reported `paging.total=11` while page 2 is not approved
+- do not auto-fetch remaining mapping pages; mapping pagination strategy must be accepted before any page 2+ calls
+- canonical-fixture-first page-1 comparison is DONE / NOT FOUND: known provider fixture IDs `1576052` and `1576053` were not present in existing page-1 mapping coverage
+- do not auto-fetch page 2 or crawl pages 2-11 after the not-found result; evaluate provider-supported filters or stop mapping exploration for now
+- current sanitized provider evidence confirms `GET /odds/mapping` only; it does not confirm fixture, league, season, date, bookmaker, bet, or page request parameters for `/odds/mapping`
+- mapping exploration is PAUSED; the next unblock is stronger provider docs/account evidence for useful `/odds/mapping` filters or a separate CPO-approved full-crawl budget strategy
+- further production provider odds calls require separate CPO approval
 
 Reference: `docs/sports-odds-snapshot-sync-m1-3-design.md`
 PR #80 planning reference: `docs/sports-odds-endpoint-discovery-m1-3.md`
 PR #81 confirmation reference: `docs/api-football-odds-endpoint-confirmation-m1-3.md`
 PR #82 evidence reference: `docs/api-football-odds-provider-evidence-m1-3.md`
 PR #83 scope reference: `docs/sports-odds-read-only-dry-run-scope-m1-3.md`
+PR #85 implementation reference: `docs/sports-odds-read-only-dry-run-implementation-m1-3.md`
+M1.3 read-only dry-run result reference: `docs/sports-odds-read-only-dry-run-result-m1-3.md`
+PR #88 bookmaker/mapping scope reference: `docs/sports-odds-bookmaker-mapping-discovery-scope-m1-3.md`
+M1.3 bookmaker/mapping discovery result reference: `docs/sports-odds-bookmaker-mapping-discovery-result-m1-3.md`
+M1.3 bookmaker discovery rerun result reference: `docs/sports-odds-bookmaker-discovery-rerun-result-m1-3.md`
+M1.3 bookmaker missing-name policy reference: `docs/sports-odds-bookmaker-missing-name-policy-m1-3.md`
+M1.3 bookmaker/mapping discovery rerun result reference: `docs/sports-odds-bookmaker-mapping-discovery-rerun-result-m1-3.md`
+M1.3 mapping pagination strategy reference: `docs/sports-odds-mapping-pagination-strategy-m1-3.md`
+M1.3 canonical-fixture-first mapping scope reference: `docs/sports-odds-canonical-fixture-first-mapping-scope-m1-3.md`
+M1.3 canonical-fixture-first page-1 result reference: `docs/sports-odds-canonical-fixture-first-mapping-page1-result-m1-3.md`
+M1.3 filtered mapping support evidence reference: `docs/sports-odds-filtered-mapping-support-evidence-m1-3.md`
+M1.3 mapping exploration pause reference: `docs/sports-odds-mapping-exploration-pause-m1-3.md`
+M1.2.e football enrichment design reference: `docs/sports-football-enrichment-m1-2-e-design.md`
+M1.2.e football enrichment endpoint evidence reference: `docs/sports-football-enrichment-endpoint-evidence-m1-2-e.md`
+M1.2.e.2 SportMonks canonical fixture mapping scope reference: `docs/sportmonks-canonical-fixture-mapping-scope-m1-2-e.md`
+M1.2.e.2.b SportMonks mapping discovery scope reference: `docs/sportmonks-mapping-discovery-scope-m1-2-e-2-b.md`
+M1.2.e football enrichment read-only dry-run scope reference: `docs/sports-football-enrichment-read-only-dry-run-scope-m1-2-e.md`
 
 ---
 
@@ -124,6 +175,10 @@ PR #83 scope reference: `docs/sports-odds-read-only-dry-run-scope-m1-3.md`
 | #81 | M1.3 API-Football Odds Endpoint & Cost Confirmation - docs/status confirmation block; endpoint/cost not available from Codex runtime |
 | #82 | M1.3 API-Football Odds Provider Evidence - docs/status evidence record; no runtime provider calls or writes |
 | #83 | M1.3 Read-Only Odds Dry-Run Scope - scope approval only; selects provider fixture `1576052` primary and does not run provider calls |
+| #85 | M1.3 Read-Only Odds Dry-Run Implementation - protected read-only route/helper with explicit confirmation; production provider call was not run by the PR itself |
+| #87 | M1.3 Read-Only Odds Dry-Run Result Record - documentation/status record for the one-call production dry-run result; no runtime code |
+| #92 | M1.3 Bookmaker & Mapping Discovery Read-Only Implementation - protected read-only reference discovery route/helper; production provider calls were not run by the PR itself |
+| #99 | M1.3 Bookmaker & Mapping Discovery Rerun Result Record - documentation/status record for the post-PR #98 rerun result; no runtime code |
 
 ---
 
@@ -159,6 +214,7 @@ PR #83 scope reference: `docs/sports-odds-read-only-dry-run-scope-m1-3.md`
 - Do NOT launch publicly
 - Do NOT continue Ambient Theme / Design v2
 - Do NOT start Scout v2 (until data provider decision)
+- Do NOT start M1.2.e football enrichment implementation; read-only dry-run scope is done, canonical-linked runtime remains blocked on an exact/high SportMonks provider link, M1.2.e.2.b SportMonks mapping discovery scope is in review, and no runtime provider call is approved
 - Do NOT start i18n
 - Do NOT start legal pages
 - Do NOT start broad security hardening
@@ -168,7 +224,7 @@ PR #83 scope reference: `docs/sports-odds-read-only-dry-run-scope-m1-3.md`
 - Do NOT do visual redesign
 - Do NOT merge any PR without explicit CPO ACCEPT
 - Do NOT open new code PRs unless a blocker appears in current main
-- Do NOT start M1.3 odds ingestion, provider odds calls, or migrations until endpoint/request/cost are confirmed and explicitly accepted
+- Do NOT start M1.3 odds ingestion, odds writes, migrations, broader provider odds calls, Scout/Analyst/UI odds usage, or betting signals
 
 ---
 
@@ -203,6 +259,7 @@ Daily health-check (read-only, no PR unless blocker):
 - **Dima** merges only after explicit CPO ACCEPT
 - One task = one PR — no unrelated changes bundled
 - Manual Supabase migrations applied only after CPO accept + PR merged
+- Decision numbering governance reference: `docs/decision-ledger-numbering-governance.md`
 
 ---
 
