@@ -1650,5 +1650,45 @@ Reference: `docs/sportmonks-plan-coverage-gate-result-and-discovery-retarget-m1-
 
 ---
 
+## Decision #042 - M1.2.e.2.b.2 API-Football EPL Dry-Run & Controlled Write Scope
+**Date:** 2026-07-07
+**Proposed by:** CPO + Founder
+**Status:** Scope approved for operator execution. Write flag stays default OFF; the write itself is a single operator-gated call.
+
+**Context:** Decision #041 re-targets mapping discovery to the England Premier League and requires new canonical fixtures via the validated API-Football fixture-sync path (M1.2.c precedent). PR #116 fixed the prerequisite adapter gap: league-filtered requests now require and send `season`, and multi-page responses throw a redacted `pagination overflow` error instead of silently truncating.
+
+**Decision:** The operator may run single-day API-Football dry-run probes (league 39, season 2026, 1 request each, max 4 attempts) to find an EPL 2026-27 match day with 1-2 fixtures, then perform ONE controlled write for that day: single provider, single day, `SPORTS_FIXTURE_SYNC_WRITE_ENABLED` set only for that call and removed immediately after, `WRITE_FIXTURE_SYNC_M1_2_B` confirmation, scope cap 2 fixtures (operator-checked via `report.providers[0].fetched`; code cap 25). The operator also records the API-Football account plan name observed in the dashboard, closing the plan question left OPEN by Decision #039.
+
+**Approval trail:** Founder/CPO granted blanket conversation approval on 2026-07-07 for the Decision #041 sequence; execution remains operator-gated by `SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN`. Runbook: `docs/sports-operator-runbook-m1-2-e-2-b-2.md`.
+
+**Non-use:** This decision does not approve other leagues/seasons/providers, writes above 2 fixtures, odds/results/enrichment calls, env flags beyond the single write call, Scout usage, Analyst usage, UI usage, Place Bet, probability, implied probability, edge, EV, recommendation, or betting signal.
+
+**FP-001:** Fixture identity is not a betting signal.
+
+Reference: `docs/api-football-epl-dry-run-and-controlled-write-scope-m1-2-e-2-b-2.md`
+
+---
+
+## Decision #043 - M1.2.e.2.b.2 SportMonks Mapping Discovery Implementation Scope
+**Date:** 2026-07-07
+**Proposed by:** CPO + Founder
+**Status:** Implementation merged via PR #117. Execution operator-gated (2.5.b.3). ZERO writes by construction.
+
+**Context:** Decisions #037/#040/#041 define the read-only SportMonks mapping discovery: find the SportMonks fixture ID for canonical EPL fixtures without knowing that ID, within hard request/pagination/redaction guardrails.
+
+**Decision:** BetTracker implements `POST /api/admin/sports/mapping/sportmonks-discovery` (PR #117). The approved scope is structurally pinned in the route schema: `dryRun: true`, provider `sportmonks`, `sportmonksLeagueId: '8'` (EPL per Decision #040 docs evidence), 1-2 canonical fixture UUIDs, max 2 provider requests, confirmation `RUN_SPORTMONKS_MAPPING_DISCOVERY_M1_2_E_2_B_2`. Guardrails enforced in code and tests: same-matchday targets share one `fixtures/date/{UTC}` request with `filters=fixtureLeagues:8`, `include=participants;league;state`, `per_page=50`; `pagination.has_more === true` stops the run and blocks mapping (v3 has no `total` field); the token travels only in the `Authorization` header; the `timezone` parameter is omitted so the date bucket stays UTC; match keys are read from `canonical_fixtures` + `fixture_provider_links.raw_provider_payload` at runtime; confidence rubric exact/high/medium/needs_review with ambiguity blocking; sanitized report only; `writes: "none"`.
+
+**Execution:** After the Decision #042 write exists, the operator runs discovery per the runbook. Only a single exact/high candidate sets `eligibleForProviderLink: true`; everything else blocks mapping with zero writes. The sanitized report is recorded in the ledger; a controlled provider-link write is a later, separately scoped decision.
+
+**Approval trail:** Founder/CPO blanket conversation approval 2026-07-07; operator-gated by bearer token.
+
+**Non-use:** This decision does not approve provider-link writes, enrichment calls or writes, page 2+, crawls, fallback endpoints, retries, Scout usage, Analyst usage, UI usage, Place Bet, probability, implied probability, edge, EV, recommendation, or betting signal.
+
+**FP-001:** Mapping discovery is identity evidence only.
+
+Reference: `docs/sportmonks-mapping-discovery-implementation-scope-m1-2-e-2-b-2.md`
+
+---
+
 *Last updated: 2026-07-07*
 *Owner: All (each role contributes)*

@@ -28,7 +28,7 @@ The following decision numbers are currently occupied in `docs/decisions.md`:
 ```txt
 #001-#019
 #021-#031
-#033-#041
+#033-#043
 ```
 
 Known recent entries:
@@ -48,6 +48,8 @@ Known recent entries:
 | #039 | Occupied: odds_snapshots_public Curated View Status Reconciliation & Working-Tree Hygiene |
 | #040 | Occupied: M1.2.e.2.b.1 SportMonks Mapping Discovery Endpoint Evidence Record |
 | #041 | Occupied: SportMonks Plan Coverage Gate Result & Discovery Re-Target |
+| #042 | Occupied: M1.2.e.2.b.2 API-Football EPL Dry-Run & Controlled Write Scope |
+| #043 | Occupied: M1.2.e.2.b.2 SportMonks Mapping Discovery Implementation Scope |
 
 ### Missing
 
@@ -63,7 +65,7 @@ Decision #020 must not be filled opportunistically. Any future use of #020 requi
 | --- | --- |
 | #032 | Reserved by the parallel M1.3 API-Football `/odds/mapping` filter evidence track |
 
-The #038 reservation recorded by Decision #039 was consumed when Decision #038 merged (PR #112). No next decision number is reserved by this PR. The next free unreserved number is #042 unless a later docs/status governance PR records a new reservation.
+The #038 reservation recorded by Decision #039 was consumed when Decision #038 merged (PR #112). No next decision number is reserved by this PR. The next free unreserved number is #044 unless a later docs/status governance PR records a new reservation.
 
 ## Numbering Rules
 
