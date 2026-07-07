@@ -2299,6 +2299,422 @@ await testAsync('fetchOdds/fetchResults/fetchEnrichment remain out of scope and 
   }
 });
 
+// --- M1.2.e.2.b.2 SportMonks mapping discovery (Decision #043) ---
+
+function clearCompiledSportmonksDiscoveryModules() {
+  for (const relPath of [
+    'app/api/admin/sports/mapping/sportmonks-discovery/route.js',
+    'lib/providers/sportmonks-mapping-discovery.js',
+    'lib/supabase/admin.js',
+  ]) {
+    const compiledPath = path.join(buildDir, relPath);
+    try {
+      delete require.cache[require.resolve(compiledPath)];
+    } catch {
+      // Module may not have been loaded yet.
+    }
+  }
+}
+
+function stubAdminClientModule({ fixtures, links }) {
+  const adminPath = path.join(buildDir, 'lib/supabase/admin.js');
+  require.cache[require.resolve(adminPath)] = {
+    id: adminPath,
+    filename: adminPath,
+    loaded: true,
+    exports: {
+      createAdminClient() {
+        return {
+          from(table) {
+            const rows = table === 'canonical_fixtures' ? fixtures : links;
+            const builder = {
+              select() {
+                return builder;
+              },
+              eq() {
+                return builder;
+              },
+              async in() {
+                return { data: rows, error: null };
+              },
+            };
+            return builder;
+          },
+        };
+      },
+    },
+  };
+}
+
+function sportmonksFixture(id, home, away, startingAt) {
+  return {
+    id,
+    name: `${home} vs ${away}`,
+    league_id: 8,
+    season_id: 25583,
+    state_id: 1,
+    starting_at: startingAt,
+    participants: [
+      { id: id * 10 + 1, name: home, meta: { location: 'home' } },
+      { id: id * 10 + 2, name: away, meta: { location: 'away' } },
+    ],
+  };
+}
+
+function sportmonksEnvelope(fixtures, { hasMore = false } = {}) {
+  return {
+    data: fixtures,
+    pagination: { count: fixtures.length, per_page: 50, current_page: 1, has_more: hasMore },
+    rate_limit: { resets_in_seconds: 3599, remaining: 1999, requested_entity: 'Fixture' },
+    timezone: 'UTC',
+  };
+}
+
+const DISCOVERY_TARGET_A = '11111111-1111-4111-8111-111111111111';
+const DISCOVERY_TARGET_B = '22222222-2222-4222-8222-222222222222';
+
+function discoveryDbRows() {
+  return {
+    fixtures: [
+      {
+        id: DISCOVERY_TARGET_A,
+        sport: 'football',
+        status: 'scheduled',
+        kickoff_at: '2026-08-15T14:00:00+00:00',
+        competition_name: 'Premier League',
+        competition_country: 'England',
+        season: '2026',
+      },
+      {
+        id: DISCOVERY_TARGET_B,
+        sport: 'football',
+        status: 'scheduled',
+        kickoff_at: '2026-08-15T16:30:00+00:00',
+        competition_name: 'Premier League',
+        competition_country: 'England',
+        season: '2026',
+      },
+    ],
+    links: [
+      {
+        canonical_fixture_id: DISCOVERY_TARGET_A,
+        raw_provider_payload: { teams: { home: { name: 'Arsenal' }, away: { name: 'Chelsea' } } },
+      },
+      {
+        canonical_fixture_id: DISCOVERY_TARGET_B,
+        raw_provider_payload: { teams: { home: { name: 'Cardiff MET' }, away: { name: 'Barry Town' } } },
+      },
+    ],
+  };
+}
+
+async function withSportmonksDiscoveryRoute(fn) {
+  return withCompiledAlias(async () => {
+    clearCompiledSportmonksDiscoveryModules();
+    stubAdminClientModule(discoveryDbRows());
+    const route = require(path.join(buildDir, 'app/api/admin/sports/mapping/sportmonks-discovery/route.js'));
+    try {
+      return await fn(route);
+    } finally {
+      clearCompiledSportmonksDiscoveryModules();
+    }
+  });
+}
+
+function authorizedSportmonksDiscoveryRequest(body) {
+  return new Request('https://example.test/api/admin/sports/mapping/sportmonks-discovery', {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer operator-token',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+test('sportmonks discovery: normalizeTeamName strips punctuation, case, and club suffixes', () => {
+  clearCompiledSportmonksDiscoveryModules();
+  const lib = require(path.join(buildDir, 'lib/providers/sportmonks-mapping-discovery.js'));
+
+  assert.equal(lib.normalizeTeamName('Cardiff MET FC'), 'cardiff met');
+  assert.equal(lib.normalizeTeamName('  Barry Town '), 'barry town');
+  assert.equal(lib.normalizeTeamName('AFC Bournemouth'), 'bournemouth');
+  assert.equal(lib.normalizeTeamName(null), '');
+});
+
+test('sportmonks discovery: classifyCandidate grades exact, fuzzy, and swapped orientations', () => {
+  const lib = require(path.join(buildDir, 'lib/providers/sportmonks-mapping-discovery.js'));
+
+  const exact = lib.classifyCandidate(
+    { homeTeamName: 'Arsenal', awayTeamName: 'Chelsea' },
+    sportmonksFixture(1, 'Arsenal', 'Chelsea', '2026-08-15 14:00:00')
+  );
+  assert.equal(exact.confidence, 'exact');
+
+  const fuzzy = lib.classifyCandidate(
+    { homeTeamName: 'Cardiff MET', awayTeamName: 'Barry Town' },
+    sportmonksFixture(2, 'Cardiff Metropolitan University', 'Barry Town United', '2026-08-15 14:00:00')
+  );
+  assert.equal(fuzzy.confidence, 'high');
+
+  const swapped = lib.classifyCandidate(
+    { homeTeamName: 'Arsenal', awayTeamName: 'Chelsea' },
+    sportmonksFixture(3, 'Chelsea', 'Arsenal', '2026-08-15 14:00:00')
+  );
+  assert.equal(swapped.confidence, 'needs_review');
+});
+
+test('sportmonks discovery: matchTargetAgainstFixtures returns not_found and blocks ambiguity', () => {
+  const lib = require(path.join(buildDir, 'lib/providers/sportmonks-mapping-discovery.js'));
+  const target = {
+    canonicalFixtureId: DISCOVERY_TARGET_A,
+    sport: 'football',
+    status: 'scheduled',
+    kickoffAt: '2026-08-15T14:00:00+00:00',
+    competitionName: 'Premier League',
+    competitionCountry: 'England',
+    season: '2026',
+    homeTeamName: 'Arsenal',
+    awayTeamName: 'Chelsea',
+  };
+
+  const notFound = lib.matchTargetAgainstFixtures(target, [
+    sportmonksFixture(1, 'Arsenal', 'Chelsea', '2026-08-15 19:00:00'),
+  ]);
+  assert.equal(notFound.status, 'not_found');
+  assert.equal(notFound.eligibleForProviderLink, false);
+
+  const ambiguous = lib.matchTargetAgainstFixtures(target, [
+    sportmonksFixture(1, 'Arsenal', 'Chelsea', '2026-08-15 14:00:00'),
+    sportmonksFixture(2, 'Arsenal', 'Chelsea', '2026-08-15 14:00:00'),
+  ]);
+  assert.equal(ambiguous.status, 'ambiguous');
+  assert.equal(ambiguous.eligibleForProviderLink, false);
+
+  const matched = lib.matchTargetAgainstFixtures(target, [
+    sportmonksFixture(1, 'Arsenal', 'Chelsea', '2026-08-15 14:00:00'),
+    sportmonksFixture(2, 'Everton', 'Fulham', '2026-08-15 16:30:00'),
+  ]);
+  assert.equal(matched.status, 'matched');
+  assert.equal(matched.confidence, 'exact');
+  assert.equal(matched.eligibleForProviderLink, true);
+  assert.equal(matched.candidate.sportmonksFixtureId, '1');
+});
+
+await testAsync('sportmonks discovery: one header-auth request per date, token never in URL, sanitized report', async () => {
+  const originalFetch = globalThis.fetch;
+  const observed = [];
+
+  clearCompiledSportmonksDiscoveryModules();
+  stubAdminClientModule(discoveryDbRows());
+  const lib = require(path.join(buildDir, 'lib/providers/sportmonks-mapping-discovery.js'));
+
+  globalThis.fetch = async (url, init = {}) => {
+    observed.push({ url: String(url), headers: init.headers ?? {} });
+    return jsonResponse(
+      sportmonksEnvelope([
+        sportmonksFixture(101, 'Arsenal', 'Chelsea', '2026-08-15 14:00:00'),
+        sportmonksFixture(102, 'Cardiff Metropolitan University', 'Barry Town United', '2026-08-15 16:30:00'),
+      ])
+    );
+  };
+
+  try {
+    const report = await lib.runSportMonksMappingDiscovery({
+      canonicalFixtureIds: [DISCOVERY_TARGET_A, DISCOVERY_TARGET_B],
+      sportmonksLeagueId: '8',
+    });
+
+    assert.equal(observed.length, 1, 'both same-day targets must share one provider request');
+    const url = new URL(observed[0].url);
+    assert.ok(url.pathname.endsWith('/fixtures/date/2026-08-15'));
+    assert.equal(url.searchParams.get('filters'), 'fixtureLeagues:8');
+    assert.equal(url.searchParams.get('include'), 'participants;league;state');
+    assert.equal(url.searchParams.get('per_page'), '50');
+    assert.equal(url.searchParams.get('timezone'), null, 'timezone must stay UTC (omitted)');
+    assert.equal(url.searchParams.get('api_token'), null, 'token must never be in the URL');
+    assert.equal(observed[0].headers.Authorization, 'dummy-sportmonks');
+
+    assert.equal(report.providerRequestsUsed, 1);
+    assert.equal(report.writes, 'none');
+    assert.equal(report.stopReasons.length, 0);
+
+    const targetA = report.targets.find((t) => t.canonicalFixtureId === DISCOVERY_TARGET_A);
+    const targetB = report.targets.find((t) => t.canonicalFixtureId === DISCOVERY_TARGET_B);
+    assert.equal(targetA.status, 'matched');
+    assert.equal(targetA.confidence, 'exact');
+    assert.equal(targetA.eligibleForProviderLink, true);
+    assert.equal(targetA.candidate.sportmonksFixtureId, '101');
+    assert.equal(targetB.status, 'matched');
+    assert.equal(targetB.confidence, 'high');
+    assert.equal(targetB.candidate.sportmonksFixtureId, '102');
+
+    const serialized = JSON.stringify(report);
+    for (const forbidden of ['dummy-sportmonks', 'api_token', 'rawProviderPayload', 'raw_provider_payload', 'model_probability', 'edge_percent', 'odds']) {
+      assert.equal(serialized.includes(forbidden), false, `forbidden artifact leaked: ${forbidden}`);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearCompiledSportmonksDiscoveryModules();
+  }
+});
+
+await testAsync('sportmonks discovery: has_more=true stops on page 1 and blocks mapping', async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+
+  clearCompiledSportmonksDiscoveryModules();
+  stubAdminClientModule(discoveryDbRows());
+  const lib = require(path.join(buildDir, 'lib/providers/sportmonks-mapping-discovery.js'));
+
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    return jsonResponse(
+      sportmonksEnvelope([sportmonksFixture(101, 'Arsenal', 'Chelsea', '2026-08-15 14:00:00')], { hasMore: true })
+    );
+  };
+
+  try {
+    const report = await lib.runSportMonksMappingDiscovery({
+      canonicalFixtureIds: [DISCOVERY_TARGET_A],
+      sportmonksLeagueId: '8',
+    });
+
+    assert.equal(fetchCalls, 1, 'no page 2 request is ever made');
+    assert.equal(report.stopReasons.length, 1);
+    assert.ok(report.stopReasons[0].includes('has_more=true'));
+    assert.equal(report.targets[0].status, 'ambiguous');
+    assert.equal(report.targets[0].eligibleForProviderLink, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearCompiledSportmonksDiscoveryModules();
+  }
+});
+
+await testAsync('sportmonks discovery route requires operator authorization before provider calls', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    throw new Error('provider fetch should not be called');
+  };
+
+  try {
+    await withSportmonksDiscoveryRoute(async ({ POST }) => {
+      const response = await POST(
+        new Request('https://example.test/api/admin/sports/mapping/sportmonks-discovery', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ dryRun: true }),
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 401);
+      assert.equal(fetchCalls, 0);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
+await testAsync('sportmonks discovery route pins the approved scope literals and confirmation', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    throw new Error('provider fetch should not be called');
+  };
+
+  try {
+    await withSportmonksDiscoveryRoute(async ({ POST }) => {
+      const wrongLeague = await POST(
+        authorizedSportmonksDiscoveryRequest({
+          dryRun: true,
+          provider: 'sportmonks',
+          sportmonksLeagueId: '501',
+          canonicalFixtureIds: [DISCOVERY_TARGET_A],
+          maxProviderRequests: 2,
+          operatorConfirm: 'RUN_SPORTMONKS_MAPPING_DISCOVERY_M1_2_E_2_B_2',
+        })
+      );
+      assert.equal((await readJsonResponse(wrongLeague)).status, 400);
+
+      const wrongConfirm = await POST(
+        authorizedSportmonksDiscoveryRequest({
+          dryRun: true,
+          provider: 'sportmonks',
+          sportmonksLeagueId: '8',
+          canonicalFixtureIds: [DISCOVERY_TARGET_A],
+          maxProviderRequests: 2,
+          operatorConfirm: 'WRONG',
+        })
+      );
+      const wrongConfirmResult = await readJsonResponse(wrongConfirm);
+      assert.equal(wrongConfirmResult.status, 400);
+      assert.ok(wrongConfirmResult.body.error.includes('operator confirmation'));
+
+      assert.equal(fetchCalls, 0);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
+await testAsync('sportmonks discovery route accepts the exact approved body under mocks', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () =>
+    jsonResponse(sportmonksEnvelope([sportmonksFixture(101, 'Arsenal', 'Chelsea', '2026-08-15 14:00:00')]));
+
+  try {
+    await withSportmonksDiscoveryRoute(async ({ POST }) => {
+      const response = await POST(
+        authorizedSportmonksDiscoveryRequest({
+          dryRun: true,
+          provider: 'sportmonks',
+          sportmonksLeagueId: '8',
+          canonicalFixtureIds: [DISCOVERY_TARGET_A],
+          maxProviderRequests: 2,
+          operatorConfirm: 'RUN_SPORTMONKS_MAPPING_DISCOVERY_M1_2_E_2_B_2',
+        })
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, true);
+      assert.equal(result.body.report.writes, 'none');
+      assert.equal(result.body.report.targets[0].status, 'matched');
+      assert.equal(result.body.report.targets[0].confidence, 'exact');
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) {
+      delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    } else {
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    }
+  }
+});
+
 console.log(`\n${passed + failed} tests — ${passed} passed, ${failed} failed\n`);
 
 if (failed > 0) {
