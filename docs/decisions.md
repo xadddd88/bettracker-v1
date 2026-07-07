@@ -1601,5 +1601,33 @@ Reference: `docs/sportmonks-mapping-discovery-endpoint-evidence-scope-m1-2-e-2-b
 
 ---
 
+## Decision #040 - M1.2.e.2.b.1 SportMonks Mapping Discovery Endpoint Evidence Record
+**Date:** 2026-07-07
+**Proposed by:** CPO + Founder
+**Status:** Documentation/evidence record only. Runtime provider calls, final runtime request shape, API routes, migrations, provider-link writes, enrichment writes, env flags, and downstream usage are not approved.
+
+**Context:** Decision #038 required sanitized official SportMonks docs evidence before any mapping discovery runtime proposal. Evidence was collected on 2026-07-07 from official SportMonks documentation pages only. ZERO SportMonks API calls were made and no `api_token` was used or exposed.
+
+**Decision:** BetTracker records the official SportMonks Football API v3 endpoint evidence in `docs/sportmonks-mapping-discovery-endpoint-evidence-m1-2-e-2-b-1.md`, answering every question in the Decision #038 checklist.
+
+**Key confirmed facts:**
+- Endpoint paths: `GET /v3/football/fixtures/date/{YYYY-MM-DD}` and `GET /v3/football/fixtures/between/{start}/{end}` (max 100 days); the between-for-team variant requires a SportMonks team ID BetTracker does not have.
+- Server-side league filter is documented on both endpoints: `filters=fixtureLeagues:{ids}`. A season filter target is listed but its literal spelling is unconfirmed.
+- **v3 pagination has NO total/total_pages field** (removed from v2). The Decision #037 guardrail "stop if `paging.total > 1`" must be restated in the 2.5.b.2 runtime scope as: request page 1 with `per_page=50`, stop/flag AMBIGUOUS if `pagination.has_more === true`.
+- Includes `participants;league;season;state` are valid on these endpoints; participants carry `meta.location` = home/away; includes cost zero extra rate-limit units.
+- All datetimes are UTC by default; the `timezone` parameter changes the DATE BUCKET on fixtures-by-date and must be OMITTED by the future runtime so the date bucket matches `kickoff_at` UTC.
+- Authentication supports an `Authorization` header (raw token) in addition to the `api_token` query parameter — header auth keeps the token out of URLs entirely and is recommended for the future runtime; `redactUrl()` remains defense-in-depth. `401` = bad token; `403` = feed not in the subscription plan.
+- Rate limits are per entity per hour by plan tier (Starter 2,000 / Growth 2,500 / Pro 3,000 / Enterprise 5,000); each HTTP request costs exactly 1 unit regardless of includes.
+
+**Open coverage gate (blocking runtime approval):** fixtures-by-date returns only fixtures from the subscription's selected leagues. The discovery targets are in the Welsh Premier League. The founder must confirm in my.sportmonks.com that the subscription covers that league (and record the plan tier) before any 2.5.b.3 runtime approval; otherwise discovery would return a false NOT FOUND. The SportMonks league ID for the Welsh Premier League is also still unknown and must be obtained without unapproved provider calls.
+
+**Non-use:** This decision does not approve runtime code, provider calls, API routes, migrations, Supabase writes, provider-link writes, enrichment writes, env flags, Scout usage, Analyst usage, UI usage, Place Bet, probability, implied probability, edge, EV, recommendation, or betting signal.
+
+**FP-001:** Endpoint evidence is not identity confidence, model probability, edge, EV, recommendation, Scout signal, Analyst signal, UI signal, or betting signal.
+
+Reference: `docs/sportmonks-mapping-discovery-endpoint-evidence-m1-2-e-2-b-1.md`
+
+---
+
 *Last updated: 2026-07-07*
 *Owner: All (each role contributes)*
