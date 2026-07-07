@@ -28,7 +28,7 @@ The following decision numbers are currently occupied in `docs/decisions.md`:
 ```txt
 #001-#019
 #021-#031
-#033-#036
+#033-#037
 ```
 
 Known recent entries:
@@ -43,6 +43,7 @@ Known recent entries:
 | #034 | Occupied: M1.2.e Football Enrichment Read-Only Dry-Run Scope |
 | #035 | Occupied: M1.2.e.2 SportMonks Canonical Fixture Mapping Scope |
 | #036 | Occupied: Decision Ledger / Numbering Governance |
+| #037 | Occupied: M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope |
 
 ### Missing
 
@@ -57,7 +58,8 @@ Decision #020 must not be filled opportunistically. Any future use of #020 requi
 | Decision | Reservation |
 | --- | --- |
 | #032 | Reserved by the parallel M1.3 API-Football `/odds/mapping` filter evidence track |
-| #037 | Reserved for M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope after this ledger governance PR merges |
+
+No next decision number is reserved by this PR. The next free unreserved number is #038 unless a later docs/status governance PR records a new reservation.
 
 ## Numbering Rules
 
@@ -72,15 +74,15 @@ Before assigning a decision number:
 7. If a parallel PR needs a decision number, reserve it in this ledger before relying on it.
 8. If a reserved PR is abandoned, update this ledger in a docs/status governance PR.
 
-## SportMonks Mapping Scope Reservation
+## SportMonks Mapping Scope Status
 
-The next SportMonks canonical mapping discovery scope must use:
+The SportMonks canonical mapping discovery scope now uses:
 
 ```txt
 Decision #037 - M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope
 ```
 
-That mapping scope must not be opened or merged before this ledger governance PR unless CPO explicitly changes numbering.
+Decision #037 is occupied by the docs/status-only M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope.
 
 Content direction already accepted for that future scope:
 
