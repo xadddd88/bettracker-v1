@@ -4,9 +4,18 @@ import { useState, useCallback, useRef } from 'react'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import type { Sport } from '@/types'
+import type { SportCode } from '@/types'
 
-const SPORTS: Sport[] = ['football', 'tennis', 'basketball', 'hockey', 'other']
+const SPORTS: SportCode[] = ['soccer', 'tennis', 'basketball', 'ice_hockey', 'cs2', 'mma', 'other']
+const SPORT_LABEL: Record<SportCode, string> = {
+  soccer: 'Soccer / Football',
+  tennis: 'Tennis',
+  basketball: 'Basketball',
+  ice_hockey: 'Ice Hockey',
+  cs2: 'CS2',
+  mma: 'MMA',
+  other: 'Other',
+}
 const BOOKMAKERS = ['Bet365', 'William Hill', '1xBet', 'Stake', 'Pinnacle', 'Other']
 
 // ─── Validation schema ───────────────────────────────────────
@@ -16,7 +25,7 @@ const quickBetSchema = z.object({
   selection:   z.string().optional(),
   odds:        z.number({ invalid_type_error: 'Odds must be a number' }).min(1.01, 'Odds must be > 1.00'),
   stake:       z.number({ invalid_type_error: 'Stake must be a number' }).positive('Stake must be positive'),
-  sport:       z.enum(['football', 'tennis', 'basketball', 'hockey', 'other']),
+  sport:       z.enum(['soccer', 'tennis', 'basketball', 'ice_hockey', 'cs2', 'mma', 'other']),
   bookmaker:   z.string().nullable().optional(),
   notes:       z.string().nullable().optional(),
 })
@@ -54,7 +63,7 @@ export default function NewBetPage() {
     selection:   '',
     odds:        '',
     stake:       '',
-    sport:       'football' as Sport,
+    sport:       'soccer' as SportCode,
     bookmaker:   '',
     notes:       '',
   })
@@ -92,7 +101,7 @@ export default function NewBetPage() {
         selection:   d.selection   ?? prev.selection,
         odds:        d.odds != null ? String(d.odds) : prev.odds,
         stake:       d.stake != null ? String(d.stake) : prev.stake,
-        sport:       (SPORTS.includes(d.sport) ? d.sport : prev.sport) as Sport,
+        sport:       (SPORTS.includes(d.sport) ? d.sport : prev.sport) as SportCode,
         bookmaker:   d.bookmaker   ?? prev.bookmaker,
       }))
       setScanMsg('✅ Coupon scanned — review and save')
@@ -290,7 +299,7 @@ export default function NewBetPage() {
             <label className="label">Sport</label>
             <select className="input" value={form.sport} onChange={e => set('sport', e.target.value)}>
               {SPORTS.map(s => (
-                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                <option key={s} value={s}>{SPORT_LABEL[s]}</option>
               ))}
             </select>
           </div>
