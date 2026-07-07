@@ -2,7 +2,7 @@
 
 Status: DOCS / EVIDENCE ONLY / RUNTIME BLOCKED
 
-Last updated: 2026-07-06
+Last updated: 2026-07-07
 
 ## Scope
 
@@ -316,8 +316,9 @@ Data purchase is not model validation.
 
 ```txt
 M1.2.e Football Enrichment Design - DONE
-M1.2.e Football Enrichment Endpoint Evidence - IN REVIEW
-M1.2.e read-only dry-run - NOT STARTED
+M1.2.e Football Enrichment Endpoint Evidence - DONE
+M1.2.e.2 SportMonks Canonical Fixture Mapping Scope - IN REVIEW
+M1.2.e read-only dry-run - BLOCKED ON EXACT/HIGH SPORTMONKS PROVIDER LINK
 M1.2.e schema/write design - NOT STARTED
 M1.2.e controlled write validation - NOT STARTED
 M1.2.e trust validation - NOT STARTED
@@ -326,3 +327,17 @@ football enrichment writes - NOT STARTED
 Scout/Analyst/UI enrichment usage - NOT STARTED
 betting signals - NOT STARTED
 ```
+
+Canonical-linked enrichment prerequisite:
+
+```txt
+Production DB verified:
+fixture_provider_links contains 2 api_football/exact rows and 0 sportmonks rows.
+
+No exact/high SportMonks provider link exists for canonical fixture 1576052.
+No SportMonks link -> no canonical enrichment.
+No canonical enrichment -> no write.
+No write -> no Analyst/Scout/UI.
+```
+
+A SHAPE-ONLY / UNBOUND SportMonks dry-run may validate response shape with a native SportMonks fixture ID, but it cannot write, attach to a canonical fixture, unlock enrichment writes, or unlock Scout/Analyst/UI. A CANONICAL-LINKED enrichment dry-run requires M1.2.e.2 mapping evidence and an exact/high SportMonks provider link.

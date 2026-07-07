@@ -1398,5 +1398,58 @@ Reference: `docs/sports-football-enrichment-endpoint-evidence-m1-2-e.md`
 
 ---
 
-*Last updated: 2026-07-06*
+## Decision #035 - M1.2.e.2 SportMonks Canonical Fixture Mapping Scope
+**Date:** 2026-07-07
+**Proposed by:** CPO + Founder
+**Status:** Documentation/status scope only. Runtime provider calls, writes, migrations, env flags, and downstream usage are not approved.
+
+**Numbering note:** Decision #034 is already used by the open draft PR #108 for M1.2.e Football Enrichment Read-Only Dry-Run Scope. Decision #020 remains intentionally untouched in this PR. Historical decisions are not renumbered.
+
+**Context:** M1.2.e Football Enrichment Endpoint Evidence is DONE via PR #107. SportMonks fixture-by-ID is the preferred future candidate family, but canonical-linked enrichment requires a SportMonks provider link that maps to a BetTracker canonical fixture.
+
+Production DB has been verified by the operator/CPO:
+
+```txt
+fixture_provider_links contains:
+- 2 api_football / exact rows
+- 0 sportmonks rows
+```
+
+New blocker:
+
+```txt
+No exact/high SportMonks provider link exists for canonical fixture 1576052.
+```
+
+Therefore:
+
+```txt
+No SportMonks link -> no canonical enrichment.
+No canonical enrichment -> no write.
+No write -> no Analyst/Scout/UI.
+```
+
+**Decision:** Insert M1.2.e.2 SportMonks canonical fixture mapping before any canonical-linked football enrichment dry-run, enrichment write, or downstream Scout/Analyst/UI usage.
+
+**M1.2.e.2 roadmap:**
+
+- 2.5.a Mapping Scope / Evidence - docs only
+- 2.5.b Read-only mapping discovery - separate CPO approval
+- 2.5.c Controlled provider link write - only if exact/high confidence
+- 2.5.d Mapping validation record
+
+**Dry-run distinction:**
+
+- SHAPE-ONLY / UNBOUND dry-run may validate SportMonks response shape using a native SportMonks fixture ID. It cannot write, cannot attach to a canonical fixture, cannot unlock enrichment writes, and cannot unlock Scout/Analyst/UI.
+- CANONICAL-LINKED dry-run requires an exact/high SportMonks provider link. Only then can enrichment evidence be tied to `canonical_fixture_id`.
+
+**Non-use:** This decision does not approve runtime code, provider calls, migrations, Supabase writes, env flags, enrichment writes, Scout usage, Analyst usage, UI usage, Place Bet, probability, implied probability, edge, EV, recommendation, or betting signal.
+
+**FP-001:** SportMonks mapping evidence is not model probability, edge, EV, recommendation, or Scout/Analyst signal. Provider-link availability does not close FP-001 by itself.
+
+Reference: `docs/sportmonks-canonical-fixture-mapping-scope-m1-2-e.md`
+
+---
+
+*Last updated: 2026-07-07*
 *Owner: All (each role contributes)*
