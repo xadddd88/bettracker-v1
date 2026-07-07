@@ -478,15 +478,15 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
       ? disclaimerParse.data
       : 'This scout analysis is based on general knowledge and does not include live injury reports, current odds, recent form updates, or breaking news.'
 
-    // 7. Server-side implied_probability + edge_percent override when offered_odds is present
+    // 7. FP-001 gate: Scout candidates are research leads, not priced signals.
+    // The LLM's model_probability has no verified data basis, and deriving
+    // implied probability / edge from offered_odds is exactly the
+    // "odds -> edge" false-precision class the quality gate blocks on the
+    // Analyst side. All three pricing fields are persisted as NULL until a
+    // Scout-side data-coverage gate exists; scout_score stays (it is an
+    // interestingness heuristic, documented as NOT a win probability).
     const rows = keptCandidates.map(c => {
       const offered = c.offered_odds ?? null
-      const implied = offered != null
-        ? parseFloat(((1 / offered) * 100).toFixed(2))
-        : (c.implied_probability ?? null)
-      const edge = offered != null && c.model_probability != null
-        ? parseFloat((c.model_probability - (1 / offered) * 100).toFixed(2))
-        : (c.edge_percent ?? null)
 
       return {
         user_id:             user.id,
@@ -498,9 +498,9 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
         offered_odds:        offered,
         opportunity_type:    c.opportunity_type,
         scout_score:         c.scout_score,
-        model_probability:   c.model_probability,
-        implied_probability: implied,
-        edge_percent:        edge,
+        model_probability:   null,
+        implied_probability: null,
+        edge_percent:        null,
         confidence_score:    c.confidence_score,
         risk_level:          c.risk_level,
         status:              'discovered',

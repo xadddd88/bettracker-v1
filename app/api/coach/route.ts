@@ -196,20 +196,16 @@ function buildAggregatedStats(
     win_rate: bucketWinRate(bs),
   }))
 
-  // Edge accuracy buckets (settled bets with edge data)
-  const edgeBuckets: Record<string, DbBet[]> = { '>10%': [], '5-10%': [], '0-5%': [], 'negative': [] }
-  for (const bet of settled) {
-    const edge = bet.legs?.[0]?.decisions?.edge_percent
-    if (edge == null) continue
-    if (edge > 10)       edgeBuckets['>10%'].push(bet)
-    else if (edge > 5)   edgeBuckets['5-10%'].push(bet)
-    else if (edge >= 0)  edgeBuckets['0-5%'].push(bet)
-    else                 edgeBuckets['negative'].push(bet)
-  }
-  const edge_buckets = Object.entries(edgeBuckets).map(([bucket, bs]) => ({
+  // Edge accuracy buckets — FP-001 gate: intentionally empty. Every non-null
+  // decisions.edge_percent in the database predates the analysis quality gate
+  // (which now nulls pricing on all blocked runs), i.e. it is a fabricated
+  // FP-001-era number with no data basis. Feeding those into "edge accuracy"
+  // coaching would launder false precision into calibration advice. Re-enable
+  // only when gate-passed priced decisions exist.
+  const edge_buckets = ['>10%', '5-10%', '0-5%', 'negative'].map(bucket => ({
     bucket,
-    bets: bs.length,
-    win_rate: bucketWinRate(bs),
+    bets: 0,
+    win_rate: null as number | null,
   }))
 
   // Stake buckets
