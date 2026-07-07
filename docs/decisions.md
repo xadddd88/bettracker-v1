@@ -1552,5 +1552,31 @@ Reference: `docs/sportmonks-mapping-discovery-scope-m1-2-e-2-b.md`
 
 ---
 
+## Decision #039 - odds_snapshots_public Curated View Status Reconciliation & Working-Tree Hygiene
+**Date:** 2026-07-07
+**Proposed by:** CPO + Founder
+**Status:** Documentation/status governance only. No new runtime code, provider calls, or writes are approved.
+
+**Context:** PR #84 merged migration `supabase/migrations/015_odds_snapshots_public_view.sql` (curated read-only view over `odds_snapshots`) together with the M1.2.b fixture dry-run design spec. An operator/CPO-verified production check on 2026-07-07 confirmed: the view already exists in production, `odds_snapshots` contains 0 rows, and the view's privilege posture matches the migration (REVOKE ALL from PUBLIC/anon/authenticated, GRANT SELECT to authenticated only). Earlier odds decisions (#011-#016) recorded "no migrations" scope controls for M1.3 evidence PRs; this entry reconciles the ledger with production reality instead of leaving the applied view unrecorded.
+
+**Decision:** The `odds_snapshots_public` curated view is ACCEPTED as tracked schema (migration 015). It is display-shape preparation only. User-facing odds usage remains BLOCKED: no UI reads the view, no Scout/Analyst usage, and no probability, implied probability, edge, EV, or recommendation may be derived from it. The first user-facing consumer of the view requires a separate CPO-approved decision.
+
+**Working-tree hygiene recorded by the same governance PR:**
+- Untracked `supabase/migrations/013_sports_data_foundation_fixed.sql` deleted after production verification: `football_enrichment.fixture_provider_link_id` FK is ON DELETE CASCADE in production (`pg_constraint.confdeltype = 'c'`), proving tracked 013 (+014) matches production; the `_fixed` variant was a review artifact. The 013-variant drift question is CLOSED.
+- Untracked stale duplicate `docs/PRODUCT_VISION_GAP.md` deleted; root `PRODUCT_VISION_GAP.md` is authoritative and newer.
+- Research/context docs committed as explicitly NON-ledger records: `docs/DECISION_2026-07-01_PROVIDER_AND_SCOPE.md` (annotated), `docs/SPORTS_DATA_PROVIDER_EVALUATION.md`, `docs/SPORTS_DATA_PROVIDER_EVALUATION_RU.md`, `docs/TENNIS_TRACK_API_NOTES.md`, `docs/superpowers/plans/2026-06-29-scout-web-search-hardening.md`.
+- `.gitignore` extended with `.env*` and `bettracker/` (nested legacy prototype repo with its own remote).
+- Legacy Supabase project `jbwgbjhejtraopzixjnf` lockdown on 2026-07-07: broken `global_config` RLS policies (`read: SELECT`, `write: ALL` to authenticated) dropped and RLS confirmed enabled with zero policies — the stored Anthropic key is no longer readable by any client role. Anthropic key rotation and project downgrade/pause remain founder dashboard actions.
+
+**Reservation:** Decision #038 is reserved by the parallel M1.2.e.2.b.1 SportMonks Mapping Discovery Endpoint Evidence Scope track (PR #112). The next free unreserved number after this entry is #040.
+
+**Provider-strategy contradiction (OPEN):** `docs/DECISION_2026-07-01_PROVIDER_AND_SCOPE.md` declares api-sports.io across six sports without SportMonks and states the plan is paid, while the tracked split strategy (`DATA_PROVIDER_DECISION.md`, Decisions #031-#037) uses SportMonks for enrichment/mapping and Decision #014 recorded an operator-observed Free/100-requests-day plan. A dedicated governance decision must reconcile provider strategy and confirm the actual API-Sports plan/quota before any quota-dependent runtime scope is approved.
+
+**Non-use:** This decision does not approve runtime provider calls, odds ingestion, odds writes, user-facing odds, enrichment writes, env flags, Scout usage, Analyst usage, UI usage, Place Bet, probability, implied probability, edge, EV, recommendation, or betting signal.
+
+**FP-001:** The view exposes stored odds display fields only. Odds display is not probability, edge, EV, or recommendation.
+
+---
+
 *Last updated: 2026-07-07*
 *Owner: All (each role contributes)*
