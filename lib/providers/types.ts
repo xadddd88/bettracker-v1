@@ -46,6 +46,7 @@ export interface FixtureSyncAdapter {
     competitionIds?: string[]
     dateFrom: string
     dateTo: string
+    season?: string
   }): Promise<Array<ProviderMeta & { fixture: CanonicalFixtureDraft }>>
 }
 

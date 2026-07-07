@@ -23,12 +23,17 @@ const fixtureSyncBodySchema = z
     dateFrom: dateSchema,
     dateTo: dateSchema,
     competitionIds: z.array(z.string().min(1).max(80)).max(50).optional(),
+    season: z.string().regex(/^\d{4}$/, 'Expected YYYY').optional(),
     dryRun: z.boolean().default(true),
     operatorConfirm: z.string().optional(),
   })
   .refine((body) => body.dateFrom <= body.dateTo, {
     message: 'dateFrom must be on or before dateTo',
     path: ['dateTo'],
+  })
+  .refine((body) => !body.competitionIds?.length || Boolean(body.season), {
+    message: 'competition-filtered sync requires a season (API-Football needs league+season)',
+    path: ['season'],
   })
 
 function getBearerToken(req: NextRequest): string | null {

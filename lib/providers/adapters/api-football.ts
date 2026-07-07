@@ -6,7 +6,7 @@ import type {
   ProviderMeta,
   ResultSyncAdapter,
 } from '../types'
-import { ProviderError, sanitizeProviderError } from '../errors'
+import { ProviderError, redactUrl, sanitizeProviderError } from '../errors'
 import { getProviderEnv } from '../../env'
 import { providerFetch } from '../http'
 
@@ -16,6 +16,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 interface ApiFootballFixturesEnvelope {
   errors?: unknown
   response?: unknown[]
+  paging?: { current?: number | string | null; total?: number | string | null } | null
 }
 
 interface ApiFootballFixtureRow {
@@ -157,9 +158,21 @@ export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, 
     competitionIds?: string[]
     dateFrom: string
     dateTo: string
+    season?: string
   }): Promise<Array<ProviderMeta & { fixture: CanonicalFixtureDraft }>> {
     const { API_FOOTBALL_KEY } = getProviderEnv()
     const leagueIds = params.competitionIds?.length ? params.competitionIds : []
+
+    // API-Football requires `season` alongside `league` + `from`/`to`; without
+    // it the provider returns an empty envelope. Fail before any network call.
+    if (leagueIds.length && !params.season) {
+      throw new ProviderError(
+        this.provider,
+        'invalid_response',
+        'league-filtered fixture sync requires a season (e.g. "2026")'
+      )
+    }
+
     const fixtures: Array<ProviderMeta & { fixture: CanonicalFixtureDraft }> = []
     const requests = leagueIds.length
       ? leagueIds.map((leagueId) => ({ leagueId, date: null as string | null }))
@@ -173,6 +186,7 @@ export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, 
         url.searchParams.set('from', params.dateFrom)
         url.searchParams.set('to', params.dateTo)
         if (request.leagueId) url.searchParams.set('league', request.leagueId)
+        if (params.season) url.searchParams.set('season', params.season)
       }
 
       const body = await providerFetch<ApiFootballFixturesEnvelope>(this.provider, url.toString(), {
@@ -181,6 +195,18 @@ export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, 
 
       if (hasProviderErrors(body.errors)) {
         throw sanitizeProviderError(this.provider, 'invalid_response', undefined, url.toString())
+      }
+
+      // Stop instead of silently ingesting page 1 of a multi-page response —
+      // partial coverage written as mapping_confidence='exact' would corrupt
+      // fixture identity.
+      const pagingTotal = Number(body.paging?.total ?? 1)
+      if (Number.isFinite(pagingTotal) && pagingTotal > 1) {
+        throw new ProviderError(
+          this.provider,
+          'invalid_response',
+          `fixtures response spans ${pagingTotal} pages — pagination overflow, narrow the query: ${redactUrl(url.toString())}`
+        )
       }
 
       const rows = Array.isArray(body.response) ? body.response : []
