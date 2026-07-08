@@ -21,33 +21,48 @@ export async function providerFetch<T>(
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
 
-  let response: Response
+  // The timer stays armed until the body is fully consumed — clearing it as
+  // soon as headers arrive would leave response.json() free to hang forever.
   try {
-    response = await fetch(requestUrl, { method: 'GET', headers, signal: controller.signal })
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw sanitizeProviderError(provider, 'timeout', undefined, requestUrl)
+    let response: Response
+    try {
+      // redirect: 'error' — following a cross-origin redirect would re-send
+      // provider auth headers (e.g. x-apisports-key) to the redirect target.
+      response = await fetch(requestUrl, {
+        method: 'GET',
+        headers,
+        redirect: 'error',
+        signal: controller.signal,
+      })
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw sanitizeProviderError(provider, 'timeout', undefined, requestUrl)
+      }
+      throw sanitizeProviderError(provider, 'network', undefined, requestUrl)
     }
-    throw sanitizeProviderError(provider, 'network', undefined, requestUrl)
+
+    if (!response.ok) {
+      const kind =
+        response.status === 401 || response.status === 403
+          ? 'auth'
+          : response.status === 429
+            ? 'rate_limit'
+            : response.status === 404
+              ? 'not_found'
+              : 'invalid_response'
+      throw sanitizeProviderError(provider, kind, response.status, requestUrl)
+    }
+
+    try {
+      return (await response.json()) as T
+    } catch (err) {
+      // An abort mid-body rejects the read — report it as the timeout it is.
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw sanitizeProviderError(provider, 'timeout', response.status, requestUrl)
+      }
+      throw sanitizeProviderError(provider, 'invalid_response', response.status, requestUrl)
+    }
   } finally {
     clearTimeout(timer)
-  }
-
-  if (!response.ok) {
-    const kind =
-      response.status === 401 || response.status === 403
-        ? 'auth'
-        : response.status === 429
-          ? 'rate_limit'
-          : response.status === 404
-            ? 'not_found'
-            : 'invalid_response'
-    throw sanitizeProviderError(provider, kind, response.status, requestUrl)
-  }
-
-  try {
-    return (await response.json()) as T
-  } catch {
-    throw sanitizeProviderError(provider, 'invalid_response', response.status, requestUrl)
   }
 }
