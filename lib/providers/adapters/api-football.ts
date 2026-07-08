@@ -220,6 +220,17 @@ export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, 
       }
 
       const rows = Array.isArray(body.response) ? body.response : []
+
+      // total=0 is only coherent for an empty match day — rows alongside it
+      // mean the envelope is inconsistent and completeness cannot be trusted.
+      if (pagingTotal === 0 && rows.length > 0) {
+        throw new ProviderError(
+          this.provider,
+          'invalid_response',
+          `fixtures response reports paging.total=0 but contains rows — inconsistent envelope, cannot verify single-page completeness: ${redactUrl(url.toString())}`
+        )
+      }
+
       for (const row of rows) {
         const parsed = parseApiFootballFixture(row)
         if (parsed) fixtures.push(parsed)

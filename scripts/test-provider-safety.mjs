@@ -2270,6 +2270,37 @@ await testAsync('ApiFootballAdapter.fetchFixtures accepts explicit single-page e
   }
 });
 
+await testAsync('ApiFootballAdapter.fetchFixtures blocks paging.total=0 with a non-empty response as inconsistent', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+
+  globalThis.fetch = async () =>
+    jsonResponse({
+      errors: [],
+      paging: { current: 1, total: 0 },
+      response: footballPayload().response,
+    });
+
+  try {
+    await assert.rejects(
+      () =>
+        new ApiFootballAdapter().fetchFixtures({
+          competitionIds: ['39'],
+          season: '2026',
+          dateFrom: '2026-08-21',
+          dateTo: '2026-08-21',
+        }),
+      (err) =>
+        err.name === 'ProviderError' &&
+        err.kind === 'invalid_response' &&
+        /paging\.total=0 but contains rows/.test(err.message),
+      'total=0 alongside rows is an inconsistent envelope and must block'
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 await testAsync('providerFetch sends redirect:"error" so provider auth headers never follow a redirect', async () => {
   const originalFetch = globalThis.fetch;
   const { providerFetch } = require(path.join(buildDir, 'lib/providers/http.js'));
