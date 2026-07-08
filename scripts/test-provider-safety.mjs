@@ -223,6 +223,7 @@ function authorizedFixtureSyncRequest(body) {
 function footballPayload() {
   return {
     errors: [],
+    paging: { current: 1, total: 1 },
     response: [
       {
         fixture: {
@@ -252,6 +253,7 @@ function footballPayloadMany(count) {
   const base = footballPayload().response[0];
   return {
     errors: [],
+    paging: { current: 1, total: 1 },
     response: Array.from({ length: count }, (_, index) => ({
       ...base,
       fixture: {
@@ -2083,7 +2085,7 @@ await testAsync('ApiFootballAdapter.fetchFixtures fetches unfiltered ranges one 
 
   globalThis.fetch = async (url) => {
     observedUrls.push(String(url));
-    return jsonResponse({ errors: [], response: [] });
+    return jsonResponse({ errors: [], paging: { current: 1, total: 1 }, response: [] });
   };
 
   try {
@@ -2194,6 +2196,157 @@ await testAsync('ApiFootballAdapter.fetchFixtures stops on multi-page responses 
         err.name === 'ProviderError' &&
         /pagination overflow/.test(err.message) &&
         /spans 3 pages/.test(err.message)
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('ApiFootballAdapter.fetchFixtures blocks malformed paging.total instead of coercing it past the guard', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+
+  const malformedPagings = [
+    { current: 1, total: 'abc' }, // Number('abc') = NaN — used to slip past Number.isFinite guard
+    { current: 1, total: '' },    // Number('') = 0 — used to coerce to a passing value
+    { current: 1, total: null },  // Number(null) = 0 — same silent coercion
+    { current: 1, total: 2.5 },   // non-integer page count is shape drift
+    { current: 1, total: -1 },    // negative page count is shape drift
+    { current: 1 },               // total absent
+    undefined,                    // paging object absent entirely
+  ];
+
+  try {
+    for (const paging of malformedPagings) {
+      globalThis.fetch = async () => jsonResponse({ errors: [], paging, response: [{}] });
+
+      await assert.rejects(
+        () =>
+          new ApiFootballAdapter().fetchFixtures({
+            competitionIds: ['39'],
+            season: '2026',
+            dateFrom: '2026-08-21',
+            dateTo: '2026-08-21',
+          }),
+        (err) =>
+          err.name === 'ProviderError' &&
+          err.kind === 'invalid_response' &&
+          /missing or malformed paging\.total/.test(err.message),
+        `paging=${JSON.stringify(paging)} must block, not silently ingest page 1`
+      );
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('ApiFootballAdapter.fetchFixtures accepts explicit single-page envelopes (paging.total 1 and 0)', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+
+  try {
+    // total: 1 with fixtures — the standard single-page envelope still passes.
+    globalThis.fetch = async () => jsonResponse(footballPayload());
+    const rows = await new ApiFootballAdapter().fetchFixtures({
+      competitionIds: ['39'],
+      season: '2026',
+      dateFrom: '2026-08-21',
+      dateTo: '2026-08-21',
+    });
+    assert.equal(rows.length, 1);
+
+    // total: 0 with an empty response — an empty match day cannot be truncated.
+    globalThis.fetch = async () =>
+      jsonResponse({ errors: [], paging: { current: 1, total: 0 }, response: [] });
+    const emptyRows = await new ApiFootballAdapter().fetchFixtures({
+      competitionIds: ['39'],
+      season: '2026',
+      dateFrom: '2026-08-21',
+      dateTo: '2026-08-21',
+    });
+    assert.equal(emptyRows.length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('providerFetch sends redirect:"error" so provider auth headers never follow a redirect', async () => {
+  const originalFetch = globalThis.fetch;
+  const { providerFetch } = require(path.join(buildDir, 'lib/providers/http.js'));
+  let observedInit = null;
+
+  globalThis.fetch = async (url, init = {}) => {
+    observedInit = init;
+    return jsonResponse({ ok: true });
+  };
+
+  try {
+    await providerFetch('api_football', 'https://v3.football.api-sports.io/fixtures?date=2026-08-21', {
+      headers: { 'x-apisports-key': 'SECRET_KEY' },
+    });
+    assert.equal(observedInit.redirect, 'error', 'fetch must be called with redirect:"error"');
+    assert.ok(observedInit.signal, 'fetch must receive the timeout abort signal');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('providerFetch maps a redirect rejection to a sanitized network error', async () => {
+  const originalFetch = globalThis.fetch;
+  const { providerFetch } = require(path.join(buildDir, 'lib/providers/http.js'));
+
+  // With redirect:'error', undici rejects the fetch promise on any 3xx.
+  globalThis.fetch = async () => {
+    throw new TypeError('fetch failed: unexpected redirect');
+  };
+
+  try {
+    await assert.rejects(
+      () =>
+        providerFetch(
+          'sportmonks',
+          'https://api.sportmonks.com/v3/football/fixtures/date/2026-08-21?api_token=SECRET_TOKEN'
+        ),
+      (err) =>
+        err.name === 'ProviderError' &&
+        err.kind === 'network' &&
+        !err.message.includes('SECRET_TOKEN')
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('providerFetch timeout stays armed through the response body read', async () => {
+  const originalFetch = globalThis.fetch;
+  const { providerFetch } = require(path.join(buildDir, 'lib/providers/http.js'));
+
+  // Simulate headers arriving instantly while the body read hangs until the
+  // abort signal fires — as undici behaves when a provider stalls mid-body.
+  globalThis.fetch = async (url, init = {}) => ({
+    ok: true,
+    status: 200,
+    json: () =>
+      new Promise((_, reject) => {
+        const signal = init.signal;
+        if (signal?.aborted) {
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+          return;
+        }
+        signal?.addEventListener('abort', () =>
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+        );
+      }),
+  });
+
+  try {
+    await assert.rejects(
+      () =>
+        providerFetch('api_football', 'https://v3.football.api-sports.io/fixtures?date=2026-08-21', {
+          timeoutMs: 40,
+        }),
+      (err) => err.name === 'ProviderError' && err.kind === 'timeout',
+      'a body read that outlives timeoutMs must reject as a provider timeout'
     );
   } finally {
     globalThis.fetch = originalFetch;

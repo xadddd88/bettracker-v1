@@ -199,9 +199,19 @@ export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, 
 
       // Stop instead of silently ingesting page 1 of a multi-page response —
       // partial coverage written as mapping_confidence='exact' would corrupt
-      // fixture identity.
-      const pagingTotal = Number(body.paging?.total ?? 1)
-      if (Number.isFinite(pagingTotal) && pagingTotal > 1) {
+      // fixture identity. Every real v3 envelope carries paging.total as an
+      // integer; anything else (missing, string, NaN) is shape drift where
+      // single-page completeness cannot be verified, so it must block too —
+      // coercing malformed values used to slip past the overflow check.
+      const pagingTotal = body.paging?.total
+      if (typeof pagingTotal !== 'number' || !Number.isInteger(pagingTotal) || pagingTotal < 0) {
+        throw new ProviderError(
+          this.provider,
+          'invalid_response',
+          `fixtures response has missing or malformed paging.total — cannot verify single-page completeness: ${redactUrl(url.toString())}`
+        )
+      }
+      if (pagingTotal > 1) {
         throw new ProviderError(
           this.provider,
           'invalid_response',
