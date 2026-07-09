@@ -1690,5 +1690,32 @@ Reference: `docs/sportmonks-mapping-discovery-implementation-scope-m1-2-e-2-b-2.
 
 ---
 
-*Last updated: 2026-07-07*
+## Decision #044 - M1.2.e.2.b.2 EPL Controlled Write & SportMonks Discovery Execution Record
+**Date:** 2026-07-09
+**Proposed by:** Founder (operator) + Claude
+**Status:** Execution record. No new scope approved; the controlled provider-link write remains a separately scoped decision (#045 candidate).
+
+**Context:** Decisions #042/#043 approved the operator-gated EPL dry-run/controlled-write sequence and the read-only SportMonks mapping discovery run. The founder executed both on 2026-07-09 per `docs/sports-operator-runbook-m1-2-e-2-b-2.md`, with Claude driving the calls under the founder's live supervision.
+
+**Decision:** BetTracker records the execution results in `docs/sportmonks-discovery-execution-record-m1-2-e-2-b-2.md`:
+- Dry-runs (3 of max 4): 2026-08-14 → 0 fixtures, 2026-08-15 → 0, **2026-08-21 → 1** (EPL 2026-27 opening day; write day selected).
+- Controlled write: 1 canonical fixture + 1 `api_football` provider link inserted, 0 failures (run `fixture-sync-2026-07-09T04-41-34-153Z-ddowlgtd`); write flag removed and production redeployed immediately after.
+- New canonical fixture `92afd570-399a-48b9-915a-e1ffaf52a71c`: Arsenal vs Coventry City, Premier League 2026-27 R1, kickoff 2026-08-21 19:00 UTC, `api_football:1557367` (exact).
+- Discovery run `sportmonks-mapping-discovery-2026-07-09T04-58-46-908Z-8i1oc162`: 1 of 2 provider requests, page 1, `has_more: false`, single candidate at kickoff → **`matched` / `high` / `eligibleForProviderLink: true`** — SportMonks fixture **19722203** ("Arsenal vs Coventry City", league 8, season 28083). Zero writes (`writes: "none"`).
+
+**Deviations recorded:** (D1) first write call ran before the env-flag redeploy propagated — `writeEnabled: false`, zero writes, one extra API-Football fetch consumed (total 5 requests, inside the approved 4-probe + 1-write envelope). (D2) production `SPORTMONKS_TOKEN` was invalid (two sanitized 401s, no budget consumed, no token leakage); replacement token validated out-of-band with one `leagues/8` metadata request from the operator machine, then env corrected. Both deviations and the operational hygiene follow-ups (delete local token scratch files incl. OneDrive copy; rotate operator token) are detailed in the execution record.
+
+**Still OPEN:** the API-Football dashboard plan name (Decision #039/#042 question) was not captured during this run and remains an operator action.
+
+**Next step:** controlled provider-link write `sportmonks:19722203 → 92afd570-399a-48b9-915a-e1ffaf52a71c` (single `fixture_provider_links` row) — Decision #045 candidate; requires its own scope approval and implementation. Nothing is written manually.
+
+**Non-use:** This decision does not approve provider-link writes, enrichment calls or writes, additional provider calls, page 2+, retries, odds usage, Scout usage, Analyst usage, UI usage, Place Bet, probability, implied probability, edge, EV, recommendation, or betting signal.
+
+**FP-001:** Mapping discovery output is identity evidence only — not model probability, edge, EV, recommendation, or any betting signal.
+
+Reference: `docs/sportmonks-discovery-execution-record-m1-2-e-2-b-2.md`
+
+---
+
+*Last updated: 2026-07-09*
 *Owner: All (each role contributes)*
