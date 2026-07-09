@@ -121,8 +121,8 @@ Two SportMonks 401 responses (D2) consumed no rate-limit units and no discovery 
   OneDrive-synced copy of a scratch `api.txt` holding the operator token). All local token
   files are to be deleted post-run; rotating `SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN` afterwards
   is recommended as cheap hygiene.
-- The Decision #039/#042 OPEN question (API-Football dashboard plan name) was **not** closed
-  in this run — the operator has not yet reported the plan name. It stays OPEN.
+- The Decision #039/#042 OPEN question (API-Football dashboard plan name) is CLOSED: the
+  founder reported the dashboard plan as **Ultra** on 2026-07-09 (plan name only, no keys).
 
 ## Next step
 

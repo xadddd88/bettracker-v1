@@ -1705,7 +1705,7 @@ Reference: `docs/sportmonks-mapping-discovery-implementation-scope-m1-2-e-2-b-2.
 
 **Deviations recorded:** (D1) first write call ran before the env-flag redeploy propagated — `writeEnabled: false`, zero writes, one extra API-Football fetch consumed (total 5 requests, inside the approved 4-probe + 1-write envelope). (D2) production `SPORTMONKS_TOKEN` was invalid (two sanitized 401s, no budget consumed, no token leakage); replacement token validated out-of-band with one `leagues/8` metadata request from the operator machine, then env corrected. Both deviations and the operational hygiene follow-ups (delete local token scratch files incl. OneDrive copy; rotate operator token) are detailed in the execution record.
 
-**Still OPEN:** the API-Football dashboard plan name (Decision #039/#042 question) was not captured during this run and remains an operator action.
+**Plan question CLOSED:** the founder reported the API-Football dashboard plan as **Ultra** (2026-07-09), closing the plan-name question left OPEN by Decisions #039/#042.
 
 **Next step:** controlled provider-link write `sportmonks:19722203 → 92afd570-399a-48b9-915a-e1ffaf52a71c` (single `fixture_provider_links` row) — Decision #045 candidate; requires its own scope approval and implementation. Nothing is written manually.
 
