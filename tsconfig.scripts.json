@@ -18,6 +18,7 @@
     "app/api/admin/sports/odds/dry-run/route.ts",
     "app/api/admin/sports/odds/reference-discovery/route.ts",
     "app/api/admin/sports/mapping/sportmonks-discovery/route.ts",
+    "app/api/admin/sports/mapping/provider-link/route.ts",
     "lib/ai/**/*.ts",
     "lib/providers/**/*.ts",
     "lib/env.ts",

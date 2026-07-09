@@ -1717,5 +1717,26 @@ Reference: `docs/sportmonks-discovery-execution-record-m1-2-e-2-b-2.md`
 
 ---
 
+## Decision #045 - M1.2.e.2.b.3 Controlled SportMonks Provider-Link Write Scope
+**Date:** 2026-07-09
+**Proposed by:** Founder + Claude
+**Status:** Scope approved for operator execution (founder conversation approval 2026-07-09). Write flag default OFF; the write itself is a single operator-gated call.
+
+**Context:** Decision #044 recorded the discovery result for canonical fixture `92afd570-399a-48b9-915a-e1ffaf52a71c` (Arsenal vs Coventry City, PL 2026-27 R1, kickoff 2026-08-21 19:00 UTC): single candidate, confidence `high`, `eligibleForProviderLink: true` → SportMonks fixture `19722203`. Decision #043 requires the provider-link write to be separately scoped — this is that scope.
+
+**Decision:** BetTracker implements `POST /api/admin/sports/mapping/provider-link` writing at most ONE `fixture_provider_links` row, both sides structurally pinned (zod literals + module constants): canonical `92afd570-…a71c` ↔ `sportmonks:19722203`, `mapping_confidence: high`, `mapping_method: name_time_match`, provenance-only `raw_provider_payload` (discovery run id + Decision #044 sanitized candidate). Guardrails: ZERO provider calls (evidence-based write, network asserted untouched in tests); triple write gate (`dryRun:false` + `SPORTS_PROVIDER_LINK_WRITE_ENABLED` env flag + confirmation `WRITE_SPORTMONKS_PROVIDER_LINK_M1_2_E_2_B_3`); operator bearer token (503/401); DB preflight re-verifies discovery preconditions at write time (fixture exists, football+scheduled, kickoff minute unchanged, api_football provenance link present, no conflicting sportmonks link in either direction) and blocks on drift; identical existing link short-circuits as idempotent `alreadyLinked` with zero writes; sanitized report only.
+
+**Tests:** 10 new provider-safety cases (scope pinning, confirmation, auth, flag-off block, exact pinned row, idempotency, both conflict directions, kickoff drift) — suite 77/77, wired into CI per PR #119.
+
+**Execution:** operator runbook in the reference doc (dry-run preflight → flag on → single write call → flag off → Claude verifies the row and records execution in the ledger).
+
+**Non-use:** This decision does not approve enrichment calls or writes, odds calls/ingestion/usage, additional links, other fixtures/providers/leagues, page 2+, retries, Scout usage, Analyst usage, UI usage, Place Bet, probability, implied probability, edge, EV, recommendation, or betting signal.
+
+**FP-001:** A provider-link row is identity evidence only — not model probability, edge, EV, recommendation, or any betting signal.
+
+Reference: `docs/sportmonks-provider-link-write-scope-m1-2-e-2-b-3.md`
+
+---
+
 *Last updated: 2026-07-09*
 *Owner: All (each role contributes)*

@@ -2899,6 +2899,353 @@ await testAsync('sportmonks discovery route accepts the exact approved body unde
   }
 });
 
+// --- M1.2.e.2.b.3 SportMonks provider-link write (Decision #045) ---
+
+const LINK_WRITE_FIXTURE_ID = '92afd570-399a-48b9-915a-e1ffaf52a71c';
+const LINK_WRITE_SPORTMONKS_ID = '19722203';
+const LINK_WRITE_CONFIRM = 'WRITE_SPORTMONKS_PROVIDER_LINK_M1_2_E_2_B_3';
+
+function clearCompiledProviderLinkModules() {
+  for (const relPath of [
+    'app/api/admin/sports/mapping/provider-link/route.js',
+    'lib/providers/sportmonks-provider-link-write.js',
+    'lib/providers/sportmonks-mapping-discovery.js',
+    'lib/supabase/admin.js',
+  ]) {
+    const compiledPath = path.join(buildDir, relPath);
+    try {
+      delete require.cache[require.resolve(compiledPath)];
+    } catch {
+      // Module may not have been loaded yet.
+    }
+  }
+}
+
+function healthyLinkWriteDb(overrides = {}) {
+  return {
+    fixtureRow: {
+      id: LINK_WRITE_FIXTURE_ID,
+      sport: 'football',
+      status: 'scheduled',
+      kickoff_at: '2026-08-21T19:00:00+00:00',
+    },
+    apiFootballLinkRow: { canonical_fixture_id: LINK_WRITE_FIXTURE_ID },
+    sportmonksLinkByFixture: null,
+    sportmonksClaimRow: null,
+    insertError: null,
+    inserts: [],
+    ...overrides,
+  };
+}
+
+function stubProviderLinkAdminModule(db) {
+  const adminPath = path.join(buildDir, 'lib/supabase/admin.js');
+  require.cache[require.resolve(adminPath)] = {
+    id: adminPath,
+    filename: adminPath,
+    loaded: true,
+    exports: {
+      createAdminClient() {
+        return {
+          from(table) {
+            const filters = {};
+            const builder = {
+              select() {
+                return builder;
+              },
+              eq(column, value) {
+                filters[column] = value;
+                return builder;
+              },
+              async maybeSingle() {
+                if (table === 'canonical_fixtures') return { data: db.fixtureRow, error: null };
+                if (filters.provider === 'api_football') return { data: db.apiFootballLinkRow, error: null };
+                if (filters.provider === 'sportmonks' && 'canonical_fixture_id' in filters) {
+                  return { data: db.sportmonksLinkByFixture, error: null };
+                }
+                if (filters.provider === 'sportmonks' && 'provider_fixture_id' in filters) {
+                  return { data: db.sportmonksClaimRow, error: null };
+                }
+                return { data: null, error: null };
+              },
+              async insert(row) {
+                db.inserts.push({ table, row });
+                return { error: db.insertError };
+              },
+            };
+            return builder;
+          },
+        };
+      },
+    },
+  };
+}
+
+async function withProviderLinkRoute(db, fn) {
+  return withCompiledAlias(async () => {
+    clearCompiledProviderLinkModules();
+    stubProviderLinkAdminModule(db);
+    const route = require(path.join(buildDir, 'app/api/admin/sports/mapping/provider-link/route.js'));
+    try {
+      return await fn(route);
+    } finally {
+      clearCompiledProviderLinkModules();
+    }
+  });
+}
+
+function providerLinkRequest(body, token = 'operator-token') {
+  return new Request('https://example.test/api/admin/sports/mapping/provider-link', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+function approvedProviderLinkBody(overrides = {}) {
+  return {
+    dryRun: true,
+    provider: 'sportmonks',
+    canonicalFixtureId: LINK_WRITE_FIXTURE_ID,
+    sportmonksFixtureId: LINK_WRITE_SPORTMONKS_ID,
+    operatorConfirm: LINK_WRITE_CONFIRM,
+    ...overrides,
+  };
+}
+
+async function withProviderLinkEnv({ writeFlag }, fn) {
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const originalFlag = process.env.SPORTS_PROVIDER_LINK_WRITE_ENABLED;
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  if (writeFlag === undefined) {
+    delete process.env.SPORTS_PROVIDER_LINK_WRITE_ENABLED;
+  } else {
+    process.env.SPORTS_PROVIDER_LINK_WRITE_ENABLED = writeFlag;
+  }
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    throw new Error('provider-link write must never call the network');
+  };
+
+  try {
+    await fn();
+    assert.equal(fetchCalls, 0, 'provider-link write made a network call');
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    if (originalFlag === undefined) delete process.env.SPORTS_PROVIDER_LINK_WRITE_ENABLED;
+    else process.env.SPORTS_PROVIDER_LINK_WRITE_ENABLED = originalFlag;
+  }
+}
+
+await testAsync('provider-link route: dry-run approved body passes preflight, zero provider calls, zero writes', async () => {
+  await withProviderLinkEnv({ writeFlag: undefined }, async () => {
+    const db = healthyLinkWriteDb();
+    await withProviderLinkRoute(db, async ({ POST }) => {
+      const response = await POST(providerLinkRequest(approvedProviderLinkBody()));
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, true);
+      assert.equal(result.body.report.writes, 'none');
+      assert.equal(result.body.report.preflight.passed, true);
+      assert.equal(result.body.report.providerRequestsUsed, 0);
+      assert.equal(result.body.report.wrote, null);
+      assert.equal(db.inserts.length, 0);
+    });
+  });
+});
+
+await testAsync('provider-link route: rejects any body outside the pinned Decision #045 scope', async () => {
+  await withProviderLinkEnv({ writeFlag: undefined }, async () => {
+    const badBodies = [
+      approvedProviderLinkBody({ canonicalFixtureId: '11111111-1111-4111-8111-111111111111' }),
+      approvedProviderLinkBody({ sportmonksFixtureId: '99999999' }),
+      approvedProviderLinkBody({ provider: 'api_football' }),
+      approvedProviderLinkBody({ extraField: true }),
+    ];
+
+    const db = healthyLinkWriteDb();
+    await withProviderLinkRoute(db, async ({ POST }) => {
+      for (const body of badBodies) {
+        const response = await POST(providerLinkRequest(body));
+        assert.equal(response.status, 400, `expected 400 for ${JSON.stringify(body)}`);
+      }
+      assert.equal(db.inserts.length, 0);
+    });
+  });
+});
+
+await testAsync('provider-link route: rejects a wrong confirmation phrase', async () => {
+  await withProviderLinkEnv({ writeFlag: 'true' }, async () => {
+    const db = healthyLinkWriteDb();
+    await withProviderLinkRoute(db, async ({ POST }) => {
+      const response = await POST(
+        providerLinkRequest(approvedProviderLinkBody({ dryRun: false, operatorConfirm: 'WRITE_SOMETHING_ELSE' }))
+      );
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 400);
+      assert.match(result.body.error, /operator confirmation/);
+      assert.equal(db.inserts.length, 0);
+    });
+  });
+});
+
+await testAsync('provider-link route: 503 without configured operator token, 401 with a wrong bearer', async () => {
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+
+  try {
+    const db = healthyLinkWriteDb();
+    await withProviderLinkRoute(db, async ({ POST }) => {
+      const missing = await POST(providerLinkRequest(approvedProviderLinkBody()));
+      assert.equal(missing.status, 503);
+
+      process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+      const wrong = await POST(providerLinkRequest(approvedProviderLinkBody(), 'not-the-token'));
+      assert.equal(wrong.status, 401);
+      assert.equal(db.inserts.length, 0);
+    });
+  } finally {
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('provider-link write: env flag off blocks the write even with dryRun=false + confirmation', async () => {
+  await withProviderLinkEnv({ writeFlag: undefined }, async () => {
+    const db = healthyLinkWriteDb();
+    await withProviderLinkRoute(db, async ({ POST }) => {
+      const response = await POST(providerLinkRequest(approvedProviderLinkBody({ dryRun: false })));
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.report.writeEnabled, false);
+      assert.equal(result.body.report.writes, 'none');
+      assert.equal(result.body.report.wrote, null);
+      assert.equal(db.inserts.length, 0);
+    });
+  });
+});
+
+await testAsync('provider-link write: full gate writes exactly one pinned row', async () => {
+  await withProviderLinkEnv({ writeFlag: 'true' }, async () => {
+    const db = healthyLinkWriteDb();
+    await withProviderLinkRoute(db, async ({ POST }) => {
+      const response = await POST(providerLinkRequest(approvedProviderLinkBody({ dryRun: false })));
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, true);
+      assert.equal(result.body.report.writes, 'single_provider_link');
+      assert.equal(result.body.report.wrote.insertedProviderLinks, 1);
+      assert.equal(result.body.report.wrote.failedWrites, 0);
+
+      assert.equal(db.inserts.length, 1);
+      const { table, row } = db.inserts[0];
+      assert.equal(table, 'fixture_provider_links');
+      assert.equal(row.canonical_fixture_id, LINK_WRITE_FIXTURE_ID);
+      assert.equal(row.provider, 'sportmonks');
+      assert.equal(row.provider_fixture_id, LINK_WRITE_SPORTMONKS_ID);
+      assert.equal(row.mapping_confidence, 'high');
+      assert.equal(row.mapping_method, 'name_time_match');
+      assert.equal(row.raw_provider_payload.source, 'sportmonks-mapping-discovery');
+      assert.match(row.raw_provider_payload.discoveryRunId, /^sportmonks-mapping-discovery-/);
+      assert.equal(row.raw_provider_payload.candidate.sportmonksFixtureId, LINK_WRITE_SPORTMONKS_ID);
+      assert.match(row.sync_run_id, /^sportmonks-provider-link-write-/);
+      assert.equal(row.provider_updated_at, null);
+    });
+  });
+});
+
+await testAsync('provider-link write: identical existing link is idempotent — alreadyLinked, no insert', async () => {
+  await withProviderLinkEnv({ writeFlag: 'true' }, async () => {
+    const db = healthyLinkWriteDb({
+      sportmonksLinkByFixture: { provider_fixture_id: LINK_WRITE_SPORTMONKS_ID },
+      sportmonksClaimRow: { canonical_fixture_id: LINK_WRITE_FIXTURE_ID },
+    });
+    await withProviderLinkRoute(db, async ({ POST }) => {
+      const response = await POST(providerLinkRequest(approvedProviderLinkBody({ dryRun: false })));
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, true);
+      assert.equal(result.body.report.alreadyLinked, true);
+      assert.equal(result.body.report.writes, 'none');
+      assert.equal(db.inserts.length, 0);
+    });
+  });
+});
+
+await testAsync('provider-link write: conflicting sportmonks link on the fixture blocks the write', async () => {
+  await withProviderLinkEnv({ writeFlag: 'true' }, async () => {
+    const db = healthyLinkWriteDb({
+      sportmonksLinkByFixture: { provider_fixture_id: '55555555' },
+    });
+    await withProviderLinkRoute(db, async ({ POST }) => {
+      const response = await POST(providerLinkRequest(approvedProviderLinkBody({ dryRun: false })));
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.report.preflight.passed, false);
+      assert.equal(result.body.report.writes, 'none');
+      assert.equal(db.inserts.length, 0);
+    });
+  });
+});
+
+await testAsync('provider-link write: provider_fixture_id claimed by another fixture blocks the write', async () => {
+  await withProviderLinkEnv({ writeFlag: 'true' }, async () => {
+    const db = healthyLinkWriteDb({
+      sportmonksClaimRow: { canonical_fixture_id: '33333333-3333-4333-8333-333333333333' },
+    });
+    await withProviderLinkRoute(db, async ({ POST }) => {
+      const response = await POST(providerLinkRequest(approvedProviderLinkBody({ dryRun: false })));
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.report.preflight.passed, false);
+      assert.equal(db.inserts.length, 0);
+    });
+  });
+});
+
+await testAsync('provider-link write: kickoff drift from the discovery evidence blocks the write', async () => {
+  await withProviderLinkEnv({ writeFlag: 'true' }, async () => {
+    const db = healthyLinkWriteDb({
+      fixtureRow: {
+        id: LINK_WRITE_FIXTURE_ID,
+        sport: 'football',
+        status: 'scheduled',
+        kickoff_at: '2026-08-22T14:00:00+00:00',
+      },
+    });
+    await withProviderLinkRoute(db, async ({ POST }) => {
+      const response = await POST(providerLinkRequest(approvedProviderLinkBody({ dryRun: false })));
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.report.preflight.passed, false);
+      const kickoffCheck = result.body.report.preflight.checks.find(
+        (check) => check.name === 'kickoff_minute_matches_discovery'
+      );
+      assert.equal(kickoffCheck.pass, false);
+      assert.equal(db.inserts.length, 0);
+    });
+  });
+});
+
 console.log(`\n${passed + failed} tests — ${passed} passed, ${failed} failed\n`);
 
 if (failed > 0) {
