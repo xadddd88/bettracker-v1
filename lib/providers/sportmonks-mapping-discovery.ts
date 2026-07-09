@@ -139,7 +139,7 @@ function namesFuzzyMatch(a: string | null | undefined, b: string | null | undefi
   return false
 }
 
-function kickoffMinuteUtc(value: string | null | undefined): string | null {
+export function kickoffMinuteUtc(value: string | null | undefined): string | null {
   if (!value) return null
   // Accepts both timestamptz ('2026-08-15T12:30:00+00:00') and SportMonks
   // UTC datetimes ('2026-08-15 12:30:00').
