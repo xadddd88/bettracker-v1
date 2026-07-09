@@ -2,9 +2,9 @@
 
 ## Status
 
-OPERATOR RUNBOOK / EXECUTION REQUIRES OPERATOR TOKEN
+EXECUTED 2026-07-09 — see `docs/sportmonks-discovery-execution-record-m1-2-e-2-b-2.md` (Decision #044). Kept for reference; re-execution requires a new scope decision.
 
-Last updated: 2026-07-07
+Last updated: 2026-07-09
 
 Executes the Decision #041 sequence via Decisions #042 (API-Football EPL dry-run + controlled write) and #043 (SportMonks discovery run). Founder granted blanket conversation approval on 2026-07-07; execution remains operator-gated by the bearer token, which exists only in Vercel env (`SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN`).
 
