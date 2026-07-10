@@ -15,7 +15,8 @@
     "test:financial-safety": "npm run build:provider-scripts && node scripts/test-financial-safety.mjs",
     "test:domain-write-boundaries": "npm run build:provider-scripts && node scripts/test-domain-write-boundaries.mjs",
     "test:agent-write-boundaries": "node scripts/test-agent-write-boundaries.mjs",
-    "test:auth-invite": "npm run build:provider-scripts && node scripts/test-auth-invite.mjs"
+    "test:auth-invite": "npm run build:provider-scripts && node scripts/test-auth-invite.mjs",
+    "test:fp001-quarantine": "node scripts/test-fp001-quarantine.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

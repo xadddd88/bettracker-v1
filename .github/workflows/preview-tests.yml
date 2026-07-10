@@ -67,6 +67,8 @@ jobs:
         run: npm run test:agent-write-boundaries
       - name: "Auth invite flow suite (Decision #050)"
         run: npm run test:auth-invite
+      - name: "FP-001 legacy quarantine suite (Decision #051)"
+        run: npm run test:fp001-quarantine
 
   # ── Job 3: Smoke tests against Vercel preview deployment ───────────────────
   smoke:
