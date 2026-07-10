@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Bankroll, BankrollTransaction, TxnType } from '@/types'
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -45,6 +46,7 @@ interface BankrollViewProps {
 export default function BankrollView({
   bankroll, transactions: initialTxs, currency, stats: initialStats,
 }: BankrollViewProps) {
+  const router = useRouter()
   const symbol = CURRENCY_SYMBOLS[currency] ?? currency
 
   const [balance,      setBalance]      = useState(bankroll.balance)
@@ -99,6 +101,14 @@ export default function BankrollView({
         return
       }
 
+      if (json.replayed) {
+        // The server already applied this exact request earlier — do not
+        // append a duplicate row or move the stats; re-read server truth.
+        closeForm()
+        router.refresh()
+        return
+      }
+
       const newBalance: number = json.balance
       const delta = form === 'deposit' ? amountNum : -amountNum
 
@@ -126,7 +136,7 @@ export default function BankrollView({
     } finally {
       setSubmitting(false)
     }
-  }, [amount, note, form, bankroll, idemKey, closeForm])
+  }, [amount, note, form, bankroll, idemKey, closeForm, router])
 
   return (
     <div className="flex flex-col gap-6">

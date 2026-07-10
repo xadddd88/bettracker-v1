@@ -2,11 +2,13 @@
 -- Migration 016: Atomic financial writes & no-overdraft policy
 -- Decision #047 (CPO audit 2026-07-10, P0 items 2 and 3)
 --
--- 1. adjust_bankroll() RPC — the ONLY approved path for
---    deposit / withdrawal / reconciliation adjustment:
+-- 1. adjust_bankroll() RPC — the ONLY approved user path for
+--    deposit / withdrawal:
 --    row lock (FOR UPDATE) → validate → funds guard → balance
 --    update + transaction insert in ONE transaction, with
---    idempotency-key replay support.
+--    strict payload-bound idempotency (required UUID key).
+--    Reconciliation 'adjustment' is NOT user-callable — it is a
+--    separate future operator-controlled flow.
 -- 2. set_user_currency() RPC — atomic profiles.currency +
 --    default bankroll currency sync (replaces the two separate
 --    unchecked UPDATEs in /api/settings).
@@ -23,7 +25,7 @@
 -- Historical negative bankroll: preserved as-is
 -- (reconciliation_required). Stakes and withdrawals from it are
 -- blocked automatically by the guards (negative < any positive
--- amount); deposits and positive adjustments remain allowed.
+-- amount); deposits remain allowed for repair.
 -- A hard CHECK (balance >= 0) is deliberately NOT added here —
 -- it would fail validation against the existing negative row
 -- and would reject partial repair deposits (-100 → -50). It is
@@ -46,11 +48,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_bankroll_tx_user_idempotency_key
 -- ── 2. adjust_bankroll() ─────────────────────────────────────
 -- Identity comes ONLY from auth.uid(). Amount is always a
 -- positive number; the sign is derived from the type:
---   deposit / adjustment → +amount
---   withdrawal           → -amount
--- 'adjustment' is reserved for audited positive reconciliation
--- repairs (Decision #047 policy: no automatic zeroing, no
--- negative adjustments through this path).
+--   deposit    → +amount
+--   withdrawal → -amount
+-- The authenticated path supports deposit/withdrawal ONLY (CPO
+-- review of PR #127): reconciliation 'adjustment' is a separate
+-- future operator-controlled flow, never user-callable.
+--
+-- Strict idempotency: a UUID key is REQUIRED, and a replay is
+-- bound to the original payload — the same key with a different
+-- type/amount/note is a conflict with zero writes.
 
 CREATE OR REPLACE FUNCTION adjust_bankroll(
   p_type            text,
@@ -65,6 +71,7 @@ DECLARE
   v_balance     numeric;
   v_new_balance numeric;
   v_delta       numeric;
+  v_note        text;
   v_tx_id       uuid;
   v_existing    record;
 BEGIN
@@ -72,7 +79,7 @@ BEGIN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
 
-  IF p_type NOT IN ('deposit', 'withdrawal', 'adjustment') THEN
+  IF p_type NOT IN ('deposit', 'withdrawal') THEN
     RAISE EXCEPTION 'Unsupported transaction type';
   END IF;
 
@@ -83,6 +90,18 @@ BEGIN
   IF p_amount > 100000000 THEN
     RAISE EXCEPTION 'Amount exceeds sanity limit';
   END IF;
+
+  IF p_idempotency_key IS NULL
+     OR p_idempotency_key !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+    RAISE EXCEPTION 'Invalid idempotency key';
+  END IF;
+
+  v_note := NULLIF(trim(p_note), '');
+  IF length(v_note) > 200 THEN
+    RAISE EXCEPTION 'Note too long';
+  END IF;
+
+  v_delta := CASE WHEN p_type = 'withdrawal' THEN -p_amount ELSE p_amount END;
 
   -- Lock the default bankroll row FIRST. Concurrent calls for
   -- the same user serialize here; the idempotency check below
@@ -98,27 +117,31 @@ BEGIN
     RAISE EXCEPTION 'No default bankroll found';
   END IF;
 
-  -- Idempotent replay: the same key returns the original result
-  -- and never applies the amount a second time.
-  IF p_idempotency_key IS NOT NULL THEN
-    SELECT id, balance_after INTO v_existing
-    FROM bankroll_transactions
-    WHERE user_id = v_user_id AND idempotency_key = p_idempotency_key;
+  -- Idempotent replay, bound to the original payload: the same
+  -- key returns the original result and never applies twice; the
+  -- same key with a different payload is a conflict, zero writes.
+  SELECT id, balance_after, type, amount, metadata->>'note' AS note
+  INTO v_existing
+  FROM bankroll_transactions
+  WHERE user_id = v_user_id AND idempotency_key = p_idempotency_key;
 
-    IF FOUND THEN
-      RETURN jsonb_build_object(
-        'transaction_id', v_existing.id,
-        'balance',        v_existing.balance_after,
-        'replayed',       true
-      );
+  IF FOUND THEN
+    IF v_existing.type IS DISTINCT FROM p_type
+       OR v_existing.amount IS DISTINCT FROM v_delta
+       OR COALESCE(v_existing.note, '') IS DISTINCT FROM COALESCE(v_note, '') THEN
+      RAISE EXCEPTION 'Idempotency conflict';
     END IF;
-  END IF;
 
-  v_delta := CASE WHEN p_type = 'withdrawal' THEN -p_amount ELSE p_amount END;
+    RETURN jsonb_build_object(
+      'transaction_id', v_existing.id,
+      'balance',        v_existing.balance_after,
+      'replayed',       true
+    );
+  END IF;
 
   -- No-overdraft guard. A negative historical balance blocks
   -- every withdrawal automatically (negative < any positive
-  -- amount) while deposits and positive adjustments stay open.
+  -- amount) while deposits stay open for repair.
   IF p_type = 'withdrawal' AND v_balance < p_amount THEN
     RAISE EXCEPTION 'Insufficient balance';
   END IF;
@@ -128,24 +151,17 @@ BEGIN
   UPDATE bankrolls SET balance = v_new_balance
   WHERE id = v_bankroll_id AND user_id = v_user_id;
 
-  BEGIN
-    INSERT INTO bankroll_transactions (
-      user_id, bankroll_id, type, amount, balance_after, metadata, idempotency_key
-    ) VALUES (
-      v_user_id, v_bankroll_id, p_type, v_delta, v_new_balance,
-      jsonb_strip_nulls(jsonb_build_object(
-        'note',             p_note,
-        'previous_balance', v_balance
-      )),
-      p_idempotency_key
-    )
-    RETURNING id INTO v_tx_id;
-  EXCEPTION WHEN unique_violation THEN
-    -- Backstop for a same-key race that slipped past the lock
-    -- (e.g. non-default-bankroll paths in the future). Roll the
-    -- whole function call back to the replay semantics.
-    RAISE EXCEPTION 'Duplicate idempotency key';
-  END;
+  INSERT INTO bankroll_transactions (
+    user_id, bankroll_id, type, amount, balance_after, metadata, idempotency_key
+  ) VALUES (
+    v_user_id, v_bankroll_id, p_type, v_delta, v_new_balance,
+    jsonb_strip_nulls(jsonb_build_object(
+      'note',             v_note,
+      'previous_balance', v_balance
+    )),
+    p_idempotency_key
+  )
+  RETURNING id INTO v_tx_id;
 
   RETURN jsonb_build_object(
     'transaction_id', v_tx_id,
@@ -167,6 +183,7 @@ CREATE OR REPLACE FUNCTION set_user_currency(
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_user_id uuid := auth.uid();
+  v_rows    integer;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
@@ -181,8 +198,19 @@ BEGIN
     RAISE EXCEPTION 'Profile not found';
   END IF;
 
+  -- Invariant (CPO review of PR #127): EXACTLY one default
+  -- bankroll must take the new currency. Zero or multiple rows
+  -- raise, which rolls the profile update back with it.
   UPDATE bankrolls SET currency = p_currency
   WHERE user_id = v_user_id AND is_default = true;
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+
+  IF v_rows = 0 THEN
+    RAISE EXCEPTION 'No default bankroll found';
+  END IF;
+  IF v_rows > 1 THEN
+    RAISE EXCEPTION 'Multiple default bankrolls';
+  END IF;
 
   RETURN jsonb_build_object('currency', p_currency);
 END;
@@ -389,6 +417,10 @@ GRANT  EXECUTE ON FUNCTION place_bet_from_decision(uuid, uuid, numeric, text, te
 --   -- funds guard: expect 'Insufficient balance' on absurd stake
 --   -- SELECT create_quick_bet(NULL, 'T', 'soccer', '1X2', 'Home', 2.0, 999999999);
 --   -- idempotent replay: second call returns replayed=true, same tx id
---   -- SELECT adjust_bankroll('deposit', 1, 'verify-016', 'verify-016-key');
---   -- SELECT adjust_bankroll('deposit', 1, 'verify-016', 'verify-016-key');
+--   -- SELECT adjust_bankroll('deposit', 1, 'verify-016', '00000000-0000-4000-8000-000000000016');
+--   -- SELECT adjust_bankroll('deposit', 1, 'verify-016', '00000000-0000-4000-8000-000000000016');
+--   -- payload-bound conflict: expect 'Idempotency conflict'
+--   -- SELECT adjust_bankroll('deposit', 2, 'verify-016', '00000000-0000-4000-8000-000000000016');
+--   -- user-callable adjustment removed: expect 'Unsupported transaction type'
+--   -- SELECT adjust_bankroll('adjustment', 1, NULL, '00000000-0000-4000-8000-000000000017');
 -- ROLLBACK;

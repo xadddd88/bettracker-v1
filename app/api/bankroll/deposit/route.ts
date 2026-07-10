@@ -6,10 +6,10 @@ import { EVENTS } from '@/lib/analytics/events'
 import { bucketAmount } from '@/lib/analytics/buckets'
 
 const schema = z.object({
-  amount:          z.number().positive('Amount must be positive'),
+  amount:          z.number().positive('Amount must be positive').max(100_000_000, 'Amount exceeds limit'),
   type:            z.enum(['deposit', 'withdrawal']),
   note:            z.string().max(200).optional(),
-  idempotency_key: z.string().min(8).max(64).optional(),
+  idempotency_key: z.string().uuid('Idempotency key must be a UUID'),
 })
 
 // Decision #047: the route no longer touches bankrolls or
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     p_type:            type,
     p_amount:          amount,
     p_note:            note ?? null,
-    p_idempotency_key: idempotency_key ?? null,
+    p_idempotency_key: idempotency_key,
   })
 
   if (error) {
@@ -47,6 +47,9 @@ export async function POST(req: NextRequest) {
     }
     if (/no default bankroll/i.test(error.message)) {
       return NextResponse.json({ error: 'Bankroll not found' }, { status: 404 })
+    }
+    if (/idempotency conflict/i.test(error.message)) {
+      return NextResponse.json({ error: 'Request conflict' }, { status: 409 })
     }
     console.error('[deposit] adjust_bankroll failed:', error.message)
     return NextResponse.json({ error: 'Transaction failed' }, { status: 500 })

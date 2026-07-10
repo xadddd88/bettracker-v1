@@ -25,8 +25,8 @@ bankroll below 0. Negative balance is not a credit limit.
 | Object | Purpose |
 |--------|---------|
 | `bankroll_transactions.idempotency_key` + partial unique index `(user_id, idempotency_key)` | replay protection |
-| `adjust_bankroll(p_type, p_amount, p_note, p_idempotency_key)` | THE deposit/withdrawal/adjustment path: `FOR UPDATE` row lock → validation → funds guard → balance update + transaction insert in one DB transaction; same idempotency key replays the original result without re-applying; metadata records `previous_balance` for audit |
-| `set_user_currency(p_currency)` | atomic `profiles.currency` + default-bankroll currency sync |
+| `adjust_bankroll(p_type, p_amount, p_note, p_idempotency_key)` | THE user deposit/withdrawal path (user-callable `adjustment` REMOVED per CPO review — operator reconciliation is a separate future controlled flow): `FOR UPDATE` row lock → validation → funds guard → balance update + transaction insert in one DB transaction. Strict idempotency: UUID key REQUIRED; a replay is bound to the original type + signed amount + normalized note — the same key with a different payload raises `Idempotency conflict` (HTTP 409, zero writes); metadata records `previous_balance` for audit |
+| `set_user_currency(p_currency)` | atomic `profiles.currency` + default-bankroll currency sync; requires EXACTLY one default bankroll updated (`GET DIAGNOSTICS ROW_COUNT`) — zero or multiple rows raise and roll the profile update back |
 | `create_quick_bet()` (replaced) | stake deduction is now `... AND balance >= p_stake` conditional locked subtraction; `Insufficient balance` exception rolls back decision/bet/leg rows |
 | `place_bet_from_decision()` (replaced) | same guard (`balance >= v_stake`) |
 
@@ -49,13 +49,14 @@ two parallel operations cannot overspend.
 ### Negative historical bankroll (reconciliation_required)
 
 Preserved exactly as-is. The guards block new stakes and withdrawals from it automatically
-(negative < any positive amount); deposits and positive `adjustment` transactions remain
-open for audited repair. **No automatic zeroing.** The hard `CHECK (balance >= 0)`
+(negative < any positive amount); deposits remain open for repair. Audited operator
+reconciliation (`adjustment`) is a separate future controlled flow — it is NOT
+user-callable in this decision. **No automatic zeroing.** The hard `CHECK (balance >= 0)`
 constraint intentionally does NOT ship in 016 — it would fail validation against the
 existing row and reject partial repair deposits; it lands in a later migration after
 reconciliation (the financial-safety suite asserts 016 does not contain it).
 
-### Tests — `npm run test:financial-safety` (13 cases, wired into CI)
+### Tests — `npm run test:financial-safety` (15 cases, wired into CI)
 
 Route delegation + zero direct financial table access, sanitized error mapping, idempotency
 pass-through and replay surfacing, currency-sync RPC enforcement and hard-failure, mixed
@@ -83,8 +84,10 @@ The new routes call RPCs that do not exist until migration 016 is applied:
 
 ```sql
 BEGIN;
-  SELECT adjust_bankroll('deposit', 1, 'verify-016', 'verify-016-key');
-  SELECT adjust_bankroll('deposit', 1, 'verify-016', 'verify-016-key'); -- expect replayed=true, same tx id
+  SELECT adjust_bankroll('deposit', 1, 'verify-016', '00000000-0000-4000-8000-000000000016');
+  SELECT adjust_bankroll('deposit', 1, 'verify-016', '00000000-0000-4000-8000-000000000016'); -- expect replayed=true, same tx id
+  -- SELECT adjust_bankroll('deposit', 2, 'verify-016', '00000000-0000-4000-8000-000000000016'); -- expect 'Idempotency conflict'
+  -- SELECT adjust_bankroll('adjustment', 1, NULL, '00000000-0000-4000-8000-000000000017');      -- expect 'Unsupported transaction type'
 ROLLBACK;
 ```
 

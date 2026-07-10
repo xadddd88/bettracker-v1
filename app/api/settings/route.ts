@@ -59,6 +59,9 @@ export async function PATCH(req: NextRequest) {
     })
 
     if (currencyError) {
+      if (/no default bankroll/i.test(currencyError.message)) {
+        return NextResponse.json({ error: 'Bankroll not found' }, { status: 404 })
+      }
       console.error('[settings] currency sync failed:', currencyError.message)
       return NextResponse.json({ error: 'Failed to update currency' }, { status: 500 })
     }

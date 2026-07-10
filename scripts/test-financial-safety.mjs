@@ -185,6 +185,7 @@ function jsonRequest(url, body) {
 const DEPOSIT_ROUTE = 'app/api/bankroll/deposit/route.js';
 const SETTINGS_ROUTE = 'app/api/settings/route.js';
 const FINANCIAL_TABLES = ['bankrolls', 'bankroll_transactions', 'bets', 'bet_legs'];
+const IDEM_KEY = '11111111-aaaa-4bbb-8ccc-222222222222';
 
 function assertNoFinancialTableAccess(stub) {
   const touched = stub.calls.from.filter((entry) => FINANCIAL_TABLES.includes(entry.table));
@@ -202,7 +203,7 @@ await testAsync('deposit: delegates to adjust_bankroll RPC, no direct financial 
 
   await withFinancialRoute(DEPOSIT_ROUTE, stub, async ({ POST }) => {
     const response = await POST(jsonRequest('https://example.test/api/bankroll/deposit', {
-      amount: 50, type: 'deposit', note: 'top up', idempotency_key: '11111111-aaaa-4bbb-8ccc-222222222222',
+      amount: 50, type: 'deposit', note: 'top up', idempotency_key: IDEM_KEY,
     }));
     const result = await readJsonResponse(response);
 
@@ -219,7 +220,7 @@ await testAsync('deposit: delegates to adjust_bankroll RPC, no direct financial 
       p_type: 'deposit',
       p_amount: 50,
       p_note: 'top up',
-      p_idempotency_key: '11111111-aaaa-4bbb-8ccc-222222222222',
+      p_idempotency_key: IDEM_KEY,
     });
 
     assertNoFinancialTableAccess(stub);
@@ -235,7 +236,7 @@ await testAsync('deposit: insufficient balance maps to 422 with a sanitized mess
 
   await withFinancialRoute(DEPOSIT_ROUTE, stub, async ({ POST }) => {
     const response = await POST(jsonRequest('https://example.test/api/bankroll/deposit', {
-      amount: 500, type: 'withdrawal',
+      amount: 500, type: 'withdrawal', idempotency_key: IDEM_KEY,
     }));
     const result = await readJsonResponse(response);
 
@@ -255,9 +256,29 @@ await testAsync('deposit: missing default bankroll maps to 404', async () => {
 
   await withFinancialRoute(DEPOSIT_ROUTE, stub, async ({ POST }) => {
     const response = await POST(jsonRequest('https://example.test/api/bankroll/deposit', {
-      amount: 10, type: 'deposit',
+      amount: 10, type: 'deposit', idempotency_key: IDEM_KEY,
     }));
     assert.equal(response.status, 404);
+  });
+});
+
+await testAsync('deposit: same key with a different payload maps to 409 conflict, zero writes', async () => {
+  const stub = makeStubClient({
+    rpcResults: {
+      adjust_bankroll: { data: null, error: { message: 'Idempotency conflict' } },
+    },
+  });
+
+  await withFinancialRoute(DEPOSIT_ROUTE, stub, async ({ POST }) => {
+    const response = await POST(jsonRequest('https://example.test/api/bankroll/deposit', {
+      amount: 75, type: 'deposit', idempotency_key: IDEM_KEY,
+    }));
+    const result = await readJsonResponse(response);
+
+    assert.equal(result.status, 409);
+    assert.equal(result.body.error, 'Request conflict');
+    assert.equal(result.body.success, undefined);
+    assertNoFinancialTableAccess(stub);
   });
 });
 
@@ -273,7 +294,7 @@ await testAsync('deposit: unexpected RPC error returns 500 without leaking DB de
 
   await withFinancialRoute(DEPOSIT_ROUTE, stub, async ({ POST }) => {
     const response = await POST(jsonRequest('https://example.test/api/bankroll/deposit', {
-      amount: 10, type: 'deposit',
+      amount: 10, type: 'deposit', idempotency_key: IDEM_KEY,
     }));
     const result = await readJsonResponse(response);
 
@@ -288,9 +309,12 @@ await testAsync('deposit: invalid input is rejected before any RPC call', async 
 
   await withFinancialRoute(DEPOSIT_ROUTE, stub, async ({ POST }) => {
     for (const body of [
-      { amount: -5, type: 'deposit' },
-      { amount: 10, type: 'stake' },
-      { amount: 10, type: 'deposit', idempotency_key: 'short' },
+      { amount: -5, type: 'deposit', idempotency_key: IDEM_KEY },
+      { amount: 100_000_001, type: 'deposit', idempotency_key: IDEM_KEY },
+      { amount: 10, type: 'stake', idempotency_key: IDEM_KEY },
+      { amount: 10, type: 'adjustment', idempotency_key: IDEM_KEY },
+      { amount: 10, type: 'deposit' },
+      { amount: 10, type: 'deposit', idempotency_key: 'not-a-uuid' },
     ]) {
       const response = await POST(jsonRequest('https://example.test/api/bankroll/deposit', body));
       assert.equal(response.status, 400, `expected 400 for ${JSON.stringify(body)}`);
@@ -308,7 +332,7 @@ await testAsync('deposit: idempotent replay is surfaced to the client', async ()
 
   await withFinancialRoute(DEPOSIT_ROUTE, stub, async ({ POST }) => {
     const response = await POST(jsonRequest('https://example.test/api/bankroll/deposit', {
-      amount: 50, type: 'deposit', idempotency_key: '11111111-aaaa-4bbb-8ccc-222222222222',
+      amount: 50, type: 'deposit', idempotency_key: IDEM_KEY,
     }));
     const result = await readJsonResponse(response);
 
@@ -389,6 +413,22 @@ await testAsync('settings: currency sync failure is a hard error, not a silent p
   });
 });
 
+await testAsync('settings: missing default bankroll surfaces as 404, currency change does not half-apply', async () => {
+  const stub = makeStubClient({
+    profileRow: { id: 'user-1' },
+    rpcResults: { set_user_currency: { data: null, error: { message: 'No default bankroll found' } } },
+  });
+
+  await withFinancialRoute(SETTINGS_ROUTE, stub, async (route) => {
+    const response = await route.PATCH(jsonRequest('https://example.test/api/settings', { currency: 'EUR' }));
+    const result = await readJsonResponse(response);
+
+    assert.equal(result.status, 404);
+    assert.equal(result.body.error, 'Bankroll not found');
+    assert.equal(result.body.success, undefined);
+  });
+});
+
 await testAsync('settings: non-currency update makes no RPC call', async () => {
   const stub = makeStubClient({ profileRow: { id: 'user-1', default_stake: 25 } });
 
@@ -431,6 +471,11 @@ test('migration 016: row lock, funds guards, idempotency index and definer hygie
   assert.ok(sql.includes("RAISE EXCEPTION 'Insufficient balance'"), 'insufficient-balance exception missing');
   assert.ok(sql.includes('uq_bankroll_tx_user_idempotency_key'), 'idempotency unique index missing');
   assert.ok(sql.includes('WHERE idempotency_key IS NOT NULL'), 'partial index predicate missing');
+  assert.ok(sql.includes("IF p_type NOT IN ('deposit', 'withdrawal')"), 'user-callable types must be deposit/withdrawal only');
+  assert.ok(sql.includes("RAISE EXCEPTION 'Idempotency conflict'"), 'payload-bound idempotency conflict missing');
+  assert.ok(sql.includes("RAISE EXCEPTION 'Invalid idempotency key'"), 'required-UUID idempotency validation missing');
+  assert.ok(sql.includes('GET DIAGNOSTICS'), 'set_user_currency exactly-one-row invariant missing');
+  assert.ok(sql.includes("RAISE EXCEPTION 'No default bankroll found'"), 'no-default-bankroll exception missing');
   assert.ok((sql.match(/SECURITY DEFINER/g) ?? []).length >= 4, 'expected all four functions to be SECURITY DEFINER');
   assert.ok((sql.match(/SET search_path = public/g) ?? []).length >= 4, 'expected search_path pinning on all functions');
   assert.ok(sql.includes('REVOKE EXECUTE ON FUNCTION adjust_bankroll'), 'adjust_bankroll grant hygiene missing');
