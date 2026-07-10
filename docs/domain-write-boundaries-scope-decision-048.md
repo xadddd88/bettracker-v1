@@ -2,7 +2,9 @@
 
 ## Status
 
-SCOPE + IMPLEMENTATION (two-phase). Awaiting CPO review; migrations NOT applied yet.
+EXECUTED 2026-07-10 — both migrations applied + verified, PR #129 merged (production
+`66aa980`), bypass verification 10/10 denied, `smoke-047` deleted. See
+`docs/domain-write-boundaries-execution-record-048.md`.
 
 Last updated: 2026-07-10
 
