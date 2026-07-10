@@ -1840,7 +1840,7 @@ Reference: `docs/agent-write-boundaries-scope-decision-049.md`
 ## Decision #050 - Registration Invite Flow (pre-hijack fix)
 **Date:** 2026-07-10
 **Proposed by:** Founder (product choice) + Claude
-**Status:** Implementation ready. Migration 021 NOT applied until CPO review; requires a founder email-round-trip test before production is trusted.
+**Status:** PARTIALLY EXECUTED 2026-07-10 (CPO accept). Migration 021 applied + verified (enum += invited, invited_at, 3 existing rows intact) → PR #133 merged (production `60cb28c`) → live routes verified server-side: register non-allowlisted → neutral 200 with 0 stray beta_access/auth.users rows (no enumeration, no side effects), password-in-body ignored, invalid email 400, complete-invite unauth 401, set-password reachable. **The SMTP email round-trip is PENDING a founder test** (approve test email → request → receive → click → set password → dashboard; verify approved→invited→used; verify non-allowlisted gets neutral msg + NO email; verify Supabase Invite template action link + "Enable email signups" OFF) — cannot be automated. Execution record: `docs/registration-invite-flow-execution-record-050.md`. Next free decision number: #051.
 
 **Context:** CPO audit P1 (the last remaining P1) — `/api/auth/register` created a user with `email_confirm: true` and a caller-supplied password without proving email ownership, so anyone who knew an allowlisted address could pre-register it and hijack the invited account. Founder product decision (2026-07-10): **invite + set-password flow** (Supabase `inviteUserByEmail`).
 

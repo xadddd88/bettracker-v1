@@ -2,8 +2,9 @@
 
 ## Status
 
-SCOPE + IMPLEMENTATION. Awaiting CPO review. Migration 021 NOT applied yet; requires a
-founder email-round-trip test before production is trusted.
+PARTIALLY EXECUTED 2026-07-10 — migration 021 applied + verified, PR #133 merged (production
+`60cb28c`), live routes verified server-side. **SMTP email round-trip PENDING founder test.**
+See `docs/registration-invite-flow-execution-record-050.md`.
 
 Last updated: 2026-07-10
 
