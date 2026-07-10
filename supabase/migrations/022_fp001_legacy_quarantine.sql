@@ -74,6 +74,10 @@ BEGIN
 
   -- ── 3. ai_analysis_runs.output_json ──────────────────────────
   -- Back up just the pricing keys, then strip them from the JSON.
+  -- Match by non-null VALUE, not mere key presence: only runs that carry an
+  -- actual fabricated number are quarantined, so every audit row is
+  -- meaningful. Runs whose keys exist but are already null are left alone
+  -- (a null key is not readable false precision).
   INSERT INTO fp001_pricing_quarantine (source_table, row_id, user_id, output_json_pricing)
   SELECT 'ai_analysis_runs', id, user_id,
          jsonb_strip_nulls(jsonb_build_object(
@@ -84,13 +88,17 @@ BEGIN
   FROM ai_analysis_runs
   WHERE created_at < v_cutoff
     AND output_json IS NOT NULL
-    AND (output_json ? 'model_probability' OR output_json ? 'implied_probability' OR output_json ? 'edge_percent');
+    AND ((output_json->>'model_probability') IS NOT NULL
+      OR (output_json->>'implied_probability') IS NOT NULL
+      OR (output_json->>'edge_percent') IS NOT NULL);
 
   UPDATE ai_analysis_runs
   SET output_json = (output_json - 'model_probability' - 'implied_probability' - 'edge_percent')
   WHERE created_at < v_cutoff
     AND output_json IS NOT NULL
-    AND (output_json ? 'model_probability' OR output_json ? 'implied_probability' OR output_json ? 'edge_percent');
+    AND ((output_json->>'model_probability') IS NOT NULL
+      OR (output_json->>'implied_probability') IS NOT NULL
+      OR (output_json->>'edge_percent') IS NOT NULL);
 
 END $$;
 
