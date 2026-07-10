@@ -22,6 +22,8 @@
     "app/api/bankroll/deposit/route.ts",
     "app/api/settings/route.ts",
     "app/api/onboarding/complete/route.ts",
+    "app/api/auth/register/route.ts",
+    "app/api/auth/complete-invite/route.ts",
     "lib/money.ts",
     "lib/ai/**/*.ts",
     "lib/providers/**/*.ts",

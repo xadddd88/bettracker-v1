@@ -1837,5 +1837,32 @@ Reference: `docs/agent-write-boundaries-scope-decision-049.md`
 
 ---
 
+## Decision #050 - Registration Invite Flow (pre-hijack fix)
+**Date:** 2026-07-10
+**Proposed by:** Founder (product choice) + Claude
+**Status:** Implementation ready. Migration 021 NOT applied until CPO review; requires a founder email-round-trip test before production is trusted.
+
+**Context:** CPO audit P1 (the last remaining P1) — `/api/auth/register` created a user with `email_confirm: true` and a caller-supplied password without proving email ownership, so anyone who knew an allowlisted address could pre-register it and hijack the invited account. Founder product decision (2026-07-10): **invite + set-password flow** (Supabase `inviteUserByEmail`).
+
+**Decision:** Registration becomes an email-only, allowlist-gated invite request:
+- `POST /api/auth/register` (email only, no password) → rate-limit + allowlist; only `approved`/`invited` proceed; sends `inviteUserByEmail(email, { redirectTo: /auth/callback?next=/auth/set-password })`; marks the row `invited`. **Every branch returns ONE neutral message** ("an invite link is on its way") — closes allowlist enumeration.
+- Ownership proof: the invite email reaches only the real mailbox; an attacker can at most cause an email to be sent to the real owner, never receive the link → pre-hijack closed.
+- `/auth/callback` honours a same-origin `next` param (open-redirect guarded).
+- `/auth/set-password` (new, session-gated) sets the password via `updateUser`, then calls `POST /api/auth/complete-invite` (authenticated) which marks `beta_access` `used` — consumed only after ownership + intent are proven; idempotent per user; 403 for foreign/revoked.
+- Migration 021: widens `beta_access.status` CHECK to include `invited`, adds `invited_at`. Lifecycle `approved → invited → used`.
+- The password path (`createUser({ email_confirm: true, password })`) is removed; login Register tab is now email-only.
+
+**Tests:** new CI suite `test:auth-invite` (17 cases). All suites green: auth 17/17, agent 12/12, domain 13/13, financial 10/10, provider-safety 77/77, FP-001 26/26, tsc/lint clean, full `next build` OK.
+
+**Execution requirement:** `inviteUserByEmail` uses Supabase SMTP (already configured — magic-link works). A real email round-trip must be tested by the founder (approve test email → request → receive → click → set password → dashboard; verify row `approved→invited→used`; verify a non-allowlisted email gets the neutral message and NO email) before production is trusted. Founder also verifies the Supabase Invite email template action link and keeps "Enable email signups" OFF.
+
+**Non-use:** No change to password Sign-In or Magic-Link login, the allowlist admin process, or email-template design.
+
+**FP-001:** N/A (auth/identity surface, no pricing).
+
+Reference: `docs/registration-invite-flow-scope-decision-050.md`
+
+---
+
 *Last updated: 2026-07-10*
 *Owner: All (each role contributes)*

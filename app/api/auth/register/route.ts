@@ -5,14 +5,18 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 
-const registerSchema = z.object({
-  email:    z.string().email(),
-  password: z.string().min(8),
+// Decision #050 — invite flow. This route no longer accepts a password.
+// It verifies the allowlist and sends a Supabase invite email to the
+// address; the account only becomes usable after the real mailbox owner
+// clicks the emailed link and sets a password on /auth/set-password.
+// This proves email ownership and closes the pre-hijack: an attacker who
+// knows an allowlisted address can only cause an invite to be sent to
+// that address's real inbox — they never receive the link.
+const requestSchema = z.object({
+  email: z.string().email(),
 })
 
 // ─── Rate limit (in-memory, per client IP) ───────────────────
-// This route is unauthenticated and backed by service-role queries — without
-// a throttle it is an allowlist-enumeration and signup-abuse surface.
 const envInt = (key: string, def: number) => {
   const n = parseInt(process.env[key] ?? '', 10)
   return Number.isFinite(n) && n > 0 ? n : def
@@ -36,14 +40,8 @@ function checkRateLimit(key: string): { allowed: boolean; retryAfter?: number } 
 
   const entry = rateLimitStore.get(key) ?? { minute: 0, hour: 0, minuteTs: now, hourTs: now }
 
-  if (now - entry.minuteTs > minuteWindow) {
-    entry.minute = 0
-    entry.minuteTs = now
-  }
-  if (now - entry.hourTs > hourWindow) {
-    entry.hour = 0
-    entry.hourTs = now
-  }
+  if (now - entry.minuteTs > minuteWindow) { entry.minute = 0; entry.minuteTs = now }
+  if (now - entry.hourTs > hourWindow)     { entry.hour = 0;   entry.hourTs = now }
 
   if (entry.minute >= RATE_LIMIT_PER_MINUTE) {
     return { allowed: false, retryAfter: Math.ceil((entry.minuteTs + minuteWindow - now) / 1000) }
@@ -58,6 +56,19 @@ function checkRateLimit(key: string): { allowed: boolean; retryAfter?: number } 
   return { allowed: true }
 }
 
+// A single neutral response for every "we won't tell you the allowlist
+// state" branch — prevents allowlist enumeration.
+function neutralOk() {
+  return NextResponse.json({
+    success: true,
+    message: 'If your email is approved for the beta, an invite link is on its way. Check your inbox.',
+  })
+}
+
+function siteOrigin(req: NextRequest): string {
+  return process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ?? new URL(req.url).origin
+}
+
 export async function POST(req: NextRequest) {
   const rateCheck = checkRateLimit(clientIp(req))
   if (!rateCheck.allowed) {
@@ -67,43 +78,30 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // 1. Parse + validate input
   let body: unknown
   try { body = await req.json() } catch { body = null }
 
-  const parsed = registerSchema.safeParse(body)
+  const parsed = requestSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: 'Invalid email or password.' },
-      { status: 400 },
-    )
+    return NextResponse.json({ success: false, error: 'Enter a valid email.' }, { status: 400 })
   }
 
-  const { email, password } = parsed.data
-  const emailNormalized = email.toLowerCase().trim()
-
-  // Use a random distinct ID for pre-auth PostHog events (no email sent to PostHog)
+  const emailNormalized = parsed.data.email.toLowerCase().trim()
   const anonId = randomUUID()
-
   await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_ATTEMPTED, { source: 'login_page' })
 
-  // 2. Initialise admin client (requires SUPABASE_SERVICE_ROLE_KEY)
   let admin: ReturnType<typeof createAdminClient>
   try {
     admin = createAdminClient()
   } catch {
     console.error('[register] SUPABASE_SERVICE_ROLE_KEY is not configured')
-    await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_BLOCKED, {
-      source: 'login_page',
-      reason: 'service_unavailable',
-    })
+    await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_BLOCKED, { source: 'login_page', reason: 'service_unavailable' })
     return NextResponse.json(
       { success: false, error: 'Beta registration is temporarily unavailable. Try again later.' },
       { status: 503 },
     )
   }
 
-  // 3. Check allowlist
   const { data: entry, error: lookupErr } = await admin
     .from('beta_access')
     .select('id, status')
@@ -112,98 +110,62 @@ export async function POST(req: NextRequest) {
 
   if (lookupErr) {
     console.error('[register] beta_access lookup error:', lookupErr.message)
-    await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_BLOCKED, {
-      source: 'login_page',
-      reason: 'service_unavailable',
-    })
+    await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_BLOCKED, { source: 'login_page', reason: 'service_unavailable' })
     return NextResponse.json(
       { success: false, error: 'Beta registration is temporarily unavailable. Try again later.' },
       { status: 503 },
     )
   }
 
-  if (!entry || entry.status !== 'approved') {
-    const reason = !entry ? 'not_allowlisted' : 'revoked_or_used'
+  // Not allowlisted, already used, or revoked → neutral response (no
+  // enumeration). Only 'approved' or a prior 'invited' (resend) proceed.
+  if (!entry || (entry.status !== 'approved' && entry.status !== 'invited')) {
     await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_BLOCKED, {
       source: 'login_page',
-      reason,
+      reason: !entry ? 'not_allowlisted' : 'revoked_or_used',
     })
-    return NextResponse.json(
-      {
-        success: false,
-        error:   'BetTracker AI is currently in closed beta. Ask for access to join.',
-      },
-      { status: 403 },
-    )
+    return neutralOk()
   }
 
-  // 4. Track allowed — email is approved, proceeding to create account
   await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_ALLOWED, { source: 'login_page' })
 
-  // 5. Create user (email_confirm: true — no email confirmation required)
-  const { data: authData, error: createErr } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  })
+  // Send the invite. The link goes to the real address and lands on the
+  // set-password page (via the auth callback), which sets the password
+  // and consumes the invite. No password is set here.
+  const redirectTo = `${siteOrigin(req)}/auth/callback?next=/auth/set-password`
+  const { error: inviteErr } = await admin.auth.admin.inviteUserByEmail(emailNormalized, { redirectTo })
 
-  if (createErr || !authData?.user) {
-    const msg = createErr?.message ?? ''
-    const isDuplicate = /already|registered|exists/i.test(msg)
-    if (isDuplicate) {
-      await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_BLOCKED, {
-        source: 'login_page',
-        reason: 'revoked_or_used',
-      })
-      return NextResponse.json(
-        { success: false, error: 'Account already exists or access was already used. Try signing in.' },
-        { status: 409 },
-      )
+  if (inviteErr) {
+    // Already-registered means an invite/account already exists for this
+    // address. If the row isn't yet 'used', the earlier invite email is
+    // still the way in; return the same neutral message either way so we
+    // never disclose account state.
+    if (/already|registered|exists/i.test(inviteErr.message)) {
+      await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_BLOCKED, { source: 'login_page', reason: 'revoked_or_used' })
+      return neutralOk()
     }
-    console.error('[register] createUser failed:', createErr?.message)
-    await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_BLOCKED, {
-      source: 'login_page',
-      reason: 'service_unavailable',
-    })
+    console.error('[register] inviteUserByEmail failed:', inviteErr.message)
+    await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_BLOCKED, { source: 'login_page', reason: 'service_unavailable' })
     return NextResponse.json(
       { success: false, error: 'Beta registration is temporarily unavailable. Try again later.' },
       { status: 503 },
     )
   }
 
-  // 6. Mark beta_access entry as used (only after user is created successfully)
-  const { error: markUsedErr } = await admin
+  // Mark invited (not used) — the invite is consumed only when the
+  // password is set on /auth/set-password (proves ownership + intent).
+  const nowIso = new Date().toISOString()
+  const { error: markErr } = await admin
     .from('beta_access')
-    .update({
-      status:          'used',
-      used_at:         new Date().toISOString(),
-      used_by_user_id: authData.user.id,
-      updated_at:      new Date().toISOString(),
-    })
+    .update({ status: 'invited', invited_at: nowIso, updated_at: nowIso })
     .eq('id', entry.id)
 
-  if (markUsedErr) {
-    console.error('[register] failed to mark beta_access as used:', markUsedErr.message)
-    // Roll back: delete the auth user so beta_access stays approved and can be retried
-    await admin.auth.admin.deleteUser(authData.user.id).catch(() => {})
-    await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_BLOCKED, {
-      source: 'login_page',
-      reason: 'service_unavailable',
-    })
-    return NextResponse.json(
-      { success: false, error: 'Beta registration is temporarily unavailable. Try again later.' },
-      { status: 503 },
-    )
+  if (markErr) {
+    // The invite email was already sent; a stale 'approved'/'invited'
+    // status is harmless (completion re-checks and marks 'used'). Log only.
+    console.error('[register] failed to mark beta_access invited:', markErr.message)
   }
 
-  // 7. Track completed (now we have the real user ID)
-  await trackServerEvent(authData.user.id, EVENTS.BETA_SIGNUP_COMPLETED, {
-    source: 'login_page',
-    reason: 'success',
-  })
-
-  return NextResponse.json({
-    success: true,
-    message: 'Account created. You can now sign in.',
-  })
+  await trackServerEvent(anonId, EVENTS.BETA_SIGNUP_ALLOWED, { source: 'login_page', reason: 'invited' })
+  return neutralOk()
 }

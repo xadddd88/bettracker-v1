@@ -92,7 +92,7 @@ test('migration 019: Scout persist forces FP-001 pricing NULL, structural status
   assert.ok(!/->>'edge_percent'/.test(fnBody), 'edge_percent must not be read from input');
   // Status structural, not from input (a caller cannot seed 'converted').
   assert.ok(!/COALESCE\(v_row->>'status'/.test(fnBody), 'status must not be read from input');
-  assert.ok(/'discovered',\n\s+v_row->>'reasoning'/.test(fnBody), "status must be the literal 'discovered'");
+  assert.ok(/'discovered',\s+v_row->>'reasoning'/.test(fnBody), "status must be the literal 'discovered'");
   // NULL-safe + bounded 1..25 batch.
   assert.ok(/p_rows IS NULL OR jsonb_typeof\(p_rows\) <> 'array'/.test(fnBody), 'NULL/array guard missing');
   assert.ok(/jsonb_array_length\(p_rows\) < 1 OR jsonb_array_length\(p_rows\) > 25/.test(fnBody), 'batch must be bounded 1..25');
