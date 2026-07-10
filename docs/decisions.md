@@ -1765,7 +1765,7 @@ Reference: `docs/sportmonks-provider-link-write-execution-record-m1-2-e-2-b-3.md
 ## Decision #047 - Atomic Financial Writes & No-Overdraft Policy
 **Date:** 2026-07-10
 **Proposed by:** CPO (full audit 2026-07-10) + Founder
-**Status:** Scope + implementation approved (CPO handoff "Proceed", founder conversation approval). Migration 016 must be applied before the code deploy goes live.
+**Status:** EXECUTED 2026-07-10. CPO final accept on head `fc1bcd9`; migration applied via Supabase migration tooling and verified (definitions, index, privileges); PR #127 merged (production `1e197f6`); controlled smoke on a dedicated test account passed 7/7 (deposit, exact replay, payload conflict, over-withdrawal block, adjustment rejection, currency sync both ways, balance/transaction integrity). Execution record: `docs/atomic-financial-writes-execution-record-047.md`. Next free decision number: #048.
 
 **Context:** The CPO audit found the risk profile inverted: provider safety is now stronger than the financial write boundaries. P0 items — `/api/bankroll/deposit` was non-atomic (read → compute → update → separate insert; returned success even when the transaction insert failed; concurrent requests could overwrite each other), `create_quick_bet()`/`place_bet_from_decision()` deducted stakes unconditionally (production holds one negative bankroll), `/api/settings` synced currency as an unchecked second write. Audit claims verified against code and `pg_policies` before implementation.
 
