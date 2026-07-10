@@ -2,7 +2,9 @@
 
 ## Status
 
-SCOPE + IMPLEMENTATION. Awaiting CPO review. Migration 022 NOT applied yet.
+EXECUTED 2026-07-10 — migration 022 applied + verified (decisions 20→0, opportunities 41→0,
+runs 17→0, quarantine = 78), PR #135 merged. See
+`docs/fp001-legacy-quarantine-execution-record-051.md`.
 
 Last updated: 2026-07-10
 

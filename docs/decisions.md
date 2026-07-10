@@ -1867,7 +1867,7 @@ Reference: `docs/registration-invite-flow-scope-decision-050.md`
 ## Decision #051 - FP-001 Legacy Pricing Quarantine
 **Date:** 2026-07-10
 **Proposed by:** CPO (audit item 5) + Claude
-**Status:** Implementation ready. Migration 022 NOT applied until CPO review.
+**Status:** EXECUTED 2026-07-10 (CPO accept, PR #135). Pre-apply refinement: `ai_analysis_runs` matched by non-null pricing VALUE not key presence (31 by key incl. 14 null-valued → 17 real), aligning with the reviewed 78. Migration 022 applied + verified: decisions 20→0, market_opportunities 41→0, ai_analysis_runs (non-null value) 17→0; `fp001_pricing_quarantine` = 78 rows (service-role only, RLS, 0 anon/auth grants); 14 runs retain null-valued keys (harmless). Execution record: `docs/fp001-legacy-quarantine-execution-record-051.md`. Next free decision number: #052.
 
 **Context:** "Code is protected better than data." PR #122 stopped Scout/Coach from using legacy pricing and the gate blocks display, but fabricated pre-gate numbers still sit in the DB. Inventory (2026-07-10): 20 `decisions` (all ai_analyst, newest 2026-07-04), 41 `market_opportunities` (all rows, newest 2026-07-01), and 17 `ai_analysis_runs.output_json` (none carry a quality_gate) carry model/implied/edge. Pricing has been blocked on 100% of runs, so no verified pricing has ever existed — every value is fabricated. The UI hides them, but the raw values remain readable by future analytics/migration/Coach.
 
