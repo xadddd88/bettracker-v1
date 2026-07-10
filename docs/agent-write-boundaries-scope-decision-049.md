@@ -2,7 +2,9 @@
 
 ## Status
 
-SCOPE + IMPLEMENTATION (two-phase). Awaiting CPO review; migrations NOT applied yet.
+EXECUTED 2026-07-10 — both migrations applied + verified, PR #131 merged (production
+`004ce3c`), state-machine 7/7 + bypass 8/8, `smoke-049` deleted. See
+`docs/agent-write-boundaries-execution-record-049.md`.
 
 Last updated: 2026-07-10
 
