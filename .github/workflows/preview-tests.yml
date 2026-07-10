@@ -41,6 +41,8 @@ jobs:
         run: npm run test:analysis-quality-gate
       - name: "Financial safety suite (Decision #047)"
         run: npm run test:financial-safety
+      - name: "Domain write boundaries suite (Decision #048)"
+        run: npm run test:domain-write-boundaries
 
   # ── Job 3: Smoke tests against Vercel preview deployment ───────────────────
   smoke:

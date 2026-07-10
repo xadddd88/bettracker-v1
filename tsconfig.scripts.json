@@ -21,6 +21,7 @@
     "app/api/admin/sports/mapping/provider-link/route.ts",
     "app/api/bankroll/deposit/route.ts",
     "app/api/settings/route.ts",
+    "app/api/onboarding/complete/route.ts",
     "lib/money.ts",
     "lib/ai/**/*.ts",
     "lib/providers/**/*.ts",

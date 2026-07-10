@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 import { bucketOdds, bucketConfidence } from '@/lib/analytics/buckets'
@@ -400,7 +401,15 @@ Return structured JSON analysis only.`
       trust_view:          trustPayload.trust_view,
     }
 
-    const { data: rpcData, error: rpcErr } = await supabase.rpc('create_decision_with_analysis', {
+    // Decision #048: persistence is server-only. The user client above
+    // authenticated the session and ran the FP-001 quality gate; the write
+    // goes through persist_analysis_decision (service_role EXECUTE only)
+    // with the user id derived from that session — never from the body.
+    // The user-callable create_decision_with_analysis loses EXECUTE in
+    // migration 018, closing the gate-bypass surface.
+    const adminClient = createAdminClient()
+    const { data: rpcData, error: rpcErr } = await adminClient.rpc('persist_analysis_decision', {
+      p_user_id:             user.id,
       p_sport:               input.sport,
       p_event_name:          input.event_name,
       p_market_type:         input.market_type,
@@ -426,10 +435,10 @@ Return structured JSON analysis only.`
     })
 
     if (rpcErr) {
-      console.error('[analyst] persist error:', rpcErr)
+      console.error('[analyst] persist error:', rpcErr.message)
       await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, { sport: input.sport, error_type: 'persist' })
       return NextResponse.json(
-        { success: false, error: `Analysis succeeded but failed to persist: ${rpcErr.message}` },
+        { success: false, error: 'Analysis succeeded but failed to persist' },
         { status: 500 }
       )
     }
