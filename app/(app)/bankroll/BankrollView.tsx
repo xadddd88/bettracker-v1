@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Bankroll, BankrollTransaction, TxnType } from '@/types'
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -45,6 +46,7 @@ interface BankrollViewProps {
 export default function BankrollView({
   bankroll, transactions: initialTxs, currency, stats: initialStats,
 }: BankrollViewProps) {
+  const router = useRouter()
   const symbol = CURRENCY_SYMBOLS[currency] ?? currency
 
   const [balance,      setBalance]      = useState(bankroll.balance)
@@ -56,12 +58,16 @@ export default function BankrollView({
   const [note,       setNote]       = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError,  setFormError]  = useState('')
+  // One key per form session: a retry after a network error reuses it,
+  // so the server-side idempotency guard can never double-apply.
+  const [idemKey,    setIdemKey]    = useState('')
 
   const openForm = useCallback((type: 'deposit' | 'withdrawal') => {
     setForm(type)
     setAmount('')
     setNote('')
     setFormError('')
+    setIdemKey(crypto.randomUUID())
   }, [])
 
   const closeForm = useCallback(() => {
@@ -82,7 +88,12 @@ export default function BankrollView({
       const res = await fetch('/api/bankroll/deposit', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ amount: amountNum, type: form, note: note.trim() || undefined }),
+        body:    JSON.stringify({
+          amount: amountNum,
+          type: form,
+          note: note.trim() || undefined,
+          idempotency_key: idemKey || undefined,
+        }),
       })
       const json = await res.json()
       if (!res.ok || !json.success) {
@@ -90,11 +101,19 @@ export default function BankrollView({
         return
       }
 
+      if (json.replayed) {
+        // The server already applied this exact request earlier — do not
+        // append a duplicate row or move the stats; re-read server truth.
+        closeForm()
+        router.refresh()
+        return
+      }
+
       const newBalance: number = json.balance
       const delta = form === 'deposit' ? amountNum : -amountNum
 
       const newTx: BankrollTransaction = {
-        id:            crypto.randomUUID(),
+        id:            json.transaction_id ?? crypto.randomUUID(),
         user_id:       bankroll.user_id,
         bankroll_id:   bankroll.id,
         type:          form!,
@@ -117,7 +136,7 @@ export default function BankrollView({
     } finally {
       setSubmitting(false)
     }
-  }, [amount, note, form, bankroll, closeForm])
+  }, [amount, note, form, bankroll, idemKey, closeForm, router])
 
   return (
     <div className="flex flex-col gap-6">

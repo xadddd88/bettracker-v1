@@ -39,6 +39,8 @@ jobs:
         run: npm run test:provider-safety
       - name: Analysis quality gate (FP-001) suite
         run: npm run test:analysis-quality-gate
+      - name: "Financial safety suite (Decision #047)"
+        run: npm run test:financial-safety
 
   # ── Job 3: Smoke tests against Vercel preview deployment ───────────────────
   smoke:

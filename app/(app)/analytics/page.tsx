@@ -5,6 +5,7 @@ import { calcPerformance } from '@/lib/analytics/performance'
 import BetaNote from '@/components/ui/BetaNote'
 import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
+import { currencySymbol, fmtPnl, fmtPct } from '@/lib/money'
 
 const SPORT_ICON: Record<string, string> = {
   soccer: '⚽', tennis: '🎾', basketball: '🏀',
@@ -25,13 +26,6 @@ const ACTION_LABEL: Record<string, string> = {
 const ACTION_COLOR: Record<string, string> = {
   placed: 'text-green-400', skipped: 'text-gray-400', watchlisted: 'text-yellow-400',
   ignored: 'text-gray-600', pending: 'text-gray-500',
-}
-
-function fmtPnl(v: number, sym: string) {
-  return `${v >= 0 ? '+' : ''}${sym}${Math.abs(v).toFixed(2)}`
-}
-function fmtPct(v: number) {
-  return `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`
 }
 
 export default async function AnalyticsPage() {
@@ -58,7 +52,7 @@ export default async function AnalyticsPage() {
   const bets       = (betsRes.data || []) as Bet[]
   const decisions  = decisionsRes.data || []
   const currency   = bankrollRes.data?.currency || 'USD'
-  const sym        = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'UAH' ? '₴' : currency
+  const sym        = currencySymbol(currency)
 
   const m = calcPerformance(bets, decisions)
 
