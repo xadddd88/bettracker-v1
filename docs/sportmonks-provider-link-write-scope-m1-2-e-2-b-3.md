@@ -2,9 +2,10 @@
 
 ## Status
 
-SCOPE + IMPLEMENTATION (Decision #045). Execution operator-gated; write flag default OFF.
+EXECUTED 2026-07-10 — see `docs/sportmonks-provider-link-write-execution-record-m1-2-e-2-b-3.md`
+(Decision #046). Kept for reference; re-execution requires a new scope decision.
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 ## Context
 
