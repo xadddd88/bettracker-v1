@@ -343,101 +343,10 @@ await testAsync('deposit: idempotent replay is surfaced to the client', async ()
 });
 
 // ── /api/settings ────────────────────────────────────────────────────
-
-await testAsync('settings: currency change goes through set_user_currency, never a direct bankroll write', async () => {
-  const stub = makeStubClient({
-    profileRow: { id: 'user-1', currency: 'EUR' },
-    rpcResults: { set_user_currency: { data: { currency: 'EUR' }, error: null } },
-  });
-
-  await withFinancialRoute(SETTINGS_ROUTE, stub, async (route) => {
-    const response = await route.PATCH(jsonRequest('https://example.test/api/settings', { currency: 'EUR' }));
-    const result = await readJsonResponse(response);
-
-    assert.equal(result.status, 200);
-    assert.equal(result.body.success, true);
-
-    assert.equal(stub.calls.rpc.length, 1);
-    assert.equal(stub.calls.rpc[0].name, 'set_user_currency');
-    assert.deepEqual(stub.calls.rpc[0].args, { p_currency: 'EUR' });
-
-    const bankrollWrites = stub.calls.from.filter(
-      (entry) => entry.table === 'bankrolls' && entry.ops.some((op) => op.op === 'update' || op.op === 'insert')
-    );
-    assert.equal(bankrollWrites.length, 0, 'settings route wrote to bankrolls directly');
-
-    const profileUpdates = stub.calls.from.filter(
-      (entry) => entry.table === 'profiles' && entry.ops.some((op) => op.op === 'update')
-    );
-    assert.equal(profileUpdates.length, 0, 'currency-only change should not update profiles directly');
-  });
-});
-
-await testAsync('settings: mixed update strips currency from the direct profile write', async () => {
-  const stub = makeStubClient({
-    profileRow: { id: 'user-1', currency: 'UAH', display_name: 'Dima' },
-    rpcResults: { set_user_currency: { data: { currency: 'UAH' }, error: null } },
-  });
-
-  await withFinancialRoute(SETTINGS_ROUTE, stub, async (route) => {
-    const response = await route.PATCH(jsonRequest('https://example.test/api/settings', {
-      currency: 'UAH', display_name: 'Dima',
-    }));
-    assert.equal(response.status, 200);
-
-    const profileUpdate = stub.calls.from.find(
-      (entry) => entry.table === 'profiles' && entry.ops.some((op) => op.op === 'update')
-    );
-    assert.ok(profileUpdate, 'expected a profiles update for non-currency fields');
-    const updateOp = profileUpdate.ops.find((op) => op.op === 'update');
-    assert.deepEqual(updateOp.values, { display_name: 'Dima' });
-    assert.ok(!('currency' in updateOp.values), 'currency must not be written directly to profiles');
-
-    assert.equal(stub.calls.rpc.filter((c) => c.name === 'set_user_currency').length, 1);
-  });
-});
-
-await testAsync('settings: currency sync failure is a hard error, not a silent partial success', async () => {
-  const stub = makeStubClient({
-    profileRow: { id: 'user-1' },
-    rpcResults: { set_user_currency: { data: null, error: { message: 'boom' } } },
-  });
-
-  await withFinancialRoute(SETTINGS_ROUTE, stub, async (route) => {
-    const response = await route.PATCH(jsonRequest('https://example.test/api/settings', { currency: 'GBP' }));
-    const result = await readJsonResponse(response);
-
-    assert.equal(result.status, 500);
-    assert.equal(result.body.error, 'Failed to update currency');
-    assert.equal(result.body.success, undefined);
-  });
-});
-
-await testAsync('settings: missing default bankroll surfaces as 404, currency change does not half-apply', async () => {
-  const stub = makeStubClient({
-    profileRow: { id: 'user-1' },
-    rpcResults: { set_user_currency: { data: null, error: { message: 'No default bankroll found' } } },
-  });
-
-  await withFinancialRoute(SETTINGS_ROUTE, stub, async (route) => {
-    const response = await route.PATCH(jsonRequest('https://example.test/api/settings', { currency: 'EUR' }));
-    const result = await readJsonResponse(response);
-
-    assert.equal(result.status, 404);
-    assert.equal(result.body.error, 'Bankroll not found');
-    assert.equal(result.body.success, undefined);
-  });
-});
-
-await testAsync('settings: non-currency update makes no RPC call', async () => {
-  const stub = makeStubClient({ profileRow: { id: 'user-1', default_stake: 25 } });
-
-  await withFinancialRoute(SETTINGS_ROUTE, stub, async (route) => {
-    const response = await route.PATCH(jsonRequest('https://example.test/api/settings', { default_stake: 25 }));
-    assert.equal(response.status, 200);
-    assert.equal(stub.calls.rpc.length, 0);
-  });
-});
+// The settings-route write contract moved to the Decision #048 suite
+// (scripts/test-domain-write-boundaries.mjs): a single save_user_settings
+// RPC call, zero direct table access. This suite keeps only the shared
+// financial invariants below.
 
 // ── lib/money ────────────────────────────────────────────────────────
 

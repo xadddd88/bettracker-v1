@@ -1790,5 +1790,31 @@ Reference: `docs/atomic-financial-writes-scope-decision-047.md`
 
 ---
 
+## Decision #048 - Core Domain Write Boundaries
+**Date:** 2026-07-10
+**Proposed by:** CPO (audit + preflight corrections) + Founder
+**Status:** Implementation ready, two-phase. Migrations NOT applied until CPO review of the PR; enforcement (018) applies only after the Phase-A deploy is verified in production.
+
+**Context:** Production inventory confirmed the audit: all seven core tables (`profiles`, `bankrolls`, `bankroll_transactions`, `bets`, `bet_legs`, `decisions`, `ai_analysis_runs`) carry `FOR ALL` policies and BOTH `anon` and `authenticated` hold the full table privilege set — multi-tenancy is protected, domain invariants are not. CPO preflight added two mandatory corrections: (1) `profiles` joins the scope — direct profile writes could desync `profiles.currency` from the default bankroll, re-breaking the Decision #047 invariant; (2) `create_decision_with_analysis()` is a user-callable FP-001 bypass — it accepts client-supplied model_probability/implied_probability/edge_percent/recommendation and persists them as `ai_analyst` output while skipping the `/api/ai/analyst` quality gate.
+
+**Decision:** Two-phase boundary enforcement:
+- **Phase A (`017_prepare_domain_write_boundaries.sql`, additive):** `persist_analysis_decision(p_user_id, …)` — server-only Analyst persistence, EXECUTE for `service_role` ONLY, `p_user_id` derived exclusively from the authenticated server session; `save_user_settings(…)` — atomic profile settings + default-bankroll currency sync (Decision #047 invariant preserved); `complete_onboarding()`. Routes move in the same PR (`/api/ai/analyst` → admin client, `/api/settings` → single RPC, `/api/onboarding/complete` → RPC), old paths stay alive until Phase B → zero downtime.
+- **Phase B (`018_enforce_domain_write_boundaries.sql`, enforcement):** for each core table — `REVOKE ALL` from PUBLIC/anon, `REVOKE INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER` from authenticated, `GRANT SELECT`, `FOR ALL` policy replaced by a `FOR SELECT` own-rows policy (production ownership quals preserved, `bet_legs` via parent bet); `create_decision_with_analysis` loses user EXECUTE (kept, dropped later); NO `FORCE ROW LEVEL SECURITY`; `service_role` untouched. Emergency rollback prepared in `docs/decision-048-rollback.sql` (never applied automatically).
+- Bypass verification with the retained `smoke-047` account (SAVEPOINT-per-denial), then the account is deleted.
+
+**CPO review round (PR #129) incorporated:** (P1) `REVOKE ALL` + `GRANT SELECT` per table — an enumerated revoke list would leave PostgreSQL 17's `MAINTAIN` privilege behind (prod ACLs = `arwdDxtm`); (P1) `place_bet_from_decision` hardened — pending-only + AI trust gate (`quality_gate.pricingAllowed` AND `trust_view.showPlaceBet` must be `true` for `ai_analyst` decisions; missing/legacy runs fail closed → `decision_not_placeable`, zero writes) — closes the Place-Bet trust-gate RPC bypass; (P1) `update_decision_action` reads the current action `FOR UPDATE` — closes the race against concurrent placement; 018 opens with a fail-closed Phase-A preflight `DO` block (raises before any REVOKE if 017's functions/EXECUTE surfaces are absent); rollback made transactional (`BEGIN`/`COMMIT`); new required CI job `Typecheck & lint`; direct-write sweep now recursive over `app/**/*.ts(x)`.
+
+**Tests:** CI suite `test:domain-write-boundaries` (13 cases after the review round). Settings-route write contract moved there from the financial-safety suite. All suites green: boundaries 13/13, financial 10/10, provider-safety 77/77, FP-001 26/26, tsc clean.
+
+**Recorded OPEN (not silently included):** `market_opportunities` (`FOR ALL` policy granted to role `{public}`; Scout writes directly) and `coaching_sessions` (user-callable INSERT) — separate trust-domain decision before external beta.
+
+**Non-use:** This decision does not approve enrichment, odds, provider calls, FP-001 gate changes, market_opportunities/coaching_sessions changes, or dropping the legacy Analyst RPC.
+
+**FP-001:** Closes a real FP-001 bypass (client-supplied pricing via RPC). No pricing surface is added.
+
+Reference: `docs/domain-write-boundaries-scope-decision-048.md`
+
+---
+
 *Last updated: 2026-07-10*
 *Owner: All (each role contributes)*

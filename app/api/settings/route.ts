@@ -15,6 +15,11 @@ const settingsSchema = z.object({
   timezone:           z.string().max(100).optional(),
 })
 
+// Decision #048: the route performs exactly ONE save_user_settings()
+// RPC call — profile fields and the default-bankroll currency sync are
+// a single DB transaction (profiles is SELECT-only for authenticated
+// after migration 018). The RPC returns the updated profile row, so no
+// separate read-back is needed.
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -35,47 +40,21 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'No fields provided' }, { status: 400 })
   }
 
-  // Decision #047: currency is synced to profiles AND the default
-  // bankroll atomically via set_user_currency() — the route never
-  // updates bankrolls directly, and a currency sync failure is a real
-  // error, not a silently dropped second write.
-  const { currency, ...profileUpdates } = updates
+  const { data, error } = await supabase.rpc('save_user_settings', {
+    p_display_name:       updates.display_name ?? null,
+    p_currency:           updates.currency ?? null,
+    p_default_stake:      updates.default_stake ?? null,
+    p_kelly_fraction:     updates.kelly_fraction ?? null,
+    p_web_search_enabled: updates.web_search_enabled ?? null,
+    p_timezone:           updates.timezone ?? null,
+  })
 
-  if (Object.keys(profileUpdates).length > 0) {
-    const { error } = await supabase
-      .from('profiles')
-      .update(profileUpdates)
-      .eq('id', user.id)
-
-    if (error) {
-      console.error('[settings] profile update failed:', error.message)
-      return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
+  if (error) {
+    if (/no default bankroll/i.test(error.message)) {
+      return NextResponse.json({ error: 'Bankroll not found' }, { status: 404 })
     }
-  }
-
-  if (currency) {
-    const { error: currencyError } = await supabase.rpc('set_user_currency', {
-      p_currency: currency,
-    })
-
-    if (currencyError) {
-      if (/no default bankroll/i.test(currencyError.message)) {
-        return NextResponse.json({ error: 'Bankroll not found' }, { status: 404 })
-      }
-      console.error('[settings] currency sync failed:', currencyError.message)
-      return NextResponse.json({ error: 'Failed to update currency' }, { status: 500 })
-    }
-  }
-
-  const { data, error: readError } = await supabase
-    .from('profiles')
-    .select()
-    .eq('id', user.id)
-    .single()
-
-  if (readError) {
-    console.error('[settings] profile read-back failed:', readError.message)
-    return NextResponse.json({ error: 'Failed to load settings' }, { status: 500 })
+    console.error('[settings] save_user_settings failed:', error.message)
+    return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
   }
 
   await trackServerEvent(user.id, EVENTS.SETTINGS_SAVED, {
