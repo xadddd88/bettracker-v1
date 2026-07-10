@@ -144,8 +144,12 @@ test('migration 023: service-role-only table + RPC, atomic multi-window deny', (
   assert.ok(/ENABLE ROW LEVEL SECURITY/.test(sql), 'RLS must be enabled');
   assert.ok(/REVOKE ALL ON api_rate_limits FROM PUBLIC, anon, authenticated/.test(sql), 'table must be service-role-only');
   assert.ok(/CREATE OR REPLACE FUNCTION rate_limit_check/.test(sql), 'rate_limit_check missing');
-  assert.ok(/ON CONFLICT \(bucket\) DO UPDATE SET count = api_rate_limits.count \+ 1/.test(sql), 'atomic increment missing');
-  assert.ok(/IF v_count > v_limit THEN/.test(sql), 'per-window limit check missing');
+  // Two-phase check-then-consume: a locked no-op read, deny at the limit,
+  // and consume from every window ONLY if all passed (denied requests must
+  // not drain a longer window's budget).
+  assert.ok(/ON CONFLICT \(bucket\) DO UPDATE SET count = api_rate_limits\.count\b(?! \+)/.test(sql), 'phase-1 must be a locked no-op read (no increment)');
+  assert.ok(/IF v_count >= v_limit THEN/.test(sql), 'per-window limit check missing');
+  assert.ok(/IF NOT v_denied THEN\s+UPDATE api_rate_limits SET count = count \+ 1 WHERE bucket = ANY\(v_buckets\)/.test(sql), 'phase-2 must consume only when all windows pass');
   assert.ok(/'retry_after'/.test(sql), 'retry_after not returned');
   assert.ok(/REVOKE EXECUTE ON FUNCTION rate_limit_check\(text, jsonb\) FROM PUBLIC, anon, authenticated/.test(sql), 'RPC grant hygiene missing');
   assert.ok(/GRANT {2}EXECUTE ON FUNCTION rate_limit_check\(text, jsonb\) TO service_role/.test(sql), 'RPC must be granted to service_role');

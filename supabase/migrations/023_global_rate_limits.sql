@@ -26,9 +26,13 @@ ALTER TABLE api_rate_limits ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON api_rate_limits FROM PUBLIC, anon, authenticated;
 
 -- rate_limit_check(key, windows) — windows is a JSON array of
--- {"limit": <int>, "seconds": <int>}. Increments every window's fixed
--- bucket atomically and denies if ANY is over its limit. retry_after is
--- the seconds until the longest-blocked window resets.
+-- {"limit": <int>, "seconds": <int>}. Two-phase check-then-consume:
+-- Phase 1 takes a row lock on every window's fixed bucket and reads its
+-- current count; Phase 2 consumes one token from EVERY window only if ALL
+-- are under limit. A denied request consumes NOTHING, so a burst blocked
+-- by a short window can never drain a longer window's budget. retry_after
+-- is the seconds until the longest-blocked window resets. The per-bucket
+-- row locks (held by ON CONFLICT DO UPDATE) serialize concurrent callers.
 CREATE OR REPLACE FUNCTION rate_limit_check(
   p_key     text,
   p_windows jsonb
@@ -44,6 +48,7 @@ DECLARE
   v_window_end bigint;
   v_denied    boolean := false;
   v_retry     integer := 0;
+  v_buckets   text[] := '{}';
 BEGIN
   IF p_key IS NULL OR length(p_key) = 0 OR length(p_key) > 200 THEN
     RAISE EXCEPTION 'invalid key';
@@ -57,6 +62,9 @@ BEGIN
     DELETE FROM api_rate_limits WHERE expires_at < now();
   END IF;
 
+  -- Phase 1: lock every window's bucket and read its current count without
+  -- consuming. ON CONFLICT DO UPDATE (a no-op here) still takes the row lock,
+  -- so concurrent callers on the same bucket serialize.
   FOR w IN SELECT * FROM jsonb_array_elements(p_windows)
   LOOP
     v_limit   := (w->>'limit')::integer;
@@ -69,15 +77,23 @@ BEGIN
     v_window_end := ((v_now / v_seconds) + 1) * v_seconds;
 
     INSERT INTO api_rate_limits (bucket, count, expires_at)
-    VALUES (v_bucket, 1, to_timestamp(v_window_end))
-    ON CONFLICT (bucket) DO UPDATE SET count = api_rate_limits.count + 1
+    VALUES (v_bucket, 0, to_timestamp(v_window_end))
+    ON CONFLICT (bucket) DO UPDATE SET count = api_rate_limits.count
     RETURNING count INTO v_count;
 
-    IF v_count > v_limit THEN
+    v_buckets := array_append(v_buckets, v_bucket);
+
+    -- count is the number already consumed this window; deny at the limit.
+    IF v_count >= v_limit THEN
       v_denied := true;
       v_retry  := GREATEST(v_retry, (v_window_end - v_now)::integer);
     END IF;
   END LOOP;
+
+  -- Phase 2: consume a token from every window ONLY if all passed.
+  IF NOT v_denied THEN
+    UPDATE api_rate_limits SET count = count + 1 WHERE bucket = ANY(v_buckets);
+  END IF;
 
   RETURN jsonb_build_object('allowed', NOT v_denied, 'retry_after', v_retry);
 END;

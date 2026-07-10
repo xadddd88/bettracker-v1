@@ -23,10 +23,17 @@ Supabase Postgres, atomic and shared across every instance.
 - `api_rate_limits` table (`bucket` PK, `count`, `expires_at`; index on `expires_at`) —
   service-role only (RLS on, no anon/authenticated grants).
 - `rate_limit_check(p_key text, p_windows jsonb)` RPC (SECURITY DEFINER, service_role only):
-  fixed-window atomic counter. For each window (`{limit, seconds}`) it computes a bucket
-  `key|seconds|floor(epoch/seconds)`, `INSERT … ON CONFLICT DO UPDATE SET count = count + 1`,
-  and denies if any window's new count exceeds its limit. `retry_after` = seconds until the
-  longest-blocked window resets. Opportunistic expired-bucket cleanup (~1% of calls).
+  fixed-window, **two-phase check-then-consume**. Phase 1 takes a row lock on every window's
+  bucket (`key|seconds|floor(epoch/seconds)`) via a no-op `ON CONFLICT DO UPDATE` and reads
+  its current count; Phase 2 consumes one token from **every** window only if **all** are
+  under limit. A denied request consumes NOTHING — so a burst blocked by a short window can
+  never drain a longer window's budget (VADE review fix, PR #137: the earlier
+  increment-then-check version let a per-minute-blocked burst exhaust the per-day cap and
+  lock the caller out for the whole day). `retry_after` = seconds until the longest-blocked
+  window resets; the per-bucket row locks serialize concurrent callers. Opportunistic
+  expired-bucket cleanup (~1% of calls). Behaviourally verified: a 4-request burst against
+  limit 2/min + 5/day yields allowed `true true false false` with the day counter at **2**,
+  not 4.
 
 ### Shared helper `lib/rate-limit.ts`
 - `enforceRateLimit(key, windows)` → `{ allowed, retryAfter }` via the RPC (admin client).
