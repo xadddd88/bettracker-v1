@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 import { bucketScoutScore } from '@/lib/analytics/buckets'
@@ -515,19 +516,26 @@ Return 1–5 research candidates as JSON only. No markdown, no explanation outsi
       }
     })
 
-    // 8. Batch insert — all or nothing
-    const { data: inserted, error: insertErr } = await supabase
-      .from('market_opportunities')
-      .insert(rows)
-      .select()
+    // 8. Batch insert — server-only persistence (Decision #049).
+    // market_opportunities is SELECT-only for authenticated after
+    // migration 020; the write goes through persist_market_opportunities
+    // (service_role EXECUTE only) with the session-derived user id.
+    const adminClient = createAdminClient()
+    const { data: insertedData, error: insertErr } = await adminClient.rpc('persist_market_opportunities', {
+      p_user_id: user.id,
+      p_rows:    rows,
+    })
 
     if (insertErr) {
+      console.error('[scout] persist error:', insertErr.message)
       await trackServerEvent(user.id, EVENTS.SCOUT_FAILED, { sport: input.sport, error_type: 'persist' })
       return NextResponse.json(
-        { success: false, error: `Scout succeeded but failed to persist: ${insertErr.message}` },
+        { success: false, error: 'Scout succeeded but failed to persist' },
         { status: 500 },
       )
     }
+
+    const inserted = (insertedData ?? []) as unknown[]
 
     await trackServerEvent(user.id, EVENTS.SCOUT_COMPLETED, {
       sport:           input.sport,
