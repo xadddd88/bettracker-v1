@@ -2,7 +2,8 @@
 
 ## Status
 
-SCOPE + IMPLEMENTATION. Migration 016 requires manual apply before the code deploy goes live.
+EXECUTED 2026-07-10 — migration applied + verified, PR #127 merged (production `1e197f6`),
+controlled smoke passed. See `docs/atomic-financial-writes-execution-record-047.md`.
 
 Last updated: 2026-07-10
 
