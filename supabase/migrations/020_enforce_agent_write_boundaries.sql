@@ -32,17 +32,44 @@ BEGIN
     RAISE EXCEPTION 'Phase A missing: update_opportunity_status not found — apply migration 019 first';
   END IF;
 
+  -- persist_market_opportunities: service_role yes, authenticated/anon no
   IF NOT has_function_privilege('service_role', v_opps, 'EXECUTE') THEN
     RAISE EXCEPTION 'Phase A invalid: service_role lacks EXECUTE on persist_market_opportunities';
   END IF;
   IF has_function_privilege('authenticated', v_opps, 'EXECUTE') THEN
     RAISE EXCEPTION 'Phase A invalid: authenticated must NOT have EXECUTE on persist_market_opportunities';
   END IF;
+  IF has_function_privilege('anon', v_opps, 'EXECUTE') THEN
+    RAISE EXCEPTION 'Phase A invalid: anon must NOT have EXECUTE on persist_market_opportunities';
+  END IF;
+
+  -- persist_coaching_session: service_role yes, authenticated/anon no
+  IF NOT has_function_privilege('service_role', v_coach, 'EXECUTE') THEN
+    RAISE EXCEPTION 'Phase A invalid: service_role lacks EXECUTE on persist_coaching_session';
+  END IF;
   IF has_function_privilege('authenticated', v_coach, 'EXECUTE') THEN
     RAISE EXCEPTION 'Phase A invalid: authenticated must NOT have EXECUTE on persist_coaching_session';
   END IF;
+  IF has_function_privilege('anon', v_coach, 'EXECUTE') THEN
+    RAISE EXCEPTION 'Phase A invalid: anon must NOT have EXECUTE on persist_coaching_session';
+  END IF;
+
+  -- update_opportunity_status: authenticated yes, anon no
   IF NOT has_function_privilege('authenticated', v_status, 'EXECUTE') THEN
     RAISE EXCEPTION 'Phase A invalid: authenticated lacks EXECUTE on update_opportunity_status';
+  END IF;
+  IF has_function_privilege('anon', v_status, 'EXECUTE') THEN
+    RAISE EXCEPTION 'Phase A invalid: anon must NOT have EXECUTE on update_opportunity_status';
+  END IF;
+
+  -- RLS must be ON before we grant authenticated SELECT — otherwise a
+  -- rebuilt environment could expose the tables. (Enabled in production;
+  -- asserted here so the migration is correct fail-closed everywhere.)
+  IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.market_opportunities'::regclass) THEN
+    RAISE EXCEPTION 'RLS not enabled on market_opportunities';
+  END IF;
+  IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.coaching_sessions'::regclass) THEN
+    RAISE EXCEPTION 'RLS not enabled on coaching_sessions';
   END IF;
 END
 $$;
@@ -56,7 +83,7 @@ REVOKE ALL ON public.market_opportunities FROM authenticated;
 GRANT SELECT ON public.market_opportunities TO authenticated;
 -- The old policy was FOR ALL granted to role PUBLIC — worse than the core tables.
 DROP POLICY IF EXISTS "Users see own opportunities" ON public.market_opportunities;
-DROP POLICY IF EXISTS "market_opportunities select own" ON public.market_opportunities;
+DROP POLICY IF EXISTS "market_opportunities select own" ON public.market_opportunities;  -- idempotent re-run safety
 CREATE POLICY "market_opportunities select own" ON public.market_opportunities
   FOR SELECT TO authenticated
   USING ((SELECT auth.uid()) = user_id);
@@ -76,6 +103,7 @@ GRANT SELECT ON public.coaching_sessions TO authenticated;
 DROP POLICY IF EXISTS "Users see own sessions" ON public.coaching_sessions;
 DROP POLICY IF EXISTS "coaching_sessions_insert" ON public.coaching_sessions;
 DROP POLICY IF EXISTS "coaching_sessions_select" ON public.coaching_sessions;
+DROP POLICY IF EXISTS "coaching_sessions select own" ON public.coaching_sessions;  -- idempotent re-run safety
 CREATE POLICY "coaching_sessions select own" ON public.coaching_sessions
   FOR SELECT TO authenticated
   USING ((SELECT auth.uid()) = user_id);

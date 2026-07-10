@@ -81,33 +81,57 @@ test('migration 019: Scout/Coach persistence RPCs are service_role only', () => 
   assert.ok((sql.match(/SET search_path = public/g) ?? []).length >= 3, 'search_path pinning missing');
 });
 
-test('migration 019: Scout persist forces FP-001 pricing fields to NULL', () => {
+test('migration 019: Scout persist forces FP-001 pricing NULL, structural status, bounded batch', () => {
   const sql = readFileSync(path.join(repoRoot, MIG_019), 'utf8');
   const fnStart = sql.indexOf('CREATE OR REPLACE FUNCTION persist_market_opportunities');
   const fnBody = sql.slice(fnStart, sql.indexOf('$$;', fnStart));
 
-  // The insert column list has model_probability, implied_probability,
-  // edge_percent, and their VALUES entry must be the literal NULL triple —
-  // not read from the input row.
+  // Pricing forced NULL, not read from input.
   assert.ok(/NULL, NULL, NULL,/.test(fnBody), 'pricing must be forced to NULL in the VALUES list');
   assert.ok(!/->>'model_probability'/.test(fnBody), 'model_probability must not be read from input');
   assert.ok(!/->>'edge_percent'/.test(fnBody), 'edge_percent must not be read from input');
-  assert.ok(/jsonb_array_length\(p_rows\) > 25/.test(fnBody), 'batch size cap missing');
+  // Status structural, not from input (a caller cannot seed 'converted').
+  assert.ok(!/COALESCE\(v_row->>'status'/.test(fnBody), 'status must not be read from input');
+  assert.ok(/'discovered',\n\s+v_row->>'reasoning'/.test(fnBody), "status must be the literal 'discovered'");
+  // NULL-safe + bounded 1..25 batch.
+  assert.ok(/p_rows IS NULL OR jsonb_typeof\(p_rows\) <> 'array'/.test(fnBody), 'NULL/array guard missing');
+  assert.ok(/jsonb_array_length\(p_rows\) < 1 OR jsonb_array_length\(p_rows\) > 25/.test(fnBody), 'batch must be bounded 1..25');
 });
 
-test('migration 019: update_opportunity_status is authenticated + ownership-scoped', () => {
+test('migration 019: update_opportunity_status is a locked, ownership-scoped state machine', () => {
   const sql = readFileSync(path.join(repoRoot, MIG_019), 'utf8');
 
   assert.ok(sql.includes('CREATE OR REPLACE FUNCTION update_opportunity_status('), 'update_opportunity_status missing');
   const fnStart = sql.indexOf('CREATE OR REPLACE FUNCTION update_opportunity_status');
   const fnBody = sql.slice(fnStart, sql.indexOf('$$;', fnStart));
-  assert.ok(fnBody.includes('v_user_id uuid := auth.uid()'), 'must derive user from auth.uid()');
-  assert.ok(/WHERE id = p_opportunity_id AND user_id = v_user_id/.test(fnBody), 'update must be ownership-scoped');
-  assert.ok(fnBody.includes("RAISE EXCEPTION 'Invalid status value'"), 'status enum validation missing');
-  assert.ok(/Linked decision not found/.test(fnBody), 'linked-decision ownership check missing');
+
+  assert.ok(fnBody.includes('v_user_id       uuid := auth.uid()'), 'must derive user from auth.uid()');
+  // Only genuine user actions accepted.
+  assert.ok(fnBody.includes("p_status NOT IN ('watchlisted','dismissed','converted_to_decision')"), 'status must be narrowed to user actions');
+  // Row lock before evaluating the transition.
+  assert.ok(/FROM market_opportunities[\s\S]*?FOR UPDATE;/.test(fnBody), 'must lock the opportunity row FOR UPDATE');
+  // Terminal states + idempotent conversion repeat.
+  assert.ok(fnBody.includes("RAISE EXCEPTION 'invalid_transition'"), 'terminal-state guard missing');
+  assert.ok(/p_linked_decision_id = v_current_link[\s\S]*?RETURN;/.test(fnBody), 'idempotent exact-repeat conversion missing');
+  // Conversion requires an owned ai_analyst decision.
+  assert.ok(fnBody.includes("RAISE EXCEPTION 'link_required'"), 'link_required guard missing');
+  assert.ok(/AND source = 'ai_analyst'/.test(fnBody), 'conversion must require an ai_analyst decision');
+  assert.ok(fnBody.includes("RAISE EXCEPTION 'invalid_link'"), 'invalid_link guard missing');
+  // Non-conversion statuses forbid a link.
+  assert.ok(fnBody.includes("RAISE EXCEPTION 'link_not_allowed'"), 'link_not_allowed guard missing');
+  // Link is never carried over via COALESCE (the old bug).
+  assert.ok(!/linked_decision_id = COALESCE\(p_linked_decision_id, linked_decision_id\)/.test(fnBody), 'link must not be carried over with COALESCE');
   assert.ok(
     /GRANT {2}EXECUTE ON FUNCTION update_opportunity_status\([^)]*\) TO authenticated, service_role;/.test(sql),
     'update_opportunity_status grant to authenticated missing'
+  );
+});
+
+test('migration 019: partial unique index prevents two opportunities claiming one decision', () => {
+  const sql = readFileSync(path.join(repoRoot, MIG_019), 'utf8');
+  assert.ok(
+    /CREATE UNIQUE INDEX IF NOT EXISTS uq_market_opp_linked_decision\s+ON market_opportunities \(linked_decision_id\)\s+WHERE linked_decision_id IS NOT NULL;/.test(sql),
+    'partial unique index on linked_decision_id missing'
   );
 });
 
@@ -148,7 +172,7 @@ test('migration 020: both agent tables become SELECT-only for authenticated (REV
   }
 });
 
-test('migration 020: fail-closed Phase-A preflight runs before any REVOKE', () => {
+test('migration 020: fail-closed Phase-A preflight checks the full grant matrix + RLS before any REVOKE', () => {
   const sql = readFileSync(path.join(repoRoot, MIG_020), 'utf8');
   const active = stripSqlComments(sql);
 
@@ -156,14 +180,26 @@ test('migration 020: fail-closed Phase-A preflight runs before any REVOKE', () =
   const firstRevokeIdx = active.indexOf('REVOKE ALL ON public.');
   assert.ok(preflightIdx !== -1 && firstRevokeIdx !== -1, 'preflight and revokes must exist');
   assert.ok(preflightIdx < firstRevokeIdx, 'preflight must run BEFORE the first REVOKE');
-  for (const fn of ['persist_market_opportunities', 'persist_coaching_session', 'update_opportunity_status']) {
-    assert.ok(active.includes(fn), `preflight must check ${fn}`);
-  }
-  assert.ok(
-    /IF has_function_privilege\('authenticated', v_opps, 'EXECUTE'\) THEN/.test(active),
-    'preflight must fail if authenticated can execute persist_market_opportunities'
-  );
-  assert.ok((active.match(/RAISE EXCEPTION 'Phase A/g) ?? []).length >= 4, 'preflight must raise on every mismatch');
+
+  const preflight = active.slice(preflightIdx, firstRevokeIdx);
+
+  // service_role must hold EXECUTE on both persist RPCs.
+  assert.ok(/NOT has_function_privilege\('service_role', v_opps, 'EXECUTE'\)/.test(preflight), 'service_role→persist_opps check missing');
+  assert.ok(/NOT has_function_privilege\('service_role', v_coach, 'EXECUTE'\)/.test(preflight), 'service_role→persist_coach check missing');
+  // authenticated must NOT hold EXECUTE on either persist RPC.
+  assert.ok(/has_function_privilege\('authenticated', v_opps, 'EXECUTE'\)/.test(preflight), 'authenticated!→persist_opps check missing');
+  assert.ok(/has_function_privilege\('authenticated', v_coach, 'EXECUTE'\)/.test(preflight), 'authenticated!→persist_coach check missing');
+  // anon must NOT hold EXECUTE on any of the three.
+  assert.ok(/has_function_privilege\('anon', v_opps, 'EXECUTE'\)/.test(preflight), 'anon!→persist_opps check missing');
+  assert.ok(/has_function_privilege\('anon', v_coach, 'EXECUTE'\)/.test(preflight), 'anon!→persist_coach check missing');
+  assert.ok(/has_function_privilege\('anon', v_status, 'EXECUTE'\)/.test(preflight), 'anon!→update_status check missing');
+  // authenticated must hold EXECUTE on the status RPC.
+  assert.ok(/NOT has_function_privilege\('authenticated', v_status, 'EXECUTE'\)/.test(preflight), 'authenticated→update_status check missing');
+  // RLS must be enabled on both tables before granting SELECT.
+  assert.ok(/relrowsecurity FROM pg_class WHERE oid = 'public\.market_opportunities'::regclass/.test(preflight), 'market_opportunities RLS check missing');
+  assert.ok(/relrowsecurity FROM pg_class WHERE oid = 'public\.coaching_sessions'::regclass/.test(preflight), 'coaching_sessions RLS check missing');
+
+  assert.ok((preflight.match(/RAISE EXCEPTION/g) ?? []).length >= 11, 'preflight must raise on every mismatch (>=11 checks)');
 });
 
 test('rollback script exists outside migrations, is transactional, restores prior state', () => {
@@ -187,17 +223,36 @@ test('rollback script exists outside migrations, is transactional, restores prio
 
 test('scout route: persists via admin client + persist_market_opportunities, session user id', () => {
   const src = readFileSync(path.join(repoRoot, 'app/api/scout/route.ts'), 'utf8');
+  const compact = src.replace(/\s+/g, '');
   assert.ok(src.includes('createAdminClient'), 'scout route must use the admin client for persistence');
   assert.ok(/adminClient\.rpc\('persist_market_opportunities'/.test(src), 'scout route must call persist_market_opportunities');
   assert.ok(/p_user_id:\s+user\.id/.test(src), 'p_user_id must come from the authenticated session');
-  assert.ok(!/\.from\(['"`]market_opportunities['"`]\)\s*\.insert/.test(src.replace(/\s+/g, '')) || true, 'sanity');
+  assert.ok(!/\.from\(['"`]market_opportunities['"`]\)\.insert/.test(compact), 'must not insert market_opportunities directly');
 });
 
-test('scout [id] route: status change via update_opportunity_status RPC', () => {
+test('scout [id] route: RPC-only, UUID-validated, sanitized errors, mapped status codes', () => {
   const src = readFileSync(path.join(repoRoot, 'app/api/scout/[id]/route.ts'), 'utf8');
-  assert.ok(/rpc\('update_opportunity_status'/.test(src), 'scout [id] route must call update_opportunity_status');
   const compact = src.replace(/\s+/g, '');
+
+  assert.ok(/rpc\('update_opportunity_status'/.test(src), 'must call update_opportunity_status');
   assert.ok(!/\.from\(['"`]market_opportunities['"`]\)\.update/.test(compact), 'must not update market_opportunities directly');
+  // Narrowed schema — no system statuses.
+  assert.ok(/z\.enum\(\['watchlisted', 'dismissed', 'converted_to_decision'\]\)/.test(src), 'schema must be narrowed to user actions');
+  // Path id validated as UUID → 400.
+  assert.ok(/z\.string\(\)\.uuid\(\)\.safeParse\(id\)/.test(src), 'path id must be UUID-validated');
+  // Error-token mapping.
+  assert.ok(/opportunity_not_found[\s\S]*?status: 404/.test(src), 'not-found must map to 404');
+  assert.ok(/invalid_transition[\s\S]*?status: 409/.test(src), 'invalid transition must map to 409');
+  assert.ok(/link_required\|invalid_link\|link_not_allowed[\s\S]*?status: 400/.test(src), 'bad request tokens must map to 400');
+  // Generic catch must not leak err.message.
+  assert.ok(!/error:\s*msg\b/.test(src), 'generic catch must not return raw err.message');
+  assert.ok(/err instanceof Error \? err\.name/.test(src), 'generic catch must log err.name only');
+});
+
+test('coach route: generic catch does not leak raw error messages', () => {
+  const src = readFileSync(path.join(repoRoot, 'app/api/coach/route.ts'), 'utf8');
+  assert.ok(!/const msg = err instanceof Error \? err\.message/.test(src), 'coach catch must not build a raw error message');
+  assert.ok(/\[coach\] unhandled error:'/.test(src) || /\[coach\] unhandled error:/.test(src), 'coach catch must log a sanitized line');
 });
 
 test('coach route: persists via admin client + persist_coaching_session, session user id', () => {

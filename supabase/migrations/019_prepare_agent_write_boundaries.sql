@@ -46,11 +46,13 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_user_id) THEN
     RAISE EXCEPTION 'Unknown user';
   END IF;
-  IF jsonb_typeof(p_rows) <> 'array' THEN
+  -- NULL-safe: jsonb_typeof(NULL) is NULL, so an explicit NULL check is
+  -- required or a NULL batch would slip past as a silent empty success.
+  IF p_rows IS NULL OR jsonb_typeof(p_rows) <> 'array' THEN
     RAISE EXCEPTION 'rows must be a json array';
   END IF;
-  IF jsonb_array_length(p_rows) > 25 THEN
-    RAISE EXCEPTION 'too many opportunities in one batch';
+  IF jsonb_array_length(p_rows) < 1 OR jsonb_array_length(p_rows) > 25 THEN
+    RAISE EXCEPTION 'batch size must be between 1 and 25';
   END IF;
 
   FOR v_row IN SELECT * FROM jsonb_array_elements(p_rows)
@@ -75,7 +77,9 @@ BEGIN
       NULL, NULL, NULL,
       NULLIF(v_row->>'confidence_score','')::int,
       v_row->>'risk_level',
-      COALESCE(v_row->>'status','discovered'),
+      -- Status is structurally 'discovered' for a fresh Scout batch — never
+      -- read from input (a caller cannot seed an opportunity as converted).
+      'discovered',
       v_row->>'reasoning',
       v_row->'required_checks',
       COALESCE((v_row->>'web_search_used')::boolean, false),
@@ -144,9 +148,18 @@ $$;
 REVOKE EXECUTE ON FUNCTION persist_coaching_session(uuid, int, date, date, int, int, text, text, jsonb, jsonb, jsonb, jsonb, jsonb, text, text, text) FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION persist_coaching_session(uuid, int, date, date, int, int, text, text, jsonb, jsonb, jsonb, jsonb, jsonb, text, text, text) TO service_role;
 
--- ── 3. update_opportunity_status() — authenticated ───────────
--- User action (dismiss / watchlist / convert). auth.uid()-scoped,
--- status enum validated, ownership enforced.
+-- ── 3. update_opportunity_status() — authenticated state machine ──
+-- Only genuine user actions are accepted: watchlisted / dismissed /
+-- converted_to_decision. The row is locked (FOR UPDATE) and a state
+-- machine governs transitions:
+--   from discovered / research_needed / watchlisted →
+--        watchlisted | dismissed (link must be NULL)
+--        converted_to_decision (link required, owned, ai_analyst)
+--   converted_to_decision / dismissed / expired are terminal
+--   (an exact repeat of the same conversion link is idempotent).
+-- The conversion link is immutable once set. 'expired' and other
+-- system transitions are not reachable through this user path.
+-- Error tokens are stable so the route can map them to status codes.
 
 CREATE OR REPLACE FUNCTION update_opportunity_status(
   p_opportunity_id    uuid,
@@ -155,36 +168,83 @@ CREATE OR REPLACE FUNCTION update_opportunity_status(
 )
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  v_user_id uuid := auth.uid();
+  v_user_id       uuid := auth.uid();
+  v_current_status text;
+  v_current_link  uuid;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
 
-  IF p_status NOT IN (
-    'discovered','research_needed','watchlisted',
-    'converted_to_decision','dismissed','expired'
-  ) THEN
-    RAISE EXCEPTION 'Invalid status value';
+  IF p_status NOT IN ('watchlisted','dismissed','converted_to_decision') THEN
+    RAISE EXCEPTION 'invalid_status';
   END IF;
 
-  -- If a linked decision is supplied it must belong to the caller.
-  IF p_linked_decision_id IS NOT NULL
-     AND NOT EXISTS (SELECT 1 FROM decisions WHERE id = p_linked_decision_id AND user_id = v_user_id) THEN
-    RAISE EXCEPTION 'Linked decision not found or does not belong to user';
-  END IF;
-
-  UPDATE market_opportunities SET
-    status             = p_status,
-    linked_decision_id = COALESCE(p_linked_decision_id, linked_decision_id),
-    updated_at         = now()
-  WHERE id = p_opportunity_id AND user_id = v_user_id;
+  -- Lock the row, read current state.
+  SELECT status, linked_decision_id
+  INTO v_current_status, v_current_link
+  FROM market_opportunities
+  WHERE id = p_opportunity_id AND user_id = v_user_id
+  FOR UPDATE;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'Opportunity not found or does not belong to user';
+    RAISE EXCEPTION 'opportunity_not_found';
+  END IF;
+
+  -- Terminal states.
+  IF v_current_status = 'converted_to_decision' THEN
+    -- Idempotent exact repeat of the same conversion is a no-op.
+    IF p_status = 'converted_to_decision'
+       AND p_linked_decision_id IS NOT NULL
+       AND p_linked_decision_id = v_current_link THEN
+      RETURN;
+    END IF;
+    RAISE EXCEPTION 'invalid_transition';
+  END IF;
+  IF v_current_status IN ('dismissed','expired') THEN
+    RAISE EXCEPTION 'invalid_transition';
+  END IF;
+
+  -- Current status is now discovered / research_needed / watchlisted.
+  IF p_status = 'converted_to_decision' THEN
+    IF p_linked_decision_id IS NULL THEN
+      RAISE EXCEPTION 'link_required';
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM decisions
+      WHERE id = p_linked_decision_id
+        AND user_id = v_user_id
+        AND source = 'ai_analyst'
+    ) THEN
+      RAISE EXCEPTION 'invalid_link';
+    END IF;
+
+    UPDATE market_opportunities SET
+      status             = 'converted_to_decision',
+      linked_decision_id = p_linked_decision_id,
+      updated_at         = now()
+    WHERE id = p_opportunity_id AND user_id = v_user_id;
+  ELSE
+    -- watchlisted / dismissed carry no link.
+    IF p_linked_decision_id IS NOT NULL THEN
+      RAISE EXCEPTION 'link_not_allowed';
+    END IF;
+
+    UPDATE market_opportunities SET
+      status     = p_status,
+      updated_at = now()
+    WHERE id = p_opportunity_id AND user_id = v_user_id;
   END IF;
 END;
 $$;
 
 REVOKE EXECUTE ON FUNCTION update_opportunity_status(uuid, text, uuid) FROM PUBLIC, anon;
 GRANT  EXECUTE ON FUNCTION update_opportunity_status(uuid, text, uuid) TO authenticated, service_role;
+
+-- One canonical opportunity per converted Decision — a Decision cannot be
+-- claimed as the conversion target of two opportunities. Partial: only
+-- rows that actually carry a link are constrained. Production verified
+-- duplicate-free (read-only) before adding this.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_market_opp_linked_decision
+  ON market_opportunities (linked_decision_id)
+  WHERE linked_decision_id IS NOT NULL;

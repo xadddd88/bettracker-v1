@@ -630,8 +630,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, data: inserted })
 
   } catch (err: unknown) {
-    console.error('[coach]', err)
-    const msg = err instanceof Error ? err.message : 'Internal error'
-    return NextResponse.json({ success: false, error: msg }, { status: 500 })
+    console.error('[coach] unhandled error:', err instanceof Error ? err.name : 'unknown')
+    return NextResponse.json({ success: false, error: 'Internal error' }, { status: 500 })
   }
 }
