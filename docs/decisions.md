@@ -1864,5 +1864,31 @@ Reference: `docs/registration-invite-flow-scope-decision-050.md`
 
 ---
 
+## Decision #051 - FP-001 Legacy Pricing Quarantine
+**Date:** 2026-07-10
+**Proposed by:** CPO (audit item 5) + Claude
+**Status:** Implementation ready. Migration 022 NOT applied until CPO review.
+
+**Context:** "Code is protected better than data." PR #122 stopped Scout/Coach from using legacy pricing and the gate blocks display, but fabricated pre-gate numbers still sit in the DB. Inventory (2026-07-10): 20 `decisions` (all ai_analyst, newest 2026-07-04), 41 `market_opportunities` (all rows, newest 2026-07-01), and 17 `ai_analysis_runs.output_json` (none carry a quality_gate) carry model/implied/edge. Pricing has been blocked on 100% of runs, so no verified pricing has ever existed — every value is fabricated. The UI hides them, but the raw values remain readable by future analytics/migration/Coach.
+
+**Decision:** Migration `022_fp001_legacy_quarantine.sql` — backup + scrub (CPO's recommended option):
+- Audit table `fp001_pricing_quarantine` (service-role only, RLS on, no anon/authenticated grants) preserves every scrubbed value (reversible).
+- Back up **before** scrubbing, per surface: `decisions` + `market_opportunities` pricing columns → NULL; `ai_analysis_runs.output_json` model/implied/edge keys stripped.
+- Cutoff guard `created_at < '2026-07-07'` (gate/PR #122 ship date) so re-running never scrubs a future verified row.
+- Expected: 0 live readable pricing across all three surfaces; quarantine holds 20+41+17 = 78 rows.
+- No live trust-marker column (the quarantine table is the audit record; post-scrub NULL already means "no trustworthy pricing"); no schema change to the pricing columns; values preserved, not deleted.
+
+**Safety:** No read path breaks — Coach already ignores legacy edge_percent (PR #122), the Analyst/decision/Scout surfaces gate display on the quality gate (NULL → blocked surface, already what legacy rows show), analytics reads bet P&L not decision pricing.
+
+**Tests:** new CI suite `test:fp001-quarantine` (5 static cases). Live before/after counts verified during execution.
+
+**Non-use:** No gate change, no Scout/Coach/Analyst logic change, no deletion of the fabricated values, no live marker column.
+
+**FP-001:** Directly closes the FP-001 data residue — removes the last place fabricated pricing is readable as if real.
+
+Reference: `docs/fp001-legacy-quarantine-scope-decision-051.md`
+
+---
+
 *Last updated: 2026-07-10*
 *Owner: All (each role contributes)*
