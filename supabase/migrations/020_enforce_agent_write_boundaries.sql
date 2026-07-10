@@ -66,6 +66,14 @@ REVOKE ALL ON public.coaching_sessions FROM PUBLIC;
 REVOKE ALL ON public.coaching_sessions FROM anon;
 REVOKE ALL ON public.coaching_sessions FROM authenticated;
 GRANT SELECT ON public.coaching_sessions TO authenticated;
+-- Drop EVERY known coaching_sessions policy name. Tracked migration 005
+-- created a FOR ALL policy "Users see own sessions"; production was later
+-- switched (untracked, via SQL Editor) to the split _select/_insert
+-- policies. Dropping all three names makes this migration correct whether
+-- applied to production OR to an environment rebuilt from tracked
+-- migrations — otherwise the FOR ALL policy would survive and the table
+-- would never actually become SELECT-only.
+DROP POLICY IF EXISTS "Users see own sessions" ON public.coaching_sessions;
 DROP POLICY IF EXISTS "coaching_sessions_insert" ON public.coaching_sessions;
 DROP POLICY IF EXISTS "coaching_sessions_select" ON public.coaching_sessions;
 CREATE POLICY "coaching_sessions select own" ON public.coaching_sessions

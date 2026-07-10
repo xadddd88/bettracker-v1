@@ -45,6 +45,15 @@ policy. No `FORCE ROW LEVEL SECURITY`. `service_role` untouched.
 Emergency rollback: `docs/decision-049-rollback.sql` (single `BEGIN`/`COMMIT`, outside
 migrations, manual-only).
 
+**Schema-drift note (found in review):** tracked migration 005 created a `FOR ALL` policy
+`"Users see own sessions"` on `coaching_sessions`, but production was later switched
+(untracked, via SQL Editor) to the split `coaching_sessions_select` / `coaching_sessions_insert`
+policies. Migration 020 drops all three names so it is correct whether applied to production
+or to an environment rebuilt from tracked migrations — otherwise the `FOR ALL` policy would
+survive on a fresh rebuild and the table would never become SELECT-only. This is another
+instance of the standing manual-migration drift risk; a later reconciliation pass should make
+the tracked migrations match production.
+
 ## Tests
 
 New CI suite `npm run test:agent-write-boundaries` (10 cases): 019 static guards (EXECUTE

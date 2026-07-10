@@ -131,9 +131,21 @@ test('migration 020: both agent tables become SELECT-only for authenticated (REV
   assert.ok(!/REVOKE INSERT, UPDATE, DELETE/.test(active), 'no enumerated authenticated revoke may remain');
   assert.ok(!active.includes('FORCE ROW LEVEL SECURITY'), 'FORCE RLS must NOT be enabled');
   assert.ok(!/CREATE POLICY[^;]*FOR ALL/.test(active), 'no FOR ALL policy may remain');
-  // The pre-existing worst offender: FOR ALL to role public must be dropped.
-  assert.ok(sql.includes('DROP POLICY IF EXISTS "Users see own opportunities"'), 'legacy public FOR ALL policy must be dropped');
-  assert.ok(sql.includes('DROP POLICY IF EXISTS "coaching_sessions_insert"'), 'coaching_sessions INSERT policy must be dropped');
+  // Every legacy policy name that could exist on these tables must be
+  // dropped — in production AND in an environment rebuilt from tracked
+  // migrations (004/005). Missing any one leaves a write-permitting
+  // policy alive so the table never becomes SELECT-only.
+  const requiredDrops = [
+    // market_opportunities — tracked 004 name (FOR ALL, role public)
+    'DROP POLICY IF EXISTS "Users see own opportunities" ON public.market_opportunities;',
+    // coaching_sessions — tracked 005 name (FOR ALL) + production split names
+    'DROP POLICY IF EXISTS "Users see own sessions" ON public.coaching_sessions;',
+    'DROP POLICY IF EXISTS "coaching_sessions_insert" ON public.coaching_sessions;',
+    'DROP POLICY IF EXISTS "coaching_sessions_select" ON public.coaching_sessions;',
+  ];
+  for (const drop of requiredDrops) {
+    assert.ok(sql.includes(drop), `missing required policy drop: ${drop}`);
+  }
 });
 
 test('migration 020: fail-closed Phase-A preflight runs before any REVOKE', () => {
