@@ -1762,5 +1762,32 @@ Reference: `docs/sportmonks-provider-link-write-execution-record-m1-2-e-2-b-3.md
 
 ---
 
+## Decision #047 - Atomic Financial Writes & No-Overdraft Policy
+**Date:** 2026-07-10
+**Proposed by:** CPO (full audit 2026-07-10) + Founder
+**Status:** Scope + implementation approved (CPO handoff "Proceed", founder conversation approval). Migration 016 must be applied before the code deploy goes live.
+
+**Context:** The CPO audit found the risk profile inverted: provider safety is now stronger than the financial write boundaries. P0 items — `/api/bankroll/deposit` was non-atomic (read → compute → update → separate insert; returned success even when the transaction insert failed; concurrent requests could overwrite each other), `create_quick_bet()`/`place_bet_from_decision()` deducted stakes unconditionally (production holds one negative bankroll), `/api/settings` synced currency as an unchecked second write. Audit claims verified against code and `pg_policies` before implementation.
+
+**Decision:** BetTracker adopts the no-overdraft policy (a bet or withdrawal can never take a bankroll below 0; negative balance is not a credit limit; overdraft is not a product feature) and ships migration `016_atomic_financial_writes.sql` + route changes:
+- `adjust_bankroll()` — the only approved deposit/withdrawal/adjustment path: `FOR UPDATE` row lock, funds guard, balance update + transaction insert in one DB transaction, idempotency-key replay (partial unique index on `(user_id, idempotency_key)`), `previous_balance` audit metadata.
+- `set_user_currency()` — atomic profiles + default-bankroll currency sync; `/api/settings` fails loudly on sync failure.
+- Funds guards in both bet RPCs: conditional locked subtraction (`... AND balance >= stake`), `Insufficient balance` exception rolls back the whole bet flow. Concurrent operations serialize on the row lock — overspend impossible by construction.
+- `/api/bankroll/deposit` → single RPC call, sanitized 422/404/500 error mapping, client idempotency key per form session.
+- Historical negative bankroll: preserved, `reconciliation_required`; stakes/withdrawals blocked automatically by the guards, deposits/positive adjustments open; NO automatic zeroing; hard `CHECK (balance >= 0)` deliberately deferred until after reconciliation.
+- UI: shared `lib/money.ts` — negative P&L keeps its minus sign (audit item 7), Linked Bet stake uses the bankroll currency instead of hardcoded `$`.
+
+**Tests:** new `test:financial-safety` suite (13 cases) wired into CI alongside provider-safety/FP-001; migration static guards prevent silently dropping the row lock, funds guards, or idempotency index. DB-level concurrency is enforced by construction; live concurrency tests deferred to the #048 verification pass.
+
+**Sequencing:** direct DML on financial tables is NOT revoked here — Decision #048 (Enforce Domain Write Boundaries) lands only after every active caller is on these RPCs and 016 is applied, deployed, and production-smoked.
+
+**Non-use:** This decision does not approve provider calls, enrichment, odds work, RLS changes, settlement changes, or automatic repair of the historical negative bankroll.
+
+**FP-001:** Financial integrity work only — no probability, edge, EV, recommendation, or betting signal surface is touched.
+
+Reference: `docs/atomic-financial-writes-scope-decision-047.md`
+
+---
+
 *Last updated: 2026-07-10*
 *Owner: All (each role contributes)*

@@ -11,6 +11,7 @@ import {
   type AnalysisQualityGateResult,
   type AnalystTrustView,
 } from '@/lib/ai/analysis-quality-gate'
+import { currencySymbol } from '@/lib/money'
 
 interface Factor { name: string; score: number; detail: string }
 
@@ -124,22 +125,32 @@ export default async function DecisionDetailPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) notFound()
 
-  const { data: decision } = await supabase
-    .from('decisions')
-    .select(`
-      id, sport, event_name, market_type, selection, line,
-      offered_odds, bookmaker, final_action, source,
-      recommendation, risk_level, model_probability, implied_probability,
-      edge_percent, confidence_score, reasoning, factors,
-      output_language, created_at,
-      bet_legs(bet_id, bets(id, stake, status, total_odds)),
-      ai_analysis_runs(output_json)
-    `)
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .single()
+  const [{ data: decision }, { data: bankroll }] = await Promise.all([
+    supabase
+      .from('decisions')
+      .select(`
+        id, sport, event_name, market_type, selection, line,
+        offered_odds, bookmaker, final_action, source,
+        recommendation, risk_level, model_probability, implied_probability,
+        edge_percent, confidence_score, reasoning, factors,
+        output_language, created_at,
+        bet_legs(bet_id, bets(id, stake, status, total_odds)),
+        ai_analysis_runs(output_json)
+      `)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single(),
+    supabase
+      .from('bankrolls')
+      .select('currency')
+      .eq('user_id', user.id)
+      .eq('is_default', true)
+      .maybeSingle(),
+  ])
 
   if (!decision) notFound()
+
+  const stakeSymbol = currencySymbol(bankroll?.currency)
 
   const d = decision as unknown as DecisionRow
   const rec    = d.recommendation ? REC_CONFIG[d.recommendation]   : null
@@ -329,7 +340,7 @@ export default async function DecisionDetailPage({
         <div className="card border border-gray-700">
           <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-2">Linked Bet</div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-300">Stake: <span className="text-white font-medium">${linkedBet.stake}</span></span>
+            <span className="text-gray-300">Stake: <span className="text-white font-medium">{stakeSymbol}{linkedBet.stake}</span></span>
             <span className="text-gray-300">Odds: <span className="text-white font-medium">{linkedBet.total_odds ?? d.offered_odds}</span></span>
             <span className={`font-medium capitalize ${linkedBet.status === 'won' ? 'text-green-400' : linkedBet.status === 'lost' ? 'text-red-400' : 'text-yellow-400'}`}>
               {linkedBet.status}

@@ -6,11 +6,17 @@ import { EVENTS } from '@/lib/analytics/events'
 import { bucketAmount } from '@/lib/analytics/buckets'
 
 const schema = z.object({
-  amount: z.number().positive('Amount must be positive'),
-  type:   z.enum(['deposit', 'withdrawal']),
-  note:   z.string().max(200).optional(),
+  amount:          z.number().positive('Amount must be positive'),
+  type:            z.enum(['deposit', 'withdrawal']),
+  note:            z.string().max(200).optional(),
+  idempotency_key: z.string().min(8).max(64).optional(),
 })
 
+// Decision #047: the route no longer touches bankrolls or
+// bankroll_transactions directly. One adjust_bankroll() RPC does the
+// row lock, funds guard, balance update and transaction insert in a
+// single DB transaction — success here means the WHOLE operation
+// committed, never a partial write.
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -26,54 +32,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 })
   }
 
-  const { amount, type, note } = parsed.data
+  const { amount, type, note, idempotency_key } = parsed.data
 
-  // Get default bankroll
-  const { data: bankroll, error: brErr } = await supabase
-    .from('bankrolls')
-    .select('id, balance')
-    .eq('user_id', user.id)
-    .eq('is_default', true)
-    .single()
-
-  if (brErr || !bankroll) {
-    return NextResponse.json({ error: 'Bankroll not found' }, { status: 404 })
-  }
-
-  const delta       = type === 'deposit' ? amount : -amount
-  const newBalance  = bankroll.balance + delta
-
-  if (type === 'withdrawal' && newBalance < 0) {
-    return NextResponse.json({ error: 'Insufficient balance' }, { status: 422 })
-  }
-
-  // Update balance
-  const { error: updateErr } = await supabase
-    .from('bankrolls')
-    .update({ balance: newBalance })
-    .eq('id', bankroll.id)
-    .eq('user_id', user.id)
-
-  if (updateErr) {
-    return NextResponse.json({ error: updateErr.message }, { status: 500 })
-  }
-
-  // Insert transaction record
-  const { error: txErr } = await supabase.from('bankroll_transactions').insert({
-    user_id:       user.id,
-    bankroll_id:   bankroll.id,
-    type,
-    amount:        delta,
-    balance_after: newBalance,
-    ...(note ? { metadata: { note } } : {}),
+  const { data, error } = await supabase.rpc('adjust_bankroll', {
+    p_type:            type,
+    p_amount:          amount,
+    p_note:            note ?? null,
+    p_idempotency_key: idempotency_key ?? null,
   })
 
-  if (txErr) {
-    console.error('[deposit] transaction insert failed:', txErr.message)
+  if (error) {
+    if (/insufficient balance/i.test(error.message)) {
+      return NextResponse.json({ error: 'Insufficient balance' }, { status: 422 })
+    }
+    if (/no default bankroll/i.test(error.message)) {
+      return NextResponse.json({ error: 'Bankroll not found' }, { status: 404 })
+    }
+    console.error('[deposit] adjust_bankroll failed:', error.message)
+    return NextResponse.json({ error: 'Transaction failed' }, { status: 500 })
   }
 
-  const eventName = type === 'deposit' ? EVENTS.DEPOSIT_RECORDED : EVENTS.WITHDRAWAL_RECORDED
-  await trackServerEvent(user.id, eventName, { amount_bucket: bucketAmount(amount) })
+  const result = data as { transaction_id: string; balance: number; replayed: boolean }
 
-  return NextResponse.json({ success: true, balance: newBalance })
+  if (!result.replayed) {
+    const eventName = type === 'deposit' ? EVENTS.DEPOSIT_RECORDED : EVENTS.WITHDRAWAL_RECORDED
+    await trackServerEvent(user.id, eventName, { amount_bucket: bucketAmount(amount) })
+  }
+
+  return NextResponse.json({
+    success:        true,
+    balance:        result.balance,
+    transaction_id: result.transaction_id,
+    replayed:       result.replayed,
+  })
 }

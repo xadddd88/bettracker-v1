@@ -35,21 +35,44 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'No fields provided' }, { status: 400 })
   }
 
-  const { data, error } = await supabase
+  // Decision #047: currency is synced to profiles AND the default
+  // bankroll atomically via set_user_currency() — the route never
+  // updates bankrolls directly, and a currency sync failure is a real
+  // error, not a silently dropped second write.
+  const { currency, ...profileUpdates } = updates
+
+  if (Object.keys(profileUpdates).length > 0) {
+    const { error } = await supabase
+      .from('profiles')
+      .update(profileUpdates)
+      .eq('id', user.id)
+
+    if (error) {
+      console.error('[settings] profile update failed:', error.message)
+      return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
+    }
+  }
+
+  if (currency) {
+    const { error: currencyError } = await supabase.rpc('set_user_currency', {
+      p_currency: currency,
+    })
+
+    if (currencyError) {
+      console.error('[settings] currency sync failed:', currencyError.message)
+      return NextResponse.json({ error: 'Failed to update currency' }, { status: 500 })
+    }
+  }
+
+  const { data, error: readError } = await supabase
     .from('profiles')
-    .update(updates)
-    .eq('id', user.id)
     .select()
+    .eq('id', user.id)
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  if (updates.currency) {
-    await supabase
-      .from('bankrolls')
-      .update({ currency: updates.currency })
-      .eq('user_id', user.id)
-      .eq('is_default', true)
+  if (readError) {
+    console.error('[settings] profile read-back failed:', readError.message)
+    return NextResponse.json({ error: 'Failed to load settings' }, { status: 500 })
   }
 
   await trackServerEvent(user.id, EVENTS.SETTINGS_SAVED, {
