@@ -29,17 +29,19 @@ export default function LoginPage() {
         if (error) throw error
         setMagicSent(true)
       } else if (mode === 'register') {
+        // Decision #050 — invite flow: request an invite by email only. The
+        // account is created (and a password set) only after the invitee
+        // clicks the emailed link, which proves ownership.
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email }),
         })
         const json = await res.json()
         if (!res.ok) {
           throw new Error(json.error ?? 'Something went wrong. Please try again.')
         }
         setSuccessMsg(json.message)
-        setMode('login')
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
@@ -98,7 +100,7 @@ export default function LoginPage() {
                 />
               </div>
 
-              {mode !== 'magic' && (
+              {mode === 'login' && (
                 <div>
                   <label className="label">Password</label>
                   <input
@@ -110,6 +112,12 @@ export default function LoginPage() {
                     required
                   />
                 </div>
+              )}
+
+              {mode === 'register' && (
+                <p className="text-xs text-gray-500 -mt-1">
+                  We&apos;ll email you an invite link to set your password. Beta access only.
+                </p>
               )}
 
               {error && (
@@ -125,7 +133,7 @@ export default function LoginPage() {
               )}
 
               <button type="submit" className="btn-primary w-full mt-1" disabled={loading}>
-                {loading ? 'Loading...' : mode === 'magic' ? 'Send Magic Link' : mode === 'register' ? 'Create Account' : 'Sign In'}
+                {loading ? 'Loading...' : mode === 'magic' ? 'Send Magic Link' : mode === 'register' ? 'Send Invite Link' : 'Sign In'}
               </button>
             </form>
           )}
