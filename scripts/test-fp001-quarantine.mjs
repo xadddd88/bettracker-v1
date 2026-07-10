@@ -48,8 +48,9 @@ test('migration 022: backs up BEFORE scrubbing, for every surface', () => {
 
 test('migration 022: scrubs all three pricing columns on decisions + opportunities', () => {
   for (const tbl of ['decisions', 'market_opportunities']) {
-    const start = sql.indexOf(`UPDATE ${tbl}\n  SET`);
-    const body = sql.slice(start, start + 220);
+    const m = new RegExp(`UPDATE ${tbl}\\s+SET([\\s\\S]{0,220})`).exec(sql);
+    assert.ok(m, `${tbl}: scrub UPDATE not found`);
+    const body = m[1];
     assert.ok(/model_probability = NULL/.test(body), `${tbl}: model_probability not nulled`);
     assert.ok(/implied_probability = NULL/.test(body), `${tbl}: implied_probability not nulled`);
     assert.ok(/edge_percent = NULL/.test(body), `${tbl}: edge_percent not nulled`);

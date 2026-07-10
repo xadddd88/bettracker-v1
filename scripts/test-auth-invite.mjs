@@ -229,17 +229,8 @@ await testAsync('register: invalid email → 400', async () => {
   });
 });
 
-await testAsync('register: rate limit returns 429 after the per-minute cap', async () => {
-  adminStub = betaTable({ row: null });
-  await withRoutes(async ({ register }) => {
-    let got429 = false;
-    for (let i = 0; i < 7; i++) {
-      const res = await register.POST(registerReq({ email: 'x@example.com' }, 'ratelimit-ip'));
-      if (res.status === 429) { got429 = true; break; }
-    }
-    assert.ok(got429, 'expected a 429 within the per-minute cap');
-  });
-});
+// (Rate limiting moved to the shared durable limiter in Decision #052 —
+// covered by scripts/test-rate-limit.mjs, no longer a register-route concern.)
 
 // ── complete-invite ──────────────────────────────────────────────────
 

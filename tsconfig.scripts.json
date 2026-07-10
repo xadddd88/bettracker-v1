@@ -25,6 +25,7 @@
     "app/api/auth/register/route.ts",
     "app/api/auth/complete-invite/route.ts",
     "lib/money.ts",
+    "lib/rate-limit.ts",
     "lib/ai/**/*.ts",
     "lib/providers/**/*.ts",
     "lib/env.ts",

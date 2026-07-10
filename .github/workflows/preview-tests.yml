@@ -69,6 +69,8 @@ jobs:
         run: npm run test:auth-invite
       - name: "FP-001 legacy quarantine suite (Decision #051)"
         run: npm run test:fp001-quarantine
+      - name: "Global rate-limit suite (Decision #052)"
+        run: npm run test:rate-limit
 
   # ── Job 3: Smoke tests against Vercel preview deployment ───────────────────
   smoke:

@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 // Decision #050 — invite flow. This route no longer accepts a password.
 // It verifies the allowlist and sends a Supabase invite email to the
@@ -16,44 +17,11 @@ const requestSchema = z.object({
   email: z.string().email(),
 })
 
-// ─── Rate limit (in-memory, per client IP) ───────────────────
-const envInt = (key: string, def: number) => {
-  const n = parseInt(process.env[key] ?? '', 10)
-  return Number.isFinite(n) && n > 0 ? n : def
-}
-
-const rateLimitStore = new Map<string, { minute: number; hour: number; minuteTs: number; hourTs: number }>()
-
-const RATE_LIMIT_PER_MINUTE = envInt('RATE_LIMIT_REGISTER_PER_MINUTE', 5)
-const RATE_LIMIT_PER_HOUR   = envInt('RATE_LIMIT_REGISTER_PER_HOUR', 15)
-
+// ─── Rate limit (durable, per client IP — Decision #052) ─────
 function clientIp(req: NextRequest): string {
   const forwarded = req.headers.get('x-forwarded-for')
   if (forwarded) return forwarded.split(',')[0].trim()
   return req.headers.get('x-real-ip')?.trim() ?? 'unknown'
-}
-
-function checkRateLimit(key: string): { allowed: boolean; retryAfter?: number } {
-  const now = Date.now()
-  const minuteWindow = 60_000
-  const hourWindow   = 3_600_000
-
-  const entry = rateLimitStore.get(key) ?? { minute: 0, hour: 0, minuteTs: now, hourTs: now }
-
-  if (now - entry.minuteTs > minuteWindow) { entry.minute = 0; entry.minuteTs = now }
-  if (now - entry.hourTs > hourWindow)     { entry.hour = 0;   entry.hourTs = now }
-
-  if (entry.minute >= RATE_LIMIT_PER_MINUTE) {
-    return { allowed: false, retryAfter: Math.ceil((entry.minuteTs + minuteWindow - now) / 1000) }
-  }
-  if (entry.hour >= RATE_LIMIT_PER_HOUR) {
-    return { allowed: false, retryAfter: Math.ceil((entry.hourTs + hourWindow - now) / 1000) }
-  }
-
-  entry.minute++
-  entry.hour++
-  rateLimitStore.set(key, entry)
-  return { allowed: true }
 }
 
 // A single neutral response for every "we won't tell you the allowlist
@@ -70,11 +38,11 @@ function siteOrigin(req: NextRequest): string {
 }
 
 export async function POST(req: NextRequest) {
-  const rateCheck = checkRateLimit(clientIp(req))
+  const rateCheck = await enforceRateLimit(`register:${clientIp(req)}`, RATE_LIMITS.register())
   if (!rateCheck.allowed) {
     return NextResponse.json(
       { success: false, error: 'Too many attempts — please wait before trying again.' },
-      { status: 429, headers: { 'Retry-After': String(rateCheck.retryAfter ?? 60) } },
+      { status: 429, headers: { 'Retry-After': String(rateCheck.retryAfter || 60) } },
     )
   }
 
