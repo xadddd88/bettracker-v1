@@ -70,15 +70,21 @@ async function withHelper(fn) {
   }
 }
 
-await testAsync('rate-limit: calls rate_limit_check with the key and windows, maps allowed/retry', async () => {
+import { createHash } from 'node:crypto';
+const sha = (s) => createHash('sha256').update(s).digest('hex');
+
+await testAsync('rate-limit: calls rate_limit_check with a HASHED key and the windows', async () => {
   const calls = [];
   adminStub = { rpc: async (name, args) => { calls.push({ name, args }); return { data: { allowed: true, retry_after: 0 }, error: null }; } };
   await withHelper(async ({ enforceRateLimit }) => {
     const res = await enforceRateLimit('analyst:u1', [{ limit: 10, seconds: 60 }, { limit: 200, seconds: 86400 }]);
     assert.equal(res.allowed, true);
+    assert.equal(res.unavailable, false);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].name, 'rate_limit_check');
-    assert.equal(calls[0].args.p_key, 'analyst:u1');
+    // The key reaching the store is a sha256 — never the raw user id.
+    assert.equal(calls[0].args.p_key, sha('analyst:u1'));
+    assert.ok(!calls[0].args.p_key.includes('u1'), 'raw key must not reach the store');
     assert.deepEqual(calls[0].args.p_windows, [{ limit: 10, seconds: 60 }, { limit: 200, seconds: 86400 }]);
   });
 });
@@ -88,23 +94,56 @@ await testAsync('rate-limit: denied result surfaces allowed:false + retryAfter',
   await withHelper(async ({ enforceRateLimit }) => {
     const res = await enforceRateLimit('scout:u1', [{ limit: 3, seconds: 60 }]);
     assert.equal(res.allowed, false);
+    assert.equal(res.unavailable, false);
     assert.equal(res.retryAfter, 42);
   });
 });
 
-await testAsync('rate-limit: FAILS OPEN when the RPC errors', async () => {
+await testAsync('rate-limit: FAILS CLOSED (unavailable) when the RPC errors', async () => {
   adminStub = { rpc: async () => ({ data: null, error: { message: 'db down' } }) };
   await withHelper(async ({ enforceRateLimit }) => {
     const res = await enforceRateLimit('scanner:u1', [{ limit: 5, seconds: 60 }]);
-    assert.equal(res.allowed, true, 'a limiter outage must not block the route');
+    assert.equal(res.unavailable, true, 'a limiter outage must fail closed');
+    assert.equal(res.allowed, false);
   });
 });
 
-await testAsync('rate-limit: FAILS OPEN when the admin client is unavailable', async () => {
+await testAsync('rate-limit: FAILS CLOSED when the admin client is unavailable', async () => {
   adminStub = null; // createAdminClient throws
   await withHelper(async ({ enforceRateLimit }) => {
     const res = await enforceRateLimit('coach:u1', [{ limit: 20, seconds: 86400 }]);
-    assert.equal(res.allowed, true);
+    assert.equal(res.unavailable, true);
+    assert.equal(res.allowed, false);
+  });
+});
+
+await testAsync('rate-limit: FAILS CLOSED on a malformed RPC result', async () => {
+  for (const bad of [null, {}, { allowed: 'yes', retry_after: 0 }, { allowed: true }, { allowed: true, retry_after: -1 }, { allowed: true, retry_after: 1.5 }, 'nope']) {
+    adminStub = { rpc: async () => ({ data: bad, error: null }) };
+    await withHelper(async ({ enforceRateLimit }) => {
+      const res = await enforceRateLimit('analyst:u1', [{ limit: 10, seconds: 60 }]);
+      assert.equal(res.unavailable, true, `malformed result ${JSON.stringify(bad)} must fail closed`);
+      assert.equal(res.allowed, false);
+    });
+  }
+});
+
+test('rate-limit: canonicalClientIp validates and falls back to a fixed bucket', () => {
+  const src = readFileSync(path.join(repoRoot, 'lib/rate-limit.ts'), 'utf8');
+  assert.ok(/export function canonicalClientIp/.test(src), 'canonicalClientIp missing');
+  assert.ok(/IPV4|IPV6/.test(src), 'IP validation missing');
+  assert.ok(/return 'unknown'/.test(src), 'must fall back to a fixed bucket for garbage input');
+});
+
+await testAsync('rate-limit: canonicalClientIp behavior — valid IPs pass, garbage → unknown', async () => {
+  await withHelper(async (mod) => {
+    const { canonicalClientIp } = mod;
+    assert.equal(canonicalClientIp('203.0.113.7, 10.0.0.1', null), '203.0.113.7');
+    assert.equal(canonicalClientIp(null, '198.51.100.9'), '198.51.100.9');
+    assert.equal(canonicalClientIp('2001:db8::1', null), '2001:db8::1');
+    assert.equal(canonicalClientIp('not an ip; drop table', null), 'unknown');
+    assert.equal(canonicalClientIp(null, null), 'unknown');
+    assert.equal(canonicalClientIp('a'.repeat(500), null), 'unknown');
   });
 });
 
@@ -133,7 +172,22 @@ test('routes: no in-memory rate-limit Map remains; all call enforceRateLimit', (
     assert.ok(!/function checkRateLimit\(/.test(src), `${rel}: local checkRateLimit must be gone`);
     assert.ok(/enforceRateLimit\(/.test(src), `${rel}: must call enforceRateLimit`);
     assert.ok(src.includes(`\`${keyPrefix}`), `${rel}: must key by ${keyPrefix}`);
+    // Fail-closed: an unavailable limiter must 503 BEFORE the paid/abusable work.
+    assert.ok(/\.unavailable/.test(src), `${rel}: must handle the unavailable (fail-closed) branch`);
+    assert.ok(/status: 503/.test(src), `${rel}: unavailable must map to 503`);
   }
+});
+
+test('register route: keys by a canonicalized client IP (not the raw header)', () => {
+  const src = readFileSync(path.join(repoRoot, 'app/api/auth/register/route.ts'), 'utf8');
+  assert.ok(/canonicalClientIp\(/.test(src), 'register must canonicalize the client IP');
+  assert.ok(!/forwarded\.split\(','\)\[0\]\.trim\(\)/.test(src), 'raw x-forwarded-for parsing must be gone');
+});
+
+test('coach route: 429 message is neutral (no hardcoded count that drifts from the env limit)', () => {
+  const src = readFileSync(path.join(repoRoot, 'app/api/coach/route.ts'), 'utf8');
+  assert.ok(!/Coach can run 2 times per 24 hours/.test(src), 'stale hardcoded count must be gone');
+  assert.ok(/Rate limit exceeded\. Try again later\./.test(src), 'neutral 429 message expected');
 });
 
 // ── Migration 023 static guards ──────────────────────────────────────
@@ -144,16 +198,21 @@ test('migration 023: service-role-only table + RPC, atomic multi-window deny', (
   assert.ok(/ENABLE ROW LEVEL SECURITY/.test(sql), 'RLS must be enabled');
   assert.ok(/REVOKE ALL ON api_rate_limits FROM PUBLIC, anon, authenticated/.test(sql), 'table must be service-role-only');
   assert.ok(/CREATE OR REPLACE FUNCTION rate_limit_check/.test(sql), 'rate_limit_check missing');
-  // Two-phase check-then-consume: a locked no-op read, deny at the limit,
-  // and consume from every window ONLY if all passed (denied requests must
-  // not drain a longer window's budget).
+  // Per-key transaction advisory lock serializes check-then-consume.
+  assert.ok(/pg_advisory_xact_lock\(hashtextextended\(p_key, 0\)\)/.test(sql), 'per-key advisory lock missing');
+  // Two-phase check-then-consume.
   assert.ok(/ON CONFLICT \(bucket\) DO UPDATE SET count = api_rate_limits\.count\b(?! \+)/.test(sql), 'phase-1 must be a locked no-op read (no increment)');
   assert.ok(/IF v_count >= v_limit THEN/.test(sql), 'per-window limit check missing');
   assert.ok(/IF NOT v_denied THEN\s+UPDATE api_rate_limits SET count = count \+ 1 WHERE bucket = ANY\(v_buckets\)/.test(sql), 'phase-2 must consume only when all windows pass');
   assert.ok(/'retry_after'/.test(sql), 'retry_after not returned');
+  // Fail-closed validation.
+  assert.ok(/p_windows IS NULL OR jsonb_typeof\(p_windows\) <> 'array'/.test(sql), 'explicit NULL windows guard missing');
+  assert.ok(/duplicate seconds/.test(sql), 'duplicate-seconds guard missing');
+  assert.ok(/v_limit > 1000000|v_seconds > 2592000/.test(sql), 'out-of-range guard missing');
+  // Grant hygiene + bounded cleanup.
   assert.ok(/REVOKE EXECUTE ON FUNCTION rate_limit_check\(text, jsonb\) FROM PUBLIC, anon, authenticated/.test(sql), 'RPC grant hygiene missing');
   assert.ok(/GRANT {2}EXECUTE ON FUNCTION rate_limit_check\(text, jsonb\) TO service_role/.test(sql), 'RPC must be granted to service_role');
-  assert.ok(/DELETE FROM api_rate_limits WHERE expires_at < now\(\)/.test(sql), 'expired-bucket cleanup missing');
+  assert.ok(/LIMIT 500/.test(sql), 'cleanup must be bounded to a batch');
 });
 
 console.log(`\n${passed + failed} tests — ${passed} passed, ${failed} failed\n`);

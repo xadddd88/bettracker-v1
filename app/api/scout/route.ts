@@ -281,6 +281,12 @@ export async function POST(req: NextRequest) {
 
     // 3. Rate limit (durable, cross-instance — Decision #052)
     const rl = await enforceRateLimit(`scout:${user.id}`, RATE_LIMITS.scout())
+    if (rl.unavailable) {
+      return NextResponse.json(
+        { success: false, error: 'Service temporarily unavailable. Try again shortly.' },
+        { status: 503 },
+      )
+    }
     if (!rl.allowed) {
       await trackServerEvent(user.id, EVENTS.SCOUT_RATE_LIMITED, {
         sport:       input.sport,

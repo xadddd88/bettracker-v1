@@ -62,6 +62,13 @@ function betaTable(cfg) {
   const calls = { updates: [] };
   return {
     calls,
+    // The register route rate-limits via enforceRateLimit → admin.rpc
+    // ('rate_limit_check'); allow it through so these tests exercise the
+    // invite logic (rate limiting has its own suite).
+    rpc: async (name) => {
+      if (name === 'rate_limit_check') return { data: { allowed: true, retry_after: 0 }, error: null };
+      return { data: null, error: null };
+    },
     from(table) {
       assert.equal(table, 'beta_access', `unexpected table ${table}`);
       const b = {

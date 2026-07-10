@@ -29,17 +29,34 @@ Supabase Postgres, atomic and shared across every instance.
   under limit. A denied request consumes NOTHING — so a burst blocked by a short window can
   never drain a longer window's budget (VADE review fix, PR #137: the earlier
   increment-then-check version let a per-minute-blocked burst exhaust the per-day cap and
-  lock the caller out for the whole day). `retry_after` = seconds until the longest-blocked
-  window resets; the per-bucket row locks serialize concurrent callers. Opportunistic
-  expired-bucket cleanup (~1% of calls). Behaviourally verified: a 4-request burst against
-  limit 2/min + 5/day yields allowed `true true false false` with the day counter at **2**,
+  lock the caller out for the whole day). A per-key
+  `pg_advisory_xact_lock(hashtextextended(p_key,0))` (CPO review) serializes the entire
+  check-then-consume for a key across all its windows, so concurrency is correct even beyond
+  per-bucket locks. `retry_after` = seconds until the longest-blocked window resets.
+  **Fail-closed validation** raises on NULL/non-array/empty/>5 windows, non-object entries,
+  non-integer / out-of-range / duplicate-`seconds` windows (an explicit NULL check — SQL
+  three-valued logic would otherwise let a NULL `p_windows` return allowed on an empty loop).
+  Bounded expired-bucket cleanup (~1% of calls, `LIMIT 500`). Behaviourally verified: a
+  4-request burst against limit 2/min + 5/day yields allowed `true true false false` with the
+  day counter at **2**,
   not 4.
 
 ### Shared helper `lib/rate-limit.ts`
-- `enforceRateLimit(key, windows)` → `{ allowed, retryAfter }` via the RPC (admin client).
-- **Fail-open**: any failure (no service role, store unreachable, thrown RPC) returns
-  `allowed` — a limiter outage must never take a route down; the routes it guards already
-  need the same database, so a store outage degrades them regardless. Every failure is logged.
+- `enforceRateLimit(key, windows)` → `{ allowed, retryAfter, unavailable }` via the RPC.
+- **Fail-CLOSED** (CPO review, PR #137): any failure (no service role, store unreachable,
+  thrown RPC, malformed response) returns `unavailable: true` and the route must respond
+  **503 before doing the work the limiter protects** (Anthropic spend, invite abuse). The
+  earlier fail-open version was reversed — a scanner/analyst request that passed auth would
+  proceed to an expensive provider call even if the limiter RPC or its grants were broken,
+  exposing exactly the spend the cap defends. The response is strictly validated: `allowed`
+  must be a boolean and `retry_after` a non-negative integer; `null`/`{}`/wrong-typed results
+  fail closed.
+- **Key hashing**: every key is `sha256`ed before it reaches the store, so `api_rate_limits`
+  never holds a raw IP or user UUID.
+- `canonicalClientIp(x-forwarded-for, x-real-ip)`: takes the first forwarded entry
+  (Vercel populates the real client IP there), validates it as a plausible IPv4/IPv6 and
+  length-caps it, else falls back to a fixed `unknown` bucket so a garbage header can't fan
+  out into unbounded buckets.
 - `RATE_LIMITS` centralizes the env-tunable window configs (unchanged defaults):
 
   | Route | Windows |
@@ -53,7 +70,10 @@ Supabase Postgres, atomic and shared across every instance.
 ### Routes
 All five drop their in-memory `Map` + local `checkRateLimit` and call
 `enforceRateLimit('<route>:<key>', RATE_LIMITS.<route>())` — AI routes key by `user.id`,
-register keys by client IP. The 429 response + `Retry-After` header are unchanged.
+register by the canonicalized client IP. Each route now handles three outcomes:
+`unavailable → 503` (before any paid/abusable work), `!allowed → 429` + `Retry-After`,
+else proceed. Coach's 429 message is neutral (`"Rate limit exceeded. Try again later."`)
+instead of the stale hardcoded "2 times per 24 hours" that had drifted from the env limit.
 
 ## Tests
 

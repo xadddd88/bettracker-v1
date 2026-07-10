@@ -416,9 +416,15 @@ export async function POST(req: NextRequest) {
 
     // 2. Rate limit (durable, cross-instance — Decision #052)
     const rl = await enforceRateLimit(`coach:${user.id}`, RATE_LIMITS.coach())
+    if (rl.unavailable) {
+      return NextResponse.json(
+        { success: false, error: 'Service temporarily unavailable. Try again shortly.' },
+        { status: 503 }
+      )
+    }
     if (!rl.allowed) {
       return NextResponse.json(
-        { success: false, error: 'Rate limit exceeded. Coach can run 2 times per 24 hours.' },
+        { success: false, error: 'Rate limit exceeded. Try again later.' },
         { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
       )
     }

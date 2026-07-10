@@ -26,52 +26,78 @@ ALTER TABLE api_rate_limits ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON api_rate_limits FROM PUBLIC, anon, authenticated;
 
 -- rate_limit_check(key, windows) — windows is a JSON array of
--- {"limit": <int>, "seconds": <int>}. Two-phase check-then-consume:
--- Phase 1 takes a row lock on every window's fixed bucket and reads its
--- current count; Phase 2 consumes one token from EVERY window only if ALL
--- are under limit. A denied request consumes NOTHING, so a burst blocked
--- by a short window can never drain a longer window's budget. retry_after
--- is the seconds until the longest-blocked window resets. The per-bucket
--- row locks (held by ON CONFLICT DO UPDATE) serialize concurrent callers.
+-- {"limit": <int>, "seconds": <int>}. Two-phase check-then-consume under a
+-- per-key transaction advisory lock:
+--   * pg_advisory_xact_lock(hashtextextended(p_key, 0)) fully serializes
+--     every call for a key, so the read-check-consume is atomic even across
+--     the key's different window buckets (no interleaving between the check
+--     and the increment).
+--   * Phase 1 reads every window's current count (no consume).
+--   * Phase 2 consumes one token from EVERY window only if ALL are under
+--     limit — a denied request consumes NOTHING, so a burst blocked by a
+--     short window can never drain a longer window's budget.
+-- retry_after = seconds until the longest-blocked window resets. Validation
+-- is strictly fail-closed: any malformed input raises (the helper maps a
+-- raised RPC to a 503, never an open door). p_key is expected to already be
+-- a hash (the helper sha256s it) so no raw IP/UUID is stored.
 CREATE OR REPLACE FUNCTION rate_limit_check(
   p_key     text,
   p_windows jsonb
 )
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  w           jsonb;
-  v_limit     integer;
-  v_seconds   integer;
-  v_bucket    text;
-  v_count     integer;
-  v_now       bigint := extract(epoch FROM now())::bigint;
+  w            jsonb;
+  v_limit      integer;
+  v_seconds    integer;
+  v_bucket     text;
+  v_count      integer;
+  v_now        bigint := extract(epoch FROM now())::bigint;
   v_window_end bigint;
-  v_denied    boolean := false;
-  v_retry     integer := 0;
-  v_buckets   text[] := '{}';
+  v_denied     boolean := false;
+  v_retry      integer := 0;
+  v_buckets    text[] := '{}';
+  v_seen_secs  integer[] := '{}';
 BEGIN
+  -- Fail-closed input validation. NULL is handled explicitly: SQL
+  -- three-valued logic would let a NULL p_windows slip past a bare
+  -- `jsonb_typeof(...) <> 'array'` check and return allowed on an empty loop.
   IF p_key IS NULL OR length(p_key) = 0 OR length(p_key) > 200 THEN
     RAISE EXCEPTION 'invalid key';
   END IF;
-  IF jsonb_typeof(p_windows) <> 'array' OR jsonb_array_length(p_windows) = 0 OR jsonb_array_length(p_windows) > 5 THEN
-    RAISE EXCEPTION 'invalid windows';
+  IF p_windows IS NULL OR jsonb_typeof(p_windows) <> 'array' THEN
+    RAISE EXCEPTION 'invalid windows: not an array';
+  END IF;
+  IF jsonb_array_length(p_windows) = 0 OR jsonb_array_length(p_windows) > 5 THEN
+    RAISE EXCEPTION 'invalid windows: count';
   END IF;
 
-  -- Opportunistic cleanup of expired buckets (bounded cost — ~1% of calls).
+  -- Serialize the whole check-then-consume for this key.
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_key, 0));
+
+  -- Bounded opportunistic cleanup of expired buckets (~1% of calls, max 500).
   IF random() < 0.01 THEN
-    DELETE FROM api_rate_limits WHERE expires_at < now();
+    DELETE FROM api_rate_limits
+    WHERE bucket IN (SELECT bucket FROM api_rate_limits WHERE expires_at < now() LIMIT 500);
   END IF;
 
-  -- Phase 1: lock every window's bucket and read its current count without
-  -- consuming. ON CONFLICT DO UPDATE (a no-op here) still takes the row lock,
-  -- so concurrent callers on the same bucket serialize.
+  -- Phase 1: read every window's current count (no consume).
   FOR w IN SELECT * FROM jsonb_array_elements(p_windows)
   LOOP
+    IF jsonb_typeof(w) <> 'object' THEN
+      RAISE EXCEPTION 'invalid window entry: not an object';
+    END IF;
+    IF jsonb_typeof(w->'limit') <> 'number' OR jsonb_typeof(w->'seconds') <> 'number' THEN
+      RAISE EXCEPTION 'invalid window entry: limit/seconds not numbers';
+    END IF;
     v_limit   := (w->>'limit')::integer;
     v_seconds := (w->>'seconds')::integer;
-    IF v_limit IS NULL OR v_limit <= 0 OR v_seconds IS NULL OR v_seconds <= 0 THEN
-      RAISE EXCEPTION 'invalid window entry';
+    IF v_limit <= 0 OR v_limit > 1000000 OR v_seconds <= 0 OR v_seconds > 2592000 THEN
+      RAISE EXCEPTION 'invalid window entry: out of range';
     END IF;
+    IF v_seconds = ANY(v_seen_secs) THEN
+      RAISE EXCEPTION 'invalid windows: duplicate seconds';
+    END IF;
+    v_seen_secs := array_append(v_seen_secs, v_seconds);
 
     v_bucket     := p_key || '|' || v_seconds || '|' || (v_now / v_seconds);
     v_window_end := ((v_now / v_seconds) + 1) * v_seconds;

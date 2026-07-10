@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
-import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import { enforceRateLimit, RATE_LIMITS, canonicalClientIp } from '@/lib/rate-limit'
 
 // Decision #050 — invite flow. This route no longer accepts a password.
 // It verifies the allowlist and sends a Supabase invite email to the
@@ -17,12 +17,6 @@ const requestSchema = z.object({
   email: z.string().email(),
 })
 
-// ─── Rate limit (durable, per client IP — Decision #052) ─────
-function clientIp(req: NextRequest): string {
-  const forwarded = req.headers.get('x-forwarded-for')
-  if (forwarded) return forwarded.split(',')[0].trim()
-  return req.headers.get('x-real-ip')?.trim() ?? 'unknown'
-}
 
 // A single neutral response for every "we won't tell you the allowlist
 // state" branch — prevents allowlist enumeration.
@@ -38,7 +32,14 @@ function siteOrigin(req: NextRequest): string {
 }
 
 export async function POST(req: NextRequest) {
-  const rateCheck = await enforceRateLimit(`register:${clientIp(req)}`, RATE_LIMITS.register())
+  const ip = canonicalClientIp(req.headers.get('x-forwarded-for'), req.headers.get('x-real-ip'))
+  const rateCheck = await enforceRateLimit(`register:${ip}`, RATE_LIMITS.register())
+  if (rateCheck.unavailable) {
+    return NextResponse.json(
+      { success: false, error: 'Beta registration is temporarily unavailable. Try again later.' },
+      { status: 503 },
+    )
+  }
   if (!rateCheck.allowed) {
     return NextResponse.json(
       { success: false, error: 'Too many attempts — please wait before trying again.' },

@@ -205,6 +205,12 @@ export async function POST(req: NextRequest) {
 
     // 2. Rate limit (durable, cross-instance — Decision #052)
     const rl = await enforceRateLimit(`analyst:${user.id}`, RATE_LIMITS.analyst())
+    if (rl.unavailable) {
+      return NextResponse.json(
+        { success: false, error: 'Service temporarily unavailable. Try again shortly.' },
+        { status: 503 }
+      )
+    }
     if (!rl.allowed) {
       return NextResponse.json(
         { success: false, error: 'Rate limit exceeded. Try again later.' },

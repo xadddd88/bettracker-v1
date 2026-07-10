@@ -232,6 +232,9 @@ export async function POST(req: NextRequest) {
   }
 
   const rateCheck = await enforceRateLimit(`scanner:${user.id}`, RATE_LIMITS.scanner())
+  if (rateCheck.unavailable) {
+    return NextResponse.json({ error: 'Service temporarily unavailable. Try again shortly.' }, { status: 503 })
+  }
   if (!rateCheck.allowed) {
     return NextResponse.json(
       { error: 'Too many scans — please wait before trying again' },
