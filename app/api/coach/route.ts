@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 import { extractJsonObject } from '@/lib/ai/extract-json'
@@ -585,16 +586,35 @@ export async function POST(req: NextRequest) {
       disclaimer:         output.disclaimer,
     }
 
-    const { data: inserted, error: insertErr } = await supabase
-      .from('coaching_sessions')
-      .insert(row)
-      .select()
-      .single()
+    // Decision #049: coaching_sessions is SELECT-only for authenticated
+    // after migration 020 — persistence goes through the server-only
+    // persist_coaching_session RPC (service_role EXECUTE only) with the
+    // session-derived user id.
+    const adminClient = createAdminClient()
+    const { data: inserted, error: insertErr } = await adminClient.rpc('persist_coaching_session', {
+      p_user_id:            user.id,
+      p_period_days:        row.period_days,
+      p_period_start:       row.period_start,
+      p_period_end:         row.period_end,
+      p_bets_analysed:      row.bets_analysed,
+      p_decisions_analysed: row.decisions_analysed,
+      p_summary:            row.summary,
+      p_calibration_grade:  row.calibration_grade,
+      p_strengths:          row.strengths,
+      p_weaknesses:         row.weaknesses,
+      p_recommendations:    row.recommendations,
+      p_patterns:           row.patterns,
+      p_metrics_snapshot:   row.metrics_snapshot,
+      p_focus_notes:        row.focus_notes,
+      p_model_name:         row.model_name,
+      p_disclaimer:         row.disclaimer,
+    })
 
     if (insertErr) {
+      console.error('[coach] persist error:', insertErr.message)
       await trackServerEvent(user.id, EVENTS.COACH_FAILED, { period_days: input.period_days, error_type: 'persist' })
       return NextResponse.json(
-        { success: false, error: `Coach succeeded but failed to persist: ${insertErr.message}` },
+        { success: false, error: 'Coach succeeded but failed to persist' },
         { status: 500 }
       )
     }

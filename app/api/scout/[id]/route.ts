@@ -28,19 +28,21 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: 'Invalid input' }, { status: 400 })
     }
 
-    const updateData: Record<string, string | null> = { status: parsed.data.status }
-    if (parsed.data.linked_decision_id) {
-      updateData.linked_decision_id = parsed.data.linked_decision_id
-    }
-
-    const { error } = await supabase
-      .from('market_opportunities')
-      .update(updateData)
-      .eq('id', id)
-      .eq('user_id', user.id)
+    // Decision #049: market_opportunities is SELECT-only for
+    // authenticated after migration 020 — the status change goes through
+    // update_opportunity_status (auth.uid()-scoped, ownership enforced).
+    const { error } = await supabase.rpc('update_opportunity_status', {
+      p_opportunity_id:     id,
+      p_status:             parsed.data.status,
+      p_linked_decision_id: parsed.data.linked_decision_id ?? null,
+    })
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      if (/not found or does not belong/i.test(error.message)) {
+        return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
+      }
+      console.error('[scout-patch] update_opportunity_status failed:', error.message)
+      return NextResponse.json({ success: false, error: 'Failed to update' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

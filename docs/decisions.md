@@ -1816,5 +1816,26 @@ Reference: `docs/domain-write-boundaries-scope-decision-048.md`
 
 ---
 
+## Decision #049 - Agent Write Boundaries (Scout & Coach)
+**Date:** 2026-07-10
+**Proposed by:** Founder + Claude (continuation of the #048 boundary track)
+**Status:** Implementation ready, two-phase. Migrations NOT applied until CPO review of the PR; enforcement (020) applies only after the Phase-A deploy is verified in production.
+
+**Context:** Decision #048 recorded `market_opportunities` and `coaching_sessions` as OPEN. Production inventory confirmed: `market_opportunities` has a `FOR ALL` policy **granted to role `public`** (worse than the core tables) with full `anon`+`authenticated` privileges and direct Scout insert + status-update writes; `coaching_sessions` has a user-callable INSERT policy with full privileges and a direct Coach insert. Both are agent-generated content — the same server-only-persistence shape as the Analyst closed in #048.
+
+**Decision:** Extend the #048 two-phase pattern to both tables:
+- **Phase A (`019_prepare_agent_write_boundaries.sql`, additive):** `persist_market_opportunities(p_user_id, p_rows)` and `persist_coaching_session(p_user_id, …)` — server-only (service_role EXECUTE only), `p_user_id` from the authenticated session; the Scout persist RPC **forces `model_probability`/`implied_probability`/`edge_percent` to NULL** regardless of input (FP-001 defense-in-depth, matching PR #122) and caps batches at 25. `update_opportunity_status(p_opportunity_id, p_status, p_linked_decision_id)` — authenticated user action, `auth.uid()`-scoped, status enum validated, linked-decision ownership checked. Routes move in the same PR (Scout → admin client; Scout status → RPC; Coach → admin client); old paths stay alive until Phase B.
+- **Phase B (`020_enforce_agent_write_boundaries.sql`):** fail-closed Phase-A preflight, then for both tables `REVOKE ALL` from PUBLIC/anon/authenticated (covers PG17 MAINTAIN) + `GRANT SELECT` + drop the legacy policies (`Users see own opportunities` FOR ALL/public; `coaching_sessions_insert`) + `FOR SELECT` own-rows policies. No FORCE RLS; service_role untouched. Rollback in `docs/decision-049-rollback.sql` (transactional, manual-only).
+
+**Tests:** new CI suite `test:agent-write-boundaries` (10 cases). All suites green: agent 10/10, domain 13/13, financial 10/10, provider-safety 77/77, FP-001 26/26, tsc/lint clean.
+
+**Non-use:** No enrichment, odds, provider-call changes, FP-001 gate changes, changes to the seven #048 core tables, or Scout/Coach model changes.
+
+**FP-001:** Hardens a real FP-001 surface — the Scout persist RPC structurally forces pricing to NULL even if a future caller supplies it.
+
+Reference: `docs/agent-write-boundaries-scope-decision-049.md`
+
+---
+
 *Last updated: 2026-07-10*
 *Owner: All (each role contributes)*
