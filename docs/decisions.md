@@ -1738,5 +1738,29 @@ Reference: `docs/sportmonks-provider-link-write-scope-m1-2-e-2-b-3.md`
 
 ---
 
-*Last updated: 2026-07-09*
+## Decision #046 - M1.2.e.2.b.3 Provider-Link Write Execution Record
+**Date:** 2026-07-10
+**Proposed by:** Founder (operator) + Claude
+**Status:** Execution record. No new scope approved.
+
+**Context:** Decision #045 approved the controlled single-row provider-link write (implementation PR #125). The founder executed it on 2026-07-10, with Claude driving the calls and — at the founder's live instruction — the Vercel dashboard steps (token-rotation redeploy, flag deletion, post-deletion redeploy) via the founder's authenticated browser.
+
+**Decision:** BetTracker records the execution results in `docs/sportmonks-provider-link-write-execution-record-m1-2-e-2-b-3.md`:
+- Preflight dry-run: all 6 checks passed, `alreadyLinked: false`, zero writes (run `…vryd3pd4`).
+- Write: **1 `fixture_provider_links` row inserted, 0 failures** (run `sportmonks-provider-link-write-2026-07-10T14-13-04-277Z-mkuvx3k4`); row verified in production immediately after.
+- Canonical fixture `92afd570-…a71c` (Arsenal vs Coventry City, kickoff 2026-08-21 19:00 UTC) now carries BOTH provider links: `api_football:1557367` (exact) + `sportmonks:19722203` (high, name_time_match, provenance → discovery run `…8i1oc162`). **First complete dual-provider mapping chain — the M1.2 mapping path is proven end-to-end.**
+- **ZERO provider calls** in the entire execution (`providerRequestsUsed: 0` in both reports).
+- `SPORTS_PROVIDER_LINK_WRITE_ENABLED` deleted + production redeployed immediately after the write.
+
+**Deviations recorded:** (D3) the write flag had been pre-set to `true` by the founder on 2026-07-09 (ahead of the runbook's flag-on step, after the PR #125 merge summary) — gate ordering deviation only; the token + pinned body + confirmation + DB preflight still gated the write. Operator token rotated as planned Decision #044 hygiene (old OneDrive-exposed token dead); two costless 401s during propagation.
+
+**Non-use:** This decision does not approve further provider-link writes, enrichment calls or writes, odds calls/ingestion/usage, Scout usage, Analyst usage, UI usage, Place Bet, probability, implied probability, edge, EV, recommendation, or betting signal.
+
+**FP-001:** A provider-link row is identity evidence only — not model probability, edge, EV, recommendation, or any betting signal.
+
+Reference: `docs/sportmonks-provider-link-write-execution-record-m1-2-e-2-b-3.md`
+
+---
+
+*Last updated: 2026-07-10*
 *Owner: All (each role contributes)*
