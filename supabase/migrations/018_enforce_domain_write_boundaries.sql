@@ -26,10 +26,56 @@
 -- prior grants/policies; NOT to be applied automatically).
 -- ============================================================
 
+-- ── Phase-A prerequisite preflight (fail-closed) ─────────────
+-- 018 must be impossible to apply before 017: if the RPC layer
+-- is absent or has the wrong EXECUTE surface, raise BEFORE any
+-- REVOKE runs and leave enforcement untouched. (SQL cannot prove
+-- the application deploy itself — the operator sequence remains
+-- mandatory.)
+DO $$
+DECLARE
+  v_persist regprocedure := to_regprocedure(
+    'persist_analysis_decision(uuid,text,text,text,text,numeric,numeric,text,text,text,jsonb,text,text,numeric,numeric,numeric,numeric,text,text,text,jsonb,text,text,jsonb,jsonb,boolean,integer,integer,text)');
+  v_settings regprocedure := to_regprocedure('save_user_settings(text,text,numeric,numeric,boolean,text)');
+  v_onboarding regprocedure := to_regprocedure('complete_onboarding()');
+BEGIN
+  IF v_persist IS NULL THEN
+    RAISE EXCEPTION 'Phase A missing: persist_analysis_decision not found — apply migration 017 first';
+  END IF;
+  IF v_settings IS NULL THEN
+    RAISE EXCEPTION 'Phase A missing: save_user_settings not found — apply migration 017 first';
+  END IF;
+  IF v_onboarding IS NULL THEN
+    RAISE EXCEPTION 'Phase A missing: complete_onboarding not found — apply migration 017 first';
+  END IF;
+
+  IF NOT has_function_privilege('service_role', v_persist, 'EXECUTE') THEN
+    RAISE EXCEPTION 'Phase A invalid: service_role lacks EXECUTE on persist_analysis_decision';
+  END IF;
+  IF has_function_privilege('authenticated', v_persist, 'EXECUTE') THEN
+    RAISE EXCEPTION 'Phase A invalid: authenticated must NOT have EXECUTE on persist_analysis_decision';
+  END IF;
+  IF has_function_privilege('anon', v_persist, 'EXECUTE') THEN
+    RAISE EXCEPTION 'Phase A invalid: anon must NOT have EXECUTE on persist_analysis_decision';
+  END IF;
+  IF NOT has_function_privilege('authenticated', v_settings, 'EXECUTE') THEN
+    RAISE EXCEPTION 'Phase A invalid: authenticated lacks EXECUTE on save_user_settings';
+  END IF;
+  IF NOT has_function_privilege('authenticated', v_onboarding, 'EXECUTE') THEN
+    RAISE EXCEPTION 'Phase A invalid: authenticated lacks EXECUTE on complete_onboarding';
+  END IF;
+END
+$$;
+
+-- NOTE on the grant pattern below: authenticated gets REVOKE ALL
+-- (not an enumerated list) followed by GRANT SELECT — PostgreSQL 17
+-- adds MAINTAIN ('m' in the ACL) which an enumerated revoke would
+-- silently leave behind.
+
 -- ── profiles ─────────────────────────────────────────────────
 REVOKE ALL ON public.profiles FROM PUBLIC;
 REVOKE ALL ON public.profiles FROM anon;
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.profiles FROM authenticated;
+REVOKE ALL ON public.profiles FROM authenticated;
 GRANT SELECT ON public.profiles TO authenticated;
 DROP POLICY IF EXISTS "own profiles" ON public.profiles;
 DROP POLICY IF EXISTS "profiles select own" ON public.profiles;
@@ -40,7 +86,7 @@ CREATE POLICY "profiles select own" ON public.profiles
 -- ── bankrolls ────────────────────────────────────────────────
 REVOKE ALL ON public.bankrolls FROM PUBLIC;
 REVOKE ALL ON public.bankrolls FROM anon;
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.bankrolls FROM authenticated;
+REVOKE ALL ON public.bankrolls FROM authenticated;
 GRANT SELECT ON public.bankrolls TO authenticated;
 DROP POLICY IF EXISTS "own bankrolls" ON public.bankrolls;
 DROP POLICY IF EXISTS "bankrolls select own" ON public.bankrolls;
@@ -51,7 +97,7 @@ CREATE POLICY "bankrolls select own" ON public.bankrolls
 -- ── bankroll_transactions (append-only via RPC) ──────────────
 REVOKE ALL ON public.bankroll_transactions FROM PUBLIC;
 REVOKE ALL ON public.bankroll_transactions FROM anon;
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.bankroll_transactions FROM authenticated;
+REVOKE ALL ON public.bankroll_transactions FROM authenticated;
 GRANT SELECT ON public.bankroll_transactions TO authenticated;
 DROP POLICY IF EXISTS "own txns" ON public.bankroll_transactions;
 DROP POLICY IF EXISTS "bankroll_transactions select own" ON public.bankroll_transactions;
@@ -62,7 +108,7 @@ CREATE POLICY "bankroll_transactions select own" ON public.bankroll_transactions
 -- ── bets ─────────────────────────────────────────────────────
 REVOKE ALL ON public.bets FROM PUBLIC;
 REVOKE ALL ON public.bets FROM anon;
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.bets FROM authenticated;
+REVOKE ALL ON public.bets FROM authenticated;
 GRANT SELECT ON public.bets TO authenticated;
 DROP POLICY IF EXISTS "own bets" ON public.bets;
 DROP POLICY IF EXISTS "bets select own" ON public.bets;
@@ -73,7 +119,7 @@ CREATE POLICY "bets select own" ON public.bets
 -- ── bet_legs (ownership via parent bet) ──────────────────────
 REVOKE ALL ON public.bet_legs FROM PUBLIC;
 REVOKE ALL ON public.bet_legs FROM anon;
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.bet_legs FROM authenticated;
+REVOKE ALL ON public.bet_legs FROM authenticated;
 GRANT SELECT ON public.bet_legs TO authenticated;
 DROP POLICY IF EXISTS "own bet_legs" ON public.bet_legs;
 DROP POLICY IF EXISTS "bet_legs select own" ON public.bet_legs;
@@ -88,7 +134,7 @@ CREATE POLICY "bet_legs select own" ON public.bet_legs
 -- ── decisions ────────────────────────────────────────────────
 REVOKE ALL ON public.decisions FROM PUBLIC;
 REVOKE ALL ON public.decisions FROM anon;
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.decisions FROM authenticated;
+REVOKE ALL ON public.decisions FROM authenticated;
 GRANT SELECT ON public.decisions TO authenticated;
 DROP POLICY IF EXISTS "own decisions" ON public.decisions;
 DROP POLICY IF EXISTS "decisions select own" ON public.decisions;
@@ -99,7 +145,7 @@ CREATE POLICY "decisions select own" ON public.decisions
 -- ── ai_analysis_runs ─────────────────────────────────────────
 REVOKE ALL ON public.ai_analysis_runs FROM PUBLIC;
 REVOKE ALL ON public.ai_analysis_runs FROM anon;
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.ai_analysis_runs FROM authenticated;
+REVOKE ALL ON public.ai_analysis_runs FROM authenticated;
 GRANT SELECT ON public.ai_analysis_runs TO authenticated;
 DROP POLICY IF EXISTS "own ai_runs" ON public.ai_analysis_runs;
 DROP POLICY IF EXISTS "ai_analysis_runs select own" ON public.ai_analysis_runs;

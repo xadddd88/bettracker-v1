@@ -12,7 +12,12 @@
 --   - anon + authenticated: full table privileges
 --   - one FOR ALL own-rows policy per table
 --   - authenticated EXECUTE on create_decision_with_analysis
+--
+-- Atomic: the whole restoration is one transaction — a failure
+-- mid-way leaves NOTHING partially restored.
 -- ============================================================
+
+BEGIN;
 
 -- profiles
 GRANT ALL ON public.profiles TO anon, authenticated;
@@ -72,3 +77,5 @@ GRANT EXECUTE ON FUNCTION create_decision_with_analysis(
   numeric, numeric, numeric, numeric, text, text, text, jsonb,
   text, text, jsonb, jsonb, boolean, int, int, text
 ) TO authenticated;
+
+COMMIT;

@@ -60,6 +60,25 @@ Plus: `REVOKE EXECUTE` on `create_decision_with_analysis` from PUBLIC/anon/authe
 **No `FORCE ROW LEVEL SECURITY`** — it would break the SECURITY DEFINER RPC layer.
 `service_role` retains full access.
 
+**CPO review round (PR #129) incorporated:**
+- `authenticated` gets `REVOKE ALL` + `GRANT SELECT` per table (an enumerated privilege
+  list would silently leave PostgreSQL 17's `MAINTAIN` behind — production ACLs showed
+  `arwdDxtm`).
+- 018 opens with a fail-closed `DO` preflight: it verifies the Phase-A functions exist with
+  the correct EXECUTE surfaces and raises BEFORE any `REVOKE` runs, so 018 cannot be
+  applied ahead of 017.
+- `place_bet_from_decision()` hardened (ships in 017): pending-only, and for
+  `source = 'ai_analyst'` the latest run must carry `quality_gate.pricingAllowed = true`
+  AND `trust_view.showPlaceBet = true` — otherwise `decision_not_placeable` with zero
+  writes; missing/legacy runs fail closed. Closes the Place-Bet trust-gate RPC bypass.
+- `update_decision_action()` hardened (ships in 017): the current action is read
+  `FOR UPDATE`, closing the race where a concurrent placement could be overwritten to
+  skipped/watchlisted.
+- Emergency rollback wrapped in a single `BEGIN`/`COMMIT` transaction.
+- New required CI job `Typecheck & lint` (`tsc --noEmit` + `next lint`).
+- The direct-write sweep is now recursive over `app/**/*.ts(x)` (writes to any of the
+  seven tables fail the suite; `.select()`/`.rpc()` remain allowed).
+
 Emergency rollback: `docs/decision-048-rollback.sql` — restores the inventoried grants and
 FOR ALL policies. Lives outside `supabase/migrations/` on purpose; applied only as a
 deliberate forward step after recording observed breakage, never automatically.

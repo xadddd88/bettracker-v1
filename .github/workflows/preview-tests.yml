@@ -19,6 +19,26 @@ jobs:
       - name: Run extractJsonObject tests
         run: node scripts/test-extract-json.mjs
 
+  # ── Job: Typecheck + lint gate ──────────────────────────────────────────────
+  # Explicit required gate: the Vercel build covers production compilation but
+  # is not a substitute for a blocking tsc/lint check on every PR.
+  quality:
+    name: Typecheck & lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+
   # ── Job 2: Provider safety + FP-001 quality gate regression suites ─────────
   # Stubbed-network suites: no provider calls, no Supabase. These are the
   # trust-layer regression guards (FP-001) — a PR that reintroduces pricing in

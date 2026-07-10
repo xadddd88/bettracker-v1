@@ -20,7 +20,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import Module from 'node:module';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -117,15 +117,17 @@ test('migration 017: save_user_settings and complete_onboarding for authenticate
 
 // ── Migration 018 (Phase B — enforcement) ────────────────────────────
 
-test('migration 018: every core table becomes SELECT-only for authenticated', () => {
+test('migration 018: every core table becomes SELECT-only for authenticated (REVOKE ALL covers PG17 MAINTAIN)', () => {
   const sql = readFileSync(path.join(repoRoot, 'supabase/migrations/018_enforce_domain_write_boundaries.sql'), 'utf8');
 
   for (const table of CORE_TABLES) {
     assert.ok(sql.includes(`REVOKE ALL ON public.${table} FROM PUBLIC;`), `${table}: PUBLIC revoke missing`);
     assert.ok(sql.includes(`REVOKE ALL ON public.${table} FROM anon;`), `${table}: anon revoke missing`);
+    // REVOKE ALL (not an enumerated privilege list) — PostgreSQL 17 adds
+    // MAINTAIN, which an enumerated revoke would silently leave behind.
     assert.ok(
-      sql.includes(`REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.${table} FROM authenticated;`),
-      `${table}: authenticated DML revoke missing`
+      sql.includes(`REVOKE ALL ON public.${table} FROM authenticated;`),
+      `${table}: authenticated must get REVOKE ALL (enumerated lists miss PG17 MAINTAIN)`
     );
     assert.ok(sql.includes(`GRANT SELECT ON public.${table} TO authenticated;`), `${table}: SELECT grant missing`);
     assert.ok(
@@ -135,8 +137,56 @@ test('migration 018: every core table becomes SELECT-only for authenticated', ()
   }
 
   const active = stripSqlComments(sql);
+  assert.ok(!/REVOKE INSERT, UPDATE, DELETE/.test(active), 'no enumerated authenticated revoke may remain');
   assert.ok(!active.includes('FORCE ROW LEVEL SECURITY'), 'FORCE RLS must NOT be enabled (breaks SECURITY DEFINER RPCs)');
   assert.ok(!/CREATE POLICY[^;]*FOR ALL/.test(active), 'no FOR ALL policy may remain in 018');
+});
+
+test('migration 018: Phase-A preflight is fail-closed and runs before any REVOKE', () => {
+  const sql = readFileSync(path.join(repoRoot, 'supabase/migrations/018_enforce_domain_write_boundaries.sql'), 'utf8');
+  const active = stripSqlComments(sql);
+
+  const preflightIdx = active.indexOf('DO $$');
+  const firstRevokeIdx = active.indexOf('REVOKE ALL ON public.');
+  assert.ok(preflightIdx !== -1, 'Phase-A preflight DO block missing');
+  assert.ok(firstRevokeIdx !== -1, 'no revokes found');
+  assert.ok(preflightIdx < firstRevokeIdx, 'preflight must run BEFORE the first REVOKE');
+
+  for (const fn of ['persist_analysis_decision', 'save_user_settings', 'complete_onboarding']) {
+    assert.ok(active.includes(`to_regprocedure`) && active.includes(fn), `preflight must check ${fn} exists`);
+  }
+  assert.ok(
+    /IF has_function_privilege\('authenticated', v_persist, 'EXECUTE'\) THEN/.test(active),
+    'preflight must fail if authenticated can execute persist_analysis_decision'
+  );
+  assert.ok(
+    /IF NOT has_function_privilege\('service_role', v_persist, 'EXECUTE'\) THEN/.test(active),
+    'preflight must fail if service_role cannot execute persist_analysis_decision'
+  );
+  assert.ok((active.match(/RAISE EXCEPTION 'Phase A/g) ?? []).length >= 5, 'preflight must raise on every mismatch');
+});
+
+test('migration 017: place_bet_from_decision enforces pending-only + AI trust gate', () => {
+  const sql = readFileSync(path.join(repoRoot, 'supabase/migrations/017_prepare_domain_write_boundaries.sql'), 'utf8');
+
+  assert.ok(sql.includes("IF v_decision.final_action <> 'pending' THEN"), 'pending-only check missing');
+  assert.ok((sql.match(/RAISE EXCEPTION 'decision_not_placeable'/g) ?? []).length >= 2, 'decision_not_placeable exceptions missing');
+  assert.ok(sql.includes("IF v_decision.source = 'ai_analyst' THEN"), 'AI-source trust gate branch missing');
+  assert.ok(sql.includes("'quality_gate' -> 'pricingAllowed'"), 'quality_gate.pricingAllowed check missing');
+  assert.ok(sql.includes("'trust_view' -> 'showPlaceBet'"), 'trust_view.showPlaceBet check missing');
+  assert.ok(/IS DISTINCT FROM 'true'::jsonb/.test(sql), 'trust gate must be NULL-safe fail-closed');
+  assert.ok(sql.includes('AND balance >= v_stake'), 'funds guard from #047 must be preserved');
+});
+
+test('migration 017: update_decision_action locks the row before the transition', () => {
+  const sql = readFileSync(path.join(repoRoot, 'supabase/migrations/017_prepare_domain_write_boundaries.sql'), 'utf8');
+
+  const fnStart = sql.indexOf('CREATE OR REPLACE FUNCTION update_decision_action');
+  assert.ok(fnStart !== -1, 'update_decision_action replacement missing');
+  const fnBody = sql.slice(fnStart, sql.indexOf('$$;', fnStart));
+  assert.ok(/SELECT final_action INTO v_current_action FROM decisions[\s\S]*?FOR UPDATE;/.test(fnBody),
+    'update_decision_action must read the current action FOR UPDATE');
+  assert.ok(fnBody.includes("IF v_current_action = 'placed' THEN"), 'placed guard must run after the lock');
 });
 
 test('migration 018: FP-001 bypass closed — old Analyst RPC loses user EXECUTE but is not dropped', () => {
@@ -150,12 +200,19 @@ test('migration 018: FP-001 bypass closed — old Analyst RPC loses user EXECUTE
   assert.ok(!active.includes('DROP FUNCTION'), 'old function must be kept until stable verification (dropped later)');
 });
 
-test('rollback script exists outside supabase/migrations and restores prior state', () => {
+test('rollback script exists outside supabase/migrations, is transactional, and restores prior state', () => {
   const rollbackPath = path.join(repoRoot, 'docs/decision-048-rollback.sql');
   assert.ok(existsSync(rollbackPath), 'docs/decision-048-rollback.sql missing');
   assert.ok(!existsSync(path.join(repoRoot, 'supabase/migrations/decision-048-rollback.sql')), 'rollback must NOT live in migrations dir');
 
   const sql = readFileSync(rollbackPath, 'utf8');
+  const active = stripSqlComments(sql);
+  const beginIdx = active.indexOf('BEGIN;');
+  const commitIdx = active.indexOf('COMMIT;');
+  const firstGrantIdx = active.indexOf('GRANT ALL ON public.');
+  assert.ok(beginIdx !== -1 && commitIdx !== -1, 'rollback must be wrapped in BEGIN/COMMIT');
+  assert.ok(beginIdx < firstGrantIdx && firstGrantIdx < commitIdx, 'all restoration must sit inside the transaction');
+
   for (const table of CORE_TABLES) {
     assert.ok(sql.includes(`GRANT ALL ON public.${table} TO anon, authenticated;`), `rollback: ${table} grant restore missing`);
   }
@@ -331,22 +388,31 @@ await testAsync('onboarding route: writes only via complete_onboarding RPC', asy
   });
 });
 
-// ── Core routes contain no direct core-table writes ──────────────────
+// ── Recursive sweep: NO direct core-table writes anywhere in app/ ────
 
-test('core route sources contain no direct writes to core tables', () => {
-  const routes = [
-    'app/api/settings/route.ts',
-    'app/api/onboarding/complete/route.ts',
-    'app/api/bankroll/deposit/route.ts',
-  ];
-  const writePattern = new RegExp(
-    `from\\('(${CORE_TABLES.join('|')})'\\)\\s*\\.\\s*(update|insert|upsert|delete)`,
-    's'
-  );
-  for (const rel of routes) {
-    const src = readFileSync(path.join(repoRoot, rel), 'utf8');
-    assert.ok(!writePattern.test(src), `${rel} still writes a core table directly`);
+test('recursive sweep: no app source writes a core table directly', () => {
+  const offenders = [];
+
+  function walk(dir) {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (/\.(ts|tsx)$/.test(entry.name)) {
+        // Normalize whitespace so chained builders split across lines
+        // still match; .select() and .rpc() stay allowed.
+        const compact = readFileSync(full, 'utf8').replace(/\s+/g, '');
+        for (const table of CORE_TABLES) {
+          if (new RegExp(`\\.from\\(['"\`]${table}['"\`]\\)\\.(insert|update|upsert|delete)\\(`).test(compact)) {
+            offenders.push(`${path.relative(repoRoot, full)} → ${table}`);
+          }
+        }
+      }
+    }
   }
+
+  walk(path.join(repoRoot, 'app'));
+  assert.deepEqual(offenders, [], `direct core-table writes found:\n      ${offenders.join('\n      ')}`);
 });
 
 console.log(`\n${passed + failed} tests — ${passed} passed, ${failed} failed\n`);
