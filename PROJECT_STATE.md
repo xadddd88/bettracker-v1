@@ -13,7 +13,7 @@
 | Production | `https://btdk.app` |
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
-| Current decision | **#053 — Project State & Migration Reconciliation** |
+| Latest completed decision | **#053 — Project State & Migration Reconciliation (EXECUTED / CLOSED)** |
 | Next reserved decision | **#054 — CSP Enforcement & CSP Report Hardening** |
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. The next football-enrichment step remains blocked by a separate scope/runtime approval and trust validation, not by missing provider identity.
