@@ -13,8 +13,8 @@
 | Production | `https://btdk.app` |
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
-| Latest completed decision | **#053 — Project State & Migration Reconciliation (EXECUTED / CLOSED)** |
-| Current decision | **#054 — CSP Report Hardening & Security Headers, Phase A (AWAITING CPO REVIEW)** |
+| Latest completed decision | **#054 — CSP Report Hardening & Security Headers, Phase A (EXECUTED / MERGED / DEPLOYED)** |
+| Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
 | Next unreserved decision | **#055** |
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. The next football-enrichment step remains blocked by a separate scope/runtime approval and trust validation, not by missing provider identity.
@@ -135,7 +135,7 @@ Current safeguards:
 External beta remains paused because the product vision is not yet complete. Important open areas:
 
 1. Founder SMTP round-trip for Decision #050.
-2. Decision #054 Phase A review; enforced CSP and nonce/hash Phase B remain unapproved.
+2. Decision #054 Report-Only observation period; enforced CSP and nonce/hash Phase B remain unapproved.
 3. Football enrichment read-only scope/runtime approval and trust validation.
 4. Odds ingestion/normalization and user-facing trust validation.
 5. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial).
@@ -169,7 +169,7 @@ CSP enforcement / nonce / strict-dynamic — NOT APPROVED in Phase A
 
 ```txt
 #053 — Project State & Migration Reconciliation — EXECUTED / CLOSED
-#054 — CSP Report Hardening & Security Headers, Phase A — AWAITING CPO REVIEW
+#054 — CSP Report Hardening & Security Headers, Phase A — EXECUTED / MERGED / DEPLOYED
 #055 — next unreserved decision
 ```
 

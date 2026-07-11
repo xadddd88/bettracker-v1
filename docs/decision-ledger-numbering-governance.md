@@ -1,6 +1,6 @@
 # Decision Ledger / Numbering Governance
 
-Status: CURRENT — Decision #054 Phase A under review  
+Status: CURRENT — Decision #054 Phase A executed; Report-Only observation period active  
 Last updated: 2026-07-11
 
 ## Purpose
@@ -13,7 +13,7 @@ This file prevents decision-number collisions. Historical numbers are immutable:
 Occupied: #001-#019, #021-#031, #033-#054
 Do not reuse: #020
 Retired reservation / do not reuse: #032
-Current active: #054 — CSP Report Hardening & Security Headers, Phase A
+Latest executed: #054 — CSP Report Hardening & Security Headers, Phase A
 Next unreserved: #055
 ```
 
@@ -31,7 +31,7 @@ Next unreserved: #055
 | #051 | FP-001 Legacy Pricing Quarantine — EXECUTED |
 | #052 | Global Durable Rate Limits — EXECUTED |
 | #053 | Project State & Migration Reconciliation — EXECUTED / CLOSED |
-| #054 | CSP Report Hardening & Security Headers, Phase A — IMPLEMENTED / AWAITING CPO REVIEW |
+| #054 | CSP Report Hardening & Security Headers, Phase A — EXECUTED / MERGED / DEPLOYED; Phase B NOT APPROVED |
 
 ## Retired / Superseded Tracks
 
@@ -52,4 +52,4 @@ Next unreserved: #055
 
 ## Current Holds
 
-Decision numbering does not grant runtime authority. Provider calls, writes, enrichment, odds ingestion, and betting-signal surfaces still require their own explicit scopes and approvals. FP-001 remains active.
+Decision numbering does not grant runtime authority. Provider calls, writes, enrichment, odds ingestion, betting-signal surfaces, and CSP enforcement still require their own explicit scopes and approvals. FP-001 remains active. Decision #054 Phase B is not approved.

@@ -1953,7 +1953,7 @@ Reference: `docs/global-rate-limits-scope-decision-052.md`
 **Date:** 2026-07-11
 **Proposed by:** CPO + Lead Engineer
 **Approved by:** CPO autonomous-window scope
-**Status:** PHASE A IMPLEMENTED / AWAITING CPO REVIEW
+**Status:** PHASE A EXECUTED / MERGED / DEPLOYED 2026-07-11. PR #141 squash-merged as `676740b`; production deployment `dpl_BaZTgPrueBxwYfFkmAsQ1QNJR9h3` READY on `btdk.app`. Live headers and non-invasive route guards verified. CSP remains Report-Only; Phase B enforcement is NOT APPROVED.
 
 **Decision:** Harden CSP report ingestion and add baseline HTTP security headers while keeping CSP in Report-Only mode.
 
