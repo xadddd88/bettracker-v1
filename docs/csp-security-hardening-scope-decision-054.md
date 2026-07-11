@@ -107,7 +107,7 @@ COOP, COEP, and CORP are intentionally not added without a compatibility audit.
 - baseline headers;
 - CSP remains Report-Only and keeps `unsafe-inline` in Phase A.
 
-The suite is wired into PR CI with all existing trust and safety suites.
+A dedicated CSP Security GitHub Actions workflow runs this suite on the PR; all existing Preview Tests trust, safety, typecheck/lint, and smoke jobs continue unchanged.
 
 ## Phase B — Not Implemented
 
