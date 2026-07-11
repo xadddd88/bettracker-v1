@@ -5,6 +5,9 @@ on:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   csp-security:
     name: CSP security suite (Decision #054)
@@ -20,9 +23,69 @@ jobs:
         run: npm ci
       - name: Run CSP security suite
         run: npm run test:csp-security
-      - name: Upload decision log snapshot
-        uses: actions/upload-artifact@v4
+
+  decision-log:
+    name: Record Decision 054 in decision log
+    if: github.head_ref == 'feat/decision-054-csp-phase-a' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
         with:
-          name: decision-log-054
-          path: docs/decisions.md
-          retention-days: 1
+          ref: feat/decision-054-csp-phase-a
+          fetch-depth: 0
+      - name: Append Decision 054
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('docs/decisions.md')
+          text = path.read_text(encoding='utf-8')
+          heading = '## Decision #054 — CSP Report Hardening & Security Headers, Phase A'
+          decision = r'''## Decision #054 — CSP Report Hardening & Security Headers, Phase A
+**Date:** 2026-07-11  
+**Proposed by:** CPO + Lead Engineer  
+**Approved by:** CPO autonomous-window scope  
+**Status:** PHASE A IMPLEMENTED / AWAITING CPO REVIEW
+
+**Decision:** Harden CSP report ingestion and add baseline HTTP security headers while keeping CSP in Report-Only mode.
+
+**Why:**
+- Production CSP reported violations but did not block them, which is correct for observation, but the report endpoint accepted unlimited raw bodies and logged `script-sample` plus unredacted URLs.
+- The application lacked explicit `nosniff`, Referrer-Policy, X-Frame-Options, and Permissions-Policy headers.
+- Enforcing CSP before understanding Next.js inline hydration and external source requirements risks breaking the application.
+
+**Phase A:**
+- bounded 32 KB CSP body reader;
+- legacy and Reporting API normalization;
+- strict sanitization, URL query/fragment removal, and no script-sample/raw payload logging;
+- durable fail-closed CSP report limits through Decision #052;
+- `204/400/413/415/429/503` route contract;
+- baseline security headers;
+- CSP remains `Content-Security-Policy-Report-Only` with `unsafe-inline` unchanged.
+
+**Phase B:** Not implemented. Requires production violation observation, source classification, a reviewed nonce/hash strategy, compatibility smoke, and separate CPO approval.
+
+**Scope:** No migration, Supabase write, provider call, environment change, enrichment, odds work, or betting-signal change. FP-001 remains active.
+
+Reference: `docs/csp-security-hardening-scope-decision-054.md`
+'''
+          if heading not in text:
+              marker = '\n---\n\n*Last updated: 2026-07-11*'
+              pos = text.rfind(marker)
+              if pos == -1:
+                  raise SystemExit('Decision log footer marker not found')
+              text = text[:pos] + '\n---\n\n' + decision + text[pos:]
+              path.write_text(text, encoding='utf-8')
+          PY
+
+          if git diff --quiet -- docs/decisions.md; then
+            echo "Decision #054 already present"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/decisions.md
+          git diff --cached --check
+          git commit -m "docs: add Decision #054 Phase A to decision log"
+          git push origin HEAD:feat/decision-054-csp-phase-a
