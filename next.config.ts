@@ -4,10 +4,9 @@ import type { NextConfig } from 'next'
 const supabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
 const posthogOrigin  = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://eu.i.posthog.com'
 
-// CSP directive list — Report-Only mode (never blocks, only reports).
-// Violations POST to /api/csp-report → captured in Vercel runtime logs.
-// To harden further: drop 'unsafe-inline' from script-src (requires nonces),
-// then switch the header key to Content-Security-Policy to enforce.
+// Decision #054 Phase A: CSP remains Report-Only. This phase hardens the
+// reporting endpoint and baseline headers without enabling enforcement or
+// removing unsafe-inline. Nonce/hash enforcement requires a later review.
 const cspDirectives = [
   "default-src 'self'",
   // Next.js App Router injects inline hydration/streaming scripts
@@ -43,6 +42,22 @@ const nextConfig: NextConfig = {
           {
             key:   'Content-Security-Policy-Report-Only',
             value: cspDirectives,
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
           },
         ],
       },
