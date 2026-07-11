@@ -1,0 +1,69 @@
+name: Decision 053 Closeout
+
+on:
+  push:
+    branches:
+      - docs/decision-053-closeout
+
+permissions:
+  contents: write
+
+jobs:
+  closeout:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/decision-053-closeout
+          fetch-depth: 0
+
+      - name: Close Decision 053 status surfaces
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              Path('docs/decisions.md'): [
+                  (
+                      '**Status:** IMPLEMENTED / AWAITING MERGE (docs-only)',
+                      '**Status:** EXECUTED / CLOSED 2026-07-11. PR #139 squash-merged as `a925085`; production deployment READY. No runtime code, migrations, provider calls, Supabase writes, or environment changes were made by Decision #053.'
+                  ),
+              ],
+              Path('docs/project-state-migration-reconciliation-053.md'): [
+                  (
+                      'IMPLEMENTED / AWAITING MERGE — docs/status/inventory only.',
+                      'EXECUTED / MERGED — PR #139 (`a925085`), production READY. Docs/status/inventory only.'
+                  ),
+              ],
+              Path('docs/decision-ledger-numbering-governance.md'): [
+                  (
+                      '| #053 | Project State & Migration Reconciliation — IMPLEMENTED / AWAITING MERGE |',
+                      '| #053 | Project State & Migration Reconciliation — EXECUTED / CLOSED |'
+                  ),
+              ],
+              Path('PROJECT_STATE.md'): [
+                  (
+                      '| Current decision | **#053 — Project State & Migration Reconciliation** |',
+                      '| Latest completed decision | **#053 — Project State & Migration Reconciliation (EXECUTED / CLOSED)** |'
+                  ),
+              ],
+          }
+
+          for path, pairs in replacements.items():
+              text = path.read_text(encoding='utf-8')
+              for old, new in pairs:
+                  if old not in text:
+                      raise SystemExit(f'Expected text missing in {path}: {old}')
+                  text = text.replace(old, new, 1)
+              path.write_text(text, encoding='utf-8')
+          PY
+
+          rm .github/workflows/decision-053-closeout.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md docs/decisions.md docs/project-state-migration-reconciliation-053.md docs/decision-ledger-numbering-governance.md .github/workflows/decision-053-closeout.yml
+          git diff --cached --check
+          git commit -m "docs: close Decision #053 after merge and production deploy"
+          git push origin HEAD:docs/decision-053-closeout
