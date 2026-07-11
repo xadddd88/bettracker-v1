@@ -1949,5 +1949,35 @@ Reference: `docs/global-rate-limits-scope-decision-052.md`
 - Decision #050's SMTP round-trip remains a visible founder action and is not falsely marked complete.
 ---
 
+## Decision #054 — CSP Report Hardening & Security Headers, Phase A
+**Date:** 2026-07-11
+**Proposed by:** CPO + Lead Engineer
+**Approved by:** CPO autonomous-window scope
+**Status:** PHASE A IMPLEMENTED / AWAITING CPO REVIEW
+
+**Decision:** Harden CSP report ingestion and add baseline HTTP security headers while keeping CSP in Report-Only mode.
+
+**Why:**
+- Production CSP reports violations but does not block them, which is appropriate for observation, while the old report endpoint accepted an unlimited raw body and logged `script-sample` plus unredacted URLs.
+- The application lacked explicit `nosniff`, Referrer-Policy, X-Frame-Options, and Permissions-Policy headers.
+- Enforcing CSP before classifying real sources and designing a Next.js-compatible nonce/hash strategy risks breaking hydration, authentication, analytics, or observability.
+
+**Phase A:**
+- bounded 32 KB request-body reader using both Content-Length preflight and streamed enforcement;
+- legacy `application/csp-report` and Reporting API normalization;
+- allowlisted, bounded structured fields with URL query/fragment removal;
+- `script-sample`, raw payloads, cookies, credentials, and request headers are never logged;
+- durable fail-closed rate limits through Decision #052;
+- reviewed `204 / 400 / 413 / 415 / 429 / 503` route contract;
+- baseline `X-Content-Type-Options`, Referrer-Policy, X-Frame-Options, and Permissions-Policy headers;
+- CSP remains `Content-Security-Policy-Report-Only`; `unsafe-inline` remains unchanged.
+
+**Phase B:** Not implemented. It requires production Report-Only evidence, source classification, a reviewed nonce/hash strategy, compatibility smoke for Next.js hydration/auth/Supabase/PostHog/Sentry, and separate CPO approval.
+
+**Scope:** No migration, Supabase write, provider call, production environment change, enrichment, odds work, or betting-signal change. FP-001 remains active.
+
+Reference: `docs/csp-security-hardening-scope-decision-054.md`
+---
+
 *Last updated: 2026-07-11*
 *Owner: All (each role contributes)*
