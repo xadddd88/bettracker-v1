@@ -5,31 +5,9 @@ on:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  decision-053-patch:
-    name: Decision #053 log reconciliation
-    if: github.head_ref == 'docs/decision-053-project-state-reconciliation'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: docs/decision-053-project-state-reconciliation
-          fetch-depth: 0
-      - name: Apply decision-log patch and remove temporary helpers
-        run: |
-          python scripts/patch-decision-053.py
-          git fetch origin main
-          git checkout origin/main -- .github/workflows/preview-tests.yml
-          git rm scripts/patch-decision-053.py
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/decisions.md .github/workflows/preview-tests.yml
-          git commit -m "docs: reconcile Decision #052 body and add Decision #053"
-          git push origin HEAD:docs/decision-053-project-state-reconciliation
-
+  # ── Job 1: JSON parser unit tests ──────────────────────────────────────────
+  # Runs independently of any Vercel deployment.
   unit-tests:
     name: JSON parser unit tests
     runs-on: ubuntu-latest
@@ -41,6 +19,9 @@ jobs:
       - name: Run extractJsonObject tests
         run: node scripts/test-extract-json.mjs
 
+  # ── Job: Typecheck + lint gate ──────────────────────────────────────────────
+  # Explicit required gate: the Vercel build covers production compilation but
+  # is not a substitute for a blocking tsc/lint check on every PR.
   quality:
     name: Typecheck & lint
     runs-on: ubuntu-latest
@@ -58,6 +39,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
+  # ── Job 2: Provider safety + FP-001 quality gate regression suites ─────────
+  # Stubbed-network suites: no provider calls, no Supabase. These are the
+  # trust-layer regression guards (FP-001) — a PR that reintroduces pricing in
+  # blocked mode or leaks a provider token fails here.
   safety-suites:
     name: Provider safety & FP-001 quality gate
     runs-on: ubuntu-latest
@@ -87,17 +72,7 @@ jobs:
       - name: "Global rate-limit suite (Decision #052)"
         run: npm run test:rate-limit
 
-  decision-053-source:
-    name: Decision #053 source snapshot
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/upload-artifact@v4
-        with:
-          name: decision-053-source
-          path: docs/decisions.md
-          retention-days: 1
-
+  # ── Job 3: Smoke tests against Vercel preview deployment ───────────────────
   smoke:
     name: Smoke tests on preview
     runs-on: ubuntu-latest
@@ -119,6 +94,8 @@ jobs:
           PROJECT_ID="prj_HgkXfIh2s8J7fdjStH4atnBpXBa2"
           TEAM_ID="team_Evt0BlM2Dy7FxfskYnlNcMo4"
 
+          # Compute deterministic branch alias slug:
+          #   lowercase → replace non-[a-z0-9] with '-' → collapse runs → trim edges
           BRANCH_SLUG=$(echo "$BRANCH" \
             | tr '[:upper:]' '[:lower:]' \
             | sed 's/[^a-z0-9]/-/g' \
@@ -126,14 +103,20 @@ jobs:
             | sed 's/^-//;s/-$//')
           ALIAS_URL="https://bettracker-git-${BRANCH_SLUG}-betracker.vercel.app"
 
+          # VERCEL_TOKEN is required — a missing token means we cannot verify
+          # which deployment the branch alias is serving, risking tests against
+          # a stale build (root cause of the PR #46 false failure).
           if [ -z "$VERCEL_TOKEN" ]; then
-            echo "::error::VERCEL_TOKEN secret is not set. Smoke tests require the Vercel API to confirm the exact commit is deployed before running."
+            echo "::error::VERCEL_TOKEN secret is not set. Smoke tests require the Vercel API to confirm the exact commit is deployed before running. Add VERCEL_TOKEN in repo Settings → Secrets and variables → Actions."
             exit 1
           fi
 
           API="https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&teamId=${TEAM_ID}&limit=10"
           PREVIEW_URL=""
 
+          # ── Path 1: exact deployment URL via Vercel API (up to 6 min) ────────
+          # Polls until a deployment matching this exact commit SHA is READY,
+          # then uses its unique URL. 36 × 10 s = 360 s = 6 min.
           echo "Polling Vercel API for sha=$SHA (36 × 10 s = 6 min max)..."
 
           for i in $(seq 1 36); do
@@ -145,7 +128,7 @@ jobs:
               "$API" 2>/dev/null || echo "000")
 
             if [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
-              echo "::error::Vercel API HTTP $HTTP_CODE — VERCEL_TOKEN may be expired or have insufficient scope"
+              echo "::error::Vercel API HTTP $HTTP_CODE — VERCEL_TOKEN may be expired or have insufficient scope (needs deployments:read)"
               exit 1
             fi
 
@@ -176,6 +159,11 @@ jobs:
             sleep 10
           done
 
+          # ── Path 2: branch alias, SHA-verified (up to 4 more min) ───────────
+          # Reached only if Path 1 timed out (deployment took >6 min).
+          # Uses the branch alias URL, but only after the API confirms the
+          # expected SHA is READY — prevents testing against a stale build.
+          # 24 × 10 s = 240 s = 4 min. Combined max wait: 10 min.
           if [ -z "$PREVIEW_URL" ]; then
             echo "Path 1 timed out — waiting for alias to serve sha=$SHA (24 × 10 s = 4 min max)"
             echo "Branch alias: $ALIAS_URL"
@@ -188,11 +176,14 @@ jobs:
                 "${ALIAS_URL}/login" 2>/dev/null || echo "000")
 
               if [ "$ALIAS_HTTP" = "200" ]; then
+                # Confirm via API that the expected SHA is now READY before
+                # accepting the alias as a valid test target.
                 READY=$(curl -s \
                   -H "Authorization: Bearer $VERCEL_TOKEN" \
                   "$API" 2>/dev/null \
                   | jq -r --arg sha "$SHA" \
                   '[.deployments[] | select(.meta.githubCommitSha == $sha and .state == "READY")] | .[0].url // empty')
+
                 if [ -n "$READY" ]; then
                   echo "[$i/24] sha=$SHA READY — alias confirmed"
                   PREVIEW_URL="$ALIAS_URL"
@@ -208,6 +199,7 @@ jobs:
             done
           fi
 
+          # ── Fail clearly if neither path resolved ─────────────────────────
           if [ -z "$PREVIEW_URL" ]; then
             echo "::error::sha=$SHA not READY after 10 min. Branch alias attempted: $ALIAS_URL"
             exit 1
