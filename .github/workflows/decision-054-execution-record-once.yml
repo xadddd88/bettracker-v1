@@ -1,16 +1,15 @@
 name: Decision 054 Execution Record One-Time Update
 
 on:
-  push:
-    branches:
-      - docs/decision-054-phase-a-execution-record
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
   update:
-    if: github.actor != 'github-actions[bot]'
+    if: github.head_ref == 'docs/decision-054-phase-a-execution-record' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +24,6 @@ jobs:
           from pathlib import Path
           from textwrap import dedent
 
-          # Decision log: update only Decision #054 status.
           path = Path('docs/decisions.md')
           text = path.read_text(encoding='utf-8')
           heading = '## Decision #054 — CSP Report Hardening & Security Headers, Phase A'
@@ -47,7 +45,6 @@ jobs:
           block = block.replace(old_status, new_status, 1)
           path.write_text(text[:start] + block + text[end:], encoding='utf-8')
 
-          # Numbering ledger.
           path = Path('docs/decision-ledger-numbering-governance.md')
           text = path.read_text(encoding='utf-8')
           replacements = [
@@ -71,7 +68,6 @@ jobs:
               raise SystemExit('ledger hold anchor missing')
           path.write_text(text.replace(old_hold, new_hold, 1), encoding='utf-8')
 
-          # Project state.
           path = Path('PROJECT_STATE.md')
           text = path.read_text(encoding='utf-8')
           replacements = [
@@ -90,7 +86,6 @@ jobs:
               text = text.replace(old, new, 1)
           path.write_text(text, encoding='utf-8')
 
-          # Execution record.
           record = dedent(r'''
           # CSP Security Hardening Phase A — Execution Record (Decision #054)
 
@@ -134,11 +129,7 @@ jobs:
           Strict-Transport-Security: present
           ```
 
-          This confirms that Phase A did not accidentally enable CSP enforcement or remove the inline allowances required by the current Next.js application.
-
           ### CSP report endpoint
-
-          Non-invasive production checks:
 
           ```txt
           GET /api/csp-report                         -> 405 Method Not Allowed
@@ -155,64 +146,25 @@ jobs:
           limiter unavailable     -> 503, fail closed
           ```
 
-          A live 429/503 stress test was intentionally not run: it would create artificial CSP traffic, temporarily consume a production bucket, and add noise to the observation logs.
+          A live 429/503 stress test was intentionally not run because it would create artificial production traffic and log noise.
 
           ## Privacy and Logging Boundary
 
-          The deployed route:
-
-          - reads at most 32 KB;
-          - accepts legacy CSP reports and Reporting API CSP entries;
-          - stores/logs no raw request body;
-          - drops `script-sample`;
-          - strips URL query strings and fragments;
-          - limits strings and report count;
-          - logs only the reviewed sanitized field allowlist;
-          - uses durable fail-closed rate limiting from Decision #052.
+          The deployed route reads at most 32 KB, normalizes both report formats, drops `script-sample`, strips URL queries/fragments, caps fields/report count, logs no raw body, and uses durable fail-closed rate limiting.
 
           No runtime error/fatal cluster was observed during the production checkpoint.
 
           ## CI Evidence
 
-          The merged implementation passed:
-
-          ```txt
-          JSON parser
-          provider safety
-          FP-001 quality gate
-          financial safety
-          core domain write boundaries
-          agent write boundaries
-          auth invite flow
-          FP-001 legacy quarantine
-          global durable rate limits
-          CSP security suite
-          Typecheck and lint
-          preview smoke
-          Vercel preview build
-          ```
+          JSON parser, all trust/safety suites including CSP, Typecheck/lint, preview smoke, and Vercel preview build passed before merge.
 
           ## Phase B Boundary
 
-          Phase B is **NOT APPROVED**.
-
-          Before any enforced `Content-Security-Policy`, nonce/hash strategy, removal of `unsafe-inline`, or addition of `strict-dynamic`, BetTracker must:
-
-          1. collect real Report-Only violations over an observation period;
-          2. classify application-required sources versus browser extensions/noise;
-          3. confirm Next.js hydration, Supabase, PostHog, Sentry, fonts, images, auth, and invite flows;
-          4. design a Next.js-compatible nonce/hash strategy;
-          5. pass preview and authenticated-flow compatibility smoke;
-          6. receive a separate CPO decision.
+          Phase B is **NOT APPROVED**. It requires a Report-Only observation period, source classification, compatibility checks, a Next.js-compatible nonce/hash design, preview/authenticated-flow smoke, and a separate CPO decision.
 
           ## Remaining Manual Action
 
-          Decision #050 remains separate:
-
-          ```txt
-          Registration Invite Flow — DEPLOYED / ROUTE-VERIFIED
-          Founder SMTP round-trip — PENDING
-          ```
+          Decision #050 remains `DEPLOYED / ROUTE-VERIFIED`; the founder SMTP round-trip remains pending.
 
           ## Scope Confirmation
 
@@ -227,13 +179,13 @@ jobs:
           Decision #050 SMTP test — untouched
           ```
           ''').lstrip()
-
           record_path = Path('docs/csp-security-phase-a-execution-record-054.md')
           if record_path.exists():
               raise SystemExit('execution record already exists')
           record_path.write_text(record, encoding='utf-8')
 
           Path('.github/workflows/decision-054-execution-record-once.yml').unlink()
+          Path('.decision-054-execution-trigger').unlink(missing_ok=True)
           PY
 
           git config user.name "github-actions[bot]"
