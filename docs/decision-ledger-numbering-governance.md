@@ -1,146 +1,55 @@
 # Decision Ledger / Numbering Governance
 
-Status: DOCS / STATUS GOVERNANCE ONLY
-
-Last updated: 2026-07-07
+Status: CURRENT — reconciled by Decision #053  
+Last updated: 2026-07-11
 
 ## Purpose
 
-This document records occupied, reserved, missing, and next-planned decision numbers so concurrent documentation PRs do not guess or collide.
+This file prevents decision-number collisions. Historical numbers are immutable: gaps and retired reservations are never opportunistically backfilled.
 
-This is documentation/status governance only:
-
-- no runtime code
-- no provider calls
-- no migrations
-- no Supabase writes
-- no env flags
-- no enrichment writes
-- no Scout/Analyst/UI usage
-- no probability, implied probability, edge, EV, recommendation, Place Bet, or betting signal
-
-## Current Ledger State
-
-### Occupied
-
-The following decision numbers are currently occupied in `docs/decisions.md`:
+## Current Number Map
 
 ```txt
-#001-#019
-#021-#031
-#033-#043
+Occupied: #001-#019, #021-#031, #033-#053
+Do not reuse: #020
+Retired reservation / do not reuse: #032
+Reserved next: #054 — CSP Enforcement & CSP Report Hardening
+Next unreserved after #054: #055
 ```
 
-Known recent entries:
+## Recent Decisions
 
-| Decision | Status |
-| --- | --- |
-| #018 | Occupied: Bookmaker and Mapping Discovery Scope Before Reference Calls |
-| #019 | Occupied: FP-001 False Precision Regression Case |
-| #021 | Occupied: FP-001 Data Coverage Map |
-| #031 | Occupied: M1.2.e Football Enrichment Design |
-| #033 | Occupied: M1.2.e Football Enrichment Endpoint Evidence |
-| #034 | Occupied: M1.2.e Football Enrichment Read-Only Dry-Run Scope |
-| #035 | Occupied: M1.2.e.2 SportMonks Canonical Fixture Mapping Scope |
-| #036 | Occupied: Decision Ledger / Numbering Governance |
-| #037 | Occupied: M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope |
-| #038 | Occupied: M1.2.e.2.b.1 SportMonks Mapping Discovery Endpoint Evidence Scope |
-| #039 | Occupied: odds_snapshots_public Curated View Status Reconciliation & Working-Tree Hygiene |
-| #040 | Occupied: M1.2.e.2.b.1 SportMonks Mapping Discovery Endpoint Evidence Record |
-| #041 | Occupied: SportMonks Plan Coverage Gate Result & Discovery Re-Target |
-| #042 | Occupied: M1.2.e.2.b.2 API-Football EPL Dry-Run & Controlled Write Scope |
-| #043 | Occupied: M1.2.e.2.b.2 SportMonks Mapping Discovery Implementation Scope |
+| Decision | Status / subject |
+|---|---|
+| #044 | EPL controlled fixture write + SportMonks discovery execution record — EXECUTED |
+| #045 | Controlled SportMonks provider-link write — EXECUTED |
+| #046 | Provider-link execution/validation record — EXECUTED |
+| #047 | Atomic Financial Writes & No-Overdraft Policy — EXECUTED |
+| #048 | Core Domain Write Boundaries — EXECUTED |
+| #049 | Scout/Coach Agent Write Boundaries — EXECUTED |
+| #050 | Registration Invite Flow — DEPLOYED / ROUTE-VERIFIED; founder SMTP round-trip pending |
+| #051 | FP-001 Legacy Pricing Quarantine — EXECUTED |
+| #052 | Global Durable Rate Limits — EXECUTED |
+| #053 | Project State & Migration Reconciliation — IMPLEMENTED / AWAITING MERGE |
+| #054 | **RESERVED** — CSP Enforcement & CSP Report Hardening |
 
-### Missing
+## Retired / Superseded Tracks
 
-| Decision | Status |
-| --- | --- |
-| #020 | Missing / intentionally not backfilled in current work |
+- **#020:** never reuse. PR #90 tried to claim it for Third-Party Manual Context Policy, but that PR is closed without merge and the policy is not adopted.
+- **#032:** the old M1.3 filter-evidence reservation is retired after PR #106 was superseded. Keep the number unused to preserve audit history.
+- A revived third-party manual-context policy must use **#055 or later** in a fresh PR.
 
-Decision #020 must not be filled opportunistically. Any future use of #020 requires a dedicated CPO-approved governance decision.
+## Rules
 
-### Reserved
+1. Scan `docs/decisions.md` and this ledger before assigning a number.
+2. Use the next free number unless an explicit reservation exists.
+3. Never renumber merged decisions.
+4. Never backfill #020 or #032.
+5. Record concurrent reservations before relying on them.
+6. If a reserved PR is abandoned, retire the reservation in a docs/governance PR.
+7. Execution-record PRs may ride under the original decision number and do not consume a new number.
+8. Placeholder headings such as `#NNN` are templates, not occupied decisions.
 
-| Decision | Reservation |
-| --- | --- |
-| #032 | Reserved by the parallel M1.3 API-Football `/odds/mapping` filter evidence track |
+## Current Holds
 
-The #038 reservation recorded by Decision #039 was consumed when Decision #038 merged (PR #112). No next decision number is reserved by this PR. The next free unreserved number is #044 unless a later docs/status governance PR records a new reservation.
-
-## Numbering Rules
-
-Before assigning a decision number:
-
-1. Scan `docs/decisions.md` for existing decision headings.
-2. Check this ledger for reserved and missing numbers.
-3. Use the next appropriate free or explicitly reserved number.
-4. Do not use placeholder numbers such as `#0XX`.
-5. Do not close historical gaps unless the PR is explicitly a governance PR for that gap.
-6. Do not renumber historical decisions.
-7. If a parallel PR needs a decision number, reserve it in this ledger before relying on it.
-8. If a reserved PR is abandoned, update this ledger in a docs/status governance PR.
-
-## SportMonks Mapping Scope Status
-
-The SportMonks canonical mapping discovery scope now uses:
-
-```txt
-Decision #037 - M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope
-```
-
-Decision #037 is occupied by the docs/status-only M1.2.e.2.b Read-Only SportMonks Mapping Discovery Scope.
-
-Content direction already accepted for that future scope:
-
-- discovery is not SportMonks `GET /v3/football/fixtures/{ID}` because the SportMonks fixture ID is unknown
-- discovery must search by canonical fixture date, kickoff window, league/competition if available, participants/team names, and season if available
-- candidate endpoint family is SportMonks fixtures by date or fixtures between dates
-- exact endpoint remains unconfirmed until official endpoint evidence is recorded
-- endpoint-shape evidence is required before runtime
-- max provider requests: 2
-- page 1 only
-- stop if `paging.total > 1`
-- no page 2
-- no crawl
-- no broad search
-- no fallback endpoint calls
-- match keys must be read from `canonical_fixtures` at runtime
-- SportMonks `api_token` must be redacted from logs, reports, Vercel, Sentry, docs, PR bodies, errors, URLs, and console output
-- confidence rubric is `exact`, `high`, `medium`, `needs_review`, `failed`
-- only `exact` / `high` may become eligible for later controlled provider-link write
-- not-found or ambiguous results write zero rows and keep mapping blocked
-
-The future scope does not approve:
-
-- runtime provider calls
-- provider-link writes
-- enrichment writes
-- migrations
-- Supabase writes
-- env flags
-- Scout/Analyst/UI
-- probability
-- implied probability
-- edge
-- EV
-- recommendation
-- Place Bet
-- betting signal
-
-FP-001 remains active. Mapping discovery is identity evidence only.
-
-## SportMonks Mapping Endpoint Evidence Scope Status
-
-Decision #038 is occupied by:
-
-```txt
-Decision #038 - M1.2.e.2.b.1 SportMonks Mapping Discovery Endpoint Evidence Scope
-```
-
-That evidence scope is docs/evidence only. It does not approve runtime, provider calls, API routes, migrations, provider-link writes, enrichment writes, env flags, Scout/Analyst/UI, or betting signals.
-
-The scope must confirm official docs/account evidence for fixtures by date versus fixtures between dates, exact endpoint paths, request parameters, supported filters, pagination, response shape, quota/request cost, rate limits, plan availability, and SportMonks `api_token` redaction requirements before any runtime proposal.
-
-Decision #040 records the collected endpoint evidence in `docs/sportmonks-mapping-discovery-endpoint-evidence-m1-2-e-2-b-1.md`. Key runtime-relevant corrections: v3 pagination has no `total` field (guardrail must use `pagination.has_more` on page 1), the `timezone` parameter must be omitted so the date bucket stays UTC, and header-based `Authorization` auth keeps the token out of URLs.
-
-Decision #041 closes the plan/league-coverage gate with result FAILED for Cymru Premier (not in the Starter plan and not offered in the league picker) and re-targets discovery to England Premier League (primary) / Scotland Premiership 501 (backup) via `docs/sportmonks-plan-coverage-gate-result-and-discovery-retarget-m1-2-e-2-b.md`. New discovery targets require a separately approved API-Football dry-run + controlled fixture write before the 2.5.b.2 discovery implementation scope.
+Decision numbering does not grant runtime authority. Provider calls, writes, enrichment, odds ingestion, and betting-signal surfaces still require their own explicit scopes and approvals. FP-001 remains active.
