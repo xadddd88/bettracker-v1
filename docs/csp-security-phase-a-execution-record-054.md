@@ -6,6 +6,7 @@ EXECUTED / MERGED / DEPLOYED — 2026-07-11.
 
 ```txt
 Implementation PR: #141
+Execution-record PR: #142
 Squash commit: 676740bb78d1ffa598d6b6eb078204c91c284a1e
 Production deployment: dpl_BaZTgPrueBxwYfFkmAsQ1QNJR9h3
 Production alias: https://btdk.app
