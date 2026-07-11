@@ -26,9 +26,9 @@ jobs:
           text = path.read_text(encoding='utf-8')
           heading = '## Decision #054 — CSP Report Hardening & Security Headers, Phase A'
           decision = r'''## Decision #054 — CSP Report Hardening & Security Headers, Phase A
-          **Date:** 2026-07-11  
-          **Proposed by:** CPO + Lead Engineer  
-          **Approved by:** CPO autonomous-window scope  
+          **Date:** 2026-07-11
+          **Proposed by:** CPO + Lead Engineer
+          **Approved by:** CPO autonomous-window scope
           **Status:** PHASE A IMPLEMENTED / AWAITING CPO REVIEW
 
           **Decision:** Harden CSP report ingestion and add baseline HTTP security headers while keeping CSP in Report-Only mode.
