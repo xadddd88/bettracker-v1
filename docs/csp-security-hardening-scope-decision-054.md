@@ -4,6 +4,8 @@
 
 PHASE A IMPLEMENTED / AWAITING CPO REVIEW.
 
+Implementation PR: #141.
+
 CSP remains **Report-Only**. This decision does not enable enforcement, remove `unsafe-inline`, or introduce a nonce/hash strategy.
 
 Last updated: 2026-07-11
