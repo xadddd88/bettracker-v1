@@ -1893,7 +1893,7 @@ Reference: `docs/fp001-legacy-quarantine-scope-decision-051.md`
 ## Decision #052 - Global (Durable) Rate Limits
 **Date:** 2026-07-10
 **Proposed by:** CPO (audit) + Claude
-**Status:** Implementation ready. Migration 023 NOT applied until CPO review.
+**Status:** EXECUTED 2026-07-10. CPO final accept on head `33ac046` (after two review rounds: VADE self-DoS drain → check-then-consume; CPO fail-closed limiter + per-key advisory lock + strict validation + IP hashing + neutral coach message + bounded cleanup; plus a Vercel deploy-miss re-triggered via empty commit `33ac046`). Migration 023 applied + verified: grants (RLS on, anon/auth 0 table access, RPC service_role only, advisory lock present) + live 20-call burst against the deployed function (limit 5/min+15/hour → 5 allowed, 15 denied, hour counter **5** not 20 — denied consume nothing). PR #137 merged (production `47cbff9`). Execution record: `docs/global-rate-limits-execution-record-052.md`. Next free decision number: #053.
 
 **Context:** scanner/analyst/scout/coach/register rate-limited with an in-memory Map — per-instance on Vercel serverless (cold start resets, scaling multiplies the cap), so the Anthropic-spend and register-enumeration caps were not actually enforced across the fleet.
 
