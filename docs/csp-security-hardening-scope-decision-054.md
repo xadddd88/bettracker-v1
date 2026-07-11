@@ -5,6 +5,7 @@
 PHASE A IMPLEMENTED / AWAITING CPO REVIEW.
 
 Implementation PR: #141.
+Validation gates: existing Preview Tests workflow plus dedicated CSP Security workflow.
 
 CSP remains **Report-Only**. This decision does not enable enforcement, remove `unsafe-inline`, or introduce a nonce/hash strategy.
 
