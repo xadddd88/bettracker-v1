@@ -1,30 +1,30 @@
-name: Decision 053 Docs Bootstrap
+name: Decision 053 Decision-Log Patch
 
 on:
-  push:
-    branches:
-      - docs/decision-053-project-state-reconciliation
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
-  reconcile:
-    if: github.actor != 'github-actions[bot]'
+  patch-decision-log:
+    if: github.head_ref == 'docs/decision-053-project-state-reconciliation'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: docs/decision-053-project-state-reconciliation
           fetch-depth: 0
-      - name: Reconcile project state and migration inventory
+      - name: Patch decision log and remove bootstrap workflow
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          decisions_path = Path('docs/decisions.md')
-          decisions = decisions_path.read_text(encoding='utf-8')
+          path = Path('docs/decisions.md')
+          text = path.read_text(encoding='utf-8')
 
           old_helper = "- Shared helper `lib/rate-limit.ts` `enforceRateLimit(key, windows)` — **fail-open** on any limiter failure (logged; a limiter outage must not down the route), `RATE_LIMITS` centralizes env-tunable windows (defaults unchanged: scanner 5/min+30/day, analyst 10/min+200/day, scout 3/min+50/day, coach 20/day, register 5/min+15/hour)."
           new_helper = "- Shared helper `lib/rate-limit.ts` `enforceRateLimit(key, windows)` — **fail-closed** on any limiter failure (RPC/store error or malformed response → `unavailable: true`; routes return 503 before any Anthropic spend or invite work). All keys are `sha256`-hashed before storage; register keys use a canonicalized client IP. `RATE_LIMITS` centralizes env-tunable windows (defaults unchanged: scanner 5/min+30/day, analyst 10/min+200/day, scout 3/min+50/day, coach 20/day, register 5/min+15/hour). *(Corrected post-merge: this bullet originally described the rejected pre-review fail-open draft; the CPO review reversed it before migration 023 was applied — see the execution record.)*"
@@ -32,569 +32,44 @@ jobs:
           old_tests = "**Tests:** new CI suite `test:rate-limit` (7 cases: helper RPC call + mapping, fail-open on RPC error and missing admin, config sanity, no-in-memory-Map source sweep across all five routes, migration static guards). auth-invite's obsolete in-memory 429 test removed. All suites green: rate-limit 7/7, auth 16/16, agent 12/12, domain 13/13, financial 10/10, provider-safety 77/77, FP-001 26/26, quarantine 5/5, full build + tsc/lint clean."
           new_tests = "**Tests:** new CI suite `test:rate-limit` (12 cases at merged head `33ac046`: helper RPC call + mapping, FAILS CLOSED on RPC error / missing admin client / malformed responses, `canonicalClientIp` validation, config sanity, no-in-memory-Map source sweep across all five routes including the `unavailable → 503` branch, register canonical-IP keying, neutral Coach 429 message, and migration static guards including the per-key advisory lock plus two-phase check-then-consume). The auth-invite suite's obsolete in-memory 429 test was removed. All suites green: rate-limit 12/12, auth 16/16, agent 12/12, domain 13/13, financial 10/10, provider-safety 77/77, FP-001 26/26, quarantine 5/5, full build + tsc/lint clean. *(Corrected post-merge from the rejected pre-review \"7 cases / fail-open\" text.)*"
 
-          if old_helper in decisions:
-              decisions = decisions.replace(old_helper, new_helper, 1)
-          elif new_helper not in decisions:
-              raise SystemExit('Decision #052 helper paragraph not found')
+          if old_helper in text:
+              text = text.replace(old_helper, new_helper, 1)
+          if old_tests in text:
+              text = text.replace(old_tests, new_tests, 1)
 
-          if old_tests in decisions:
-              decisions = decisions.replace(old_tests, new_tests, 1)
-          elif new_tests not in decisions:
-              raise SystemExit('Decision #052 tests paragraph not found')
-
-          decision_053 = r'''
-## Decision #053 — Project State & Migration Reconciliation
+          decision = '''## Decision #053 — Project State & Migration Reconciliation
 **Date:** 2026-07-11  
 **Proposed by:** CPO + Lead Engineer  
 **Approved by:** Founder/CPO scope approval  
 **Status:** IMPLEMENTED / AWAITING MERGE (docs-only)
 
-**Decision:** Reconcile the repository's source-of-truth documentation with production reality through Decision #052, record migration-ledger drift without applying anything, and close superseded draft PRs without merging their stale branches.
+**Decision:** Reconcile source-of-truth documentation with production reality through Decision #052, record migration drift without applying anything, and close superseded draft PRs without merging stale branches.
 
-**Why:**
-- `PROJECT_STATE.md` was last updated on 2026-07-07 and still claimed production had zero SportMonks links, even though Decisions #045–#046 completed the controlled provider-link write.
-- README still instructed operators to run only `001_initial_schema.sql`, despite the repository carrying migrations through 023 and known bootstrap drift.
-- The Decision #052 body retained rejected fail-open wording and the obsolete 7-test count, while the final implementation and execution record are fail-closed with 12 tests.
-- PR #90 and PR #106 remained open draft branches even though their numbering/evidence state was superseded.
+**Scope:** Documentation/status/migration inventory only. No runtime code, migrations, Supabase writes, provider calls, environment changes, enrichment, odds calls, or betting signals.
 
-**Scope:**
-- Documentation, status, migration inventory, and PR disposition only.
-- No runtime code, no migration application, no Supabase writes, no provider calls, no environment changes, no enrichment, no odds calls, and no betting signal.
+**Reconciled facts:** Decisions #044–#046 completed the controlled EPL/SportMonks identity chain; #047–#049 closed financial and domain write-boundary risks; #050 remains pending founder SMTP round-trip; #051 quarantined 78 legacy FP-001 records; #052 deployed fail-closed durable rate limits with parallel production verification.
 
-**Reconciled facts:**
-- Decisions #044–#046 completed the EPL canonical fixture, SportMonks discovery, and controlled `sportmonks:19722203` → canonical fixture link.
-- Decisions #047–#049 completed atomic financial writes and removed direct authenticated writes from core and agent-domain tables.
-- Decision #050 is deployed and route-verified, but its founder SMTP round-trip remains pending.
-- Decision #051 quarantined 78 legacy FP-001 pricing records and removed readable fabricated pricing from live domain surfaces.
-- Decision #052 deployed durable, fail-closed, cross-instance rate limits and passed a real parallel production contention test.
+**Migration outcome:** No migration was applied. The missing 008 number, untracked historical objects, policy-name drift, review-only files, timestamped production ledger, and destructive 001 bootstrap risk are recorded in `docs/migration-state-reconciliation-053.md`.
 
-**Migration reconciliation:**
-- Tracked migration numbering has no `008` file.
-- Production's Supabase migration ledger contains timestamped entries and does not fully describe earlier manually applied history.
-- `update_updated_at_column()` exists as an untracked historical object required by old migration files.
-- Historical policy-name drift and REVIEW-ONLY/manual migrations are recorded; nothing is replayed or applied in this decision.
-- `001_initial_schema.sql` is explicitly not a production bootstrap command.
+**PR disposition:** PR #106 is superseded; PR #90 is closed without merge and its policy is not adopted. Decision #020 and retired #032 are never reused.
 
-**PR disposition:**
-- PR #106: close as superseded; its `/odds/mapping` filter conclusion is already present in main.
-- PR #90: close without merge; the policy is not adopted, its claimed Decision #020 is invalid, and any revival requires a fresh PR under Decision #055 or later.
+**Numbering:** Decision #054 is reserved for CSP Enforcement & CSP Report Hardening; a revived manual-context policy must use #055 or later.
+'''
 
-**Numbering:**
-- Decision #054 is reserved for CSP Enforcement & CSP Report Hardening.
-- Decision #020 and the retired #032 reservation are not reused.
-
-**Consequences:**
-- `PROJECT_STATE.md`, README, the numbering ledger, and the migration reconciliation record become the current operational documentation set.
-- The enrichment identity blocker is removed; the remaining enrichment gate is separate CPO runtime approval plus trust validation.
-- Decision #050's SMTP round-trip remains a visible founder action and is not falsely marked complete.
-'''.strip()
-
-          if '## Decision #053 — Project State & Migration Reconciliation' not in decisions:
+          if '## Decision #053 — Project State & Migration Reconciliation' not in text:
               marker = '\n---\n\n*Last updated:'
-              pos = decisions.rfind(marker)
-              if pos == -1:
-                  raise SystemExit('Decision log footer marker not found')
-              decisions = decisions[:pos] + '\n---\n\n' + decision_053 + decisions[pos:]
-
-          decisions = decisions.replace('*Last updated: 2026-07-10*', '*Last updated: 2026-07-11*')
-          decisions_path.write_text(decisions, encoding='utf-8')
-
-          project_state = r'''# BetTracker AI — Project State
-
-> **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-11 (Decision #053)
-
-## 1. Executive Status
-
-| Field | Current state |
-|---|---|
-| Engineering shell | **READY** — production is stable and guarded by CI, RLS/RPC write boundaries, FP-001 checks, and durable rate limits |
-| Product Vision Beta | **NOT READY** — core product capabilities and trusted sports-data usage remain incomplete |
-| External beta launch | **PAUSED** — product decision; do not invite external users yet |
-| Production | `https://btdk.app` |
-| Repository | `xadddd88/bettracker-v1` |
-| Branch model | Feature branch → PR → CPO review/accept → founder merge |
-| Current decision | **#053 — Project State & Migration Reconciliation** |
-| Next reserved decision | **#054 — CSP Enforcement & CSP Report Hardening** |
-
-The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. The next football-enrichment step remains blocked by a separate scope/runtime approval and trust validation, not by missing provider identity.
-
-## 2. Current Production Facts
-
-### Sports identity chain
-
-The controlled end-to-end identity chain is proven for one canonical fixture:
-
-```txt
-Canonical fixture: Arsenal vs Coventry City
-Kickoff: 2026-08-21 19:00 UTC
-canonical_fixture_id: 92afd570-399a-48b9-915a-e1ffaf52a71c
-api_football provider fixture: 1557367 (exact)
-sportmonks provider fixture: 19722203 (high)
-```
-
-Completed milestones:
-
-| Decision | Result |
-|---|---|
-| #044 | EPL dry-run/write and SportMonks discovery execution record completed |
-| #045 | Controlled SportMonks provider-link write implemented and executed |
-| #046 | Provider-link execution/validation record merged |
-
-Current downstream boundary:
-
-```txt
-provider identity link exists
-football_enrichment rows are not yet approved for use
-no enrichment data may unlock Analyst/Scout/UI pricing or betting signals
-```
-
-### Financial and domain integrity
-
-| Decision | Result |
-|---|---|
-| #047 | Atomic bankroll adjustment, idempotency, no-overdraft guards, currency sync, and financial UI fixes executed |
-| #048 | Seven core tables made SELECT-only for authenticated users; writes moved to approved RPC/server paths; bypass tests passed |
-| #049 | Scout/Coach agent-table write boundaries enforced; direct authenticated writes removed; state-machine and bypass tests passed |
-
-Authenticated users no longer have direct DML access to the protected financial, Decision, analysis, Scout, or Coach domain tables. Bankroll transactions are append-only through approved operations. Negative historical bankroll data was preserved for reconciliation; new stakes and withdrawals cannot worsen an insufficient balance.
-
-### Trust and FP-001
-
-| Decision | Result |
-|---|---|
-| #051 | 78 pre-gate pricing records quarantined with originals preserved for audit; live fabricated pricing fields scrubbed |
-| #052 | Durable Postgres-backed rate limits executed; fail-closed helper; real parallel production test passed |
-
-Active trust rules:
-
-```txt
-data present != model ready
-provider identity != enrichment approval
-enrichment fact != probability / edge / EV / recommendation
-trust-blocked AI Decision cannot be placed through UI or RPC
-```
-
-### Registration
-
-Decision #050 is **DEPLOYED / ROUTE-VERIFIED**, but not fully executed until the founder completes a real SMTP round-trip:
-
-```txt
-approve test email
-→ request invite
-→ receive email
-→ click link
-→ set password
-→ dashboard
-→ beta_access: approved → invited → used
-```
-
-Do not mark #050 fully executed before that manual verification.
-
-## 3. Sports Data Status
-
-### Football fixtures and enrichment
-
-- API-Football/API-Sports Ultra remains the broad fixture/odds/results provider.
-- SportMonks remains the football-depth provider.
-- The controlled cross-provider link exists for the Arsenal–Coventry fixture.
-- Mapping discovery and provider-link write are complete for this fixture.
-- **Football enrichment provider calls/writes remain on HOLD** until a separately reviewed read-only enrichment milestone is approved.
-- `football_enrichment` must not feed probability, edge, EV, recommendation, Place Bet, Scout, Analyst, or UI signals before trust validation.
-
-### Odds / M1.3
-
-M1.3 remains paused:
-
-```txt
-read-only odds dry-run: executed safely, no odds coverage for the original fixture
-bookmaker discovery: partial/safe
-/odds/mapping page 1: partial/safe, pagination guard stopped page 2+
-filtered /odds/mapping parameters: unconfirmed
-page 2+, crawl, writes, migrations, and user-facing odds: not approved
-```
-
-PR #106 is superseded because its conclusion — filtered mapping runtime blocked — is already recorded in main.
-
-## 4. Security and Reliability Baseline
-
-Current safeguards:
-
-- provider requests use redirect blocking, body-read timeout coverage, strict pagination validation, bounded request budgets, and token redaction;
-- provider-safety and FP-001 suites run on every PR;
-- financial-safety, domain-write-boundary, agent-write-boundary, auth-invite, quarantine, and global-rate-limit suites are in CI;
-- TypeScript and lint are explicit CI jobs;
-- protected routes use global Postgres-backed rate limits shared across Vercel instances;
-- limiter failures are fail-closed (`503`) before Anthropic or invite work;
-- rate-limit keys are hashed before storage;
-- production domain writes are mediated through reviewed RPC/server operations.
-
-## 5. Active Product Blockers
-
-External beta remains paused because the product vision is not yet complete. Important open areas:
-
-1. Founder SMTP round-trip for Decision #050.
-2. CSP enforcement and CSP-report hardening (reserved Decision #054).
-3. Football enrichment read-only scope/runtime approval and trust validation.
-4. Odds ingestion/normalization and user-facing trust validation.
-5. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial).
-6. Trusted Analyst/Scout v2 using verified provider data rather than ungrounded pricing.
-7. Full i18n UX, including Arabic RTL.
-8. Mobile/tablet product polish and closed-beta onboarding.
-
-## 6. Holds
-
-Until a separate CPO decision changes them:
-
-```txt
-football enrichment calls/writes — HOLD
-odds writes and mapping crawl — HOLD
-new provider calls outside approved scopes — HOLD
-provider data in Analyst/Scout/UI pricing — HOLD
-probability / implied probability / edge / EV / recommendation signals — FP-001 gated
-external beta invitations — PAUSED
-```
-
-## 7. Documentation and Migration Status
-
-- Decision #053 reconciles this file, README, the numbering ledger, and the migration inventory.
-- `supabase/migrations` contains numbered files through 023, with no 008 file.
-- Production's timestamped migration ledger does not represent all earlier manually applied history.
-- A fresh-database bootstrap is **not yet certified**; see `docs/migration-state-reconciliation-053.md`.
-- Never run `001_initial_schema.sql` against production as a general setup command.
-
-## 8. Next Approved Documentation Sequence
-
-```txt
-#053 — Project State & Migration Reconciliation
-#054 — CSP Enforcement & CSP Report Hardening (reserved)
-#055+ — any revived Third-Party Manual Context Policy, under a fresh PR/number
-```
-
-PR #90 is closed without merge; its policy is not adopted. Decision #020 is never reused.
-'''
-          Path('PROJECT_STATE.md').write_text(project_state, encoding='utf-8')
-
-          readme = r'''# BetTracker AI
-
-Decision-first betting analytics and bankroll tracking platform. The current working brand is **BetTracker AI**; **LineHunter AI** remains the preferred future brand direction.
-
-## Current Status
-
-- Production: `https://btdk.app`
-- Engineering shell: **READY**
-- Product Vision Beta: **NOT READY**
-- External beta: **PAUSED**
-- Current source of truth: [`PROJECT_STATE.md`](PROJECT_STATE.md)
-
-The product is intentionally trust-gated: incomplete fixture, odds, enrichment, or AI context must not become model probability, edge, EV, recommendation, Place Bet, or another betting signal.
-
-## Stack
-
-- Next.js 15 / React 19 / TypeScript
-- Tailwind CSS
-- Supabase Auth + PostgreSQL + RLS/RPC domain boundaries
-- Anthropic API for Scanner, Analyst, Scout, and Coach
-- PostHog and Sentry
-- Vercel
-
-## Local Development
-
-```bash
-npm ci
-npm run dev
-```
-
-Open `http://localhost:3000`.
-
-Before opening a PR, run:
-
-```bash
-npm run test:extract-json
-npm run test:provider-safety
-npm run test:analysis-quality-gate
-npm run test:financial-safety
-npm run test:domain-write-boundaries
-npm run test:agent-write-boundaries
-npm run test:auth-invite
-npm run test:fp001-quarantine
-npm run test:rate-limit
-npx tsc --noEmit
-npm run lint
-npm run build
-```
-
-## Environment
-
-Create `.env.local` for local development. Never commit values.
-
-### Core Supabase
-
-```txt
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY
-NEXT_PUBLIC_SITE_URL
-```
-
-### AI
-
-```txt
-ANTHROPIC_API_KEY
-ANTHROPIC_MODEL_ANALYST
-ANTHROPIC_MODEL_SCANNER
-ANTHROPIC_MODEL_SCOUT
-ANTHROPIC_MODEL_COACH
-```
-
-### Sports providers
-
-```txt
-API_FOOTBALL_KEY
-SPORTMONKS_TOKEN
-API_TENNIS_KEY
-```
-
-### Operator and controlled-write controls
-
-```txt
-SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN
-SPORTS_FIXTURE_SYNC_WRITE_ENABLED
-SPORTMONKS_PROVIDER_LINK_WRITE_ENABLED
-```
-
-Write flags are normally absent/off and may be enabled only for an explicitly approved controlled operation, then removed immediately.
-
-### Analytics / observability
-
-```txt
-NEXT_PUBLIC_POSTHOG_KEY
-NEXT_PUBLIC_POSTHOG_HOST
-NEXT_PUBLIC_SENTRY_DSN
-SENTRY_DSN
-SENTRY_AUTH_TOKEN
-```
-
-### Optional rate-limit overrides
-
-The code has reviewed defaults; environment variables may override per-minute/day/hour values for Scanner, Analyst, Scout, Coach, and Register. See `lib/rate-limit.ts`.
-
-## Database and Migrations
-
-Do **not** follow the old instruction to run only `001_initial_schema.sql`.
-
-- Numbered SQL files live in `supabase/migrations/` through 023; 008 is intentionally absent/historical.
-- Production uses Supabase migration tooling for recent migrations, but earlier history includes manually applied objects and policy drift.
-- A clean fresh-database bootstrap is not certified yet.
-- `001_initial_schema.sql` contains destructive setup logic and must never be run casually against production.
-
-Read [`docs/migration-state-reconciliation-053.md`](docs/migration-state-reconciliation-053.md) before applying or replaying any migration. Never apply a migration merely because its file exists.
-
-## Repository Structure
-
-```txt
-app/                    Next.js pages and API routes
-components/             shared UI and product components
-lib/                    Supabase, AI trust, analytics, providers, rate limits
-scripts/                safety and regression suites
-docs/                   product, decisions, execution records, runbooks
-supabase/migrations/     tracked SQL history (not a certified replay chain yet)
-types/                  shared TypeScript types
-```
-
-There is no required `legacy/` directory in the current repository.
-
-## Core Product Model
-
-```txt
-Fixture → Odds/Enrichment → Trust Gate → Decision → Bet → Result → Analytics → Learning
-```
-
-`Decision` is the first-class object. A user may analyze and skip/watch without placing a bet. Financial execution is recorded separately through `Bet`, `BetLeg`, and append-only bankroll transactions.
-
-## Documentation
-
-- [`PROJECT_STATE.md`](PROJECT_STATE.md) — current operational source of truth
-- [`PRODUCT_VISION_GAP.md`](PRODUCT_VISION_GAP.md) — gap to the intended product
-- [`docs/product.md`](docs/product.md) — product bible
-- [`docs/decisions.md`](docs/decisions.md) — decision log
-- [`docs/decision-ledger-numbering-governance.md`](docs/decision-ledger-numbering-governance.md) — numbering governance
-- [`docs/migration-state-reconciliation-053.md`](docs/migration-state-reconciliation-053.md) — tracked vs production migration inventory
-
-## Roles
-
-- Founder / CEO: Дима
-- CPO: ChatGPT
-- Lead Engineer: Claude
-'''
-          Path('README.md').write_text(readme, encoding='utf-8')
-
-          ledger = r'''# Decision Ledger / Numbering Governance
-
-Status: CURRENT — reconciled by Decision #053  
-Last updated: 2026-07-11
-
-## Purpose
-
-This file prevents decision-number collisions. Historical numbers are immutable: gaps and retired reservations are never opportunistically backfilled.
-
-## Current Number Map
-
-```txt
-Occupied: #001-#019, #021-#031, #033-#053
-Do not reuse: #020
-Retired reservation / do not reuse: #032
-Reserved next: #054 — CSP Enforcement & CSP Report Hardening
-Next unreserved after #054: #055
-```
-
-## Recent Decisions
-
-| Decision | Status / subject |
-|---|---|
-| #044 | EPL controlled fixture write + SportMonks discovery execution record — EXECUTED |
-| #045 | Controlled SportMonks provider-link write — EXECUTED |
-| #046 | Provider-link execution/validation record — EXECUTED |
-| #047 | Atomic Financial Writes & No-Overdraft Policy — EXECUTED |
-| #048 | Core Domain Write Boundaries — EXECUTED |
-| #049 | Scout/Coach Agent Write Boundaries — EXECUTED |
-| #050 | Registration Invite Flow — DEPLOYED / ROUTE-VERIFIED; founder SMTP round-trip pending |
-| #051 | FP-001 Legacy Pricing Quarantine — EXECUTED |
-| #052 | Global Durable Rate Limits — EXECUTED |
-| #053 | Project State & Migration Reconciliation — IMPLEMENTED / AWAITING MERGE |
-| #054 | **RESERVED** — CSP Enforcement & CSP Report Hardening |
-
-## Retired / Superseded Tracks
-
-- **#020:** never reuse. PR #90 tried to claim it for Third-Party Manual Context Policy, but that PR is closed without merge and the policy is not adopted.
-- **#032:** the old M1.3 filter-evidence reservation is retired after PR #106 was superseded. Keep the number unused to preserve audit history.
-- A revived third-party manual-context policy must use **#055 or later** in a fresh PR.
-
-## Rules
-
-1. Scan `docs/decisions.md` and this ledger before assigning a number.
-2. Use the next free number unless an explicit reservation exists.
-3. Never renumber merged decisions.
-4. Never backfill #020 or #032.
-5. Record concurrent reservations before relying on them.
-6. If a reserved PR is abandoned, retire the reservation in a docs/governance PR.
-7. Execution-record PRs may ride under the original decision number and do not consume a new number.
-8. Placeholder headings such as `#NNN` are templates, not occupied decisions.
-
-## Current Holds
-
-Decision numbering does not grant runtime authority. Provider calls, writes, enrichment, odds ingestion, and betting-signal surfaces still require their own explicit scopes and approvals. FP-001 remains active.
-'''
-          Path('docs/decision-ledger-numbering-governance.md').write_text(ledger, encoding='utf-8')
-
-          migration_files = sorted(p.name for p in Path('supabase/migrations').glob('*.sql'))
-          tracked = '\n'.join(f'- `{name}`' for name in migration_files)
-          migration_doc = f'''# Migration State Reconciliation — Decision #053
-
-Status: INVENTORY / DOCUMENTATION ONLY  
-Last updated: 2026-07-11
-
-No migration was applied, replayed, reverted, or modified by Decision #053.
-
-## Tracked SQL Files
-
-The repository currently contains:
-
-{tracked}
-
-Numbering note: there is no tracked `008` migration file. Do not invent or backfill it.
-
-## Production Migration Ledger (Recent Tooling History)
-
-The production Supabase ledger records recent timestamped applications:
-
-| Production version | Name |
-|---|---|
-| `20260630172508` | `012_settle_bet_fixes` |
-| `20260705175448` | `odds_snapshots_public_view` |
-| `20260705175619` | `odds_snapshots_public_view_lockdown` |
-| `20260710152051` | `atomic_financial_writes_016` |
-| `20260710165907` | `prepare_domain_write_boundaries_017` |
-| `20260710170236` | `enforce_domain_write_boundaries_018` |
-| `20260710174832` | `prepare_agent_write_boundaries_019` |
-| `20260710175148` | `enforce_agent_write_boundaries_020` |
-| `20260710182225` | `beta_access_invite_flow_021` |
-| `20260710183632` | `fp001_legacy_quarantine_022` |
-| `20260711044511` | `global_rate_limits_023` |
-
-This ledger is not the complete historical story. Earlier schema objects were created manually or before consistent migration tooling, so absence from the timestamped ledger does not mean an object is absent from production.
-
-## Known Drift and Bootstrap Risks
-
-| Area | Reconciled fact | Operational consequence |
-|---|---|---|
-| Missing 008 | Tracked numbering jumps from 007 to 009 | Preserve the gap; do not fabricate a migration |
-| `update_updated_at_column()` | Historical function exists in production but is not defined by the tracked migration chain; old files reference it | A clean replay can fail before later migrations; fresh bootstrap is not certified |
-| Coaching policies | Tracked migration 005 created `Users see own sessions` (`FOR ALL`); production later used split select/insert names | Migration 020 deliberately drops all known names; historical drift remains documented |
-| Review-only files | Migrations 010, 011, and 013 are marked review/manual in their source history | Never auto-apply solely by filename |
-| Migration 014 | Was applied in production before its merge record was finalized | Treat production evidence and repository history as separate audit signals |
-| Migration 001 | Contains destructive initialization/drop behavior | Never run against production as a generic setup step |
-| Timestamped ledger | Recent production names differ from repository filenames | Map by reviewed content and execution record, not by numeric filename alone |
-
-## Safe Migration Rules
-
-1. Never run `001_initial_schema.sql` on production as a quick-start command.
-2. Never replay all numbered files against production.
-3. Before any migration, compare repository SQL, production objects, grants/policies, and the Supabase migration ledger.
-4. Apply only the exact CPO-reviewed file through approved migration tooling.
-5. Verify functions, constraints, grants, policies, RLS, and data invariants immediately after apply.
-6. Record sanitized execution evidence in a PR.
-7. Fresh-database bootstrap requires a separate reconciliation decision and test environment.
-
-## PR Disposition Recorded by #053
-
-- PR #106 (`/odds/mapping` filter evidence): superseded and closed. Its conclusion is already in main — filter support is unconfirmed and filtered runtime stays blocked.
-- PR #90 (Third-Party Manual Context Policy): closed without merge. The policy is not adopted; Decision #020 is invalid and never reused. Any revival requires a new PR under #055 or later.
-
-## Remaining Manual Verification
-
-Decision #050 remains deployed/route-verified but awaits the founder's real SMTP invite round-trip. This is not a migration-ledger blocker and is not folded into Decision #053.
-'''
-          Path('docs/migration-state-reconciliation-053.md').write_text(migration_doc, encoding='utf-8')
-
-          scope_doc = r'''# Project State & Migration Reconciliation — Decision #053
-
-## Status
-
-IMPLEMENTED / AWAITING MERGE — docs/status/inventory only.
-
-## Scope Guard
-
-- no runtime code
-- no migration application
-- no Supabase writes
-- no provider calls
-- no environment changes
-- no enrichment or odds calls
-- no Scout/Analyst/UI signal changes
-- FP-001 remains active
-
-## Reconciliation Outcome
-
-1. Corrected the stale Decision #052 body from the rejected fail-open/7-test draft to the executed fail-closed/12-test implementation.
-2. Replaced the 2026-07-07 `PROJECT_STATE.md` snapshot with current facts through Decision #052.
-3. Removed the obsolete zero-SportMonks-link blocker and recorded the real enrichment gate: separate runtime approval plus trust validation.
-4. Rewrote README setup, environment, testing, structure, and migration guidance.
-5. Added a tracked-vs-production migration inventory and documented bootstrap drift without applying anything.
-6. Reconciled decision numbering: #053 occupied, #054 reserved for CSP, #020/#032 not reusable.
-7. Recorded PR #106 as superseded and PR #90 as closed without policy adoption.
-8. Preserved Decision #050 founder SMTP round-trip as an explicit pending manual action.
-
-## Next
-
-Decision #054 — CSP Enforcement & CSP Report Hardening.
-'''
-          Path('docs/project-state-migration-reconciliation-053.md').write_text(scope_doc, encoding='utf-8')
+              pos = text.rfind(marker)
+              if pos < 0:
+                  raise SystemExit('decision log footer not found')
+              text = text[:pos] + '\n---\n\n' + decision.strip() + text[pos:]
+
+          text = text.replace('*Last updated: 2026-07-10*', '*Last updated: 2026-07-11*')
+          path.write_text(text, encoding='utf-8')
           PY
 
           rm .github/workflows/decision-053-bootstrap.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "docs: Decision #053 project state and migration reconciliation"
+          git commit -m "docs: reconcile Decision #052 body and add Decision #053"
           git push origin HEAD:docs/decision-053-project-state-reconciliation
