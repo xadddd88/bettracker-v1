@@ -24,6 +24,14 @@ jobs:
           from pathlib import Path
           from textwrap import dedent
 
+          def replace_or_confirm(text: str, old: str, new: str, label: str) -> str:
+              if old in text:
+                  return text.replace(old, new, 1)
+              if new in text:
+                  return text
+              raise SystemExit(f'anchor missing: {label}')
+
+          # Decision log.
           path = Path('docs/decisions.md')
           text = path.read_text(encoding='utf-8')
           heading = '## Decision #054 — CSP Report Hardening & Security Headers, Phase A'
@@ -40,52 +48,54 @@ jobs:
                         '`dpl_BaZTgPrueBxwYfFkmAsQ1QNJR9h3` READY on `btdk.app`. '
                         'Live headers and non-invasive route guards verified. CSP remains '
                         'Report-Only; Phase B enforcement is NOT APPROVED.')
-          if old_status not in block:
-              raise SystemExit('Decision #054 pending status not found')
-          block = block.replace(old_status, new_status, 1)
+          block = replace_or_confirm(block, old_status, new_status, 'Decision #054 status')
           path.write_text(text[:start] + block + text[end:], encoding='utf-8')
 
+          # Numbering ledger.
           path = Path('docs/decision-ledger-numbering-governance.md')
           text = path.read_text(encoding='utf-8')
-          replacements = [
+          pairs = [
               ('Status: CURRENT — Decision #054 Phase A under review',
-               'Status: CURRENT — Decision #054 Phase A executed; Report-Only observation period active'),
+               'Status: CURRENT — Decision #054 Phase A executed; Report-Only observation period active',
+               'ledger status'),
               ('Current active: #054 — CSP Report Hardening & Security Headers, Phase A',
-               'Latest executed: #054 — CSP Report Hardening & Security Headers, Phase A'),
+               'Latest executed: #054 — CSP Report Hardening & Security Headers, Phase A',
+               'ledger current map'),
               ('| #054 | CSP Report Hardening & Security Headers, Phase A — IMPLEMENTED / AWAITING CPO REVIEW |',
-               '| #054 | CSP Report Hardening & Security Headers, Phase A — EXECUTED / MERGED / DEPLOYED; Phase B NOT APPROVED |'),
+               '| #054 | CSP Report Hardening & Security Headers, Phase A — EXECUTED / MERGED / DEPLOYED; Phase B NOT APPROVED |',
+               'ledger row'),
           ]
-          for old, new in replacements:
-              if old not in text:
-                  raise SystemExit(f'ledger anchor missing: {old}')
-              text = text.replace(old, new, 1)
+          for old, new, label in pairs:
+              text = replace_or_confirm(text, old, new, label)
           old_hold = ('Decision numbering does not grant runtime authority. Provider calls, writes, enrichment, odds ingestion, '
                       'and betting-signal surfaces still require their own explicit scopes and approvals. FP-001 remains active.')
           new_hold = ('Decision numbering does not grant runtime authority. Provider calls, writes, enrichment, odds ingestion, '
                       'betting-signal surfaces, and CSP enforcement still require their own explicit scopes and approvals. '
                       'FP-001 remains active. Decision #054 Phase B is not approved.')
-          if old_hold not in text:
-              raise SystemExit('ledger hold anchor missing')
-          path.write_text(text.replace(old_hold, new_hold, 1), encoding='utf-8')
+          text = replace_or_confirm(text, old_hold, new_hold, 'ledger hold')
+          path.write_text(text, encoding='utf-8')
 
+          # Project state.
           path = Path('PROJECT_STATE.md')
           text = path.read_text(encoding='utf-8')
-          replacements = [
+          pairs = [
               ('| Latest completed decision | **#053 — Project State & Migration Reconciliation (EXECUTED / CLOSED)** |\n'
                '| Current decision | **#054 — CSP Report Hardening & Security Headers, Phase A (AWAITING CPO REVIEW)** |',
                '| Latest completed decision | **#054 — CSP Report Hardening & Security Headers, Phase A (EXECUTED / MERGED / DEPLOYED)** |\n'
-               '| Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |'),
+               '| Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |',
+               'project status table'),
               ('2. Decision #054 Phase A review; enforced CSP and nonce/hash Phase B remain unapproved.',
-               '2. Decision #054 Report-Only observation period; enforced CSP and nonce/hash Phase B remain unapproved.'),
+               '2. Decision #054 Report-Only observation period; enforced CSP and nonce/hash Phase B remain unapproved.',
+               'project blocker'),
               ('#054 — CSP Report Hardening & Security Headers, Phase A — AWAITING CPO REVIEW',
-               '#054 — CSP Report Hardening & Security Headers, Phase A — EXECUTED / MERGED / DEPLOYED'),
+               '#054 — CSP Report Hardening & Security Headers, Phase A — EXECUTED / MERGED / DEPLOYED',
+               'project sequence'),
           ]
-          for old, new in replacements:
-              if old not in text:
-                  raise SystemExit(f'PROJECT_STATE anchor missing: {old}')
-              text = text.replace(old, new, 1)
+          for old, new, label in pairs:
+              text = replace_or_confirm(text, old, new, label)
           path.write_text(text, encoding='utf-8')
 
+          # Execution record.
           record = dedent(r'''
           # CSP Security Hardening Phase A — Execution Record (Decision #054)
 
@@ -111,11 +121,7 @@ jobs:
 
           ## Live Production Verification
 
-          The founder/engineering session independently checked the deployed commit on `btdk.app`.
-
-          ### Response headers
-
-          Verified live:
+          Verified on `btdk.app`:
 
           ```txt
           Content-Security-Policy-Report-Only: present
@@ -129,30 +135,19 @@ jobs:
           Strict-Transport-Security: present
           ```
 
-          ### CSP report endpoint
+          Non-invasive endpoint checks:
 
           ```txt
-          GET /api/csp-report                         -> 405 Method Not Allowed
-          POST text/plain /api/csp-report             -> 415 Unsupported Media Type
-          POST malformed JSON with accepted type      -> 400 Invalid CSP report JSON
+          GET /api/csp-report                    -> 405
+          POST text/plain /api/csp-report        -> 415
+          POST malformed accepted JSON           -> 400
           ```
 
-          The remaining reviewed contract is covered by source and CI tests:
-
-          ```txt
-          valid sanitized report -> 204
-          body above 32 KB        -> 413
-          rate limit exceeded     -> 429 + Retry-After
-          limiter unavailable     -> 503, fail closed
-          ```
-
-          A live 429/503 stress test was intentionally not run because it would create artificial production traffic and log noise.
+          Source and CI cover `204 / 413 / 429 / 503`. A live 429/503 stress test was intentionally not run to avoid artificial production traffic and log noise.
 
           ## Privacy and Logging Boundary
 
-          The deployed route reads at most 32 KB, normalizes both report formats, drops `script-sample`, strips URL queries/fragments, caps fields/report count, logs no raw body, and uses durable fail-closed rate limiting.
-
-          No runtime error/fatal cluster was observed during the production checkpoint.
+          The deployed route reads at most 32 KB, normalizes both report formats, drops `script-sample`, strips URL queries/fragments, caps fields/report count, logs no raw body, and uses durable fail-closed rate limiting. No runtime error/fatal cluster was observed during the production checkpoint.
 
           ## CI Evidence
 
@@ -180,9 +175,8 @@ jobs:
           ```
           ''').lstrip()
           record_path = Path('docs/csp-security-phase-a-execution-record-054.md')
-          if record_path.exists():
-              raise SystemExit('execution record already exists')
-          record_path.write_text(record, encoding='utf-8')
+          if not record_path.exists():
+              record_path.write_text(record, encoding='utf-8')
 
           Path('.github/workflows/decision-054-execution-record-once.yml').unlink()
           Path('.decision-054-execution-trigger').unlink(missing_ok=True)
