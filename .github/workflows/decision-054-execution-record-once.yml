@@ -1,0 +1,244 @@
+name: Decision 054 Execution Record One-Time Update
+
+on:
+  push:
+    branches:
+      - docs/decision-054-phase-a-execution-record
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/decision-054-phase-a-execution-record
+          fetch-depth: 0
+
+      - name: Record Decision 054 Phase A execution and remove helper
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+
+          # Decision log: update only Decision #054 status.
+          path = Path('docs/decisions.md')
+          text = path.read_text(encoding='utf-8')
+          heading = '## Decision #054 — CSP Report Hardening & Security Headers, Phase A'
+          start = text.find(heading)
+          if start == -1:
+              raise SystemExit('Decision #054 heading not found')
+          end = text.find('\n---', start)
+          if end == -1:
+              end = len(text)
+          block = text[start:end]
+          old_status = '**Status:** PHASE A IMPLEMENTED / AWAITING CPO REVIEW'
+          new_status = ('**Status:** PHASE A EXECUTED / MERGED / DEPLOYED 2026-07-11. '
+                        'PR #141 squash-merged as `676740b`; production deployment '
+                        '`dpl_BaZTgPrueBxwYfFkmAsQ1QNJR9h3` READY on `btdk.app`. '
+                        'Live headers and non-invasive route guards verified. CSP remains '
+                        'Report-Only; Phase B enforcement is NOT APPROVED.')
+          if old_status not in block:
+              raise SystemExit('Decision #054 pending status not found')
+          block = block.replace(old_status, new_status, 1)
+          path.write_text(text[:start] + block + text[end:], encoding='utf-8')
+
+          # Numbering ledger.
+          path = Path('docs/decision-ledger-numbering-governance.md')
+          text = path.read_text(encoding='utf-8')
+          replacements = [
+              ('Status: CURRENT — Decision #054 Phase A under review',
+               'Status: CURRENT — Decision #054 Phase A executed; Report-Only observation period active'),
+              ('Current active: #054 — CSP Report Hardening & Security Headers, Phase A',
+               'Latest executed: #054 — CSP Report Hardening & Security Headers, Phase A'),
+              ('| #054 | CSP Report Hardening & Security Headers, Phase A — IMPLEMENTED / AWAITING CPO REVIEW |',
+               '| #054 | CSP Report Hardening & Security Headers, Phase A — EXECUTED / MERGED / DEPLOYED; Phase B NOT APPROVED |'),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'ledger anchor missing: {old}')
+              text = text.replace(old, new, 1)
+          old_hold = ('Decision numbering does not grant runtime authority. Provider calls, writes, enrichment, odds ingestion, '
+                      'and betting-signal surfaces still require their own explicit scopes and approvals. FP-001 remains active.')
+          new_hold = ('Decision numbering does not grant runtime authority. Provider calls, writes, enrichment, odds ingestion, '
+                      'betting-signal surfaces, and CSP enforcement still require their own explicit scopes and approvals. '
+                      'FP-001 remains active. Decision #054 Phase B is not approved.')
+          if old_hold not in text:
+              raise SystemExit('ledger hold anchor missing')
+          path.write_text(text.replace(old_hold, new_hold, 1), encoding='utf-8')
+
+          # Project state.
+          path = Path('PROJECT_STATE.md')
+          text = path.read_text(encoding='utf-8')
+          replacements = [
+              ('| Latest completed decision | **#053 — Project State & Migration Reconciliation (EXECUTED / CLOSED)** |\n'
+               '| Current decision | **#054 — CSP Report Hardening & Security Headers, Phase A (AWAITING CPO REVIEW)** |',
+               '| Latest completed decision | **#054 — CSP Report Hardening & Security Headers, Phase A (EXECUTED / MERGED / DEPLOYED)** |\n'
+               '| Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |'),
+              ('2. Decision #054 Phase A review; enforced CSP and nonce/hash Phase B remain unapproved.',
+               '2. Decision #054 Report-Only observation period; enforced CSP and nonce/hash Phase B remain unapproved.'),
+              ('#054 — CSP Report Hardening & Security Headers, Phase A — AWAITING CPO REVIEW',
+               '#054 — CSP Report Hardening & Security Headers, Phase A — EXECUTED / MERGED / DEPLOYED'),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'PROJECT_STATE anchor missing: {old}')
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+
+          # Execution record.
+          record = dedent(r'''
+          # CSP Security Hardening Phase A — Execution Record (Decision #054)
+
+          ## Status
+
+          EXECUTED / MERGED / DEPLOYED — 2026-07-11.
+
+          ```txt
+          Implementation PR: #141
+          Squash commit: 676740bb78d1ffa598d6b6eb078204c91c284a1e
+          Production deployment: dpl_BaZTgPrueBxwYfFkmAsQ1QNJR9h3
+          Production alias: https://btdk.app
+          Deployment state: READY
+          ```
+
+          This record closes **Phase A only**. CSP enforcement, nonce/hash work, and `strict-dynamic` remain outside the approved scope.
+
+          ## Execution Summary
+
+          Decision #054 Phase A was reviewed, accepted, squash-merged, and deployed to production. It hardened CSP violation ingestion and added baseline browser security headers without switching the application from Report-Only to enforced CSP.
+
+          No migration was applied. No Supabase write, provider call, production environment change, enrichment/odds action, or betting-signal change occurred.
+
+          ## Live Production Verification
+
+          The founder/engineering session independently checked the deployed commit on `btdk.app`.
+
+          ### Response headers
+
+          Verified live:
+
+          ```txt
+          Content-Security-Policy-Report-Only: present
+          Content-Security-Policy: absent
+          script-src 'unsafe-inline': retained
+          style-src 'unsafe-inline': retained
+          X-Content-Type-Options: nosniff
+          X-Frame-Options: DENY
+          Referrer-Policy: strict-origin-when-cross-origin
+          Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+          Strict-Transport-Security: present
+          ```
+
+          This confirms that Phase A did not accidentally enable CSP enforcement or remove the inline allowances required by the current Next.js application.
+
+          ### CSP report endpoint
+
+          Non-invasive production checks:
+
+          ```txt
+          GET /api/csp-report                         -> 405 Method Not Allowed
+          POST text/plain /api/csp-report             -> 415 Unsupported Media Type
+          POST malformed JSON with accepted type      -> 400 Invalid CSP report JSON
+          ```
+
+          The remaining reviewed contract is covered by source and CI tests:
+
+          ```txt
+          valid sanitized report -> 204
+          body above 32 KB        -> 413
+          rate limit exceeded     -> 429 + Retry-After
+          limiter unavailable     -> 503, fail closed
+          ```
+
+          A live 429/503 stress test was intentionally not run: it would create artificial CSP traffic, temporarily consume a production bucket, and add noise to the observation logs.
+
+          ## Privacy and Logging Boundary
+
+          The deployed route:
+
+          - reads at most 32 KB;
+          - accepts legacy CSP reports and Reporting API CSP entries;
+          - stores/logs no raw request body;
+          - drops `script-sample`;
+          - strips URL query strings and fragments;
+          - limits strings and report count;
+          - logs only the reviewed sanitized field allowlist;
+          - uses durable fail-closed rate limiting from Decision #052.
+
+          No runtime error/fatal cluster was observed during the production checkpoint.
+
+          ## CI Evidence
+
+          The merged implementation passed:
+
+          ```txt
+          JSON parser
+          provider safety
+          FP-001 quality gate
+          financial safety
+          core domain write boundaries
+          agent write boundaries
+          auth invite flow
+          FP-001 legacy quarantine
+          global durable rate limits
+          CSP security suite
+          Typecheck and lint
+          preview smoke
+          Vercel preview build
+          ```
+
+          ## Phase B Boundary
+
+          Phase B is **NOT APPROVED**.
+
+          Before any enforced `Content-Security-Policy`, nonce/hash strategy, removal of `unsafe-inline`, or addition of `strict-dynamic`, BetTracker must:
+
+          1. collect real Report-Only violations over an observation period;
+          2. classify application-required sources versus browser extensions/noise;
+          3. confirm Next.js hydration, Supabase, PostHog, Sentry, fonts, images, auth, and invite flows;
+          4. design a Next.js-compatible nonce/hash strategy;
+          5. pass preview and authenticated-flow compatibility smoke;
+          6. receive a separate CPO decision.
+
+          ## Remaining Manual Action
+
+          Decision #050 remains separate:
+
+          ```txt
+          Registration Invite Flow — DEPLOYED / ROUTE-VERIFIED
+          Founder SMTP round-trip — PENDING
+          ```
+
+          ## Scope Confirmation
+
+          ```txt
+          CSP remains Report-Only
+          Phase B enforcement — NOT APPROVED
+          migrations — 0
+          Supabase writes — 0
+          provider calls — 0
+          production env changes — 0
+          FP-001 — unchanged
+          Decision #050 SMTP test — untouched
+          ```
+          ''').lstrip()
+
+          record_path = Path('docs/csp-security-phase-a-execution-record-054.md')
+          if record_path.exists():
+              raise SystemExit('execution record already exists')
+          record_path.write_text(record, encoding='utf-8')
+
+          Path('.github/workflows/decision-054-execution-record-once.yml').unlink()
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "docs: record Decision #054 Phase A execution"
+          git push origin HEAD:docs/decision-054-phase-a-execution-record
