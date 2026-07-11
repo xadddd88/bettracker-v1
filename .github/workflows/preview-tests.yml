@@ -5,7 +5,31 @@ on:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
+  decision-053-patch:
+    name: Decision #053 log reconciliation
+    if: github.head_ref == 'docs/decision-053-project-state-reconciliation'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/decision-053-project-state-reconciliation
+          fetch-depth: 0
+      - name: Apply decision-log patch and remove temporary helpers
+        run: |
+          python scripts/patch-decision-053.py
+          git fetch origin main
+          git checkout origin/main -- .github/workflows/preview-tests.yml
+          git rm scripts/patch-decision-053.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/decisions.md .github/workflows/preview-tests.yml
+          git commit -m "docs: reconcile Decision #052 body and add Decision #053"
+          git push origin HEAD:docs/decision-053-project-state-reconciliation
+
   unit-tests:
     name: JSON parser unit tests
     runs-on: ubuntu-latest
