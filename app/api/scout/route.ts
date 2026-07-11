@@ -6,17 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 import { bucketScoutScore } from '@/lib/analytics/buckets'
-
-const envInt = (key: string, def: number) => {
-  const n = parseInt(process.env[key] ?? '', 10)
-  return Number.isFinite(n) && n > 0 ? n : def
-}
-
-// ─── Rate limit store (in-memory) ────────────────────────────
-const rateLimitStore = new Map<string, { minute: number; day: number; minuteTs: number; dayTs: number }>()
-
-const RATE_LIMIT_PER_MINUTE = envInt('RATE_LIMIT_SCOUT_PER_MINUTE', 3)
-const RATE_LIMIT_PER_DAY    = envInt('RATE_LIMIT_SCOUT_PER_DAY', 50)
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 const TIMEOUT_WITH_WEB_SEARCH_MS    = 55_000
 const TIMEOUT_WITHOUT_WEB_SEARCH_MS = 55_000
@@ -43,31 +33,6 @@ function extractJsonObject(rawText: string): string {
   throw new Error('no_json_found')
 }
 
-function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
-  const now = Date.now()
-  const minuteWindow = 60_000
-  const dayWindow    = 86_400_000
-
-  const entry = rateLimitStore.get(userId) ?? {
-    minute: 0, day: 0,
-    minuteTs: now, dayTs: now,
-  }
-
-  if (now - entry.minuteTs > minuteWindow) { entry.minute = 0; entry.minuteTs = now }
-  if (now - entry.dayTs > dayWindow)        { entry.day = 0;    entry.dayTs = now }
-
-  if (entry.minute >= RATE_LIMIT_PER_MINUTE) {
-    return { allowed: false, retryAfter: Math.ceil((entry.minuteTs + minuteWindow - now) / 1000) }
-  }
-  if (entry.day >= RATE_LIMIT_PER_DAY) {
-    return { allowed: false, retryAfter: Math.ceil((entry.dayTs + dayWindow - now) / 1000) }
-  }
-
-  entry.minute++
-  entry.day++
-  rateLimitStore.set(userId, entry)
-  return { allowed: true }
-}
 
 // ─── Error taxonomy ───────────────────────────────────────────
 type ScoutErrorType =
@@ -314,8 +279,14 @@ export async function POST(req: NextRequest) {
     }
     const input = parsed.data
 
-    // 3. Rate limit
-    const rl = checkRateLimit(user.id)
+    // 3. Rate limit (durable, cross-instance — Decision #052)
+    const rl = await enforceRateLimit(`scout:${user.id}`, RATE_LIMITS.scout())
+    if (rl.unavailable) {
+      return NextResponse.json(
+        { success: false, error: 'Service temporarily unavailable. Try again shortly.' },
+        { status: 503 },
+      )
+    }
     if (!rl.allowed) {
       await trackServerEvent(user.id, EVENTS.SCOUT_RATE_LIMITED, {
         sport:       input.sport,

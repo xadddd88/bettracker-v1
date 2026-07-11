@@ -15,51 +15,7 @@ import {
   type SportModuleSupport,
 } from '@/lib/ai/analysis-quality-gate'
 
-const envInt = (key: string, def: number) => {
-  const n = parseInt(process.env[key] ?? '', 10)
-  return Number.isFinite(n) && n > 0 ? n : def
-}
-
-// ─── Rate limit store (in-memory, Sprint 2) ──────────────────
-// Sprint 3: replace with Redis
-const rateLimitStore = new Map<string, { minute: number; day: number; minuteTs: number; dayTs: number }>()
-
-const RATE_LIMIT_PER_MINUTE = envInt('RATE_LIMIT_ANALYST_PER_MINUTE', 10)
-const RATE_LIMIT_PER_DAY    = envInt('RATE_LIMIT_ANALYST_PER_DAY', 200)
-
-function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
-  const now = Date.now()
-  const minuteWindow = 60_000
-  const dayWindow    = 86_400_000
-
-  const entry = rateLimitStore.get(userId) ?? {
-    minute: 0, day: 0,
-    minuteTs: now, dayTs: now,
-  }
-
-  // Reset minute counter if window passed
-  if (now - entry.minuteTs > minuteWindow) {
-    entry.minute = 0
-    entry.minuteTs = now
-  }
-  // Reset day counter if window passed
-  if (now - entry.dayTs > dayWindow) {
-    entry.day = 0
-    entry.dayTs = now
-  }
-
-  if (entry.minute >= RATE_LIMIT_PER_MINUTE) {
-    return { allowed: false, retryAfter: Math.ceil((entry.minuteTs + minuteWindow - now) / 1000) }
-  }
-  if (entry.day >= RATE_LIMIT_PER_DAY) {
-    return { allowed: false, retryAfter: Math.ceil((entry.dayTs + dayWindow - now) / 1000) }
-  }
-
-  entry.minute++
-  entry.day++
-  rateLimitStore.set(userId, entry)
-  return { allowed: true }
-}
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 // ─── Zod schemas ─────────────────────────────────────────────
 const SPORTS = ['tennis', 'soccer', 'cs2', 'basketball', 'ice_hockey', 'mma', 'other'] as const
@@ -247,12 +203,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 2. Rate limit
-    const rl = checkRateLimit(user.id)
+    // 2. Rate limit (durable, cross-instance — Decision #052)
+    const rl = await enforceRateLimit(`analyst:${user.id}`, RATE_LIMITS.analyst())
+    if (rl.unavailable) {
+      return NextResponse.json(
+        { success: false, error: 'Service temporarily unavailable. Try again shortly.' },
+        { status: 503 }
+      )
+    }
     if (!rl.allowed) {
       return NextResponse.json(
         { success: false, error: 'Rate limit exceeded. Try again later.' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
       )
     }
 

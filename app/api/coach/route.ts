@@ -6,31 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 import { extractJsonObject } from '@/lib/ai/extract-json'
-
-const envInt = (key: string, def: number) => {
-  const n = parseInt(process.env[key] ?? '', 10)
-  return Number.isFinite(n) && n > 0 ? n : def
-}
-
-// ─── Rate limit store (in-memory, rolling 24h) ───────────────
-const rateLimitStore = new Map<string, { day: number; dayTs: number }>()
-const RATE_LIMIT_PER_DAY = envInt('RATE_LIMIT_COACH_PER_DAY', 20)
-
-function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
-  const now = Date.now()
-  const dayWindow = 86_400_000
-
-  const entry = rateLimitStore.get(userId) ?? { day: 0, dayTs: now }
-  if (now - entry.dayTs > dayWindow) { entry.day = 0; entry.dayTs = now }
-
-  if (entry.day >= RATE_LIMIT_PER_DAY) {
-    return { allowed: false, retryAfter: Math.ceil((entry.dayTs + dayWindow - now) / 1000) }
-  }
-
-  entry.day++
-  rateLimitStore.set(userId, entry)
-  return { allowed: true }
-}
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 // ─── Zod schemas ─────────────────────────────────────────────
 const requestSchema = z.object({
@@ -438,12 +414,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 2. Rate limit (first after auth)
-    const rl = checkRateLimit(user.id)
+    // 2. Rate limit (durable, cross-instance — Decision #052)
+    const rl = await enforceRateLimit(`coach:${user.id}`, RATE_LIMITS.coach())
+    if (rl.unavailable) {
+      return NextResponse.json(
+        { success: false, error: 'Service temporarily unavailable. Try again shortly.' },
+        { status: 503 }
+      )
+    }
     if (!rl.allowed) {
       return NextResponse.json(
-        { success: false, error: 'Rate limit exceeded. Coach can run 2 times per 24 hours.' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+        { success: false, error: 'Rate limit exceeded. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
       )
     }
 

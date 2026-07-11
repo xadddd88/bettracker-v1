@@ -1890,5 +1890,27 @@ Reference: `docs/fp001-legacy-quarantine-scope-decision-051.md`
 
 ---
 
+## Decision #052 - Global (Durable) Rate Limits
+**Date:** 2026-07-10
+**Proposed by:** CPO (audit) + Claude
+**Status:** Implementation ready. Migration 023 NOT applied until CPO review.
+
+**Context:** scanner/analyst/scout/coach/register rate-limited with an in-memory Map — per-instance on Vercel serverless (cold start resets, scaling multiplies the cap), so the Anthropic-spend and register-enumeration caps were not actually enforced across the fleet.
+
+**Decision:** Postgres-backed shared counter (no new infra):
+- Migration 023: `api_rate_limits` table (service-role only, RLS, 0 anon/auth grants) + `rate_limit_check(p_key, p_windows)` RPC (SECURITY DEFINER, service_role only) — fixed-window atomic counter (`INSERT … ON CONFLICT DO UPDATE count+1`), denies if any window over limit, `retry_after` = until longest-blocked window resets, ~1% opportunistic expired-bucket cleanup.
+- Shared helper `lib/rate-limit.ts` `enforceRateLimit(key, windows)` — **fail-open** on any limiter failure (logged; a limiter outage must not down the route), `RATE_LIMITS` centralizes env-tunable windows (defaults unchanged: scanner 5/min+30/day, analyst 10/min+200/day, scout 3/min+50/day, coach 20/day, register 5/min+15/hour).
+- All five routes drop the in-memory Map + local checkRateLimit and call the helper (AI routes key by user.id, register by client IP); 429 + Retry-After unchanged.
+
+**Tests:** new CI suite `test:rate-limit` (7 cases: helper RPC call + mapping, fail-open on RPC error and missing admin, config sanity, no-in-memory-Map source sweep across all five routes, migration static guards). auth-invite's obsolete in-memory 429 test removed. All suites green: rate-limit 7/7, auth 16/16, agent 12/12, domain 13/13, financial 10/10, provider-safety 77/77, FP-001 26/26, quarantine 5/5, full build + tsc/lint clean.
+
+**Non-use:** No limit-value change, no Redis/marketplace integration, no route logic change beyond the limiter call, no sliding-window.
+
+**FP-001:** N/A (infra hardening).
+
+Reference: `docs/global-rate-limits-scope-decision-052.md`
+
+---
+
 *Last updated: 2026-07-10*
 *Owner: All (each role contributes)*
