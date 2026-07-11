@@ -17,7 +17,8 @@
     "test:agent-write-boundaries": "node scripts/test-agent-write-boundaries.mjs",
     "test:auth-invite": "npm run build:provider-scripts && node scripts/test-auth-invite.mjs",
     "test:fp001-quarantine": "node scripts/test-fp001-quarantine.mjs",
-    "test:rate-limit": "npm run build:provider-scripts && node scripts/test-rate-limit.mjs"
+    "test:rate-limit": "npm run build:provider-scripts && node scripts/test-rate-limit.mjs",
+    "test:csp-security": "npm run build:provider-scripts && node scripts/test-csp-security.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
