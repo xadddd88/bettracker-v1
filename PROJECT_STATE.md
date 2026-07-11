@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-11 (Decision #053)
+> Last updated: 2026-07-11 (Decision #054 Phase A)
 
 ## 1. Executive Status
 
@@ -14,7 +14,8 @@
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
 | Latest completed decision | **#053 — Project State & Migration Reconciliation (EXECUTED / CLOSED)** |
-| Next reserved decision | **#054 — CSP Enforcement & CSP Report Hardening** |
+| Current decision | **#054 — CSP Report Hardening & Security Headers, Phase A (AWAITING CPO REVIEW)** |
+| Next unreserved decision | **#055** |
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. The next football-enrichment step remains blocked by a separate scope/runtime approval and trust validation, not by missing provider identity.
 
@@ -126,14 +127,15 @@ Current safeguards:
 - protected routes use global Postgres-backed rate limits shared across Vercel instances;
 - limiter failures are fail-closed (`503`) before Anthropic or invite work;
 - rate-limit keys are hashed before storage;
-- production domain writes are mediated through reviewed RPC/server operations.
+- production domain writes are mediated through reviewed RPC/server operations;
+- Decision #054 Phase A hardens CSP report ingestion and adds baseline headers; CSP intentionally remains Report-Only pending evidence and nonce/hash design.
 
 ## 5. Active Product Blockers
 
 External beta remains paused because the product vision is not yet complete. Important open areas:
 
 1. Founder SMTP round-trip for Decision #050.
-2. CSP enforcement and CSP-report hardening (reserved Decision #054).
+2. Decision #054 Phase A review; enforced CSP and nonce/hash Phase B remain unapproved.
 3. Football enrichment read-only scope/runtime approval and trust validation.
 4. Odds ingestion/normalization and user-facing trust validation.
 5. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial).
@@ -152,22 +154,23 @@ new provider calls outside approved scopes — HOLD
 provider data in Analyst/Scout/UI pricing — HOLD
 probability / implied probability / edge / EV / recommendation signals — FP-001 gated
 external beta invitations — PAUSED
+CSP enforcement / nonce / strict-dynamic — NOT APPROVED in Phase A
 ```
 
 ## 7. Documentation and Migration Status
 
-- Decision #053 reconciles this file, README, the numbering ledger, and the migration inventory.
+- Decision #053 reconciled this file, README, the numbering ledger, and the migration inventory.
 - `supabase/migrations` contains numbered files through 023, with no 008 file.
 - Production's timestamped migration ledger does not represent all earlier manually applied history.
 - A fresh-database bootstrap is **not yet certified**; see `docs/migration-state-reconciliation-053.md`.
 - Never run `001_initial_schema.sql` against production as a general setup command.
 
-## 8. Next Approved Documentation Sequence
+## 8. Current Decision Sequence
 
 ```txt
-#053 — Project State & Migration Reconciliation
-#054 — CSP Enforcement & CSP Report Hardening (reserved)
-#055+ — any revived Third-Party Manual Context Policy, under a fresh PR/number
+#053 — Project State & Migration Reconciliation — EXECUTED / CLOSED
+#054 — CSP Report Hardening & Security Headers, Phase A — AWAITING CPO REVIEW
+#055 — next unreserved decision
 ```
 
 PR #90 is closed without merge; its policy is not adopted. Decision #020 is never reused.
