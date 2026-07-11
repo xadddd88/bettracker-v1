@@ -2,7 +2,9 @@
 
 ## Status
 
-SCOPE + IMPLEMENTATION. Awaiting CPO review. Migration 023 NOT applied yet.
+EXECUTED 2026-07-10 — migration 023 applied + verified (grants + live 20-call burst: 5 allowed
+/ 15 denied / hour counter 5), PR #137 merged (production `47cbff9`). See
+`docs/global-rate-limits-execution-record-052.md`.
 
 Last updated: 2026-07-10
 
@@ -77,11 +79,14 @@ instead of the stale hardcoded "2 times per 24 hours" that had drifted from the 
 
 ## Tests
 
-New CI suite `npm run test:rate-limit` (7 cases): helper calls the RPC with the right
-key+windows and maps the result, denied → `allowed:false`+retry, **fails open** on RPC error
-and on missing admin client, `RATE_LIMITS` config sanity, a source sweep proving no route
-keeps an in-memory Map (all call the helper with the right key), and migration static guards
-(service-role-only table+RPC, atomic increment, per-window deny, retry_after, cleanup).
+New CI suite `npm run test:rate-limit` (12 cases): helper hashes the key (sha256) and calls
+the RPC, maps allowed/retry, **fails CLOSED** (`unavailable: true`) on RPC error, missing
+admin client, and malformed responses; `canonicalClientIp` validation; `RATE_LIMITS` config
+sanity; a source sweep proving no route keeps an in-memory Map and every route handles the
+`unavailable → 503` branch; register keys by a canonical IP; the coach 429 message is
+neutral; and migration static guards (service-role-only table+RPC, per-key advisory lock,
+two-phase check-then-consume, fail-closed validation incl. NULL/duplicate windows, bounded
+cleanup).
 
 The auth-invite suite's old in-memory 429 test was removed (rate limiting is no longer a
 register-route concern; it's covered here).
