@@ -83,7 +83,7 @@ API_TENNIS_KEY
 ```txt
 SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN
 SPORTS_FIXTURE_SYNC_WRITE_ENABLED
-SPORTMONKS_PROVIDER_LINK_WRITE_ENABLED
+SPORTS_PROVIDER_LINK_WRITE_ENABLED
 ```
 
 Write flags are normally absent/off and may be enabled only for an explicitly approved controlled operation, then removed immediately.
