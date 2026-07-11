@@ -1916,7 +1916,7 @@ Reference: `docs/global-rate-limits-scope-decision-052.md`
 **Date:** 2026-07-11  
 **Proposed by:** CPO + Lead Engineer  
 **Approved by:** Founder/CPO scope approval  
-**Status:** IMPLEMENTED / AWAITING MERGE (docs-only)
+**Status:** EXECUTED / CLOSED 2026-07-11. PR #139 squash-merged as `a925085`; production deployment READY. No runtime code, migrations, provider calls, Supabase writes, or environment changes were made by Decision #053.
 
 **Decision:** Reconcile source-of-truth documentation with production reality through Decision #052, record migration drift without applying anything, and close superseded draft PRs without merging stale branches.
 

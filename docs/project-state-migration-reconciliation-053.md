@@ -2,7 +2,7 @@
 
 ## Status
 
-IMPLEMENTED / AWAITING MERGE — docs/status/inventory only.
+EXECUTED / MERGED — PR #139 (`a925085`), production READY. Docs/status/inventory only.
 
 Last updated: 2026-07-11
 
