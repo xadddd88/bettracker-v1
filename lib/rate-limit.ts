@@ -95,6 +95,10 @@ export const RATE_LIMITS = {
     { limit: envInt('RATE_LIMIT_REGISTER_PER_MINUTE', 5), seconds: 60 },
     { limit: envInt('RATE_LIMIT_REGISTER_PER_HOUR', 15),  seconds: 3_600 },
   ],
+  cspReport: (): RateWindow[] => [
+    { limit: envInt('RATE_LIMIT_CSP_REPORT_PER_MINUTE', 60), seconds: 60 },
+    { limit: envInt('RATE_LIMIT_CSP_REPORT_PER_HOUR', 500),  seconds: 3_600 },
+  ],
 }
 
 // Canonicalize a client IP for the register key. Vercel populates
