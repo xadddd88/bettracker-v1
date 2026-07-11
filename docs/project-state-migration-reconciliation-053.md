@@ -36,7 +36,7 @@ The repository's declared source of truth had drifted behind production:
 4. Rewrote README setup, environment, testing, structure, and migration guidance.
 5. Added a tracked-vs-production migration inventory and documented bootstrap drift without applying anything.
 6. Reconciled decision numbering: #053 occupied, #054 reserved for CSP, #020/#032 not reusable.
-7. Recorded PR #106 as superseded and PR #90 as closed without policy adoption.
+7. Closed PR #106 as superseded and PR #90 without merge or policy adoption.
 8. Preserved Decision #050 founder SMTP round-trip as an explicit pending manual action.
 
 ## Current Production Facts Captured
@@ -52,7 +52,7 @@ The repository's declared source of truth had drifted behind production:
 
 ### PR #106
 
-Close as superseded. The enduring conclusion already exists in main:
+Closed as superseded. The enduring conclusion already exists in main:
 
 ```txt
 /odds/mapping filter support is unconfirmed
@@ -62,7 +62,7 @@ page 2+ and crawl remain paused
 
 ### PR #90
 
-Close without merge. The policy is not adopted because:
+Closed without merge. The policy is not adopted because:
 
 - it attempted to reuse Decision #020;
 - #020 is permanently unavailable;
