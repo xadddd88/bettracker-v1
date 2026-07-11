@@ -5,7 +5,7 @@
 PHASE A IMPLEMENTED / AWAITING CPO REVIEW.
 
 Implementation PR: #141.
-Validation gates: existing Preview Tests workflow plus dedicated CSP Security workflow.
+Validation gate: `test:csp-security` runs as a read-only step in the existing Preview Tests safety job.
 
 CSP remains **Report-Only**. This decision does not enable enforcement, remove `unsafe-inline`, or introduce a nonce/hash strategy.
 
@@ -108,7 +108,7 @@ COOP, COEP, and CORP are intentionally not added without a compatibility audit.
 - baseline headers;
 - CSP remains Report-Only and keeps `unsafe-inline` in Phase A.
 
-A dedicated CSP Security GitHub Actions workflow runs this suite on the PR; all existing Preview Tests trust, safety, typecheck/lint, and smoke jobs continue unchanged.
+The existing Preview Tests workflow runs this suite in its read-only safety job alongside all other trust and regression suites; typecheck/lint and preview smoke remain unchanged.
 
 ## Phase B — Not Implemented
 
