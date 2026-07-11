@@ -1,0 +1,822 @@
+name: Decision 054 CSP Phase A Bootstrap
+
+on:
+  push:
+    branches:
+      - feat/decision-054-csp-phase-a
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/decision-054-csp-phase-a
+          fetch-depth: 0
+
+      - name: Implement CSP Phase A and self-clean
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def write(path: str, content: str) -> None:
+              p = Path(path)
+              p.parent.mkdir(parents=True, exist_ok=True)
+              p.write_text(content, encoding='utf-8')
+
+          write('lib/security/csp-report.ts', r'''export const MAX_CSP_REPORT_BODY_BYTES = 32 * 1024
+export const MAX_CSP_REPORTS = 20
+export const MAX_CSP_REPORT_FIELD_LENGTH = 256
+
+export class CspBodyTooLargeError extends Error {
+  constructor() {
+    super('CSP report body too large')
+    this.name = 'CspBodyTooLargeError'
+  }
+}
+
+export class CspReportParseError extends Error {
+  constructor(message = 'Invalid CSP report') {
+    super(message)
+    this.name = 'CspReportParseError'
+  }
+}
+
+export interface SanitizedCspReport {
+  documentUri?: string
+  referrer?: string
+  blockedUri?: string
+  violatedDirective?: string
+  effectiveDirective?: string
+  disposition?: string
+  statusCode?: number
+  sourceFile?: string
+  lineNumber?: number
+  columnNumber?: number
+}
+
+type UnknownRecord = Record<string, unknown>
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function boundedString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const normalized = value.replace(/[\u0000-\u001f\u007f]/g, '').trim()
+  if (!normalized) return undefined
+  return normalized.slice(0, MAX_CSP_REPORT_FIELD_LENGTH)
+}
+
+function boundedInteger(value: unknown): number | undefined {
+  const n = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN
+  return Number.isInteger(n) && n >= 0 ? n : undefined
+}
+
+function sanitizeUrl(value: unknown): string | undefined {
+  const raw = boundedString(value)
+  if (!raw) return undefined
+
+  const lower = raw.toLowerCase()
+  if (lower === 'inline' || lower === 'eval' || lower === 'self') return `[${lower}]`
+  if (lower.startsWith('data:')) return '[data]'
+  if (lower.startsWith('blob:')) return '[blob]'
+
+  if (raw.startsWith('/')) {
+    return raw.split(/[?#]/, 1)[0].slice(0, MAX_CSP_REPORT_FIELD_LENGTH) || '/'
+  }
+
+  try {
+    const url = new URL(raw)
+    if (!['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) return '[unsupported-url]'
+    url.username = ''
+    url.password = ''
+    url.search = ''
+    url.hash = ''
+    return url.toString().slice(0, MAX_CSP_REPORT_FIELD_LENGTH)
+  } catch {
+    return '[invalid-url]'
+  }
+}
+
+function sanitizeLegacyBody(body: UnknownRecord): SanitizedCspReport {
+  return compactReport({
+    documentUri: sanitizeUrl(body['document-uri']),
+    referrer: sanitizeUrl(body.referrer),
+    blockedUri: sanitizeUrl(body['blocked-uri']),
+    violatedDirective: boundedString(body['violated-directive']),
+    effectiveDirective: boundedString(body['effective-directive']),
+    disposition: boundedString(body.disposition),
+    statusCode: boundedInteger(body['status-code']),
+    sourceFile: sanitizeUrl(body['source-file']),
+    lineNumber: boundedInteger(body['line-number']),
+    columnNumber: boundedInteger(body['column-number']),
+  })
+}
+
+function sanitizeReportingBody(body: UnknownRecord): SanitizedCspReport {
+  return compactReport({
+    documentUri: sanitizeUrl(body.documentURL ?? body['document-uri']),
+    referrer: sanitizeUrl(body.referrer),
+    blockedUri: sanitizeUrl(body.blockedURL ?? body['blocked-uri']),
+    violatedDirective: boundedString(body.violatedDirective ?? body['violated-directive']),
+    effectiveDirective: boundedString(body.effectiveDirective ?? body['effective-directive']),
+    disposition: boundedString(body.disposition),
+    statusCode: boundedInteger(body.statusCode ?? body['status-code']),
+    sourceFile: sanitizeUrl(body.sourceFile ?? body['source-file']),
+    lineNumber: boundedInteger(body.lineNumber ?? body['line-number']),
+    columnNumber: boundedInteger(body.columnNumber ?? body['column-number']),
+  })
+}
+
+function compactReport(report: SanitizedCspReport): SanitizedCspReport {
+  return Object.fromEntries(
+    Object.entries(report).filter(([, value]) => value !== undefined)
+  ) as SanitizedCspReport
+}
+
+export function parseCspReports(payload: unknown): SanitizedCspReport[] {
+  if (Array.isArray(payload)) {
+    const reports: SanitizedCspReport[] = []
+    for (const entry of payload.slice(0, MAX_CSP_REPORTS)) {
+      if (!isRecord(entry) || entry.type !== 'csp-violation' || !isRecord(entry.body)) continue
+      reports.push(sanitizeReportingBody(entry.body))
+    }
+    if (reports.length === 0) throw new CspReportParseError()
+    return reports
+  }
+
+  if (!isRecord(payload) || !isRecord(payload['csp-report'])) {
+    throw new CspReportParseError()
+  }
+
+  return [sanitizeLegacyBody(payload['csp-report'])]
+}
+
+export async function readBodyCapped(
+  request: Request,
+  maxBytes = MAX_CSP_REPORT_BODY_BYTES,
+): Promise<string> {
+  if (!request.body) return ''
+
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (!value) continue
+
+    total += value.byteLength
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => undefined)
+      throw new CspBodyTooLargeError()
+    }
+    chunks.push(value)
+  }
+
+  const combined = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    combined.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+
+  return new TextDecoder().decode(combined)
+}
+''')
+
+          write('app/api/csp-report/route.ts', r'''import { NextRequest, NextResponse } from 'next/server'
+import { canonicalClientIp, enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import {
+  CspBodyTooLargeError,
+  CspReportParseError,
+  MAX_CSP_REPORT_BODY_BYTES,
+  parseCspReports,
+  readBodyCapped,
+} from '@/lib/security/csp-report'
+
+const ACCEPTED_MEDIA_TYPES = new Set([
+  'application/csp-report',
+  'application/reports+json',
+  'application/json',
+])
+
+function jsonError(status: number, error: string, headers?: HeadersInit) {
+  return NextResponse.json({ success: false, error }, { status, headers })
+}
+
+function requestMediaType(req: NextRequest): string {
+  return (req.headers.get('content-type') ?? '').split(';', 1)[0].trim().toLowerCase()
+}
+
+export async function POST(req: NextRequest) {
+  const mediaType = requestMediaType(req)
+  if (!ACCEPTED_MEDIA_TYPES.has(mediaType)) {
+    return jsonError(415, 'Unsupported CSP report content type')
+  }
+
+  const contentLength = Number(req.headers.get('content-length'))
+  if (Number.isFinite(contentLength) && contentLength > MAX_CSP_REPORT_BODY_BYTES) {
+    return jsonError(413, 'CSP report body too large')
+  }
+
+  const ip = canonicalClientIp(
+    req.headers.get('x-forwarded-for'),
+    req.headers.get('x-real-ip'),
+  )
+  const limit = await enforceRateLimit(`csp-report:${ip}`, RATE_LIMITS.cspReport())
+
+  if (limit.unavailable) {
+    return jsonError(503, 'CSP report service temporarily unavailable')
+  }
+  if (!limit.allowed) {
+    return jsonError(429, 'Too many CSP reports', {
+      'Retry-After': String(limit.retryAfter || 60),
+    })
+  }
+
+  let raw: string
+  try {
+    raw = await readBodyCapped(req)
+  } catch (error) {
+    if (error instanceof CspBodyTooLargeError) {
+      return jsonError(413, 'CSP report body too large')
+    }
+    console.error('[CSP] body read failed')
+    return jsonError(400, 'Invalid CSP report')
+  }
+
+  let payload: unknown
+  try {
+    payload = JSON.parse(raw)
+  } catch {
+    return jsonError(400, 'Invalid CSP report JSON')
+  }
+
+  try {
+    const reports = parseCspReports(payload)
+    for (const report of reports) {
+      console.warn('[CSP] violation', JSON.stringify(report))
+    }
+  } catch (error) {
+    if (!(error instanceof CspReportParseError)) {
+      console.error('[CSP] report processing failed')
+    }
+    return jsonError(400, 'Invalid CSP report shape')
+  }
+
+  return new NextResponse(null, { status: 204 })
+}
+''')
+
+          write('next.config.ts', r'''import { withSentryConfig } from '@sentry/nextjs'
+import type { NextConfig } from 'next'
+
+const supabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+const posthogOrigin  = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://eu.i.posthog.com'
+
+// Decision #054 Phase A: CSP remains Report-Only. This phase hardens the
+// reporting endpoint and baseline headers without enabling enforcement or
+// removing unsafe-inline. Nonce/hash enforcement requires a later review.
+const cspDirectives = [
+  "default-src 'self'",
+  // Next.js App Router injects inline hydration/streaming scripts
+  "script-src 'self' 'unsafe-inline'",
+  // Tailwind and Next.js inject critical CSS inline
+  "style-src 'self' 'unsafe-inline'",
+  // Fonts are self-hosted by next/font at build time — no external CDN at runtime
+  "font-src 'self'",
+  // data: for base64 images; blob: for Next.js image optimisation
+  "img-src 'self' data: blob:",
+  // Supabase REST+auth (https) and Realtime (wss); PostHog analytics events.
+  // Sentry is tunnelled through /monitoring (same-origin) — no external entry needed.
+  [
+    "connect-src 'self'",
+    supabaseOrigin,
+    supabaseOrigin.replace(/^https/, 'wss'),
+    posthogOrigin,
+  ].filter(Boolean).join(' '),
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+  "report-uri /api/csp-report",
+].join('; ')
+
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key:   'Content-Security-Policy-Report-Only',
+            value: cspDirectives,
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+          },
+        ],
+      },
+    ]
+  },
+}
+
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+
+  silent: !process.env.CI,
+
+  widenClientFileUpload: true,
+
+  // Proxy Sentry requests through Next.js to avoid ad blockers
+  tunnelRoute: '/monitoring',
+
+  // Delete source maps from client bundle after uploading to Sentry
+  sourcemaps: {
+    filesToDeleteAfterUpload: ['.next/static/**/*.map'],
+  },
+
+  webpack: {
+    reactComponentAnnotation: { enabled: true },
+    treeshake: { removeDebugLogging: true },
+    automaticVercelMonitors: true,
+  },
+})
+''')
+
+          rate_path = Path('lib/rate-limit.ts')
+          rate = rate_path.read_text(encoding='utf-8')
+          old_rate = """  register: (): RateWindow[] => [
+    { limit: envInt('RATE_LIMIT_REGISTER_PER_MINUTE', 5), seconds: 60 },
+    { limit: envInt('RATE_LIMIT_REGISTER_PER_HOUR', 15),  seconds: 3_600 },
+  ],
+}"""
+          new_rate = """  register: (): RateWindow[] => [
+    { limit: envInt('RATE_LIMIT_REGISTER_PER_MINUTE', 5), seconds: 60 },
+    { limit: envInt('RATE_LIMIT_REGISTER_PER_HOUR', 15),  seconds: 3_600 },
+  ],
+  cspReport: (): RateWindow[] => [
+    { limit: envInt('RATE_LIMIT_CSP_REPORT_PER_MINUTE', 60), seconds: 60 },
+    { limit: envInt('RATE_LIMIT_CSP_REPORT_PER_HOUR', 500),  seconds: 3_600 },
+  ],
+}"""
+          if old_rate not in rate:
+              raise SystemExit('RATE_LIMITS register block not found')
+          rate_path.write_text(rate.replace(old_rate, new_rate, 1), encoding='utf-8')
+
+          package_path = Path('package.json')
+          package = package_path.read_text(encoding='utf-8')
+          old_package = '    "test:rate-limit": "npm run build:provider-scripts && node scripts/test-rate-limit.mjs"\n'
+          new_package = '    "test:rate-limit": "npm run build:provider-scripts && node scripts/test-rate-limit.mjs",\n    "test:csp-security": "npm run build:provider-scripts && node scripts/test-csp-security.mjs"\n'
+          if old_package not in package:
+              raise SystemExit('package rate-limit script not found')
+          package_path.write_text(package.replace(old_package, new_package, 1), encoding='utf-8')
+
+          tsconfig_path = Path('tsconfig.scripts.json')
+          tsconfig = tsconfig_path.read_text(encoding='utf-8')
+          old_ts = '    "lib/rate-limit.ts",\n    "lib/ai/**/*.ts",'
+          new_ts = '    "lib/rate-limit.ts",\n    "lib/security/**/*.ts",\n    "lib/ai/**/*.ts",'
+          if old_ts not in tsconfig:
+              raise SystemExit('tsconfig include anchor not found')
+          tsconfig_path.write_text(tsconfig.replace(old_ts, new_ts, 1), encoding='utf-8')
+
+          workflow_path = Path('.github/workflows/preview-tests.yml')
+          workflow = workflow_path.read_text(encoding='utf-8')
+          old_workflow = '''      - name: "Global rate-limit suite (Decision #052)"
+        run: npm run test:rate-limit
+'''
+          new_workflow = '''      - name: "Global rate-limit suite (Decision #052)"
+        run: npm run test:rate-limit
+      - name: "CSP security suite (Decision #054)"
+        run: npm run test:csp-security
+'''
+          if old_workflow not in workflow:
+              raise SystemExit('workflow rate-limit step not found')
+          workflow_path.write_text(workflow.replace(old_workflow, new_workflow, 1), encoding='utf-8')
+
+          write('scripts/test-csp-security.mjs', r'''#!/usr/bin/env node
+/**
+ * CSP security suite (Decision #054 Phase A).
+ *
+ * Behavioral tests cover the pure CSP report parser/body reader. Source
+ * assertions pin route status behavior, durable fail-closed rate limiting,
+ * baseline headers, and the requirement that CSP remains Report-Only.
+ */
+
+import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const repoRoot = path.resolve(__dirname, '..')
+const require = createRequire(import.meta.url)
+const helper = require(path.join(repoRoot, 'build/provider-smoke/lib/security/csp-report.js'))
+
+let passed = 0
+let failed = 0
+
+function test(name, fn) {
+  try {
+    fn()
+    console.log(`  ✅  ${name}`)
+    passed++
+  } catch (error) {
+    console.error(`  ❌  ${name}`)
+    console.error(`      ${error.message}`)
+    failed++
+  }
+}
+
+async function testAsync(name, fn) {
+  try {
+    await fn()
+    console.log(`  ✅  ${name}`)
+    passed++
+  } catch (error) {
+    console.error(`  ❌  ${name}`)
+    console.error(`      ${error.message}`)
+    failed++
+  }
+}
+
+const legacy = (overrides = {}) => ({
+  'csp-report': {
+    'document-uri': 'https://btdk.app/login?token=secret#fragment',
+    referrer: 'https://example.com/from?q=secret#hash',
+    'blocked-uri': 'inline',
+    'violated-directive': 'script-src-elem',
+    'effective-directive': 'script-src-elem',
+    disposition: 'report',
+    'status-code': 200,
+    'source-file': 'https://btdk.app/_next/app.js?auth=secret#x',
+    'line-number': 12,
+    'column-number': 7,
+    'script-sample': 'SECRET_INLINE_CODE()',
+    ...overrides,
+  },
+})
+
+test('legacy report parses into a bounded allowlist', () => {
+  const [report] = helper.parseCspReports(legacy())
+  assert.equal(report.effectiveDirective, 'script-src-elem')
+  assert.equal(report.statusCode, 200)
+  assert.equal(report.lineNumber, 12)
+  assert.equal(Object.hasOwn(report, 'scriptSample'), false)
+})
+
+test('Reporting API array parses csp-violation bodies', () => {
+  const [report] = helper.parseCspReports([{ type: 'csp-violation', body: {
+    documentURL: 'https://btdk.app/dashboard?x=1',
+    blockedURL: 'https://cdn.example.test/a.js?token=secret#x',
+    effectiveDirective: 'script-src-elem',
+    disposition: 'report',
+  } }])
+  assert.equal(report.documentUri, 'https://btdk.app/dashboard')
+  assert.equal(report.blockedUri, 'https://cdn.example.test/a.js')
+})
+
+test('URL query strings and fragments are removed', () => {
+  const [report] = helper.parseCspReports(legacy())
+  assert.equal(report.documentUri, 'https://btdk.app/login')
+  assert.equal(report.referrer, 'https://example.com/from')
+  assert.equal(report.sourceFile, 'https://btdk.app/_next/app.js')
+})
+
+test('malformed URLs are replaced, never logged verbatim', () => {
+  const [report] = helper.parseCspReports(legacy({ 'document-uri': 'not a url?token=super-secret' }))
+  assert.equal(report.documentUri, '[invalid-url]')
+  assert.doesNotMatch(JSON.stringify(report), /super-secret/)
+})
+
+test('inline/eval/data/blob sources map to safe sentinels', () => {
+  for (const [value, expected] of [
+    ['inline', '[inline]'],
+    ['eval', '[eval]'],
+    ['data:text/plain,secret', '[data]'],
+    ['blob:https://btdk.app/id', '[blob]'],
+  ]) {
+    const [report] = helper.parseCspReports(legacy({ 'blocked-uri': value }))
+    assert.equal(report.blockedUri, expected)
+  }
+})
+
+test('oversized strings are truncated', () => {
+  const [report] = helper.parseCspReports(legacy({ 'violated-directive': 'x'.repeat(400) }))
+  assert.equal(report.violatedDirective.length, helper.MAX_CSP_REPORT_FIELD_LENGTH)
+})
+
+test('script-sample is discarded by construction', () => {
+  const [report] = helper.parseCspReports(legacy())
+  assert.doesNotMatch(JSON.stringify(report), /SECRET_INLINE_CODE/)
+  assert.deepEqual(Object.keys(report).sort(), [
+    'blockedUri', 'columnNumber', 'disposition', 'documentUri',
+    'effectiveDirective', 'lineNumber', 'referrer', 'sourceFile',
+    'statusCode', 'violatedDirective',
+  ].sort())
+})
+
+test('malformed legacy shape is rejected', () => {
+  assert.throws(() => helper.parseCspReports({ nope: true }), helper.CspReportParseError)
+})
+
+test('Reporting API without CSP entries is rejected', () => {
+  assert.throws(() => helper.parseCspReports([{ type: 'deprecation', body: {} }]), helper.CspReportParseError)
+})
+
+await testAsync('capped body reader accepts a small payload', async () => {
+  const request = new Request('https://btdk.app/api/csp-report', { method: 'POST', body: JSON.stringify(legacy()) })
+  const text = await helper.readBodyCapped(request)
+  assert.ok(text.includes('csp-report'))
+})
+
+await testAsync('capped body reader rejects a body over 32 KB', async () => {
+  const request = new Request('https://btdk.app/api/csp-report', { method: 'POST', body: 'x'.repeat(helper.MAX_CSP_REPORT_BODY_BYTES + 1) })
+  await assert.rejects(() => helper.readBodyCapped(request), helper.CspBodyTooLargeError)
+})
+
+const route = readFileSync(path.join(repoRoot, 'app/api/csp-report/route.ts'), 'utf8')
+const config = readFileSync(path.join(repoRoot, 'next.config.ts'), 'utf8')
+const rateLimit = readFileSync(path.join(repoRoot, 'lib/rate-limit.ts'), 'utf8')
+
+test('route allows only reviewed CSP report media types', () => {
+  for (const type of ['application/csp-report', 'application/reports+json', 'application/json']) {
+    assert.ok(route.includes(type), `${type} missing`)
+  }
+  assert.ok(route.includes('415'))
+})
+
+test('route exposes the reviewed 204/400/413 contract', () => {
+  assert.match(route, /status: 204/)
+  assert.ok((route.match(/413/g) ?? []).length >= 2)
+  assert.ok((route.match(/400/g) ?? []).length >= 3)
+})
+
+test('route fails closed on limiter unavailable and returns Retry-After on 429', () => {
+  assert.match(route, /limit\.unavailable/)
+  assert.match(route, /503/)
+  assert.match(route, /!limit\.allowed/)
+  assert.match(route, /429/)
+  assert.match(route, /Retry-After/)
+})
+
+test('route uses durable limiter + canonical client IP and no in-memory Map', () => {
+  assert.match(route, /canonicalClientIp/)
+  assert.match(route, /RATE_LIMITS\.cspReport\(\)/)
+  assert.match(route, /enforceRateLimit\(`csp-report:/)
+  assert.doesNotMatch(route, /new Map/)
+})
+
+test('route never logs raw body or script-sample', () => {
+  assert.doesNotMatch(route, /script-sample/)
+  assert.doesNotMatch(route, /console\.(warn|log|error)\([^\n]*raw/)
+  assert.match(route, /JSON\.stringify\(report\)/)
+})
+
+test('baseline headers exist while CSP remains Report-Only with unsafe-inline', () => {
+  for (const value of [
+    'Content-Security-Policy-Report-Only',
+    'X-Content-Type-Options',
+    'nosniff',
+    'Referrer-Policy',
+    'strict-origin-when-cross-origin',
+    'X-Frame-Options',
+    'DENY',
+    'Permissions-Policy',
+  ]) {
+    assert.ok(config.includes(value), `${value} missing`)
+  }
+  assert.doesNotMatch(config, /key:\s*['"]Content-Security-Policy['"]/)
+  assert.ok(config.includes("'unsafe-inline'"))
+})
+
+test('RATE_LIMITS exposes CSP report windows 60/min + 500/hour', () => {
+  assert.match(rateLimit, /cspReport:\s*\(\): RateWindow\[\]/)
+  assert.match(rateLimit, /RATE_LIMIT_CSP_REPORT_PER_MINUTE', 60/)
+  assert.match(rateLimit, /RATE_LIMIT_CSP_REPORT_PER_HOUR', 500/)
+})
+
+console.log(`\n${passed + failed} tests — ${passed} passed, ${failed} failed\n`)
+if (failed > 0) process.exit(1)
+''')
+
+          write('docs/csp-security-hardening-scope-decision-054.md', r'''# CSP Report Hardening & Security Headers — Decision #054 Phase A
+
+## Status
+
+PHASE A IMPLEMENTED / AWAITING CPO REVIEW.
+
+CSP remains **Report-Only**. This decision does not enable enforcement, remove `unsafe-inline`, or introduce a nonce/hash strategy.
+
+Last updated: 2026-07-11
+
+## Scope Guard
+
+- no migration
+- no Supabase write
+- no provider call
+- no production environment change
+- no enrichment or odds work
+- no Scout/Analyst/UI pricing change
+- no betting-signal change
+- FP-001 unchanged
+
+## Current CSP Inventory
+
+Production currently sends `Content-Security-Policy-Report-Only` with:
+
+```txt
+default-src 'self'
+script-src 'self' 'unsafe-inline'
+style-src 'self' 'unsafe-inline'
+font-src 'self'
+img-src 'self' data: blob:
+connect-src 'self' <Supabase https> <Supabase wss> <PostHog origin>
+frame-ancestors 'none'
+base-uri 'self'
+form-action 'self'
+object-src 'none'
+report-uri /api/csp-report
+```
+
+Source audit findings:
+
+- Next.js App Router uses inline hydration/streaming scripts; removing `unsafe-inline` without a reviewed nonce/hash design can render HTML but break hydration.
+- Tailwind/Next.js may emit inline critical styles.
+- Supabase requires its configured HTTPS origin and matching WSS origin.
+- PostHog uses the configured public host; secondary asset/replay hosts must be learned from real reports before enforcement.
+- Sentry is tunnelled through same-origin `/monitoring`.
+- `next/font` fonts are self-hosted.
+- Browser-extension reports are expected noise and must be classified before Phase B.
+
+## Phase A Changes
+
+### CSP report endpoint
+
+`POST /api/csp-report` now:
+
+- accepts `application/csp-report`, `application/reports+json`, and structurally valid `application/json`;
+- enforces a 32 KB cap using both `Content-Length` and bounded stream reading;
+- supports legacy `report-uri` and Reporting API payloads;
+- accepts at most 20 Reporting API CSP entries per request;
+- logs only a bounded allowlist of sanitized fields;
+- strips URL query strings and fragments;
+- maps inline/eval/data/blob and malformed URLs to safe sentinels;
+- discards `script-sample` completely;
+- never logs the raw payload, cookies, headers, credentials, or tokens;
+- returns the reviewed `204 / 400 / 413 / 415 / 429 / 503` contract.
+
+### Durable rate limit
+
+The endpoint uses Decision #052 infrastructure:
+
+```txt
+60 reports / minute / canonical client IP
+500 reports / hour / canonical client IP
+```
+
+The shared helper hashes the key before storage. Limiter failure is fail-closed: the route returns `503` and performs no parsing/logging.
+
+### Baseline response headers
+
+Phase A adds:
+
+```txt
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+X-Frame-Options: DENY
+Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+```
+
+Existing HSTS remains platform-managed. CSP already contains `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, and `form-action 'self'`.
+
+COOP, COEP, and CORP are intentionally not added without a compatibility audit.
+
+## Tests
+
+`npm run test:csp-security` covers:
+
+- both report formats;
+- script-sample removal;
+- URL redaction and malformed URL handling;
+- field truncation;
+- bounded body reading;
+- media type and status contracts;
+- durable fail-closed rate limiting;
+- absence of raw-body logging/in-memory counters;
+- baseline headers;
+- CSP remains Report-Only and keeps `unsafe-inline` in Phase A.
+
+The suite is wired into PR CI with all existing trust and safety suites.
+
+## Phase B — Not Implemented
+
+Enforced CSP requires a separate CPO approval after:
+
+1. collecting real Report-Only violations in production;
+2. classifying required application sources versus extensions/noise;
+3. confirming PostHog, Supabase, Sentry, images, fonts, and auth flows;
+4. designing and testing a Next.js-compatible nonce/hash strategy;
+5. proving hydration and authenticated flows on preview;
+6. confirming that no required source needs an unjustified wildcard.
+
+Only then may a later PR consider `Content-Security-Policy`, removal of `unsafe-inline`, or `strict-dynamic`.
+''')
+
+          decisions_path = Path('docs/decisions.md')
+          decisions = decisions_path.read_text(encoding='utf-8')
+          decision_054 = r'''## Decision #054 — CSP Report Hardening & Security Headers, Phase A
+**Date:** 2026-07-11  
+**Proposed by:** CPO + Lead Engineer  
+**Approved by:** CPO autonomous-window scope  
+**Status:** PHASE A IMPLEMENTED / AWAITING CPO REVIEW
+
+**Decision:** Harden CSP report ingestion and add baseline HTTP security headers while keeping CSP in Report-Only mode.
+
+**Why:**
+- Production CSP reported violations but did not block them, which is correct for observation but the report endpoint accepted unlimited raw bodies and logged `script-sample` plus unredacted URLs.
+- The application lacked explicit `nosniff`, Referrer-Policy, X-Frame-Options, and Permissions-Policy headers.
+- Enforcing CSP before understanding Next.js inline hydration and external source requirements risks breaking the application.
+
+**Phase A:**
+- bounded 32 KB CSP body reader;
+- legacy and Reporting API normalization;
+- strict sanitization, URL query/fragment removal, and no script-sample/raw payload logging;
+- durable fail-closed CSP report limits through Decision #052;
+- `204/400/413/415/429/503` route contract;
+- baseline security headers;
+- CSP remains `Content-Security-Policy-Report-Only` with `unsafe-inline` unchanged.
+
+**Phase B:** Not implemented. Requires production violation observation, source classification, a reviewed nonce/hash strategy, compatibility smoke, and separate CPO approval.
+
+**Scope:** No migration, Supabase write, provider call, environment change, enrichment, odds work, or betting-signal change. FP-001 remains active.
+
+Reference: `docs/csp-security-hardening-scope-decision-054.md`
+'''
+          if '## Decision #054 — CSP Report Hardening & Security Headers, Phase A' not in decisions:
+              marker = '\n---\n\n*Last updated: 2026-07-11*'
+              pos = decisions.rfind(marker)
+              if pos == -1:
+                  raise SystemExit('decision footer marker not found')
+              decisions = decisions[:pos] + '\n---\n\n' + decision_054 + decisions[pos:]
+          decisions_path.write_text(decisions, encoding='utf-8')
+
+          ledger_path = Path('docs/decision-ledger-numbering-governance.md')
+          ledger = ledger_path.read_text(encoding='utf-8')
+          ledger_replacements = [
+              ('Occupied: #001-#019, #021-#031, #033-#053', 'Occupied: #001-#019, #021-#031, #033-#054'),
+              ('Reserved next: #054 — CSP Enforcement & CSP Report Hardening\nNext unreserved after #054: #055', 'Current active: #054 — CSP Report Hardening & Security Headers, Phase A\nNext unreserved: #055'),
+              ('| #054 | **RESERVED** — CSP Enforcement & CSP Report Hardening |', '| #054 | CSP Report Hardening & Security Headers, Phase A — IMPLEMENTED / AWAITING CPO REVIEW |'),
+          ]
+          for old, new in ledger_replacements:
+              if old not in ledger:
+                  raise SystemExit(f'ledger anchor missing: {old}')
+              ledger = ledger.replace(old, new, 1)
+          ledger_path.write_text(ledger, encoding='utf-8')
+
+          state_path = Path('PROJECT_STATE.md')
+          state = state_path.read_text(encoding='utf-8')
+          old_state = '| Next reserved decision | **#054 — CSP Enforcement & CSP Report Hardening** |'
+          new_state = '| Current decision | **#054 — CSP Report Hardening & Security Headers, Phase A (AWAITING CPO REVIEW)** |\n| Next unreserved decision | **#055** |'
+          if old_state not in state:
+              raise SystemExit('PROJECT_STATE decision anchor missing')
+          state = state.replace(old_state, new_state, 1)
+          security_anchor = '- production domain writes are mediated through reviewed RPC/server operations.\n'
+          security_add = security_anchor + '- Decision #054 Phase A hardens CSP report ingestion and adds baseline headers; CSP intentionally remains Report-Only pending evidence and nonce/hash design.\n'
+          if security_anchor not in state:
+              raise SystemExit('PROJECT_STATE security anchor missing')
+          state = state.replace(security_anchor, security_add, 1)
+          state_path.write_text(state, encoding='utf-8')
+          PY
+
+          rm .github/workflows/decision-054-bootstrap.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "security: Decision #054 CSP report hardening and baseline headers"
+          git push origin HEAD:feat/decision-054-csp-phase-a
