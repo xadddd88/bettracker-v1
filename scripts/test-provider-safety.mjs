@@ -3246,6 +3246,530 @@ await testAsync('provider-link write: kickoff drift from the discovery evidence 
   });
 });
 
+// ─── M1.2.e canonical-linked SportMonks enrichment dry-run (Decision #034) ───
+
+const ENRICHMENT_CANONICAL_ID = '92afd570-399a-48b9-915a-e1ffaf52a71c';
+const ENRICHMENT_PROVIDER_ID = '19722203';
+
+function clearCompiledEnrichmentDryRunModules() {
+  for (const relPath of [
+    'app/api/admin/sports/enrichment/sportmonks-dry-run/route.js',
+    'lib/providers/sportmonks-enrichment-dry-run.js',
+    'lib/providers/sportmonks-mapping-discovery.js',
+    'lib/supabase/admin.js',
+  ]) {
+    const compiledPath = path.join(buildDir, relPath);
+    try {
+      delete require.cache[require.resolve(compiledPath)];
+    } catch {
+      // Module may not have been loaded yet.
+    }
+  }
+}
+
+function stubEnrichmentAdminModule({ fixture, link }) {
+  const adminPath = path.join(buildDir, 'lib/supabase/admin.js');
+  require.cache[require.resolve(adminPath)] = {
+    id: adminPath,
+    filename: adminPath,
+    loaded: true,
+    exports: {
+      createAdminClient() {
+        return {
+          from(table) {
+            const row = table === 'canonical_fixtures' ? fixture : link;
+            const builder = {
+              select() {
+                return builder;
+              },
+              eq() {
+                return builder;
+              },
+              async maybeSingle() {
+                return { data: row, error: null };
+              },
+            };
+            return builder;
+          },
+        };
+      },
+    },
+  };
+}
+
+function enrichmentDbRows(overrides = {}) {
+  return {
+    fixture: {
+      id: ENRICHMENT_CANONICAL_ID,
+      sport: 'football',
+      status: 'scheduled',
+      kickoff_at: '2026-08-21T19:00:00+00:00',
+      ...(overrides.fixture ?? {}),
+    },
+    link: {
+      provider_fixture_id: 19722203,
+      mapping_confidence: 'high',
+      ...(overrides.link ?? {}),
+    },
+    ...(overrides.fixtureNull ? { fixture: null } : {}),
+    ...(overrides.linkNull ? { link: null } : {}),
+  };
+}
+
+// Deliberately includes team/player-ish text so the sanitization tests can
+// prove none of it leaks into the report.
+function enrichmentProviderData(overrides = {}) {
+  return {
+    id: 19722203,
+    sport_id: 1,
+    league_id: 8,
+    season_id: 25583,
+    state_id: 1,
+    name: 'Arsenal vs Coventry City',
+    starting_at: '2026-08-21 19:00:00',
+    starting_at_timestamp: 1787857200,
+    has_odds: true,
+    has_premium_odds: false,
+    participants: [
+      { id: 19, name: 'Arsenal', meta: { location: 'home' } },
+      { id: 247, name: 'Coventry City', meta: { location: 'away' } },
+    ],
+    metadata: [{ type: 'secret-player-note', values: 'Bukayo Saka fitness doubt' }],
+    ...overrides,
+  };
+}
+
+function approvedEnrichmentBody(overrides = {}) {
+  return {
+    dryRun: true,
+    provider: 'sportmonks',
+    canonicalFixtureId: ENRICHMENT_CANONICAL_ID,
+    sportmonksFixtureId: ENRICHMENT_PROVIDER_ID,
+    requestedIncludeSet: [],
+    maxProviderRequests: 1,
+    operatorConfirm: 'RUN_SPORTMONKS_ENRICHMENT_DRY_RUN_M1_2_E',
+    ...overrides,
+  };
+}
+
+function enrichmentRequest(body, token = 'operator-token') {
+  const headers = { 'content-type': 'application/json' };
+  if (token) headers.authorization = `Bearer ${token}`;
+  return new Request('https://example.test/api/admin/sports/enrichment/sportmonks-dry-run', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+}
+
+async function withEnrichmentDryRunRoute(dbRows, fn) {
+  return withCompiledAlias(async () => {
+    clearCompiledEnrichmentDryRunModules();
+    stubEnrichmentAdminModule(dbRows);
+    const route = require(
+      path.join(buildDir, 'app/api/admin/sports/enrichment/sportmonks-dry-run/route.js')
+    );
+    try {
+      return await fn(route);
+    } finally {
+      clearCompiledEnrichmentDryRunModules();
+    }
+  });
+}
+
+await testAsync('enrichment dry-run route: 503 without operator token, zero provider calls', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+
+  delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    return jsonResponse({ data: enrichmentProviderData() });
+  };
+
+  try {
+    await withEnrichmentDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(enrichmentRequest(approvedEnrichmentBody()));
+      assert.equal(response.status, 503);
+    });
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('enrichment dry-run route: 401 with a wrong token, zero provider calls', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    return jsonResponse({ data: enrichmentProviderData() });
+  };
+
+  try {
+    await withEnrichmentDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(enrichmentRequest(approvedEnrichmentBody(), 'wrong-token'));
+      assert.equal(response.status, 401);
+    });
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('enrichment dry-run route: 400 for wrong confirmation and every widened literal', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    return jsonResponse({ data: enrichmentProviderData() });
+  };
+
+  const rejectedBodies = [
+    approvedEnrichmentBody({ operatorConfirm: 'WRONG_CONFIRMATION' }),
+    approvedEnrichmentBody({ dryRun: false }),
+    approvedEnrichmentBody({ provider: 'api_football' }),
+    approvedEnrichmentBody({ canonicalFixtureId: '11111111-2222-3333-4444-555555555555' }),
+    approvedEnrichmentBody({ sportmonksFixtureId: '999999' }),
+    approvedEnrichmentBody({ requestedIncludeSet: ['state'] }),
+    approvedEnrichmentBody({ maxProviderRequests: 2 }),
+    { ...approvedEnrichmentBody(), extraField: true },
+  ];
+
+  try {
+    await withEnrichmentDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      for (const body of rejectedBodies) {
+        const response = await POST(enrichmentRequest(body));
+        assert.equal(response.status, 400, `expected 400 for ${JSON.stringify(body).slice(0, 80)}`);
+      }
+    });
+    assert.equal(fetchCalls, 0, 'rejected bodies must never reach the provider');
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('enrichment dry-run: preflight failure blocks with exactly zero fetch calls', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+
+  const failingPreflights = [
+    { rows: enrichmentDbRows({ fixtureNull: true }), reason: 'canonical fixture not found' },
+    { rows: enrichmentDbRows({ linkNull: true }), reason: 'no SportMonks provider link' },
+    { rows: enrichmentDbRows({ fixture: { sport: 'tennis' } }), reason: 'sport is tennis' },
+    { rows: enrichmentDbRows({ fixture: { status: 'finished' } }), reason: 'status is finished' },
+    { rows: enrichmentDbRows({ fixture: { kickoff_at: '2026-08-22T19:00:00+00:00' } }), reason: 'kickoff minute' },
+    { rows: enrichmentDbRows({ link: { mapping_confidence: 'medium' } }), reason: 'mapping confidence is medium' },
+    { rows: enrichmentDbRows({ link: { provider_fixture_id: 111 } }), reason: 'does not match the approved id' },
+  ];
+
+  try {
+    for (const { rows, reason } of failingPreflights) {
+      let fetchCalls = 0;
+      globalThis.fetch = async () => {
+        fetchCalls++;
+        return jsonResponse({ data: enrichmentProviderData() });
+      };
+
+      await withEnrichmentDryRunRoute(rows, async ({ POST }) => {
+        const response = await POST(enrichmentRequest(approvedEnrichmentBody()));
+        const result = await readJsonResponse(response);
+
+        assert.equal(result.status, 200);
+        assert.equal(result.body.success, false);
+        assert.equal(result.body.report.responseStatus, 'blocked');
+        assert.equal(result.body.report.requestCount, 0);
+        assert.equal(result.body.report.writes, 'none');
+        assert.ok(
+          result.body.report.warnings.some((w) => w.includes(reason)),
+          `expected a warning containing "${reason}"`
+        );
+      });
+      assert.equal(fetchCalls, 0, `preflight "${reason}" must cause zero provider calls`);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('enrichment dry-run: approved run makes exactly one header-auth request to the exact URL', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const observed = [];
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async (url, init = {}) => {
+    observed.push({ url: String(url), headers: init.headers ?? {} });
+    return jsonResponse({ data: enrichmentProviderData() });
+  };
+
+  try {
+    await withEnrichmentDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(enrichmentRequest(approvedEnrichmentBody()));
+      const result = await readJsonResponse(response);
+
+      assert.equal(observed.length, 1, 'exactly one provider request');
+      assert.equal(
+        observed[0].url,
+        'https://api.sportmonks.com/v3/football/fixtures/19722203',
+        'exact fixture-by-ID URL with no query parameters'
+      );
+      assert.ok(!observed[0].url.includes('?'), 'no query string');
+      assert.ok(!observed[0].url.includes('include'), 'no includes');
+      assert.ok(!observed[0].url.includes('dummy-sportmonks'), 'token never in the URL');
+      assert.equal(observed[0].headers.Authorization, 'dummy-sportmonks');
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, true);
+      const report = result.body.report;
+      assert.equal(report.responseStatus, 'ok');
+      assert.equal(report.requestCount, 1);
+      assert.equal(report.maxProviderRequests, 1);
+      assert.deepEqual(report.requestedIncludeSet, []);
+      assert.equal(report.fixtureIdentityMatch, true);
+      assert.equal(report.providerStateId, '1');
+      assert.equal(report.providerStartingAt, '2026-08-21T19:00:00.000Z', 'normalized ISO, never the raw provider string');
+      assert.equal(report.providerHasOdds, true);
+      assert.equal(report.providerHasPremiumOdds, false);
+      assert.equal(report.enrichmentFamiliesPresent.participants, true);
+      assert.equal(report.enrichmentFamiliesPresent.lineups, false);
+      assert.equal(report.enrichmentFamiliesPresent.odds, false);
+      assert.equal(report.freshnessFieldsPresent.starting_at, true);
+      assert.equal(report.freshnessFieldsPresent.updated_at, false);
+      assert.equal(report.sourceUpdatedAt, null);
+      assert.equal(report.writes, 'none');
+      assert.ok(Array.isArray(report.blockedDownstreamUsage) && report.blockedDownstreamUsage.length >= 3);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('enrichment dry-run: serialized response carries no raw payload, names, or tokens', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const consoleLines = [];
+  const originalWarn = console.warn;
+  const originalError = console.error;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => jsonResponse({ data: enrichmentProviderData() });
+  console.warn = (...args) => consoleLines.push(args.map(String).join(' '));
+  console.error = (...args) => consoleLines.push(args.map(String).join(' '));
+
+  try {
+    await withEnrichmentDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(enrichmentRequest(approvedEnrichmentBody()));
+      const serialized = JSON.stringify(await response.json());
+
+      for (const forbidden of [
+        'Arsenal',
+        'Coventry',
+        'Saka',
+        'secret-player-note',
+        'dummy-sportmonks',
+        'operator-token',
+        '"name"',
+      ]) {
+        assert.ok(!serialized.includes(forbidden), `response must not contain ${forbidden}`);
+      }
+      const logged = consoleLines.join('\n');
+      for (const forbidden of ['Arsenal', 'Coventry', 'dummy-sportmonks', 'operator-token']) {
+        assert.ok(!logged.includes(forbidden), `logs must not contain ${forbidden}`);
+      }
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+    console.error = originalError;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('enrichment dry-run: provider failure is sanitized and never retried', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    return jsonResponse({ message: 'denied' }, 403);
+  };
+
+  try {
+    await withEnrichmentDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(enrichmentRequest(approvedEnrichmentBody()));
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.report.responseStatus, 'failed');
+      assert.equal(result.body.report.requestCount, 1);
+      assert.ok(result.body.report.warnings.length >= 1);
+      const serialized = JSON.stringify(result.body);
+      assert.ok(!serialized.includes('dummy-sportmonks'), 'sanitized error must not leak the token');
+    });
+    assert.equal(fetchCalls, 1, 'no retry is approved — exactly one attempt');
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('enrichment dry-run: unexpected shape and identity mismatch block success (sanitized)', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+
+  const cases = [
+    {
+      payload: { data: null },
+      expectWarning: 'missing fixture data object',
+      expectIdentity: null,
+    },
+    {
+      payload: { data: enrichmentProviderData({ id: 999999 }) },
+      expectWarning: 'different fixture id',
+      expectIdentity: false,
+    },
+    {
+      payload: { data: enrichmentProviderData({ sport_id: 2 }) },
+      expectWarning: 'sport id does not match football',
+      expectIdentity: false,
+    },
+    {
+      payload: { data: enrichmentProviderData({ league_id: 501 }) },
+      expectWarning: 'league id does not match',
+      expectIdentity: false,
+    },
+    {
+      payload: { data: enrichmentProviderData({ starting_at: '2026-08-22 15:00:00' }) },
+      expectWarning: 'kickoff does not match',
+      expectIdentity: false,
+    },
+    // Present-but-invalid identity fields must FAIL CLOSED, never read as absent.
+    {
+      payload: { data: enrichmentProviderData({ sport_id: 'garbage' }) },
+      expectWarning: 'sport id does not match football',
+      expectIdentity: false,
+    },
+    {
+      payload: { data: enrichmentProviderData({ league_id: 'garbage' }) },
+      expectWarning: 'league id does not match',
+      expectIdentity: false,
+    },
+    {
+      payload: { data: enrichmentProviderData({ starting_at: 123 }) },
+      expectWarning: 'kickoff does not match',
+      expectIdentity: false,
+    },
+  ];
+
+  try {
+    for (const { payload, expectWarning, expectIdentity } of cases) {
+      globalThis.fetch = async () => jsonResponse(payload);
+
+      await withEnrichmentDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+        const response = await POST(enrichmentRequest(approvedEnrichmentBody()));
+        const result = await readJsonResponse(response);
+
+        assert.equal(result.body.success, false);
+        assert.equal(result.body.report.responseStatus, 'failed');
+        assert.equal(result.body.report.fixtureIdentityMatch, expectIdentity);
+        assert.ok(
+          result.body.report.warnings.some((w) => w.includes(expectWarning)),
+          `expected warning containing "${expectWarning}"`
+        );
+        const serialized = JSON.stringify(result.body);
+        assert.ok(!serialized.includes('999999'), 'mismatch reports must not echo the received fixture id');
+        assert.ok(!serialized.includes('garbage'), 'mismatch reports must not echo invalid field values');
+        assert.ok(!serialized.includes('Arsenal'), 'mismatch reports must not echo payload text');
+      });
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('enrichment dry-run: adversarial provider strings in id/timestamp fields never pass through', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const consoleLines = [];
+  const originalWarn = console.warn;
+  const originalError = console.error;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  // Identity fields stay valid so the run reaches the report-building path;
+  // the adversarial text sits exactly in the fields the sanitizer must gate.
+  globalThis.fetch = async () =>
+    jsonResponse({
+      data: enrichmentProviderData({
+        state_id: 'Saka secret',
+        updated_at: 'Arsenal secret',
+        starting_at_timestamp: 'Arsenal ts',
+      }),
+    });
+  console.warn = (...args) => consoleLines.push(args.map(String).join(' '));
+  console.error = (...args) => consoleLines.push(args.map(String).join(' '));
+
+  try {
+    await withEnrichmentDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(enrichmentRequest(approvedEnrichmentBody()));
+      const result = await readJsonResponse(response);
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, true, 'identity is intact — only the dirty fields are dropped');
+      const report = result.body.report;
+      assert.equal(report.providerStateId, null, 'non-digit state_id must become null');
+      assert.equal(report.sourceUpdatedAt, null, 'invalid updated_at must become null');
+      assert.equal(report.freshnessFieldsPresent.updated_at, false);
+      assert.equal(report.freshnessFieldsPresent.starting_at_timestamp, false, 'non-numeric epoch must read as absent');
+      assert.ok(
+        report.warnings.some((w) => w.includes('updated_at not present or invalid')),
+        'fixed warning for missing/invalid updated_at'
+      );
+
+      const serialized = JSON.stringify(result.body);
+      const logged = consoleLines.join('\n');
+      for (const forbidden of ['Saka', 'Arsenal', 'secret']) {
+        assert.ok(!serialized.includes(forbidden), `response must not contain ${forbidden}`);
+        assert.ok(!logged.includes(forbidden), `logs must not contain ${forbidden}`);
+      }
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+    console.error = originalError;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
 console.log(`\n${passed + failed} tests — ${passed} passed, ${failed} failed\n`);
 
 if (failed > 0) {
