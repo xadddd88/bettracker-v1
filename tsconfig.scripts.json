@@ -20,6 +20,7 @@
     "app/api/admin/sports/mapping/sportmonks-discovery/route.ts",
     "app/api/admin/sports/mapping/provider-link/route.ts",
     "app/api/admin/sports/enrichment/sportmonks-dry-run/route.ts",
+    "app/api/admin/sports/enrichment/sportmonks-structural-presence-dry-run/route.ts",
     "app/api/bankroll/deposit/route.ts",
     "app/api/settings/route.ts",
     "app/api/onboarding/complete/route.ts",
