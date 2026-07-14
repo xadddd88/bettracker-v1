@@ -5,6 +5,8 @@ import type { Bet } from '@/types'
 import SettleActions from './SettleActions'
 import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
+import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
+import { isSupportedSettlementStatus } from '@/lib/bets/settlement-metrics'
 
 export default async function BetDetailPage({
   params,
@@ -66,7 +68,7 @@ export default async function BetDetailPage({
           )}
           <Row label="Stake" value={`${sym}${bet.stake.toFixed(2)}`} />
           {bet.bookmaker && <Row label="Bookmaker" value={bet.bookmaker} />}
-          {bet.pnl != null && (
+          {isSupportedSettlementStatus(bet.status) && bet.pnl != null && (
             <Row
               label="P&L"
               value={`${bet.pnl >= 0 ? '+' : ''}${sym}${bet.pnl.toFixed(2)}`}
@@ -133,16 +135,23 @@ function Row({ label, value, color }: { label: string; value: string; color?: st
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    won:     'text-green-400 bg-green-950 border border-green-900',
-    lost:    'text-red-400 bg-red-950 border border-red-900',
-    pending: 'text-yellow-400 bg-yellow-950 border border-yellow-900',
-    void:    'text-gray-400 bg-gray-800 border border-gray-700',
-    push:    'text-blue-400 bg-blue-950 border border-blue-900',
+  // Canonical resolver (Decision #058): explicit entry for every status key,
+  // 'Unknown' label for unrecognized values — nothing renders as Void unless
+  // it IS void.
+  const styles: Record<BetStatusKey, string> = {
+    won:        'text-green-400 bg-green-950 border border-green-900',
+    lost:       'text-red-400 bg-red-950 border border-red-900',
+    pending:    'text-yellow-400 bg-yellow-950 border border-yellow-900',
+    void:       'text-gray-400 bg-gray-800 border border-gray-700',
+    push:       'text-blue-400 bg-blue-950 border border-blue-900',
+    cashed_out: 'text-purple-400 bg-purple-950 border border-purple-900',
+    partial:    'text-slate-300 bg-slate-800 border border-slate-700',
+    unknown:    'text-slate-500 bg-slate-900 border border-slate-700',
   }
+  const resolved = resolveBetStatus(status)
   return (
-    <span className={`text-xs px-2.5 py-1 rounded-full font-medium capitalize flex-shrink-0 ${styles[status] ?? 'text-gray-400 bg-gray-800 border border-gray-700'}`}>
-      {status}
+    <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${styles[resolved.key]}`}>
+      {resolved.label}
     </span>
   )
 }

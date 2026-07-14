@@ -6,6 +6,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 import { extractJsonObject } from '@/lib/ai/extract-json'
+import {
+  SUPPORTED_SETTLED_STATUSES,
+  calcSettlementMetrics,
+} from '@/lib/bets/settlement-metrics'
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 // ─── Zod schemas ─────────────────────────────────────────────
@@ -66,28 +70,27 @@ type DbBet = {
 }
 
 // ─── Aggregation helpers ──────────────────────────────────────
+// Metrics come from the canonical settlement-metrics helper (Decision #058);
+// Coach only adds its own 1-decimal rounding for the prompt payload.
 function isSettled(b: DbBet) {
-  return b.status === 'won' || b.status === 'lost' || b.status === 'void'
+  return (SUPPORTED_SETTLED_STATUSES as readonly string[]).includes(b.status)
+}
+
+function round1(v: number | null): number | null {
+  return v == null ? null : parseFloat(v.toFixed(1))
 }
 
 function groupStats(bets: DbBet[]) {
-  const won = bets.filter(b => b.status === 'won')
-  const lost = bets.filter(b => b.status === 'lost')
-  const roiEligible = [...won, ...lost]
-  const netProfit = bets.filter(isSettled).reduce((s, b) => s + (b.pnl ?? 0), 0)
-  const roiStake = roiEligible.reduce((s, b) => s + b.stake, 0)
-  const wl = won.length + lost.length
+  const sm = calcSettlementMetrics(bets)
   return {
     bets: bets.length,
-    win_rate: wl > 0 ? parseFloat(((won.length / wl) * 100).toFixed(1)) : null as number | null,
-    roi: roiStake > 0 ? parseFloat(((netProfit / roiStake) * 100).toFixed(1)) : null as number | null,
+    win_rate: round1(sm.winRate),
+    roi: round1(sm.roi),
   }
 }
 
 function bucketWinRate(bets: DbBet[]): number | null {
-  const won = bets.filter(b => b.status === 'won').length
-  const wl  = bets.filter(b => b.status === 'won' || b.status === 'lost').length
-  return wl > 0 ? parseFloat(((won / wl) * 100).toFixed(1)) : null
+  return round1(calcSettlementMetrics(bets).winRate)
 }
 
 function buildAggregatedStats(
@@ -96,19 +99,11 @@ function buildAggregatedStats(
   scoutData: { status: string }[],
 ) {
   const settled = bets.filter(isSettled)
-  const won = bets.filter(b => b.status === 'won')
-  const lost = bets.filter(b => b.status === 'lost')
-  const roiEligible = [...won, ...lost]
-
-  const netProfit = settled.reduce((s, b) => s + (b.pnl ?? 0), 0)
-  const roiStake  = roiEligible.reduce((s, b) => s + b.stake, 0)
-  const roi       = roiStake > 0 ? parseFloat(((netProfit / roiStake) * 100).toFixed(1)) : null
-  const wl        = won.length + lost.length
-  const winRate   = wl > 0 ? parseFloat(((won.length / wl) * 100).toFixed(1)) : null
-  const oddsPool  = roiEligible.filter(b => b.total_odds != null)
-  const avgOdds   = oddsPool.length > 0
-    ? parseFloat((oddsPool.reduce((s, b) => s + (b.total_odds ?? 0), 0) / oddsPool.length).toFixed(2))
-    : null
+  const m = calcSettlementMetrics(bets)
+  const netProfit = m.netProfit
+  const roi       = round1(m.roi)
+  const winRate   = round1(m.winRate)
+  const avgOdds   = m.avgOdds == null ? null : parseFloat(m.avgOdds.toFixed(2))
 
   // By bet type
   const betTypeMap = new Map<string, DbBet[]>()
@@ -192,11 +187,11 @@ function buildAggregatedStats(
     else if (bet.stake >= 10) stakeBuckets['medium (10-50)'].push(bet)
     else                      stakeBuckets['small (<10)'].push(bet)
   }
-  const stake_buckets = Object.entries(stakeBuckets).map(([bucket, bs]) => {
-    const np = bs.filter(isSettled).reduce((s, b) => s + (b.pnl ?? 0), 0)
-    const rs = bs.filter(b => b.status === 'won' || b.status === 'lost').reduce((s, b) => s + b.stake, 0)
-    return { bucket, bets: bs.length, roi: rs > 0 ? parseFloat(((np / rs) * 100).toFixed(1)) : null as number | null }
-  })
+  const stake_buckets = Object.entries(stakeBuckets).map(([bucket, bs]) => ({
+    bucket,
+    bets: bs.length,
+    roi: round1(calcSettlementMetrics(bs).roi),
+  }))
 
   // Current streak (won/lost only, ignore void)
   const resolved = settled
@@ -221,9 +216,7 @@ function buildAggregatedStats(
   })
   const last5 = recentSettled.slice(0, 5).map(b => b.status as 'won' | 'lost' | 'void').reverse()
   const last10 = recentSettled.slice(0, 10)
-  const last10NP = last10.filter(isSettled).reduce((s, b) => s + (b.pnl ?? 0), 0)
-  const last10Stake = last10.filter(b => b.status === 'won' || b.status === 'lost').reduce((s, b) => s + b.stake, 0)
-  const last10ROI = last10Stake > 0 ? parseFloat(((last10NP / last10Stake) * 100).toFixed(1)) : null
+  const last10ROI = round1(calcSettlementMetrics(last10).roi)
 
   // Scout funnel
   const scout_funnel = {

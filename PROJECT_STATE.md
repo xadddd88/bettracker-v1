@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-14 (Decision #057 results ingestion & settlement trust contract)
+> Last updated: 2026-07-14 (Decision #058 settlement metrics & status reconciliation)
 
 ## 1. Executive Status
 
@@ -13,11 +13,11 @@
 | Production | `https://btdk.app` |
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
-| Latest completed operational milestone | **#057 — Results Ingestion & Settlement Trust Contract (EXECUTED / CLOSED, docs-evidence only)** |
-| Highest-numbered executed decision | **#057 — Results Ingestion & Settlement Trust Contract** |
+| Latest completed operational milestone | **#058 — Settlement Metrics & Status Presentation Reconciliation (EXECUTED / CLOSED)** |
+| Highest-numbered executed decision | **#058 — Settlement Metrics & Status Presentation Reconciliation** |
 | Active decision | **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
-| Next unreserved decision | **#058** |
+| Next unreserved decision | **#059** |
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 completed one canonical-linked base-response dry-run with zero writes. Decision #055 then closed the trust/storage contract. Decision #056's Class A structural-presence implementation is merged and deployed (PR #146); its production provider call remains not approved and has not been run. Decision #057 closed the results-ingestion and settlement trust contract (docs-evidence only; no results runtime, result writes, or automated settlement is approved).
 
@@ -45,6 +45,7 @@ Completed milestones:
 | #034 | Canonical-linked SportMonks base-response dry-run executed and accepted; zero writes |
 | #055 | Sports-data trust classes, storage boundary, provenance/freshness contract, and promotion gates closed |
 | #057 | Results-ingestion & settlement trust contract closed (docs-evidence only; runtime/writes/settlement remain gated) |
+| #058 | Settlement metrics unified (G4) and status presentation made explicit (G12); no new settlement semantics |
 
 Current downstream boundary:
 
@@ -151,7 +152,7 @@ External beta remains paused because the product vision is not yet complete. Imp
 2. Decision #054 Report-Only observation period; enforced CSP and nonce/hash Phase B remain unapproved.
 3. Decision #056 structural-presence runtime execution (implementation is merged and deployed; the production provider call remains separately blocked and has not been run).
 4. Odds ingestion/normalization and user-facing trust validation.
-5. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated.
+5. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated. Decision #058 unifies the metric formulas (G4) and removes the misleading Void fallback (G12), but adds no new settlement semantics.
 6. Trusted Analyst/Scout v2 using verified provider data rather than ungrounded pricing.
 7. Full i18n UX, including Arabic RTL.
 8. Mobile/tablet product polish and closed-beta onboarding.
@@ -188,7 +189,8 @@ CSP enforcement / nonce / strict-dynamic — NOT APPROVED in Phase A
 #055 — Sports Data Trust Contract & Football Enrichment Storage Boundary — EXECUTED / CLOSED
 #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run — IMPLEMENTATION MERGED / DEPLOYED; RUNTIME NOT APPROVED / NOT RUN
 #057 — Results Ingestion & Settlement Trust Contract — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY
-#058 — next unreserved decision
+#058 — Settlement Metrics & Status Presentation Reconciliation — EXECUTED / CLOSED
+#059 — next unreserved decision
 ```
 
 PR #90 is closed without merge; its policy is not adopted. Decision #020 is never reused.

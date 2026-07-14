@@ -9,6 +9,8 @@ import NextBestAction, { type NextAction } from '@/components/dashboard/NextBest
 import EventPulseCard from '@/components/pulse/EventPulseCard'
 import { getPrimaryEvent } from '@/lib/events/pulse'
 import QuickSettle from '@/components/bets/QuickSettle'
+import { calcSettlementMetrics, isSupportedSettlementStatus } from '@/lib/bets/settlement-metrics'
+import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -45,17 +47,10 @@ export default async function DashboardPage() {
   const today        = new Date().toISOString().slice(0, 10)
   const primaryEvent = getPrimaryEvent(today)
 
-  const wonBets     = bets.filter(b => b.status === 'won')
-  const lostBets    = bets.filter(b => b.status === 'lost')
+  // Canonical settlement metrics (Decision #058) — same shared formulas as
+  // the bets page, analytics, and coach.
+  const m = calcSettlementMetrics(bets)
   const pendingBets = bets.filter(b => b.status === 'pending')
-  const settledBets = bets.filter(b => ['won', 'lost', 'void'].includes(b.status))
-
-  const netProfit    = settledBets.reduce((s, b) => s + (b.pnl ?? 0), 0)
-  const winLostCount = wonBets.length + lostBets.length
-  const winRate      = winLostCount > 0 ? (wonBets.length / winLostCount) * 100 : 0
-  const roiStake     = [...wonBets, ...lostBets].reduce((s, b) => s + b.stake, 0)
-  const roi          = roiStake > 0 ? (netProfit / roiStake) * 100 : 0
-  const pendingStake = pendingBets.reduce((s, b) => s + b.stake, 0)
 
   const currency = bankroll?.currency || 'USD'
   const sym = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'UAH' ? '₴' : currency
@@ -63,29 +58,29 @@ export default async function DashboardPage() {
   const statCards = [
     {
       label: 'Win Rate',
-      value: winLostCount > 0 ? `${winRate.toFixed(1)}%` : '—',
+      value: m.winRate != null ? `${m.winRate.toFixed(1)}%` : '—',
       color: '',
       sub: 'Won / (won + lost)',
     },
     {
       label: 'ROI',
-      value: roiStake > 0 ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—',
-      color: roiStake > 0 ? (roi >= 0 ? 'text-green-400' : 'text-red-400') : '',
-      sub: 'Return on settled stake',
+      value: m.roi != null ? `${m.roi >= 0 ? '+' : ''}${m.roi.toFixed(1)}%` : '—',
+      color: m.roi != null ? (m.roi >= 0 ? 'text-green-400' : 'text-red-400') : '',
+      sub: 'Return on won + lost stake',
     },
     {
       label: 'Net Profit',
-      value: settledBets.length > 0
-        ? `${netProfit >= 0 ? '+' : ''}${sym}${netProfit.toFixed(2)}`
+      value: m.settledCount > 0
+        ? `${m.netProfit >= 0 ? '+' : ''}${sym}${m.netProfit.toFixed(2)}`
         : '—',
-      color: settledBets.length > 0 ? (netProfit >= 0 ? 'text-green-400' : 'text-red-400') : '',
+      color: m.settledCount > 0 ? (m.netProfit >= 0 ? 'text-green-400' : 'text-red-400') : '',
       sub: 'Settled bets only',
     },
     {
       label: 'Pending',
-      value: `${sym}${pendingStake.toFixed(2)}`,
+      value: `${sym}${m.pendingStake.toFixed(2)}`,
       color: '',
-      sub: `${pendingBets.length} open bet${pendingBets.length !== 1 ? 's' : ''}`,
+      sub: `${m.pendingCount} open bet${m.pendingCount !== 1 ? 's' : ''}`,
     },
   ]
 
@@ -220,7 +215,7 @@ export default async function DashboardPage() {
                       <div className="text-xs text-slate-400 font-mono">{sym}{bet.stake}</div>
                       <StatusBadge status={bet.status} />
                     </div>
-                    {bet.pnl != null && (
+                    {isSupportedSettlementStatus(bet.status) && bet.pnl != null && (
                       <div className={`text-sm font-semibold font-mono w-16 text-right ${bet.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {bet.pnl >= 0 ? '+' : ''}{sym}{bet.pnl.toFixed(2)}
                       </div>
@@ -238,12 +233,19 @@ export default async function DashboardPage() {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    won:     'text-green-400',
-    lost:    'text-red-400',
-    pending: 'text-violet-400',
-    void:    'text-slate-500',
-    push:    'text-blue-400',
+  // Canonical resolver (Decision #058): explicit entry for every status key,
+  // 'Unknown' label for unrecognized values — no raw text, no misleading
+  // fallback.
+  const styles: Record<BetStatusKey, string> = {
+    won:        'text-green-400',
+    lost:       'text-red-400',
+    pending:    'text-violet-400',
+    void:       'text-slate-500',
+    push:       'text-blue-400',
+    cashed_out: 'text-purple-400',
+    partial:    'text-slate-300',
+    unknown:    'text-slate-500',
   }
-  return <span className={`text-xs capitalize ${styles[status] || 'text-slate-400'}`}>{status}</span>
+  const resolved = resolveBetStatus(status)
+  return <span className={`text-xs ${styles[resolved.key]}`}>{resolved.label}</span>
 }

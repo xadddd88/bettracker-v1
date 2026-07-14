@@ -2089,5 +2089,27 @@ Reference: `docs/results-ingestion-settlement-trust-contract-decision-057.md`
 
 ---
 
+## Decision #058 — Settlement Metrics & Status Presentation Reconciliation
+**Date:** 2026-07-14
+**Proposed by:** CPO
+**Approved by:** Founder (`APPROVE #058`)
+**Status:** EXECUTED / CLOSED by merge of the Decision #058 PR (no separate runtime step, no provider call, no database action). Highest-numbered executed decision: #058.
+
+**Decision:** Resolve Decision #057 findings G4 and G12. One shared pure contract now defines Win Rate, ROI, Net Profit, settled count, and pending stake across every surface, and no bet status can render as `Void` (or raw text) unless it is void.
+
+**Canonical contract:** supported settled = `won|lost|void`; ROI/win-rate eligible = `won|lost` (void excluded); `settledCount = won+lost+void`; `winRate = won/(won+lost)×100` (null when won+lost=0); `netProfit = Σ pnl` over supported settled (missing pnl counts 0 — pre-existing safe behavior); `roi = netProfit / Σ stake(won+lost) × 100` (null when eligible stake 0); `pendingStake = Σ stake(pending)`; `push`/`cashed_out`/`partial`/unknown enter no financial metric.
+
+**Implementation:** new pure modules `lib/bets/settlement-metrics.ts` (`calcSettlementMetrics` + `isSupportedSettlementStatus`) and `lib/bets/bet-status.ts` (`resolveBetStatus` — explicit `Partial` and `Unknown`, never a Void fallback). Reconciled: `lib/analytics/performance.ts` (4 inline recomputations), `app/(app)/bets/page.tsx` (the divergent G4 formulas), `app/(app)/dashboard/page.tsx` (ROI card labelled "Return on won + lost stake"), `app/api/coach/route.ts` (5 inline recomputations; keeps its own 1-decimal rounding), and all five status surfaces (bets list, bet detail, dashboard recent-bets, `SettleActions`, decision-detail linked bet) with complete style maps over all 8 canonical keys. Settlement P&L display is gated on `won|lost|void` everywhere — unsupported/unknown statuses never show a stored pnl. Coach calibration buckets, streaks, recent-form list, scout funnel, analytics per-status stake sums, and bankroll ledger views remain separate — different semantics, documented in the scope doc. `settle_bet` and all financial write paths untouched.
+
+**Tests:** 15 new tests in `scripts/test-financial-safety.mjs` (CI: `npm run test:financial-safety`) — formulas, void exclusion, null-safety, unsupported/unknown exclusion, the P&L predicate, edge cases (missing pnl → 0; zero-stake won/lost → ROI null; unsupported odds/stake excluded), explicit `Partial`/`Unknown` rendering, helper adoption proven behaviorally (calcPerformance ≡ helper) and by source inspection across all five status surfaces, and P&L-gating proof on every P&L surface. Suite 25/25; provider-safety 97/97; analysis-quality-gate 26/26; domain-write-boundaries 13/13; auth-invite 16/16; rate-limit 12/12; csp-security 18/18; tsc + lint clean; local `npm run build` compiles but static prerender needs Supabase env absent in the container (environment limitation; Vercel Preview is the build authority).
+
+**Non-use:** `settle_bet` changes 0; new settlement outcomes 0; payout/settlement calculation changes 0; bankroll mutations 0; migrations 0; Supabase reads/writes 0; provider calls 0; result ingestion/automated settlement 0; odds work 0; Scout/Analyst/pricing changes 0. Decision #056 runtime remains NOT APPROVED / NOT RUN. Results ingestion, result writes, and automated settlement remain HOLD. Decision #050 SMTP round-trip remains PENDING. CSP Phase B remains NOT APPROVED. FP-001 remains ACTIVE.
+
+**Numbering:** Decision #058 occupied; next unreserved decision #059.
+
+Reference: `docs/settlement-metrics-status-reconciliation-scope-decision-058.md`
+
+---
+
 *Last updated: 2026-07-14*
 *Owner: All (each role contributes)*
