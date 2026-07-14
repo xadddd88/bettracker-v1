@@ -1,7 +1,7 @@
 # Decision Ledger / Numbering Governance
 
-Status: CURRENT — Decision #054 Phase A executed; Report-Only observation period active  
-Last updated: 2026-07-11
+Status: CURRENT — Decision #055 approved for documentation/evidence only; no runtime authority  
+Last updated: 2026-07-14
 
 ## Purpose
 
@@ -10,11 +10,12 @@ This file prevents decision-number collisions. Historical numbers are immutable:
 ## Current Number Map
 
 ```txt
-Occupied: #001-#019, #021-#031, #033-#054
+Occupied: #001-#019, #021-#031, #033-#055
 Do not reuse: #020
 Retired reservation / do not reuse: #032
-Latest executed: #054 — CSP Report Hardening & Security Headers, Phase A
-Next unreserved: #055
+Highest-numbered executed: #054 — CSP Report Hardening & Security Headers, Phase A
+Active approved: #055 — Sports Data Trust Contract & Football Enrichment Storage Boundary (docs/evidence only)
+Next unreserved: #056
 ```
 
 ## Recent Decisions
@@ -32,12 +33,13 @@ Next unreserved: #055
 | #052 | Global Durable Rate Limits — EXECUTED |
 | #053 | Project State & Migration Reconciliation — EXECUTED / CLOSED |
 | #054 | CSP Report Hardening & Security Headers, Phase A — EXECUTED / MERGED / DEPLOYED; Phase B NOT APPROVED |
+| #055 | Sports Data Trust Contract & Football Enrichment Storage Boundary — APPROVED / DOCS-EVIDENCE ONLY; provider calls/writes not approved |
 
 ## Retired / Superseded Tracks
 
 - **#020:** never reuse. PR #90 tried to claim it for Third-Party Manual Context Policy, but that PR is closed without merge and the policy is not adopted.
 - **#032:** the old M1.3 filter-evidence reservation is retired after PR #106 was superseded. Keep the number unused to preserve audit history.
-- A revived third-party manual-context policy must use **#055 or later** in a fresh PR.
+- A revived third-party manual-context policy must use **#056 or later** in a fresh PR.
 
 ## Rules
 
@@ -52,4 +54,4 @@ Next unreserved: #055
 
 ## Current Holds
 
-Decision numbering does not grant runtime authority. Provider calls, writes, enrichment, odds ingestion, betting-signal surfaces, and CSP enforcement still require their own explicit scopes and approvals. FP-001 remains active. Decision #054 Phase B is not approved.
+Decision numbering does not grant runtime authority. Decision #055 is documentation/evidence only and authorizes zero provider calls, writes, migrations, environment changes, enrichment, odds ingestion, or downstream use. FP-001 remains active. Decision #054 Phase B is not approved.

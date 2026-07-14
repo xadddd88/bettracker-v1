@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-11 (Decision #054 Phase A)
+> Last updated: 2026-07-14 (Decision #055 trust-contract scope)
 
 ## 1. Executive Status
 
@@ -13,11 +13,13 @@
 | Production | `https://btdk.app` |
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
-| Latest completed decision | **#054 — CSP Report Hardening & Security Headers, Phase A (EXECUTED / MERGED / DEPLOYED)** |
+| Latest completed operational milestone | **#034 — canonical-linked SportMonks enrichment dry-run (CLOSED: implementation + runtime + ledger)** |
+| Highest-numbered executed decision | **#054 — CSP Report Hardening & Security Headers, Phase A** |
+| Active decision | **#055 — Sports Data Trust Contract & Football Enrichment Storage Boundary (docs/evidence only)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
-| Next unreserved decision | **#055** |
+| Next unreserved decision | **#056** |
 
-The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. The next football-enrichment step remains blocked by a separate scope/runtime approval and trust validation, not by missing provider identity.
+The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 then completed one canonical-linked base-response dry-run: identity matched, one request was used, no enrichment family was present, provider `updated_at` was unavailable, and zero writes occurred. Decision #055 now defines the trust/storage contract; it authorizes no further provider call or write.
 
 ## 2. Current Production Facts
 
@@ -40,13 +42,16 @@ Completed milestones:
 | #044 | EPL dry-run/write and SportMonks discovery execution record completed |
 | #045 | Controlled SportMonks provider-link write implemented and executed |
 | #046 | Provider-link execution/validation record merged |
+| #034 | Canonical-linked SportMonks base-response dry-run executed and accepted; zero writes |
 
 Current downstream boundary:
 
 ```txt
 provider identity link exists
-football_enrichment rows are not yet approved for use
-no enrichment data may unlock Analyst/Scout/UI pricing or betting signals
+Decision #034 base-response identity check passed
+no enrichment family or valid source updated_at was observed
+football_enrichment rows remain 0 and are not approved for use
+no provider data may unlock Analyst/Scout/UI pricing or betting signals
 ```
 
 ### Financial and domain integrity
@@ -99,7 +104,10 @@ Do not mark #050 fully executed before that manual verification.
 - SportMonks remains the football-depth provider.
 - The controlled cross-provider link exists for the Arsenal–Coventry fixture.
 - Mapping discovery and provider-link write are complete for this fixture.
-- **Football enrichment provider calls/writes remain on HOLD** until a separately reviewed read-only enrichment milestone is approved.
+- Decision #034 completed the one approved canonical-linked base-response dry-run: identity match, no enrichment families, no valid source `updated_at`, zero writes.
+- Decision #055 classifies structural identity, dynamic facts/provider analytics, and market/model data before any storage or consumer approval.
+- **Further football enrichment provider calls/writes remain on HOLD**; #055 authorizes neither.
+- Production inventory at #055 approval: 3 canonical fixtures, 4 provider links, 0 football enrichment rows, 0 fixture result rows, 0 odds snapshot rows.
 - `football_enrichment` must not feed probability, edge, EV, recommendation, Place Bet, Scout, Analyst, or UI signals before trust validation.
 
 ### Odds / M1.3
@@ -136,7 +144,7 @@ External beta remains paused because the product vision is not yet complete. Imp
 
 1. Founder SMTP round-trip for Decision #050.
 2. Decision #054 Report-Only observation period; enforced CSP and nonce/hash Phase B remain unapproved.
-3. Football enrichment read-only scope/runtime approval and trust validation.
+3. Decision #055 sports-data trust/storage contract; any further enrichment runtime remains separately blocked.
 4. Odds ingestion/normalization and user-facing trust validation.
 5. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial).
 6. Trusted Analyst/Scout v2 using verified provider data rather than ungrounded pricing.
@@ -168,9 +176,11 @@ CSP enforcement / nonce / strict-dynamic — NOT APPROVED in Phase A
 ## 8. Current Decision Sequence
 
 ```txt
+#034 — canonical-linked SportMonks enrichment dry-run — CLOSED 2026-07-14
 #053 — Project State & Migration Reconciliation — EXECUTED / CLOSED
 #054 — CSP Report Hardening & Security Headers, Phase A — EXECUTED / MERGED / DEPLOYED
-#055 — next unreserved decision
+#055 — Sports Data Trust Contract & Football Enrichment Storage Boundary — APPROVED / DOCS-EVIDENCE ONLY
+#056 — next unreserved decision
 ```
 
 PR #90 is closed without merge; its policy is not adopted. Decision #020 is never reused.
