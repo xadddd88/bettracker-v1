@@ -2038,7 +2038,7 @@ Reference: `docs/sports-data-trust-contract-scope-decision-055.md`
 **Date:** 2026-07-14
 **Proposed by:** CPO
 **Approved by:** Founder (`APPROVE #056`)
-**Status:** APPROVED / IMPLEMENTATION ONLY. Runtime provider call is NOT APPROVED. Merging the implementation does not authorize execution.
+**Status:** IMPLEMENTATION MERGED / DEPLOYED / READY (PR #146, merged as `bc7bcfa`). Runtime provider call NOT APPROVED / NOT RUN. Merging the implementation does not authorize execution.
 
 **Decision:** Implement a separate read-only admin dry-run for the already linked canonical fixture and exactly six Decision #055 Class A relationships: `participants;league;season;round;venue;state`.
 
@@ -2064,6 +2064,28 @@ Reference: `docs/sports-data-trust-contract-scope-decision-055.md`
 **Numbering:** Decision #056 occupied; next unreserved decision #057.
 
 Reference: `docs/sportmonks-structural-presence-dry-run-scope-decision-056.md`
+
+---
+
+## Decision #057 — Results Ingestion & Settlement Trust Contract
+**Date:** 2026-07-14
+**Proposed by:** CPO
+**Approved by:** Founder (`APPROVE #057`)
+**Status:** EXECUTED / CLOSED 2026-07-14 — DOCS-EVIDENCE ONLY (executed by the merge of the Decision #057 docs PR; no runtime step exists for this decision). No runtime code, provider calls, Supabase queries or writes, migrations, environment changes, result writes, automated settlement, bankroll mutations, odds work, Scout/Analyst/UI changes, or betting signals are authorized. Highest-numbered executed decision: #057.
+
+**Decision:** Define the trust, normalization, storage, reconciliation, and financial-safety contract required before BetTracker can ingest fixture results or perform any automated settlement. A provider response must never mutate a bet or bankroll directly: results move through three separately gated layers — provider observation (A), canonical normalized result (B), financial settlement (C) — each promoted only by its own future CPO decision.
+
+**Evidence baseline (repository-proven):** Manual settlement exists end-to-end (`app/api/bets/[id]/settle/route.ts` → `settle_bet` RPC, migrations 003/012): outcomes `won|lost|void` only, `auth.uid()` ownership + `FOR UPDATE` locking, duplicate-settlement status gate (financially replay-safe against duplicate payout today), whole-bet leg propagation, single `payout` bankroll transaction for won/void when `bankroll_id` is set. `fixture_results` exists in schema (migration 013, service-role-only) but is read/written by zero application code; production rows were 0 at the Decision #055 verification and no newer count is claimed. Key recorded gaps (G1–G12): `push`/`cashed_out`/`partial` are unreachable states and `partial` lacks even a list-page display style (Void-badge fallback); no leg-level or parlay settlement; no cash-out/half-win math; two conflicting win-rate/ROI definitions (`lib/analytics/performance.ts` and coach vs `app/(app)/bets/page.tsx`); `settle_bet` has no idempotency key (a future automation/revision-correlation gap, not a current duplicate-payout vulnerability); no deterministic rounding/currency contract; `fixture_results` lacks structured scores, schema version, finality state, and revision lineage, and cannot represent `suspended`/`unknown` states fail-closed.
+
+**Contract highlights:** exact/high provider-link identity gate with fail-closed present-but-invalid handling; versioned status normalization with `unknown` failing closed; `sourceUpdatedAt` vs `collectedAt` kept distinct (`collectedAt` is never source freshness); provider finality alone never authorizes financial writes; settlement semantics matrix marks every non-manual case BLOCKED / REQUIRES SEPARATE DECISION; financial invariants (server-side math; manual route accepts only the allowlisted user-selected `won|lost|void`, while future automation must derive outcomes from verified Layer B results and never accept a client-supplied automated outcome/payout/P&L/user ID; ownership, locking, idempotency key for automation, no duplicate bankroll transaction, deterministic rounding, no silent double-credit/debit on corrections, separately approved automation RPC); Layer B storage boundary without approving any migration; reconciliation conflicts fail closed (manual settlement is never silently overridden); five promotion gates (read-only dry-run → normalization write → automated single-bet → parlay → UI/analytics). `football_enrichment` is not a result store.
+
+**Candidate next scope:** a later decision may propose one read-only, zero-write result-presence dry-run for one canonical-linked finished fixture. Decision #057 does NOT authorize that runtime call.
+
+**Non-use:** Provider calls 0; runtime code 0; Supabase queries/writes 0; migrations 0; environment changes 0; result writes 0; automated settlement 0; bankroll mutations 0; odds writes 0; Scout/Analyst/UI changes 0; betting signals 0. Decision #056 runtime remains NOT APPROVED / NOT RUN. Decision #050 SMTP round-trip remains PENDING. CSP Phase B remains NOT APPROVED. FP-001 remains ACTIVE.
+
+**Numbering:** Decision #057 occupied; next unreserved decision #058.
+
+Reference: `docs/results-ingestion-settlement-trust-contract-decision-057.md`
 
 ---
 
