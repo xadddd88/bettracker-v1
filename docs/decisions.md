@@ -2006,5 +2006,33 @@ Reference: `docs/global-rate-limits-scope-decision-052.md`
 Reference: `docs/csp-security-hardening-scope-decision-054.md`
 ---
 
-*Last updated: 2026-07-11*
+## Decision #055 — Sports Data Trust Contract & Football Enrichment Storage Boundary
+**Date:** 2026-07-14  
+**Proposed by:** CPO  
+**Approved by:** Founder (`APPROVE #055`)  
+**Status:** APPROVED / DOCUMENTATION & EVIDENCE ONLY. No runtime code, provider call, migration, Supabase write, environment change, enrichment write, odds work, or downstream use is approved.
+
+**Decision:** Define the trust classes, provenance/freshness requirements, normalized storage ownership, and promotion gates required before any SportMonks fixture relationship can be persisted or consumed.
+
+**Evidence:** Decision #034 completed one canonical-linked Fixture-by-ID call with identity match and zero writes, but the empty include set exposed no enrichment families and no valid provider `updated_at`. Production verification on 2026-07-14 found 3 `canonical_fixtures`, 4 `fixture_provider_links`, and 0 rows in each of `football_enrichment`, `fixture_results`, and `odds_snapshots`.
+
+**Trust boundary:**
+- Class A — identity/stable structure: participants, league, season, round, venue, state.
+- Class B — dynamic facts and provider-derived analytics, kept distinguishable and freshness-gated.
+- Class C — odds, predictions, premium/in-play markets, and AI overviews; HOLD under FP-001.
+- `collectedAt`/`ingestedAt` are not source freshness.
+- Raw provider payload is not a product contract.
+- The existing `football_enrichment` table is not a universal destination for structural, event, market, or model data.
+
+**Candidate next runtime:** A later decision may propose exactly one structural presence dry-run using `participants;league;season;round;venue;state`. Decision #055 does not authorize that request.
+
+**DONE:** Docs-only scope + ledger/state/numbering reconciliation. Next unreserved decision: #056.
+
+**Non-use:** Provider calls 0; runtime code 0; writes/migrations/env changes 0. `football_enrichment`, `fixture_results`, `odds_snapshots`, Scout, Analyst, UI, odds, probability, edge, EV, recommendation, Place Bet, and betting signals remain blocked. FP-001 remains active. CSP Phase B is untouched. Decision #050 remains pending.
+
+Reference: `docs/sports-data-trust-contract-scope-decision-055.md`
+
+---
+
+*Last updated: 2026-07-14*
 *Owner: All (each role contributes)*
