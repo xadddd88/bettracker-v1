@@ -1401,7 +1401,7 @@ Reference: `docs/sports-football-enrichment-endpoint-evidence-m1-2-e.md`
 ## Decision #034 - M1.2.e Football Enrichment Read-Only Dry-Run Scope
 **Date:** 2026-07-07
 **Proposed by:** CPO + Founder
-**Status:** Scope/planning only. Runtime provider call not approved.
+**Status:** EXECUTED / VERIFIED / ACCEPTED 2026-07-14. Implementation merged via PR #143 as `1682431` (after three CPO review rounds: v2 sport_id check + hardened id/timestamp sanitizers, v3 fail-closed present-but-invalid identity fields); production deployment `dpl_F8q4gjv16UmmsL9g28ndJ2dQYiKi` READY on `btdk.app`. The single CPO-authorized canonical-linked dry-run was executed by the operator at 2026-07-14T15:51:51Z: exactly 1 provider request, no retries, identity match confirmed, sanitized report only, zero database writes (`football_enrichment` 0 rows before/during/after), no runtime errors, all 8 operator CHECKs true. Missing source `updated_at` is correctly surfaced as a warning; `collectedAt` is not source freshness, so downstream usage stays blocked. A second provider call is NOT approved. `football_enrichment` writes, Scout/Analyst/UI, and betting signals remain HOLD; FP-001 active. See the execution record below.
 
 **Context:** M1.2.e Football Enrichment Endpoint Evidence is DONE. M1.2.e.2 SportMonks Canonical Fixture Mapping Scope is DONE and records the current blocker: production `fixture_provider_links` has 2 `api_football` / exact rows and 0 `sportmonks` rows, and no exact/high SportMonks provider link exists for canonical fixture `1576052`.
 
@@ -1435,6 +1435,33 @@ Reference: `docs/sports-football-enrichment-endpoint-evidence-m1-2-e.md`
 **Freshness:** Future runtime must report whether provider freshness fields are available. Missing freshness fields keep downstream usage blocked. `collected_at` is not source freshness.
 
 **FP-001:** Endpoint/reference/enrichment evidence does not become probability, implied probability, edge, EV, recommendation, Place Bet, Scout score, Analyst signal, UI signal, or betting signal. Check against FP-001 before any downstream use.
+
+**Execution record (CPO accepted 2026-07-14):**
+
+```text
+Decision: #034
+Execution: canonical-linked SportMonks read-only enrichment dry-run
+Executed at: 2026-07-14T15:51:51.908Z
+Production commit: 16824316c349a1f322118452b5138d9a036a1a72
+Production deployment: dpl_F8q4gjv16UmmsL9g28ndJ2dQYiKi
+Canonical fixture: 92afd570-399a-48b9-915a-e1ffaf52a71c
+SportMonks fixture: 19722203
+Endpoint family: fixtures/{id}
+Include set: empty
+Provider requests: 1
+HTTP result: 200
+Response status: ok
+Identity match: true
+Starting at: 2026-08-21T19:00:00.000Z
+Source updated at: unavailable
+Enrichment families present: none
+Odds/premium odds present: false/false
+Database writes: none
+football_enrichment rows after execution: 0
+Runtime errors: none
+Raw payload retained/logged/returned: no
+Outcome: EXECUTED / VERIFIED / ACCEPTED
+```
 
 Reference: `docs/sports-football-enrichment-read-only-dry-run-scope-m1-2-e.md`
 
