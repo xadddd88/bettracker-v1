@@ -3256,6 +3256,7 @@ function clearCompiledEnrichmentDryRunModules() {
     'app/api/admin/sports/enrichment/sportmonks-dry-run/route.js',
     'lib/providers/sportmonks-enrichment-dry-run.js',
     'lib/providers/sportmonks-mapping-discovery.js',
+    'lib/env.js',
     'lib/supabase/admin.js',
   ]) {
     const compiledPath = path.join(buildDir, relPath);
@@ -3765,6 +3766,616 @@ await testAsync('enrichment dry-run: adversarial provider strings in id/timestam
     globalThis.fetch = originalFetch;
     console.warn = originalWarn;
     console.error = originalError;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+// ─── Decision #056 SportMonks Class A structural presence dry-run ───
+
+const STRUCTURAL_PRESENCE_INCLUDE_SET = [
+  'participants',
+  'league',
+  'season',
+  'round',
+  'venue',
+  'state',
+];
+
+function clearCompiledStructuralPresenceDryRunModules() {
+  for (const relPath of [
+    'app/api/admin/sports/enrichment/sportmonks-structural-presence-dry-run/route.js',
+    'lib/providers/sportmonks-structural-presence-dry-run.js',
+    'lib/providers/sportmonks-enrichment-dry-run.js',
+    'lib/providers/sportmonks-mapping-discovery.js',
+    'lib/supabase/admin.js',
+  ]) {
+    const compiledPath = path.join(buildDir, relPath);
+    try {
+      delete require.cache[require.resolve(compiledPath)];
+    } catch {
+      // Module may not have been loaded yet.
+    }
+  }
+}
+
+function structuralProviderData(overrides = {}) {
+  return {
+    id: 19722203,
+    sport_id: 1,
+    league_id: 8,
+    season_id: 25583,
+    round_id: 339001,
+    venue_id: 204,
+    state_id: 1,
+    name: 'Arsenal vs Coventry City',
+    starting_at: '2026-08-21 19:00:00',
+    starting_at_timestamp: 1787857200,
+    updated_at: '2026-07-14 15:40:00',
+    has_odds: true,
+    has_premium_odds: false,
+    participants: [
+      {
+        id: 19,
+        name: 'Arsenal',
+        image_path: 'https://secret.example/arsenal.png',
+        updated_at: '2026-07-13 10:00:00',
+      },
+      {
+        id: 247,
+        name: 'Coventry City',
+        description: 'Bukayo Saka secret note',
+        updated_at: 'invalid Saka timestamp',
+      },
+    ],
+    league: { id: 8, name: 'Premier League', updated_at: '2026-07-12 10:00:00' },
+    season: { id: 25583, name: '2026/2027', updated_at: '2026-02-31 10:00:00' },
+    round: { id: 339001, name: '1' },
+    venue: { id: 204, name: 'Emirates Stadium' },
+    state: { id: 1, name: 'Scheduled' },
+    ...overrides,
+  };
+}
+
+function approvedStructuralPresenceBody(overrides = {}) {
+  return {
+    dryRun: true,
+    provider: 'sportmonks',
+    canonicalFixtureId: ENRICHMENT_CANONICAL_ID,
+    sportmonksFixtureId: ENRICHMENT_PROVIDER_ID,
+    requestedIncludeSet: [...STRUCTURAL_PRESENCE_INCLUDE_SET],
+    maxProviderRequests: 1,
+    operatorConfirm: 'RUN_SPORTMONKS_STRUCTURAL_PRESENCE_DRY_RUN_D056',
+    ...overrides,
+  };
+}
+
+function structuralPresenceRequest(body, token = 'operator-token') {
+  const headers = { 'content-type': 'application/json' };
+  if (token) headers.authorization = `Bearer ${token}`;
+  return new Request(
+    'https://example.test/api/admin/sports/enrichment/sportmonks-structural-presence-dry-run',
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+async function withStructuralPresenceDryRunRoute(dbRows, fn) {
+  return withCompiledAlias(async () => {
+    clearCompiledStructuralPresenceDryRunModules();
+    stubEnrichmentAdminModule(dbRows);
+    const route = require(
+      path.join(
+        buildDir,
+        'app/api/admin/sports/enrichment/sportmonks-structural-presence-dry-run/route.js'
+      )
+    );
+    try {
+      return await fn(route);
+    } finally {
+      clearCompiledStructuralPresenceDryRunModules();
+    }
+  });
+}
+
+await testAsync('structural presence dry-run: operator gate rejects missing/wrong token with zero fetches', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    return jsonResponse({ data: structuralProviderData() });
+  };
+
+  try {
+    delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    await withStructuralPresenceDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(structuralPresenceRequest(approvedStructuralPresenceBody()));
+      assert.equal(response.status, 503);
+    });
+
+    process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+    await withStructuralPresenceDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(
+        structuralPresenceRequest(approvedStructuralPresenceBody(), 'wrong-token')
+      );
+      assert.equal(response.status, 401);
+    });
+
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('structural presence dry-run: strict body rejects every widened/reordered scope with zero fetches', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    return jsonResponse({ data: structuralProviderData() });
+  };
+
+  const reordered = [...STRUCTURAL_PRESENCE_INCLUDE_SET];
+  [reordered[0], reordered[1]] = [reordered[1], reordered[0]];
+
+  const rejectedBodies = [
+    approvedStructuralPresenceBody({ operatorConfirm: 'WRONG_CONFIRMATION' }),
+    approvedStructuralPresenceBody({ dryRun: false }),
+    approvedStructuralPresenceBody({ provider: 'api_football' }),
+    approvedStructuralPresenceBody({
+      canonicalFixtureId: '11111111-2222-3333-4444-555555555555',
+    }),
+    approvedStructuralPresenceBody({ sportmonksFixtureId: '999999' }),
+    approvedStructuralPresenceBody({ requestedIncludeSet: STRUCTURAL_PRESENCE_INCLUDE_SET.slice(0, 5) }),
+    approvedStructuralPresenceBody({ requestedIncludeSet: reordered }),
+    approvedStructuralPresenceBody({
+      requestedIncludeSet: [...STRUCTURAL_PRESENCE_INCLUDE_SET, 'odds'],
+    }),
+    approvedStructuralPresenceBody({ maxProviderRequests: 2 }),
+    { ...approvedStructuralPresenceBody(), extraField: true },
+  ];
+
+  try {
+    await withStructuralPresenceDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      for (const body of rejectedBodies) {
+        const response = await POST(structuralPresenceRequest(body));
+        assert.equal(response.status, 400);
+      }
+    });
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('structural presence dry-run: every preflight failure blocks before provider token/fetch', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const originalProviderToken = process.env.SPORTMONKS_TOKEN;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  delete process.env.SPORTMONKS_TOKEN;
+  const failingPreflights = [
+    { rows: enrichmentDbRows({ fixtureNull: true }), warning: 'canonical fixture not found' },
+    { rows: enrichmentDbRows({ linkNull: true }), warning: 'no SportMonks provider link' },
+    {
+      rows: enrichmentDbRows({ fixture: { sport: 'tennis-secret' } }),
+      warning: 'sport does not match football',
+    },
+    {
+      rows: enrichmentDbRows({ fixture: { status: 'finished-secret' } }),
+      warning: 'status does not match scheduled',
+    },
+    {
+      rows: enrichmentDbRows({ fixture: { kickoff_at: '2026-08-22T19:00:00+00:00' } }),
+      warning: 'kickoff minute',
+    },
+    {
+      rows: enrichmentDbRows({ link: { mapping_confidence: 'garbage-secret' } }),
+      warning: 'mapping confidence is not exact or high',
+    },
+    {
+      rows: enrichmentDbRows({ link: { provider_fixture_id: 111 } }),
+      warning: 'fixture id does not match',
+    },
+  ];
+
+  try {
+    for (const { rows, warning } of failingPreflights) {
+      let fetchCalls = 0;
+      globalThis.fetch = async () => {
+        fetchCalls++;
+        return jsonResponse({ data: structuralProviderData() });
+      };
+
+      await withStructuralPresenceDryRunRoute(rows, async ({ POST }) => {
+        const response = await POST(structuralPresenceRequest(approvedStructuralPresenceBody()));
+        const result = await readJsonResponse(response);
+        assert.equal(result.status, 200);
+        assert.equal(result.body.success, false);
+        assert.equal(result.body.report.responseStatus, 'blocked');
+        assert.equal(result.body.report.requestCount, 0);
+        assert.equal(result.body.report.writes, 'none');
+        assert.ok(result.body.report.warnings.some((item) => item.includes(warning)));
+        assert.ok(!JSON.stringify(result.body).includes('secret'));
+      });
+      assert.equal(fetchCalls, 0);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+    if (originalProviderToken === undefined) delete process.env.SPORTMONKS_TOKEN;
+    else process.env.SPORTMONKS_TOKEN = originalProviderToken;
+  }
+});
+
+await testAsync('structural presence dry-run: approved run makes one exact include request and reports shape only', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const observed = [];
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async (url, init = {}) => {
+    observed.push({ url: String(url), headers: init.headers ?? {} });
+    return jsonResponse({ data: structuralProviderData() });
+  };
+
+  try {
+    await withStructuralPresenceDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(structuralPresenceRequest(approvedStructuralPresenceBody()));
+      const result = await readJsonResponse(response);
+      const report = result.body.report;
+
+      assert.equal(observed.length, 1);
+      assert.equal(
+        observed[0].url,
+        'https://api.sportmonks.com/v3/football/fixtures/19722203?include=participants;league;season;round;venue;state'
+      );
+      assert.ok(!observed[0].url.includes('api_token'));
+      assert.ok(!observed[0].url.includes('dummy-sportmonks'));
+      assert.equal(observed[0].headers.Authorization, 'dummy-sportmonks');
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, true);
+      assert.equal(report.responseStatus, 'ok');
+      assert.equal(report.requestCount, 1);
+      assert.equal(report.fixtureIdentityMatch, true);
+      assert.deepEqual(report.requestedIncludeSet, STRUCTURAL_PRESENCE_INCLUDE_SET);
+      assert.equal(report.providerStartingAt, '2026-08-21T19:00:00.000Z');
+      assert.equal(report.fixtureSourceFreshnessPresent, true);
+      assert.equal(report.unexpectedNonStructuralRelationshipsPresent, false);
+      assert.equal(report.structuralRelationships.participants.shape, 'array');
+      assert.equal(report.structuralRelationships.participants.count, 2);
+      assert.equal(report.structuralRelationships.participants.schemaValid, true);
+      assert.equal(report.structuralRelationships.participants.identifierValid, true);
+      assert.equal(report.structuralRelationships.participants.referenceMatch, null);
+      assert.equal(report.structuralRelationships.participants.sourceFreshnessValidCount, 1);
+      assert.equal(
+        report.structuralRelationships.participants.sourceFreshnessMissingOrInvalidCount,
+        1
+      );
+      for (const key of ['league', 'season', 'round', 'venue', 'state']) {
+        assert.equal(report.structuralRelationships[key].shape, 'object');
+        assert.equal(report.structuralRelationships[key].count, 1);
+        assert.equal(report.structuralRelationships[key].schemaValid, true);
+        assert.equal(report.structuralRelationships[key].identifierValid, true);
+        assert.equal(report.structuralRelationships[key].referenceMatch, true);
+      }
+      assert.equal(report.structuralRelationships.season.sourceFreshnessValidCount, 0);
+      assert.equal(report.structuralRelationships.season.sourceFreshnessMissingOrInvalidCount, 1);
+      assert.equal(report.writes, 'none');
+      assert.ok(report.blockedDownstreamUsage.length >= 4);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('structural presence dry-run: response and logs never carry provider content or tokens', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  const originalWarn = console.warn;
+  const originalError = console.error;
+  const consoleLines = [];
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => jsonResponse({ data: structuralProviderData() });
+  console.warn = (...args) => consoleLines.push(args.map(String).join(' '));
+  console.error = (...args) => consoleLines.push(args.map(String).join(' '));
+
+  try {
+    await withStructuralPresenceDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(structuralPresenceRequest(approvedStructuralPresenceBody()));
+      const serialized = JSON.stringify(await response.json());
+      const logged = consoleLines.join('\n');
+
+      for (const forbidden of [
+        'Arsenal',
+        'Coventry',
+        'Saka',
+        'Premier League',
+        'Emirates',
+        'secret.example',
+        'dummy-sportmonks',
+        'operator-token',
+        'image_path',
+        'description',
+      ]) {
+        assert.ok(!serialized.includes(forbidden), `response must not contain ${forbidden}`);
+        assert.ok(!logged.includes(forbidden), `logs must not contain ${forbidden}`);
+      }
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+    console.error = originalError;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('structural presence dry-run: absent requested relationships are reported without widening trust', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () =>
+    jsonResponse({
+      data: structuralProviderData({
+        participants: null,
+        league: null,
+        season: null,
+        round: null,
+        venue: null,
+        state: null,
+      }),
+    });
+
+  try {
+    await withStructuralPresenceDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(structuralPresenceRequest(approvedStructuralPresenceBody()));
+      const result = await readJsonResponse(response);
+      assert.equal(result.body.success, true);
+      assert.equal(result.body.report.responseStatus, 'ok');
+      for (const key of STRUCTURAL_PRESENCE_INCLUDE_SET) {
+        const observation = result.body.report.structuralRelationships[key];
+        assert.equal(observation.present, false);
+        assert.equal(observation.shape, 'absent');
+        assert.equal(observation.count, 0);
+        assert.equal(observation.schemaValid, null);
+      }
+      assert.equal(result.body.report.writes, 'none');
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('structural presence dry-run: invalid shapes, ids, counts, and references fail closed', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  const cases = [
+    { overrides: { participants: { id: 19 } }, warning: 'invalid shape' },
+    {
+      overrides: { participants: Array.from({ length: 9 }, (_, id) => ({ id: id + 1 })) },
+      warning: 'record bound',
+    },
+    { overrides: { participants: [{ id: 19 }] }, warning: 'exactly two records' },
+    {
+      overrides: { participants: [{ id: 19 }, { id: 'garbage-secret' }] },
+      warning: 'invalid or duplicate ids',
+    },
+    {
+      overrides: { participants: [{ id: 19 }, { id: 19 }] },
+      warning: 'invalid or duplicate ids',
+    },
+    { overrides: { league: [{ id: 8 }] }, warning: 'league relationship has an invalid shape' },
+    { overrides: { season: { id: 'garbage-secret' } }, warning: 'season relationship id is invalid' },
+    { overrides: { round: { id: 999999 } }, warning: 'round relationship id does not match' },
+    {
+      overrides: { venue_id: 'garbage-secret', venue: { id: 204 } },
+      warning: 'venue fixture reference id is missing or invalid',
+    },
+  ];
+
+  try {
+    for (const { overrides, warning } of cases) {
+      globalThis.fetch = async () => jsonResponse({ data: structuralProviderData(overrides) });
+      await withStructuralPresenceDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+        const response = await POST(structuralPresenceRequest(approvedStructuralPresenceBody()));
+        const result = await readJsonResponse(response);
+        assert.equal(result.body.success, false);
+        assert.equal(result.body.report.responseStatus, 'failed');
+        assert.equal(result.body.report.requestCount, 1);
+        assert.ok(result.body.report.warnings.some((item) => item.includes(warning)));
+        const serialized = JSON.stringify(result.body);
+        assert.ok(!serialized.includes('garbage-secret'));
+        assert.ok(!serialized.includes('999999'));
+        assert.ok(!serialized.includes('Arsenal'));
+      });
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('structural presence dry-run: unexpected Class B/C relationship fails without content echo', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () =>
+    jsonResponse({
+      data: structuralProviderData({
+        odds: [{ price: 'Saka secret price', bookmaker: 'Secret Book' }],
+      }),
+    });
+
+  try {
+    await withStructuralPresenceDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(structuralPresenceRequest(approvedStructuralPresenceBody()));
+      const result = await readJsonResponse(response);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.report.responseStatus, 'failed');
+      assert.equal(result.body.report.unexpectedNonStructuralRelationshipsPresent, true);
+      assert.ok(
+        result.body.report.warnings.includes('provider returned a non-approved relationship family')
+      );
+      const serialized = JSON.stringify(result.body);
+      for (const forbidden of ['Saka', 'secret price', 'Secret Book', 'bookmaker']) {
+        assert.ok(!serialized.includes(forbidden));
+      }
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('structural presence dry-run: identity is required and present-invalid values fail closed', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  const cases = [
+    { payload: { data: null }, warning: 'missing fixture data object' },
+    { payload: { data: structuralProviderData({ id: 999999 }) }, warning: 'different fixture id' },
+    { payload: { data: structuralProviderData({ sport_id: undefined }) }, warning: 'sport id' },
+    {
+      payload: { data: structuralProviderData({ league_id: 'garbage-secret' }) },
+      warning: 'league id',
+    },
+    { payload: { data: structuralProviderData({ starting_at: 123 }) }, warning: 'kickoff' },
+  ];
+
+  try {
+    for (const { payload, warning } of cases) {
+      globalThis.fetch = async () => jsonResponse(payload);
+      await withStructuralPresenceDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+        const response = await POST(structuralPresenceRequest(approvedStructuralPresenceBody()));
+        const result = await readJsonResponse(response);
+        assert.equal(result.body.success, false);
+        assert.equal(result.body.report.responseStatus, 'failed');
+        assert.ok(result.body.report.warnings.some((item) => item.includes(warning)));
+        const serialized = JSON.stringify(result.body);
+        assert.ok(!serialized.includes('999999'));
+        assert.ok(!serialized.includes('garbage-secret'));
+        assert.ok(!serialized.includes('Arsenal'));
+      });
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+test('structural presence dry-run: missing provider env blocks with zero requests', () => {
+  const script = `
+    const path = require('node:path');
+    const buildDir = ${JSON.stringify(buildDir)};
+    const adminPath = path.join(buildDir, 'lib/supabase/admin.js');
+    const fixture = {
+      id: '${ENRICHMENT_CANONICAL_ID}',
+      sport: 'football',
+      status: 'scheduled',
+      kickoff_at: '2026-08-21T19:00:00+00:00',
+    };
+    const link = { provider_fixture_id: 19722203, mapping_confidence: 'high' };
+    require.cache[require.resolve(adminPath)] = {
+      id: adminPath,
+      filename: adminPath,
+      loaded: true,
+      exports: {
+        createAdminClient() {
+          return {
+            from(table) {
+              const row = table === 'canonical_fixtures' ? fixture : link;
+              const builder = {
+                select() { return builder; },
+                eq() { return builder; },
+                async maybeSingle() { return { data: row, error: null }; },
+              };
+              return builder;
+            },
+          };
+        },
+      },
+    };
+    let fetchCalls = 0;
+    global.fetch = async () => { fetchCalls++; throw new Error('fetch must not run'); };
+    const modulePath = path.join(
+      buildDir,
+      'lib/providers/sportmonks-structural-presence-dry-run.js'
+    );
+    require(modulePath).runSportMonksStructuralPresenceDryRun().then((report) => {
+      process.stdout.write(JSON.stringify({ report, fetchCalls }));
+    }).catch((error) => {
+      console.error(error);
+      process.exit(1);
+    });
+  `;
+  const output = runInFreshProcess(script, {
+    API_FOOTBALL_KEY: 'dummy-football',
+    API_TENNIS_KEY: 'dummy-tennis',
+    SPORTMONKS_TOKEN: '',
+  });
+  const { report, fetchCalls } = JSON.parse(output);
+  assert.equal(report.responseStatus, 'blocked');
+  assert.equal(report.requestCount, 0);
+  assert.deepEqual(report.warnings, ['provider token is not configured']);
+  assert.equal(report.writes, 'none');
+  assert.equal(fetchCalls, 0);
+});
+
+await testAsync('structural presence dry-run: provider failure is sanitized and never retried', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+  let fetchCalls = 0;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    return jsonResponse({ message: 'Arsenal provider secret' }, 503);
+  };
+
+  try {
+    await withStructuralPresenceDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(structuralPresenceRequest(approvedStructuralPresenceBody()));
+      const result = await readJsonResponse(response);
+      assert.equal(result.body.success, false);
+      assert.equal(result.body.report.responseStatus, 'failed');
+      assert.equal(result.body.report.requestCount, 1);
+      assert.deepEqual(result.body.report.warnings, ['provider request failed']);
+      const serialized = JSON.stringify(result.body);
+      assert.ok(!serialized.includes('Arsenal'));
+      assert.ok(!serialized.includes('dummy-sportmonks'));
+    });
+    assert.equal(fetchCalls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
     if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
     else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
   }

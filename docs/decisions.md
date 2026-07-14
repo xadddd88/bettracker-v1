@@ -2010,7 +2010,7 @@ Reference: `docs/csp-security-hardening-scope-decision-054.md`
 **Date:** 2026-07-14  
 **Proposed by:** CPO  
 **Approved by:** Founder (`APPROVE #055`)  
-**Status:** APPROVED / DOCUMENTATION & EVIDENCE ONLY. No runtime code, provider call, migration, Supabase write, environment change, enrichment write, odds work, or downstream use is approved.
+**Status:** EXECUTED / CLOSED 2026-07-14. Docs-only PR #145 squash-merged as `50fe921`; production deployment `dpl_9i7yn2UWjZ8knoEX2QefhnnnJkQp` READY. No runtime code, provider call, migration, Supabase write, environment change, enrichment write, odds work, or downstream use was authorized or performed.
 
 **Decision:** Define the trust classes, provenance/freshness requirements, normalized storage ownership, and promotion gates required before any SportMonks fixture relationship can be persisted or consumed.
 
@@ -2026,11 +2026,44 @@ Reference: `docs/csp-security-hardening-scope-decision-054.md`
 
 **Candidate next runtime:** A later decision may propose exactly one structural presence dry-run using `participants;league;season;round;venue;state`. Decision #055 does not authorize that request.
 
-**DONE:** Docs-only scope + ledger/state/numbering reconciliation. Next unreserved decision: #056.
+**DONE:** Docs-only scope + ledger/state/numbering reconciliation. Decision #056 now occupies the next implementation scope.
 
 **Non-use:** Provider calls 0; runtime code 0; writes/migrations/env changes 0. `football_enrichment`, `fixture_results`, `odds_snapshots`, Scout, Analyst, UI, odds, probability, edge, EV, recommendation, Place Bet, and betting signals remain blocked. FP-001 remains active. CSP Phase B is untouched. Decision #050 remains pending.
 
 Reference: `docs/sports-data-trust-contract-scope-decision-055.md`
+
+---
+
+## Decision #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run
+**Date:** 2026-07-14
+**Proposed by:** CPO
+**Approved by:** Founder (`APPROVE #056`)
+**Status:** APPROVED / IMPLEMENTATION ONLY. Runtime provider call is NOT APPROVED. Merging the implementation does not authorize execution.
+
+**Decision:** Implement a separate read-only admin dry-run for the already linked canonical fixture and exactly six Decision #055 Class A relationships: `participants;league;season;round;venue;state`.
+
+**Pinned scope:**
+- canonical fixture `92afd570-399a-48b9-915a-e1ffaf52a71c`;
+- SportMonks fixture `19722203`;
+- exact fixture-by-ID URL with the exact ordered include set;
+- at most one provider request, header-only provider token, no retry/pagination/fallback/filters/select/nesting;
+- timing-safe operator gate and strict literal body;
+- DB preflight before provider-token loading;
+- required fail-closed fixture identity;
+- sanitized presence/shape/count/ID-validity/reference-match/freshness-count report only;
+- present-invalid relationship data and unexpected Class B/C relationships fail closed;
+- no names, logos, descriptions, raw payload, tokens, markets, predictions, or relationship content in response/logs;
+- `writes: none`.
+
+**Implementation boundary:** A new module and route are used; the completed Decision #034 empty-include route is not widened. Mocked tests may exercise provider-shaped payloads, but no real provider call is permitted during implementation or CI.
+
+**Runtime boundary:** After implementation merge/deployment, one production execution still requires a separate CPO runtime authorization. Any first outcome consumes that authorization; retry requires another approval.
+
+**Non-use:** Provider calls 0 during implementation; Supabase writes/migrations/env changes 0. Structural persistence, `football_enrichment`, `fixture_results`, `odds_snapshots`, Scout, Analyst, UI, probability, edge, EV, recommendation, Place Bet, and betting signals remain blocked. FP-001 active. CSP Phase B untouched. Decision #050 remains pending.
+
+**Numbering:** Decision #056 occupied; next unreserved decision #057.
+
+Reference: `docs/sportmonks-structural-presence-dry-run-scope-decision-056.md`
 
 ---
 
