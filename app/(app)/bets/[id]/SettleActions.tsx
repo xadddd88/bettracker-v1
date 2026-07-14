@@ -4,6 +4,21 @@ import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
+import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
+import { isSupportedSettlementStatus } from '@/lib/bets/settlement-metrics'
+
+// Canonical resolver keys (Decision #058): explicit color for every status,
+// including 'partial' and 'unknown' — no raw text, no misleading fallback.
+const STATUS_TEXT: Record<BetStatusKey, string> = {
+  won:        'text-green-400',
+  lost:       'text-red-400',
+  pending:    'text-yellow-400',
+  void:       'text-gray-400',
+  push:       'text-blue-400',
+  cashed_out: 'text-purple-400',
+  partial:    'text-slate-300',
+  unknown:    'text-slate-500',
+}
 
 interface Props {
   betId: string
@@ -20,16 +35,14 @@ export default function SettleActions({ betId, status, pnl, settledAt, sym }: Pr
   const settlingRef = useRef(false)
 
   if (status !== 'pending') {
+    const resolved = resolveBetStatus(status)
     return (
       <div className="card">
         <div className="stat-label mb-2">Settlement</div>
         <div className="flex items-center gap-4 flex-wrap">
-          <span className={`font-semibold capitalize ${
-            status === 'won'  ? 'text-green-400' :
-            status === 'lost' ? 'text-red-400'   :
-            'text-gray-400'
-          }`}>{status}</span>
-          {pnl != null && (
+          <span className={`font-semibold ${STATUS_TEXT[resolved.key]}`}>{resolved.label}</span>
+          {/* Settlement P&L is only defined for won/lost/void (Decision #058) */}
+          {isSupportedSettlementStatus(status) && pnl != null && (
             <span className={`text-sm font-bold ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
               {pnl >= 0 ? '+' : ''}{sym}{pnl.toFixed(2)}
             </span>

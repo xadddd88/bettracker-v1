@@ -1,4 +1,5 @@
 import type { Bet } from '@/types'
+import { calcSettlementMetrics } from '@/lib/bets/settlement-metrics'
 
 export interface PerformanceMetrics {
   netProfit: number
@@ -58,26 +59,10 @@ export function calcPerformance(
   bets: Bet[],
   decisions: Array<{ final_action: string }>,
 ): PerformanceMetrics {
-  const won    = bets.filter(b => b.status === 'won')
-  const lost   = bets.filter(b => b.status === 'lost')
-  const voided = bets.filter(b => b.status === 'void')
-  const pending = bets.filter(b => b.status === 'pending')
-
-  // Void excluded from ROI and Win Rate per sprint spec
-  const roiEligible = [...won, ...lost]
-  const settled     = [...won, ...lost, ...voided]
-
-  const netProfit    = settled.reduce((s, b) => s + (b.pnl ?? 0), 0)
-  const roiStake     = roiEligible.reduce((s, b) => s + b.stake, 0)
-  const roi          = roiStake > 0 ? (netProfit / roiStake) * 100 : null
-  const winLost      = won.length + lost.length
-  const winRate      = winLost > 0 ? (won.length / winLost) * 100 : null
-  const pendingStake = pending.reduce((s, b) => s + b.stake, 0)
-
-  const oddsPool = roiEligible.filter(b => b.total_odds != null)
-  const avgOdds  = oddsPool.length > 0
-    ? oddsPool.reduce((s, b) => s + (b.total_odds ?? 0), 0) / oddsPool.length
-    : null
+  // Canonical settlement metrics (Decision #058): won/lost/void are the
+  // supported settled outcomes, void is excluded from Win Rate and ROI,
+  // and push/cashed_out/partial/unknown enter no financial metric.
+  const m = calcSettlementMetrics(bets)
 
   const decisionsByAction: Record<string, number> = {
     placed: 0, skipped: 0, watchlisted: 0, ignored: 0, pending: 0,
@@ -99,22 +84,17 @@ export function calcPerformance(
   }
   const bySport: SportPerf[] = Array.from(sportMap.entries())
     .map(([sport, sb]) => {
-      const sw = sb.filter(b => b.status === 'won')
-      const sl = sb.filter(b => b.status === 'lost')
-      const sv = sb.filter(b => b.status === 'void')
-      const sp = sb.filter(b => b.status === 'pending')
-      const np = [...sw, ...sl, ...sv].reduce((s, b) => s + (b.pnl ?? 0), 0)
-      const rs = [...sw, ...sl].reduce((s, b) => s + b.stake, 0)
+      const sm = calcSettlementMetrics(sb)
       return {
         sport,
         total: sb.length,
-        won: sw.length,
-        lost: sl.length,
-        void: sv.length,
-        pending: sp.length,
-        winRate: (sw.length + sl.length) > 0 ? (sw.length / (sw.length + sl.length)) * 100 : null,
-        roi: rs > 0 ? (np / rs) * 100 : null,
-        netProfit: np,
+        won: sm.wonCount,
+        lost: sm.lostCount,
+        void: sm.voidCount,
+        pending: sm.pendingCount,
+        winRate: sm.winRate,
+        roi: sm.roi,
+        netProfit: sm.netProfit,
         totalStake: sb.reduce((s, b) => s + b.stake, 0),
       }
     })
@@ -129,52 +109,44 @@ export function calcPerformance(
   }
   const bySource: SourcePerf[] = Array.from(sourceMap.entries())
     .map(([source, sb]) => {
-      const sw = sb.filter(b => b.status === 'won')
-      const sl = sb.filter(b => b.status === 'lost')
-      const sv = sb.filter(b => b.status === 'void')
-      const np = [...sw, ...sl, ...sv].reduce((s, b) => s + (b.pnl ?? 0), 0)
-      const rs = [...sw, ...sl].reduce((s, b) => s + b.stake, 0)
+      const sm = calcSettlementMetrics(sb)
       return {
         source,
         total: sb.length,
-        won: sw.length,
-        lost: sl.length,
-        winRate: (sw.length + sl.length) > 0 ? (sw.length / (sw.length + sl.length)) * 100 : null,
-        roi: rs > 0 ? (np / rs) * 100 : null,
-        netProfit: np,
+        won: sm.wonCount,
+        lost: sm.lostCount,
+        winRate: sm.winRate,
+        roi: sm.roi,
+        netProfit: sm.netProfit,
       }
     })
     .sort((a, b) => b.total - a.total)
 
   // AI Analyst = bets with source 'ai_analyst'
   const aiBets = bets.filter(b => b.source === 'ai_analyst')
-  const aiW    = aiBets.filter(b => b.status === 'won')
-  const aiL    = aiBets.filter(b => b.status === 'lost')
-  const aiV    = aiBets.filter(b => b.status === 'void')
-  const aiNP   = [...aiW, ...aiL, ...aiV].reduce((s, b) => s + (b.pnl ?? 0), 0)
-  const aiRS   = [...aiW, ...aiL].reduce((s, b) => s + b.stake, 0)
+  const am = calcSettlementMetrics(aiBets)
   const aiAnalyst: AIPerf = {
     total: aiBets.length,
-    won: aiW.length,
-    lost: aiL.length,
-    winRate: (aiW.length + aiL.length) > 0 ? (aiW.length / (aiW.length + aiL.length)) * 100 : null,
-    roi: aiRS > 0 ? (aiNP / aiRS) * 100 : null,
-    netProfit: aiNP,
+    won: am.wonCount,
+    lost: am.lostCount,
+    winRate: am.winRate,
+    roi: am.roi,
+    netProfit: am.netProfit,
   }
 
   return {
-    netProfit,
-    roi,
-    winRate,
-    settledCount: settled.length,
-    pendingStake,
+    netProfit: m.netProfit,
+    roi: m.roi,
+    winRate: m.winRate,
+    settledCount: m.settledCount,
+    pendingStake: m.pendingStake,
     totalDecisions: decisions.length,
     conversionRate,
-    avgOdds,
-    wonCount: won.length,
-    lostCount: lost.length,
-    voidCount: voided.length,
-    pendingCount: pending.length,
+    avgOdds: m.avgOdds,
+    wonCount: m.wonCount,
+    lostCount: m.lostCount,
+    voidCount: m.voidCount,
+    pendingCount: m.pendingCount,
     decisionsByAction,
     bySport,
     bySource,

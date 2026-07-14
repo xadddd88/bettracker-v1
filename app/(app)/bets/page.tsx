@@ -4,6 +4,8 @@ import type { Bet } from '@/types'
 import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
 import QuickSettle from '@/components/bets/QuickSettle'
+import { calcSettlementMetrics, isSupportedSettlementStatus } from '@/lib/bets/settlement-metrics'
+import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
 
 const SPORT_ICON: Record<string, string> = {
   football:   '⚽',
@@ -13,13 +15,18 @@ const SPORT_ICON: Record<string, string> = {
   other:      '🎯',
 }
 
-const STATUS_STYLE: Record<string, { bg: string; text: string; label: string }> = {
-  won:       { bg: 'bg-green-950 border border-green-900', text: 'text-green-400',  label: 'Won' },
-  lost:      { bg: 'bg-red-950 border border-red-900',    text: 'text-red-400',    label: 'Lost' },
-  pending:   { bg: 'bg-yellow-950 border border-yellow-900', text: 'text-yellow-400', label: 'Pending' },
-  void:      { bg: 'bg-gray-800 border border-gray-700',  text: 'text-gray-400',  label: 'Void' },
-  push:      { bg: 'bg-blue-950 border border-blue-900',  text: 'text-blue-400',  label: 'Push' },
-  cashed_out:{ bg: 'bg-purple-950 border border-purple-900', text: 'text-purple-400', label: 'Cashed out' },
+// Styles are keyed by the canonical resolver key (Decision #058): every
+// key — including 'partial' and 'unknown' — has an explicit entry, so no
+// status can silently fall back to the Void presentation (G12).
+const STATUS_STYLE: Record<BetStatusKey, { bg: string; text: string }> = {
+  won:       { bg: 'bg-green-950 border border-green-900', text: 'text-green-400' },
+  lost:      { bg: 'bg-red-950 border border-red-900',    text: 'text-red-400' },
+  pending:   { bg: 'bg-yellow-950 border border-yellow-900', text: 'text-yellow-400' },
+  void:      { bg: 'bg-gray-800 border border-gray-700',  text: 'text-gray-400' },
+  push:      { bg: 'bg-blue-950 border border-blue-900',  text: 'text-blue-400' },
+  cashed_out:{ bg: 'bg-purple-950 border border-purple-900', text: 'text-purple-400' },
+  partial:   { bg: 'bg-slate-800 border border-slate-700', text: 'text-slate-300' },
+  unknown:   { bg: 'bg-slate-900 border border-slate-700', text: 'text-slate-500' },
 }
 
 export default async function BetsPage() {
@@ -44,13 +51,11 @@ export default async function BetsPage() {
   const currency = bankroll?.currency || 'USD'
   const sym = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'UAH' ? '₴' : currency
 
-  const settled    = bets.filter(b => b.status !== 'pending')
-  const won        = settled.filter(b => b.status === 'won').length
-  const totalStaked  = bets.reduce((s, b) => s + b.stake, 0)
-  const settledStaked = settled.reduce((s, b) => s + b.stake, 0)
-  const totalProfit  = settled.reduce((s, b) => s + (b.pnl || 0), 0)
-  const winRate    = settled.length > 0 ? (won / settled.length) * 100 : 0
-  const roi        = settledStaked > 0 ? (totalProfit / settledStaked) * 100 : 0
+  // Canonical settlement metrics (Decision #058): settled = won+lost+void,
+  // void excluded from Win Rate and ROI, unsupported/unknown statuses
+  // excluded from every financial metric.
+  const m = calcSettlementMetrics(bets)
+  const totalStaked = bets.reduce((s, b) => s + b.stake, 0)
 
   return (
     <div className="flex flex-col gap-6">
@@ -61,7 +66,7 @@ export default async function BetsPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Bets</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {bets.length} bets · {settled.length} settled · live P&amp;L tracking
+            {bets.length} bets · {m.settledCount} settled · live P&amp;L tracking
           </p>
         </div>
         <Link href="/bets/new" className="btn-primary">+ Add Bet</Link>
@@ -72,9 +77,9 @@ export default async function BetsPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { label: 'Total staked',  value: `${sym}${totalStaked.toFixed(0)}` },
-            { label: 'Win rate',      value: settled.length ? `${winRate.toFixed(0)}%` : '—' },
-            { label: 'ROI',           value: settled.length ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—', color: roi >= 0 ? 'text-green-400' : 'text-red-400' },
-            { label: 'Total P&L',     value: settled.length ? `${totalProfit >= 0 ? '+' : ''}${sym}${totalProfit.toFixed(2)}` : '—', color: totalProfit >= 0 ? 'text-green-400' : 'text-red-400' },
+            { label: 'Win rate',      value: m.winRate != null ? `${m.winRate.toFixed(0)}%` : '—' },
+            { label: 'ROI',           value: m.roi != null ? `${m.roi >= 0 ? '+' : ''}${m.roi.toFixed(1)}%` : '—', color: m.roi != null && m.roi < 0 ? 'text-red-400' : 'text-green-400' },
+            { label: 'Total P&L',     value: m.settledCount ? `${m.netProfit >= 0 ? '+' : ''}${sym}${m.netProfit.toFixed(2)}` : '—', color: m.netProfit >= 0 ? 'text-green-400' : 'text-red-400' },
           ].map(({ label, value, color }) => (
             <div key={label} className="stat-card">
               <div className="stat-label">{label}</div>
@@ -115,7 +120,8 @@ export default async function BetsPage() {
             const isParlay = legs.length > 1
             const leg      = legs[0]
             const sport    = leg?.sport || 'other'
-            const status   = STATUS_STYLE[bet.status] ?? STATUS_STYLE.void
+            const resolved = resolveBetStatus(bet.status)
+            const status   = { ...STATUS_STYLE[resolved.key], label: resolved.label }
 
             const eventLabel = isParlay
               ? legs.map(l => l.event_name).join(' · ')
@@ -171,9 +177,10 @@ export default async function BetsPage() {
                   </span>
                 </div>
 
-                {/* P&L */}
+                {/* P&L — settlement P&L is only defined for won/lost/void
+                    (Decision #058); unsupported/unknown statuses show “—” */}
                 <div className="flex-shrink-0 w-20 text-right">
-                  {bet.pnl == null ? (
+                  {bet.pnl == null || !isSupportedSettlementStatus(bet.status) ? (
                     <span className="text-gray-600 text-sm">—</span>
                   ) : (
                     <span className={`text-sm font-bold ${bet.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>

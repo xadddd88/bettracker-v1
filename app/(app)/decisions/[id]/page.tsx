@@ -12,6 +12,20 @@ import {
   type AnalystTrustView,
 } from '@/lib/ai/analysis-quality-gate'
 import { currencySymbol } from '@/lib/money'
+import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
+
+// Canonical resolver keys (Decision #058): explicit color for every status —
+// unknown values render as 'Unknown', never as raw text or a settled look.
+const LINKED_BET_STATUS_TEXT: Record<BetStatusKey, string> = {
+  won:        'text-green-400',
+  lost:       'text-red-400',
+  pending:    'text-yellow-400',
+  void:       'text-gray-400',
+  push:       'text-blue-400',
+  cashed_out: 'text-purple-400',
+  partial:    'text-slate-300',
+  unknown:    'text-slate-500',
+}
 
 interface Factor { name: string; score: number; detail: string }
 
@@ -342,8 +356,8 @@ export default async function DecisionDetailPage({
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-300">Stake: <span className="text-white font-medium">{stakeSymbol}{linkedBet.stake}</span></span>
             <span className="text-gray-300">Odds: <span className="text-white font-medium">{linkedBet.total_odds ?? d.offered_odds}</span></span>
-            <span className={`font-medium capitalize ${linkedBet.status === 'won' ? 'text-green-400' : linkedBet.status === 'lost' ? 'text-red-400' : 'text-yellow-400'}`}>
-              {linkedBet.status}
+            <span className={`font-medium ${LINKED_BET_STATUS_TEXT[resolveBetStatus(linkedBet.status).key]}`}>
+              {resolveBetStatus(linkedBet.status).label}
             </span>
           </div>
         </div>

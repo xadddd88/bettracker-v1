@@ -406,6 +406,236 @@ test('deposit route source: no direct financial table access remains', () => {
   assert.ok(src.includes("rpc('adjust_bankroll'"), 'deposit route must call adjust_bankroll');
 });
 
+// ── Decision #058: canonical settlement metrics & status presentation ──
+// One shared pure contract for Win Rate / ROI / Net Profit / settled count /
+// pending stake (G4), and explicit Partial/Unknown presentation with no Void
+// fallback (G12). Pure functions only — no Supabase, providers, or network.
+
+console.log('\nDecision #058 — settlement metrics & status presentation:');
+
+await withCompiledAlias(async () => {
+  const metricsMod = require(path.join(buildDir, 'lib/bets/settlement-metrics.js'));
+  const statusMod = require(path.join(buildDir, 'lib/bets/bet-status.js'));
+  const perfMod = require(path.join(buildDir, 'lib/analytics/performance.js'));
+  const { calcSettlementMetrics, isSupportedSettlementStatus } = metricsMod;
+  const { resolveBetStatus, BET_STATUS_LABELS, KNOWN_BET_STATUSES } = statusMod;
+  const { calcPerformance } = perfMod;
+
+  const bet = (status, stake, pnl = null, total_odds = null) => ({ status, stake, pnl, total_odds });
+  const approx = (a, b) => Math.abs(a - b) < 1e-9;
+
+  test('#058: win rate = won / (won + lost) x 100', () => {
+    const m = calcSettlementMetrics([bet('won', 10, 10), bet('won', 10, 12), bet('lost', 10, -10)]);
+    assert.ok(approx(m.winRate, (2 / 3) * 100), `expected 66.67, got ${m.winRate}`);
+    assert.equal(m.settledCount, 3);
+  });
+
+  test('#058: void excluded from the win-rate denominator', () => {
+    const m = calcSettlementMetrics([bet('won', 10, 10), bet('lost', 10, -10), bet('void', 10, 0)]);
+    assert.ok(approx(m.winRate, 50), `void leaked into denominator: ${m.winRate}`);
+    assert.equal(m.settledCount, 3, 'void must still count as settled');
+  });
+
+  test('#058: void excluded from ROI eligibility (stake denominator)', () => {
+    const m = calcSettlementMetrics([bet('won', 10, 10), bet('void', 100, 0)]);
+    assert.equal(m.roiEligibleStake, 10, 'void stake leaked into ROI denominator');
+    assert.ok(approx(m.roi, 100), `expected ROI 100, got ${m.roi}`);
+  });
+
+  test('#058: net profit sums pnl over won + lost + void only', () => {
+    const m = calcSettlementMetrics([
+      bet('won', 10, 25),
+      bet('lost', 10, -10),
+      bet('void', 10, 0),
+      bet('pending', 10, null),
+      bet('push', 10, 999), // unsupported: pnl must NOT be counted
+    ]);
+    assert.ok(approx(m.netProfit, 15), `expected 15, got ${m.netProfit}`);
+  });
+
+  test('#058: zero eligible stake / empty input returns null metrics safely', () => {
+    const empty = calcSettlementMetrics([]);
+    assert.equal(empty.winRate, null);
+    assert.equal(empty.roi, null);
+    assert.equal(empty.avgOdds, null);
+    assert.equal(empty.netProfit, 0);
+    assert.equal(empty.pendingStake, 0);
+    const voidOnly = calcSettlementMetrics([bet('void', 10, 0), bet('pending', 5)]);
+    assert.equal(voidOnly.winRate, null, 'void-only must not produce a win rate');
+    assert.equal(voidOnly.roi, null, 'void-only must not produce an ROI');
+    assert.equal(voidOnly.settledCount, 1);
+  });
+
+  test('#058: pending stake includes pending bets only', () => {
+    const m = calcSettlementMetrics([
+      bet('pending', 30),
+      bet('won', 10, 10),
+      bet('push', 50),
+      bet('mystery_status', 70),
+    ]);
+    assert.equal(m.pendingStake, 30);
+    assert.equal(m.pendingCount, 1);
+  });
+
+  test('#058: push / cashed_out / partial / unknown enter no financial metric', () => {
+    const base = [bet('won', 10, 10), bet('lost', 10, -10), bet('pending', 5)];
+    const noisy = [
+      ...base,
+      bet('push', 100, 77),
+      bet('cashed_out', 100, 55),
+      bet('partial', 100, 33),
+      bet('half_won', 100, 11), // unknown value
+    ];
+    const a = calcSettlementMetrics(base);
+    const b = calcSettlementMetrics(noisy);
+    assert.equal(b.winRate, a.winRate);
+    assert.equal(b.roi, a.roi);
+    assert.equal(b.netProfit, a.netProfit);
+    assert.equal(b.settledCount, a.settledCount);
+    assert.equal(b.pendingStake, a.pendingStake);
+    assert.equal(b.unsupportedCount, 3);
+    assert.equal(b.unknownCount, 1);
+  });
+
+  test('#058: settlement P&L predicate allows only won/lost/void', () => {
+    for (const s of ['won', 'lost', 'void']) {
+      assert.equal(isSupportedSettlementStatus(s), true, `${s} must be P&L-eligible`);
+    }
+    for (const s of ['pending', 'push', 'cashed_out', 'partial', 'half_won', '', 'WON']) {
+      assert.equal(isSupportedSettlementStatus(s), false, `${s} must NOT be P&L-eligible`);
+    }
+  });
+
+  test('#058: missing pnl counts as 0; zero-stake won/lost gives ROI null; unsupported odds/stake excluded', () => {
+    // Missing pnl on a supported settled bet contributes 0 (not coerced).
+    const missingPnl = calcSettlementMetrics([bet('won', 10, null, 2.0)]);
+    assert.equal(missingPnl.netProfit, 0);
+    assert.ok(approx(missingPnl.winRate, 100));
+    assert.ok(approx(missingPnl.roi, 0), 'roi must be 0 (0 profit over 10 stake), not null');
+    // Zero eligible stake on won/lost still fails safe to null ROI.
+    const zeroStake = calcSettlementMetrics([bet('won', 0, 5)]);
+    assert.equal(zeroStake.roiEligibleStake, 0);
+    assert.equal(zeroStake.roi, null, 'zero-stake won/lost must return ROI null');
+    // Unsupported statuses contribute neither odds nor stake to eligibility.
+    const withNoise = calcSettlementMetrics([
+      bet('won', 10, 10, 2.0),
+      bet('push', 100, null, 9.9),
+      bet('cashed_out', 100, null, 8.8),
+      bet('half_won', 100, null, 7.7),
+    ]);
+    assert.ok(approx(withNoise.avgOdds, 2.0), 'unsupported odds leaked into avgOdds');
+    assert.equal(withNoise.roiEligibleStake, 10, 'unsupported stake leaked into ROI eligibility');
+  });
+
+  test('#058: partial resolves to an explicit Partial label, never Void', () => {
+    const r = resolveBetStatus('partial');
+    assert.equal(r.key, 'partial');
+    assert.equal(r.label, 'Partial');
+    assert.notEqual(r.label, 'Void');
+  });
+
+  test('#058: unknown statuses resolve to Unknown, never Void or raw text', () => {
+    for (const value of ['half_won', 'settled', '', 'VOID ', 'garbage']) {
+      const r = resolveBetStatus(value);
+      assert.equal(r.key, 'unknown', `'${value}' must resolve to unknown`);
+      assert.equal(r.label, 'Unknown');
+    }
+    // Every known status + unknown has an explicit label — no gaps to fall through.
+    for (const key of [...KNOWN_BET_STATUSES, 'unknown']) {
+      assert.ok(BET_STATUS_LABELS[key], `missing label for ${key}`);
+    }
+    assert.equal(resolveBetStatus('cashed_out').label, 'Cashed out');
+  });
+
+  test('#058: calcPerformance (analytics surface) delegates to the canonical helper', () => {
+    const bets = [
+      bet('won', 10, 25, 2.0),
+      bet('lost', 20, -20, 1.8),
+      bet('void', 30, 0),
+      bet('pending', 40),
+      bet('push', 50, 77),
+      bet('partial', 60, 33),
+      bet('half_won', 70, 11),
+    ];
+    const m = calcSettlementMetrics(bets);
+    const p = calcPerformance(bets, []);
+    assert.equal(p.winRate, m.winRate);
+    assert.equal(p.roi, m.roi);
+    assert.equal(p.netProfit, m.netProfit);
+    assert.equal(p.settledCount, m.settledCount);
+    assert.equal(p.pendingStake, m.pendingStake);
+    assert.equal(p.wonCount, m.wonCount);
+    assert.equal(p.lostCount, m.lostCount);
+    assert.equal(p.voidCount, m.voidCount);
+    assert.equal(p.pendingCount, m.pendingCount);
+    assert.equal(p.avgOdds, m.avgOdds);
+  });
+});
+
+test('#058: bets/dashboard/coach surfaces use the canonical helper (no competing formulas)', () => {
+  const betsPage = readFileSync(path.join(repoRoot, 'app/(app)/bets/page.tsx'), 'utf8');
+  const dashboard = readFileSync(path.join(repoRoot, 'app/(app)/dashboard/page.tsx'), 'utf8');
+  const detail = readFileSync(path.join(repoRoot, 'app/(app)/bets/[id]/page.tsx'), 'utf8');
+  const coach = readFileSync(path.join(repoRoot, 'app/api/coach/route.ts'), 'utf8');
+  const perf = readFileSync(path.join(repoRoot, 'lib/analytics/performance.ts'), 'utf8');
+
+  for (const [name, src] of [['bets page', betsPage], ['dashboard', dashboard], ['coach', coach], ['performance', perf]]) {
+    assert.ok(src.includes('calcSettlementMetrics'), `${name} must use the canonical metrics helper`);
+  }
+
+  // G4: the divergent formulas must not survive anywhere.
+  assert.ok(!betsPage.includes("status !== 'pending'"), 'bets page still treats any non-pending status as settled');
+  assert.ok(!betsPage.includes('/ settled.length'), 'bets page still divides by all settled (void-in-denominator win rate)');
+  assert.ok(!coach.includes('roiStake'), 'coach still recomputes ROI inline');
+  assert.ok(!perf.includes('sw.length / (sw.length + sl.length)'), 'performance.ts still recomputes group win rate inline');
+});
+
+test('#058: all five status surfaces use the resolver; no Void or raw-text fallback survives', () => {
+  const betsPage = readFileSync(path.join(repoRoot, 'app/(app)/bets/page.tsx'), 'utf8');
+  const dashboard = readFileSync(path.join(repoRoot, 'app/(app)/dashboard/page.tsx'), 'utf8');
+  const detail = readFileSync(path.join(repoRoot, 'app/(app)/bets/[id]/page.tsx'), 'utf8');
+  const settleActions = readFileSync(path.join(repoRoot, 'app/(app)/bets/[id]/SettleActions.tsx'), 'utf8');
+  const decisionDetail = readFileSync(path.join(repoRoot, 'app/(app)/decisions/[id]/page.tsx'), 'utf8');
+
+  const surfaces = [
+    ['bets page', betsPage],
+    ['dashboard', dashboard],
+    ['bet detail', detail],
+    ['SettleActions', settleActions],
+    ['decision detail', decisionDetail],
+  ];
+  for (const [name, src] of surfaces) {
+    assert.ok(src.includes('resolveBetStatus'), `${name} must resolve statuses through the canonical resolver`);
+  }
+
+  // No fallback path may remain on any surface.
+  assert.ok(!betsPage.includes('?? STATUS_STYLE.void'), 'bets page still falls back to the Void style');
+  assert.ok(!dashboard.includes('styles[status] ||'), 'dashboard badge still has a silent style fallback');
+  assert.ok(!detail.includes("?? 'text-gray-400"), 'detail badge still has a silent style fallback');
+  assert.ok(!settleActions.includes('{status}</span>'), 'SettleActions still renders the raw status value');
+  assert.ok(!decisionDetail.includes('{linkedBet.status}'), 'decision detail still renders the raw linked-bet status');
+  assert.ok(!decisionDetail.includes(": 'text-yellow-400'}"), 'decision detail still has the catch-all yellow fallback');
+  for (const [name, src] of surfaces) {
+    assert.ok(!/capitalize[^\n]*\$\{styles\[status\]/.test(src), `${name} still styles the raw status value`);
+  }
+});
+
+test('#058: settlement P&L display is gated on won/lost/void on every P&L surface', () => {
+  const betsPage = readFileSync(path.join(repoRoot, 'app/(app)/bets/page.tsx'), 'utf8');
+  const dashboard = readFileSync(path.join(repoRoot, 'app/(app)/dashboard/page.tsx'), 'utf8');
+  const detail = readFileSync(path.join(repoRoot, 'app/(app)/bets/[id]/page.tsx'), 'utf8');
+  const settleActions = readFileSync(path.join(repoRoot, 'app/(app)/bets/[id]/SettleActions.tsx'), 'utf8');
+
+  for (const [name, src] of [['bets page', betsPage], ['dashboard', dashboard], ['bet detail', detail], ['SettleActions', settleActions]]) {
+    assert.ok(src.includes('isSupportedSettlementStatus'), `${name} must gate P&L on the supported-settlement predicate`);
+  }
+  // Every remaining pnl render must sit behind the predicate, not bare `pnl != null`.
+  assert.ok(!dashboard.includes('{bet.pnl != null && ('), 'dashboard still shows P&L for any status');
+  assert.ok(!detail.includes('{bet.pnl != null && ('), 'bet detail still shows P&L for any status');
+  assert.ok(!settleActions.includes('{pnl != null && ('), 'SettleActions still shows P&L for any status');
+  assert.ok(betsPage.includes('bet.pnl == null || !isSupportedSettlementStatus(bet.status)'), 'bets page P&L cell must fall back to — for unsupported statuses');
+});
+
 console.log(`\n${passed + failed} tests — ${passed} passed, ${failed} failed\n`);
 
 if (failed > 0) {
