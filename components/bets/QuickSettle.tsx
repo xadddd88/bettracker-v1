@@ -40,8 +40,8 @@ export default function QuickSettle({ betId }: Props) {
   }
 
   return (
-    <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-900/60 border-t border-gray-800/60">
-      <span className="text-[11px] text-gray-600 shrink-0">Settle:</span>
+    <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 bg-gray-900/60 border-t border-gray-800/60">
+      <span className="text-[11px] text-gray-600 shrink-0 basis-full sm:basis-auto">Settle:</span>
       <button
         className="px-3 py-1 rounded-md text-xs font-medium bg-green-950 border border-green-900 text-green-400 hover:bg-green-900 transition-colors disabled:opacity-40"
         onClick={() => settle('won')}
@@ -63,7 +63,7 @@ export default function QuickSettle({ betId }: Props) {
       >
         {busy === 'void' ? '…' : 'Void'}
       </button>
-      {error && <span className="text-[10px] text-red-400 ml-1">{error}</span>}
+      {error && <span className="text-[10px] text-red-400 basis-full sm:basis-auto sm:ml-1">{error}</span>}
     </div>
   )
 }
