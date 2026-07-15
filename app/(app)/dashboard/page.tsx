@@ -183,7 +183,7 @@ export default async function DashboardPage() {
             <p className="font-medium text-white mb-1">No bets yet</p>
             <p className="text-slate-500 text-sm mb-5">Run the AI Analyst to get a recommendation, then place your first bet.</p>
             <div className="flex gap-3 justify-center">
-              <Link href="/ai" className="btn-ghost text-sm">Analyse match</Link>
+              <Link href="/ai" className="btn-ghost text-sm">Analyze match</Link>
               <Link href="/bets/new" className="btn-primary text-sm">+ Quick add</Link>
             </div>
           </div>
