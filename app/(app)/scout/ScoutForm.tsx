@@ -191,7 +191,7 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
             disabled={actionBusy}
           >
             <Search size={13} strokeWidth={2} />
-            Analyse
+            Analyze
           </button>
           <button
             className="flex-1 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-blue-400 text-sm font-medium border border-gray-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
@@ -473,10 +473,10 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
           <div className="flex flex-col gap-1">
             <p className="text-xs text-gray-600">{opportunities.length} opportunit{opportunities.length === 1 ? 'y' : 'ies'} · sorted by most recent</p>
             <p className="text-[10px] text-gray-700">
-              <span className="text-green-500">value</span> = price edge ·{' '}
-              <span className="text-blue-500">contrarian</span> = against market ·{' '}
-              <span className="text-purple-500">pattern</span> = historical trend ·{' '}
-              score 0–100 · Analyse → AI Analyst
+              <span className="text-green-500">value</span> = candidate to investigate ·{' '}
+              <span className="text-blue-500">contrarian</span> = alternative angle ·{' '}
+              <span className="text-purple-500">pattern</span> = contextual pattern ·{' '}
+              score 0–100 = research relevance, not probability or price edge · Analyze → AI Analyst
             </p>
           </div>
           {opportunities.length < 5 && (
@@ -499,7 +499,7 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
         <div className="card flex flex-col items-center gap-3 py-10 text-center">
           <Search size={28} strokeWidth={1.25} className="text-slate-600" />
           <p className="text-sm font-medium text-gray-400">No scouted opportunities yet</p>
-          <p className="text-xs text-gray-600">Run Scout to find markets worth analysing.</p>
+          <p className="text-xs text-gray-600">Run Scout to find markets worth analyzing.</p>
         </div>
       )}
     </div>
