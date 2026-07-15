@@ -96,9 +96,14 @@ export default async function BetDetailPage({
             <div className="text-xs text-gray-500 mb-2">Legs</div>
             <div className="flex flex-col gap-2">
               {bet.legs!.map((l, i) => (
-                <div key={l.id} className="flex items-center gap-2 text-sm">
+                <div key={l.id} className="flex items-start gap-2 text-sm">
                   <span className="text-gray-600 text-xs w-4">{i + 1}.</span>
-                  <span className="text-white flex-1">{l.event_name}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-white break-words">{l.event_name}</div>
+                    {l.selection && (
+                      <div className="text-xs text-gray-400 break-words">Selection: {l.selection}</div>
+                    )}
+                  </div>
                   <span className="text-gray-400">{l.market_type}</span>
                   <span className="text-gray-500 font-mono">@{l.odds.toFixed(2)}</span>
                 </div>
