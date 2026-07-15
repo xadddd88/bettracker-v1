@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-14 (Decision #058 settlement metrics & status reconciliation)
+> Last updated: 2026-07-14 (Decision #059 finished-fixture eligibility & result-presence scope)
 
 ## 1. Executive Status
 
@@ -13,11 +13,11 @@
 | Production | `https://btdk.app` |
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
-| Latest completed operational milestone | **#058 — Settlement Metrics & Status Presentation Reconciliation (EXECUTED / CLOSED)** |
-| Highest-numbered executed decision | **#058 — Settlement Metrics & Status Presentation Reconciliation** |
+| Latest completed operational milestone | **#059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope (EXECUTED / CLOSED, docs-evidence only; eligibility BLOCKED)** |
+| Highest-numbered executed decision | **#059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope** |
 | Active decision | **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
-| Next unreserved decision | **#059** |
+| Next unreserved decision | **#060** |
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 completed one canonical-linked base-response dry-run with zero writes. Decision #055 then closed the trust/storage contract. Decision #056's Class A structural-presence implementation is merged and deployed (PR #146); its production provider call remains not approved and has not been run. Decision #057 closed the results-ingestion and settlement trust contract (docs-evidence only; no results runtime, result writes, or automated settlement is approved).
 
@@ -46,6 +46,7 @@ Completed milestones:
 | #055 | Sports-data trust classes, storage boundary, provenance/freshness contract, and promotion gates closed |
 | #057 | Results-ingestion & settlement trust contract closed (docs-evidence only; runtime/writes/settlement remain gated) |
 | #058 | Settlement metrics unified (G4) and status presentation made explicit (G12); no new settlement semantics |
+| #059 | Result-presence dry-run eligibility verified as BLOCKED (no finished fixture); future run's fail-closed contract pinned |
 
 Current downstream boundary:
 
@@ -114,6 +115,7 @@ Do not mark #050 fully executed before that manual verification.
 - Decision #056's separate, pinned `participants;league;season;round;venue;state` presence-only dry-run is implemented, merged, and deployed; the production call remains separately blocked and has not been run.
 - **Further football enrichment provider calls/writes remain on HOLD** until an explicit runtime authorization.
 - Production inventory at #055 approval: 3 canonical fixtures, 4 provider links, 0 football enrichment rows, 0 fixture result rows, 0 odds snapshot rows.
+- Decision #059 re-verified the sports inventory on 2026-07-14 (read-only): all 3 canonical fixtures are football, `scheduled`, with future kickoffs (earliest 2026-08-21 19:00 UTC); provider links unchanged (3 exact api_football + 1 high sportmonks); `fixture_results` still 0 rows. **Result-presence dry-run eligibility: BLOCKED** — no finished fixture exists; the future run's fail-closed contract is pinned in the #059 scope doc.
 - `football_enrichment` must not feed probability, edge, EV, recommendation, Place Bet, Scout, Analyst, or UI signals before trust validation.
 
 ### Odds / M1.3
@@ -190,7 +192,8 @@ CSP enforcement / nonce / strict-dynamic — NOT APPROVED in Phase A
 #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run — IMPLEMENTATION MERGED / DEPLOYED; RUNTIME NOT APPROVED / NOT RUN
 #057 — Results Ingestion & Settlement Trust Contract — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY
 #058 — Settlement Metrics & Status Presentation Reconciliation — EXECUTED / CLOSED
-#059 — next unreserved decision
+#059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY (eligibility BLOCKED)
+#060 — next unreserved decision
 ```
 
 PR #90 is closed without merge; its policy is not adopted. Decision #020 is never reused.
