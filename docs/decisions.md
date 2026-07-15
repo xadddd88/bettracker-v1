@@ -2111,5 +2111,27 @@ Reference: `docs/settlement-metrics-status-reconciliation-scope-decision-058.md`
 
 ---
 
+## Decision #059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope
+**Date:** 2026-07-14
+**Proposed by:** CPO
+**Approved by:** Founder (`APPROVE #059`)
+**Status:** EXECUTED / CLOSED by merge of the Decision #059 PR — DOCS / EVIDENCE ONLY. Highest-numbered executed decision: #059. No implementation, provider call, write, or runtime step exists for this decision.
+
+**Decision:** Determine whether an eligible canonical finished fixture exists for a future zero-write result-presence dry-run (Decision #057 gate 1), and pin that future run's fail-closed contract without implementing it.
+
+**Evidence (2026-07-14):** Repository audit: `finished` is the only final-success value in the `canonical_fixtures.status` CHECK. The API-Football adapter normalizes `FT`/`AET`/`PEN` to `finished` (`lib/providers/adapters/api-football.ts:69`) and the API-Tennis adapter normalizes final statuses likewise (`api-tennis.ts:67`); the gated fixture-sync write path can update `canonical_fixtures.status` for already-linked fixtures (`lib/providers/fixture-sync.ts:123/179`) but writes identity tables only — it never writes `fixture_results`, which remains unused by code (per #057 §1.5/§1.8). A `finished` status alone proves neither a normalized result, nor finality, nor freshness in the Decision #057 Layer B sense. Production inventory via three read-only SELECTs on `canonical_fixtures`, `fixture_provider_links`, and `fixture_results` (count) only — no bets/users/bankroll/financial data read, zero writes: 3 canonical fixtures, all football, all `scheduled`, kickoffs 2026-08-21 19:00 UTC (`92afd570-…`, links api_football `1557367` exact + sportmonks `19722203` high), 2026-12-31 12:30 (`5a42d721-…`, api_football `1576052` exact), 2026-12-31 14:30 (`3c37358c-…`, api_football `1576053` exact); `fixture_results` = 0 rows.
+
+**Verdict: ELIGIBILITY BLOCKED.** Zero fixtures have a past kickoff and zero are in a final state; even a past kickoff with a stale `scheduled` status would be insufficient without a separately authorized status refresh through the reviewed sync path. No fixture, link, or result was created and no provider was called to manufacture eligibility. Unblock paths (each needs its own decision): wait for the earliest linked fixture (2026-08-21) to be played, then separately authorize a status refresh/re-verification through the existing reviewed gated sync path; or separately approve mapping an already-finished historical fixture via the #044–#046 identity flow — then repeat the bounded inventory/eligibility check. No provider calls or writes happen under #059 itself.
+
+**Future dry-run contract (defined, not implemented):** one pinned canonical fixture + exact/high link; max ONE provider request with no retry/pagination/fallback; DB preflight before provider-token load; identity, finality, and freshness validation fail closed (`unknown` blocks; `collectedAt` is never source freshness); sanitized presence-only report limited to IDs, normalized timestamps, status/finality classification, and presence/count flags; forbidden: raw payload, team/player names, odds, predictions, probability/edge/EV/recommendation/Place Bet, and any inferred settlement outcome; writes none; implementation, runtime authorization, normalization/storage (Layer B), and settlement (Layer C) each require separate future decisions.
+
+**Non-use:** Provider calls 0; Supabase writes 0 (reads: 3 sports-table SELECTs only); migrations/schema/env changes 0; runtime code/tests 0; result ingestion/normalization writes 0; bet/leg/settlement/bankroll mutations 0; odds/Scout/Analyst/UI changes 0. Decision #056 runtime remains NOT APPROVED / NOT RUN. Decision #050 SMTP round-trip remains PENDING. CSP Phase B remains NOT APPROVED. FP-001 remains ACTIVE.
+
+**Numbering:** Decision #059 occupied; next unreserved decision #060.
+
+Reference: `docs/finished-fixture-result-presence-dry-run-scope-decision-059.md`
+
+---
+
 *Last updated: 2026-07-14*
 *Owner: All (each role contributes)*
