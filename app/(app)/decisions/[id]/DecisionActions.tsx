@@ -150,11 +150,11 @@ export default function DecisionActions({
             onChange={e => { setStakeInput(e.target.value); setError('') }}
             autoFocus
           />
-          <div className="flex gap-2">
-            <button className="btn-primary flex-1" onClick={handleRiskCheck} disabled={saving}>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button className="btn-primary w-full sm:flex-1" onClick={handleRiskCheck} disabled={saving}>
               {labels?.checkRisk ?? 'Check Risk'}
             </button>
-            <button className="btn-ghost" onClick={() => { setShowStake(false); setStakeInput('') }}>
+            <button className="btn-ghost w-full sm:w-auto" onClick={() => { setShowStake(false); setStakeInput('') }}>
               {labels?.cancel ?? 'Cancel'}
             </button>
           </div>
@@ -162,10 +162,10 @@ export default function DecisionActions({
       )}
 
       {!showStake && (
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
           {canPlaceBet && (
             <button
-              className="btn-primary flex-1"
+              className="btn-primary w-full sm:flex-1"
               onClick={() => {
                 trackClientEvent(EVENTS.DECISION_ACTION_PLACE_CLICKED, {
                   decision_id: decisionId,
@@ -181,7 +181,7 @@ export default function DecisionActions({
           )}
           {canWatch && (
             <button
-              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50"
+              className="w-full sm:flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50"
               onClick={() => handleAction('watchlisted')}
               disabled={saving}
             >
@@ -189,7 +189,7 @@ export default function DecisionActions({
             </button>
           )}
           <button
-            className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50"
+            className="w-full sm:flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50"
             onClick={() => handleAction('skipped')}
             disabled={saving}
           >
