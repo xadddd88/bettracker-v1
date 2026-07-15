@@ -154,6 +154,14 @@ export default async function BetsPage() {
                     <span className="text-xs text-gray-600">·</span>
                     <span className="text-xs text-gray-600">{date}</span>
                   </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 sm:hidden">
+                    <span className="text-[11px] text-gray-500">
+                      Odds <span className="font-mono text-gray-300">{bet.total_odds?.toFixed(2) || '—'}</span>
+                    </span>
+                    <span className="text-[11px] text-gray-500">
+                      Stake <span className="text-gray-300">{sym}{bet.stake}</span>
+                    </span>
+                  </div>
                 </div>
 
                 {/* Odds */}
