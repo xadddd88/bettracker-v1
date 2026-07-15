@@ -111,7 +111,7 @@ export default async function DecisionsPage({
 
       {/* Workflow note */}
       {filter === 'all' && decisions.length > 0 && (
-        <p className="text-xs text-gray-600 px-0.5">Workflow: Analyse a match → place, watch, or skip → placed bets are tracked in Bets.</p>
+        <p className="text-xs text-gray-600 px-0.5">Workflow: Analyze a match → place, watch, or skip → placed bets are tracked in Bets.</p>
       )}
 
       {/* Filter tabs */}
@@ -141,7 +141,7 @@ export default async function DecisionsPage({
               <p className="text-slate-400 text-sm mb-5">
                 Every AI analysis you run is saved here. Place, watch, or skip — all actions are tracked.
               </p>
-              <Link href="/ai" className="btn-primary inline-flex text-sm">Analyse a match</Link>
+              <Link href="/ai" className="btn-primary inline-flex text-sm">Analyze a match</Link>
             </>
           ) : (
             <p className="text-slate-400 text-sm">No {filter} decisions.</p>

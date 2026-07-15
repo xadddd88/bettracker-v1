@@ -109,7 +109,7 @@ export default async function BetsPage() {
             Place a bet from an AI analysis, or add manually. Results update win rate, ROI, and P&amp;L automatically.
           </p>
           <div className="flex gap-3 justify-center">
-            <Link href="/ai" className="btn-ghost text-sm">Analyse a match</Link>
+            <Link href="/ai" className="btn-ghost text-sm">Analyze a match</Link>
             <Link href="/bets/new" className="btn-primary text-sm">+ Add bet</Link>
           </div>
         </div>
