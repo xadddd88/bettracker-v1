@@ -415,6 +415,21 @@ test('recursive sweep: no app source writes a core table directly', () => {
   assert.deepEqual(offenders, [], `direct core-table writes found:\n      ${offenders.join('\n      ')}`);
 });
 
+// ── Decision #060 Phase A: migration 024 keeps the write boundary ───
+test('migration 024: additive only — no direct DML grants, no policy widening', () => {
+  const sql = readFileSync(path.join(repoRoot, 'supabase/migrations/024_create_tracked_bet.sql'), 'utf8');
+  const sqlNoComments = sql.split('\n').filter((l) => !l.trimStart().startsWith('--')).join('\n');
+  assert.ok(!/GRANT\s+(INSERT|UPDATE|DELETE|ALL)\s+ON\s+(public\.)?(bets|bet_legs|bankrolls|bankroll_transactions)/i.test(sqlNoComments),
+    'migration 024 must not grant direct DML on protected tables');
+  assert.ok(!/CREATE POLICY/i.test(sqlNoComments), 'migration 024 must not add RLS policies');
+  assert.ok(!/DROP POLICY/i.test(sqlNoComments), 'migration 024 must not drop RLS policies');
+  assert.ok(!/DISABLE ROW LEVEL SECURITY/i.test(sqlNoComments), 'migration 024 must not disable RLS');
+  assert.ok(/REVOKE EXECUTE ON FUNCTION public\.create_tracked_bet[\s\S]*?FROM PUBLIC, anon;/.test(sql),
+    'create_tracked_bet must be revoked from PUBLIC/anon');
+  assert.ok(/GRANT {2}EXECUTE ON FUNCTION public\.create_tracked_bet[\s\S]*?TO authenticated, service_role;/.test(sql),
+    'create_tracked_bet EXECUTE surface must be authenticated/service_role only');
+});
+
 console.log(`\n${passed + failed} tests — ${passed} passed, ${failed} failed\n`);
 
 if (failed > 0) {

@@ -21,7 +21,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import Module from 'node:module';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -634,6 +634,160 @@ test('#058: settlement P&L display is gated on won/lost/void on every P&L surfac
   assert.ok(!detail.includes('{bet.pnl != null && ('), 'bet detail still shows P&L for any status');
   assert.ok(!settleActions.includes('{pnl != null && ('), 'SettleActions still shows P&L for any status');
   assert.ok(betsPage.includes('bet.pnl == null || !isSupportedSettlementStatus(bet.status)'), 'bets page P&L cell must fall back to — for unsupported statuses');
+});
+
+// ── Decision #060 Phase A: create_tracked_bet() migration guards ──
+// Static contract checks on migration 024 — the atomic tracker-entry
+// foundation. Same style as the migration-016 guard test above.
+
+console.log('\nDecision #060 Phase A — create_tracked_bet migration guards:');
+
+test('migration 024: identity, idempotency, and money invariants', () => {
+  const sql = readFileSync(path.join(repoRoot, 'supabase/migrations/024_create_tracked_bet.sql'), 'utf8');
+  assert.ok(sql.includes('auth.uid()'), 'identity must come from auth.uid()');
+  assert.ok(sql.includes("RAISE EXCEPTION 'Not authenticated'"), 'unauthenticated calls must fail');
+  assert.ok(sql.includes('is_default = true'), 'must use the default bankroll only');
+  assert.ok(!/p_bankroll_id/.test(sql), 'must NOT accept a caller-supplied bankroll id');
+  assert.ok(/FROM public\.bankrolls[\s\S]*?FOR UPDATE/.test(sql), 'bankroll row must be locked FOR UPDATE');
+  assert.ok(sql.includes("RAISE EXCEPTION 'Insufficient balance'"), 'no-overdraft guard missing');
+  assert.ok(sql.includes("RAISE EXCEPTION 'Invalid idempotency key'"), 'UUID idempotency key must be required');
+  assert.ok(/v_idempotency_key\s*:=\s*lower\(p_idempotency_key\)/.test(sql), 'UUID key must have one canonical text form');
+  assert.ok(/lower\(idempotency_key\) = v_idempotency_key/.test(sql),
+    'replay lookup must detect existing UUID keys regardless of letter case');
+  assert.ok(sql.includes("RAISE EXCEPTION 'Idempotency conflict'"), 'payload-bound conflict path missing');
+  assert.ok(sql.includes("'replayed', true"), 'exact replay must return replayed=true');
+  assert.ok(sql.includes('v_request_hash'), 'normalized request hash missing');
+  // v2: SHA-256 over the CANONICAL normalized payload, never md5/raw legs.
+  assert.ok(/encode\(sha256\(convert_to\(/.test(sql), 'request hash must use built-in sha256');
+  assert.ok(!/md5\(/.test(sql), 'md5 must not be used for the request hash');
+  assert.ok(/'legs',\s+v_normalized_legs/.test(sql), 'hash must be computed over normalized legs, not raw input');
+  assert.ok(/v_stake\s*:=\s*trim_scale\(p_stake\)/.test(sql), 'stake must be normalized before hashing and insertion');
+  assert.ok(/'stake',\s+v_stake/.test(sql), 'request hash must use normalized stake');
+  assert.ok(!/'stake',\s+p_stake/.test(sql), 'request hash must not use raw stake');
+  // v2: STRICT replay — stored tx must be a stake with a bet_id and matching hash.
+  assert.ok(/v_existing\.type IS DISTINCT FROM 'stake'\s*\n\s*OR v_existing\.bet_id IS NULL\s*\n\s*OR v_existing\.request_hash IS DISTINCT FROM v_request_hash/.test(sql),
+    'replay must verify type=stake, non-null bet_id, and hash equality');
+  assert.ok(sql.includes('SECURITY DEFINER'), 'function must be SECURITY DEFINER');
+  assert.ok(sql.includes("SET search_path = ''"), 'SECURITY DEFINER search_path must be empty');
+  for (const table of ['bankrolls', 'bankroll_transactions', 'bets', 'bet_legs']) {
+    assert.ok(sql.includes(`public.${table}`), `${table} references must be schema-qualified`);
+  }
+});
+
+test('migration 024: leg validation is fail-closed (1-20, canonical sports, bounded odds)', () => {
+  const sql = readFileSync(path.join(repoRoot, 'supabase/migrations/024_create_tracked_bet.sql'), 'utf8');
+  assert.ok(sql.includes('v_leg_count < 1 OR v_leg_count > 20'), '1..20 legs bound missing');
+  assert.ok(sql.includes("'soccer', 'tennis', 'basketball', 'ice_hockey', 'cs2', 'mma', 'other'"), 'canonical sport allowlist missing');
+  assert.ok(sql.includes('has unknown field'), 'unknown leg keys must fail closed');
+  assert.ok(/jsonb_typeof\(v_leg -> 'odds'\) IS DISTINCT FROM 'number'/.test(sql), 'odds type must be validated');
+  assert.ok(sql.includes('v_odds <= 1'), 'leg odds must be > 1');
+  assert.ok(sql.includes("RAISE EXCEPTION 'Stake must be positive'"), 'stake > 0 guard missing');
+  assert.ok(sql.includes('Stake exceeds sanity limit'), 'stake sanity bound missing');
+  // v2: selection is nullable — absent and explicit JSON null are accepted.
+  assert.ok(/jsonb_typeof\(v_leg -> 'selection'\) NOT IN \('string', 'null'\)/.test(sql),
+    'selection must accept string or explicit JSON null');
+  // v2: legs are canonically normalized (trim + NULL-collapsed selection) before use.
+  assert.ok(/v_normalized_legs := v_normalized_legs \|\| jsonb_build_object\(/.test(sql), 'canonical normalized legs missing');
+  assert.ok(/'selection',\s+NULLIF\(trim\(v_leg ->> 'selection'\), ''\)/.test(sql), 'selection must collapse to NULL in the canonical form');
+  assert.ok(/v_odds\s*:=\s*trim_scale\(\(v_leg ->> 'odds'\)::numeric\)/.test(sql), 'odds must use trim_scale');
+  assert.ok(/length\(trim\(v_leg ->> 'event_name'\)\) > 200/.test(sql), 'event_name bound must apply after trim');
+  assert.ok(/length\(trim\(v_leg ->> 'market_type'\)\) > 100/.test(sql), 'market_type bound must apply after trim');
+  assert.ok(/length\(trim\(v_leg ->> 'selection'\)\) > 200/.test(sql), 'selection bound must apply after trim');
+});
+
+test('migration 024: single/parlay derivation and preserved leg order', () => {
+  const sql = readFileSync(path.join(repoRoot, 'supabase/migrations/024_create_tracked_bet.sql'), 'utf8');
+  assert.ok(/v_total_odds\s*:=\s*trim_scale\(\(v_normalized_legs -> 0 ->> 'odds'\)::numeric\)/.test(sql),
+    'single must derive normalized total_odds from the normalized leg');
+  assert.ok(/v_total_odds\s*:=\s*trim_scale\(p_total_odds\)/.test(sql), 'parlay total_odds must use trim_scale');
+  assert.ok(sql.includes("v_bet_type := 'parlay'"), 'multi-leg must become parlay');
+  assert.ok(sql.includes("RAISE EXCEPTION 'total_odds is required for a parlay'"), 'parlay must require total_odds');
+  assert.ok(sql.includes('leg_index'), 'leg order column missing');
+  assert.ok(sql.includes('v_i + 1'), 'legs must be numbered 1..n in input order');
+  // v2: order integrity is enforced in the schema, not just in code.
+  assert.ok(/CHECK \(leg_index IS NULL OR leg_index BETWEEN 1 AND 20\)/.test(sql), 'leg_index 1..20 CHECK missing');
+  assert.ok(/CREATE UNIQUE INDEX IF NOT EXISTS uq_bet_legs_bet_leg_index\s*\n\s*ON public\.bet_legs \(bet_id, leg_index\)\s*\n\s*WHERE leg_index IS NOT NULL;/.test(sql),
+    'partial UNIQUE (bet_id, leg_index) index missing');
+  // Inserted rows must come from the canonical normalized form.
+  assert.ok(/v_leg := v_normalized_legs -> v_i;/.test(sql), 'leg inserts must use the normalized legs');
+  assert.ok(/VALUES \(\s*v_user_id, v_bankroll_id, v_bet_id, 'stake', -v_stake/.test(sql),
+    'stake transaction must use normalized stake');
+});
+
+test('migration 024: rollback script and catalog verification are in place', () => {
+  const sql = readFileSync(path.join(repoRoot, 'supabase/migrations/024_create_tracked_bet.sql'), 'utf8');
+  assert.ok(sql.includes('docs/decision-060-rollback.sql'), 'migration must reference the emergency rollback script');
+  assert.ok(sql.includes('prosecdef'), 'catalog verification must check SECURITY DEFINER');
+  assert.ok(sql.includes('aclexplode'), 'catalog verification must check the EXECUTE surface');
+  assert.ok(sql.includes("'public.create_tracked_bet(jsonb,numeric,numeric,text,text,text,text)'::regprocedure"),
+    'catalog verification must bind the exact function signature');
+  assert.ok(!/-- 5\. Smoke/.test(sql), 'migration must not embed a bare authenticated smoke call');
+  assert.ok(sql.includes('scripts/verify-migration-024.sh'), 'migration must point to the disposable verifier');
+  assert.ok(sql.includes('uq_bet_legs_bet_leg_index'), 'catalog verification must check the unique index');
+  const rollbackPath = path.join(repoRoot, 'docs/decision-060-rollback.sql');
+  const rollback = readFileSync(rollbackPath, 'utf8');
+  assert.ok(rollback.includes('DROP FUNCTION public.create_tracked_bet(jsonb, numeric, numeric, text, text, text, text);'),
+    'rollback must drop the exact function signature');
+  assert.ok(rollback.includes('DROP INDEX public.uq_bet_legs_bet_leg_index;'), 'rollback must drop the unique index');
+  assert.ok(rollback.includes('DROP COLUMN leg_index'), 'rollback must drop the leg_index column');
+  assert.equal((rollback.match(/^BEGIN;$/gm) ?? []).length, 1, 'rollback must have exactly one BEGIN');
+  assert.equal((rollback.match(/^COMMIT;$/gm) ?? []).length, 1, 'rollback must have exactly one COMMIT');
+  const preflight = rollback.indexOf('Rollback preflight failed');
+  const firstDrop = rollback.indexOf('DROP FUNCTION');
+  assert.ok(preflight !== -1 && preflight < firstDrop, 'rollback preflight must execute before destructive statements');
+  assert.ok(rollback.includes('Rollback blocked: live leg_index data exists'), 'rollback must reject live ordinal data');
+  assert.ok(rollback.includes('Rollback postcondition failed'), 'rollback must enforce executable postconditions');
+  assert.ok(/to_regprocedure\(\s*'public\.create_tracked_bet\(jsonb,numeric,numeric,text,text,text,text\)'\s*\)/.test(rollback),
+    'rollback must bind the exact function signature');
+  assert.ok(!/DROP (FUNCTION|INDEX).*IF EXISTS/.test(rollback), 'rollback destructive statements must fail on drift');
+  assert.ok(!rollbackPath.includes(`supabase${path.sep}migrations`), 'rollback must live OUTSIDE supabase/migrations');
+});
+
+test('migration 024: no Decision rows, sanitized metadata, grant hygiene', () => {
+  const sql = readFileSync(path.join(repoRoot, 'supabase/migrations/024_create_tracked_bet.sql'), 'utf8');
+  const sqlNoComments = sql.split('\n').filter((l) => !l.trimStart().startsWith('--')).join('\n');
+  assert.ok(!/INSERT INTO decisions/.test(sqlNoComments), 'tracked bets must NOT create Decision rows');
+  // Transaction metadata may carry ONLY request_hash / source / leg_count.
+  const metadataMatch = sqlNoComments.match(/INSERT INTO public\.bankroll_transactions[\s\S]*?jsonb_build_object\(([\s\S]*?)\)/);
+  assert.ok(metadataMatch, 'stake transaction must carry structured metadata');
+  const metadataKeys = [...metadataMatch[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  assert.deepEqual(metadataKeys.sort(), ['leg_count', 'request_hash', 'source'], 'metadata must contain ONLY request_hash/source/leg_count');
+  for (const banned of ['rawText', 'statusText', 'scoreText', 'event_name', 'screenshot']) {
+    assert.ok(!metadataMatch[1].includes(banned), `raw coupon field ${banned} leaked into metadata`);
+  }
+  assert.ok(/REVOKE EXECUTE ON FUNCTION public\.create_tracked_bet[\s\S]*?FROM PUBLIC, anon;/.test(sql), 'REVOKE hygiene missing');
+  assert.ok(/GRANT {2}EXECUTE ON FUNCTION public\.create_tracked_bet[\s\S]*?TO authenticated, service_role;/.test(sql), 'GRANT surface must be authenticated/service_role only');
+  assert.ok(!/GRANT\s+(INSERT|UPDATE|DELETE|ALL)\s+ON/.test(sqlNoComments), 'migration must not add direct DML grants');
+});
+
+test('migration 024: disposable PostgreSQL 17 verifier covers runtime and rollback contracts', () => {
+  const verifierPath = path.join(repoRoot, 'scripts/verify-migration-024.sh');
+  assert.ok(existsSync(verifierPath), 'disposable verifier missing');
+  const sh = readFileSync(verifierPath, 'utf8');
+  assert.ok(sh.startsWith('#!/usr/bin/env bash'), 'verifier must be a bash script');
+  assert.ok(sh.includes("server_version_num')::int"), 'verifier must pin PostgreSQL 17');
+  assert.ok(sh.includes('ALL 11 STEPS PASSED'), 'verifier must expose its 11-step completion marker');
+  for (const marker of [
+    'apply migration 024',
+    'exact catalog contract',
+    'unauthenticated call',
+    '2/2.0/2.00 replay equivalence',
+    'payload drift and cross-function',
+    'insufficient balance',
+    'parlay order plus CHECK/UNIQUE',
+    'rollback preflight blocks',
+    'execute rollback',
+    'clean re-apply',
+  ]) {
+    assert.ok(sh.includes(marker), `verifier missing coverage marker: ${marker}`);
+  }
+  assert.ok(sh.includes('refusing a production-looking database URL'), 'verifier must reject production-looking URLs');
+  assert.ok(/FROM pg_proc proc[\s\S]*?proc\.proacl[\s\S]*?proc\.proowner[\s\S]*?proc\.oid/.test(sh),
+    'verifier catalog query must not shadow its PL/pgSQL record variable');
+  assert.ok(sh.includes("'B0000000-0000-4000-8000-000000000002'"),
+    'verifier must seed an uppercase cross-function idempotency key');
+  assert.ok(sh.includes("'b0000000-0000-4000-8000-000000000002'"),
+    'verifier must prove the lowercase equivalent conflicts');
 });
 
 console.log(`\n${passed + failed} tests — ${passed} passed, ${failed} failed\n`);
