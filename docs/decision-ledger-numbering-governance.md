@@ -1,6 +1,6 @@
 # Decision Ledger / Numbering Governance
 
-Status: CURRENT — Decision #060 active (APPLIED / CATALOG VERIFIED; authenticated smoke pending; Phase B HOLD); Decision #059 executed/closed; Decision #056 implementation merged/deployed, runtime provider call not approved / not run
+Status: CURRENT — Decision #060 ACTIVE / PHASE A APPLIED, CATALOG VERIFIED, AUTHENTICATED SMOKE VERIFIED; PHASE B HOLD; Decision #059 executed/closed; Decision #056 implementation merged/deployed, runtime provider call not approved / not run
 Last updated: 2026-07-16
 
 ## Purpose
@@ -13,11 +13,11 @@ This file prevents decision-number collisions. Historical numbers are immutable:
 Occupied: #001-#019, #021-#031, #033-#060
 Do not reuse: #020
 Retired reservation / do not reuse: #032
-Highest-numbered executed: #059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope (docs-evidence only)
+Highest-numbered closed: #059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope (docs-evidence only)
 Active approved: #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run
                  (implementation merged/deployed; runtime provider call not approved / not run);
                  #060 — Founder-First Coupon-to-Tracker
-                 (APPLIED / CATALOG VERIFIED; authenticated smoke pending; Phase B HOLD)
+                 (ACTIVE / PHASE A APPLIED, CATALOG VERIFIED, AUTHENTICATED SMOKE VERIFIED; PHASE B HOLD)
 Next unreserved: #061
 ```
 
@@ -41,7 +41,7 @@ Next unreserved: #061
 | #057 | Results Ingestion & Settlement Trust Contract — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY; no runtime, writes, or automated settlement |
 | #058 | Settlement Metrics & Status Presentation Reconciliation (G4+G12) — EXECUTED / CLOSED by merge |
 | #059 | Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY; eligibility BLOCKED |
-| #060 | Founder-First Coupon-to-Tracker — APPLIED / CATALOG VERIFIED; authenticated smoke NOT APPROVED / NOT RUN; Phase B HOLD |
+| #060 | Founder-First Coupon-to-Tracker — ACTIVE / PHASE A APPLIED, CATALOG VERIFIED, AUTHENTICATED SMOKE VERIFIED; PHASE B HOLD |
 
 ## Retired / Superseded Tracks
 
@@ -62,4 +62,4 @@ Next unreserved: #061
 
 ## Current Holds
 
-Decision numbering does not grant runtime authority. Decision #056's implementation is merged and deployed, but its production provider call, writes, migrations, environment changes, persistence, odds ingestion, and downstream use remain unapproved and the call has not been run. Decision #057 is executed as docs-evidence only: results ingestion, result writes, automated settlement, and bankroll mutations remain unapproved. Decision #058 reconciled reporting metrics and status presentation only — it changed no payout/settlement calculation, settlement outcome, write path, or provider work. Decision #059 recorded a BLOCKED eligibility verdict and a future dry-run contract only — the result-presence dry-run has no implementation and no runtime authorization. Decision #060 migration 024 was applied to production on 2026-07-16 as `20260716142736_create_tracked_bet_024`, and its exact catalog contract was verified read-only. Authenticated smoke remains NOT APPROVED / NOT RUN, `create_tracked_bet` RPC runtime calls remain 0, and Phase B remains HOLD. FP-001 remains active. Decision #054 Phase B is not approved. Decision #050's founder SMTP round-trip remains pending.
+Decision numbering does not grant runtime authority. Decision #056's implementation is merged and deployed, but its production provider call, writes, migrations, environment changes, persistence, odds ingestion, and downstream use remain unapproved and the call has not been run. Decision #057 is executed as docs-evidence only: results ingestion, result writes, automated settlement, and bankroll mutations remain unapproved. Decision #058 reconciled reporting metrics and status presentation only — it changed no payout/settlement calculation, settlement outcome, write path, or provider work. Decision #059 recorded a BLOCKED eligibility verdict and a future dry-run contract only — the result-presence dry-run has no implementation and no runtime authorization. Decision #060 migration 024, read-only catalog verification, and the dedicated synthetic-account authenticated smoke are verified. The smoke made 2 `create_tracked_bet` calls (initial write + exact semantic replay), confirmed zero replay writes, and finished with independent zero-row cleanup. Decision #060 remains ACTIVE, and Phase B remains HOLD pending separate CPO approval. FP-001 remains active. Decision #054 Phase B is not approved. Decision #050's founder SMTP round-trip remains pending.

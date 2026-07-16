@@ -2,9 +2,9 @@
 
 ## Status
 
-**ACTIVE: APPLIED / CATALOG VERIFIED; authenticated smoke pending.** Founder approval: Decision #060 APPROVED.
+**ACTIVE / PHASE A APPLIED, CATALOG VERIFIED, AUTHENTICATED SMOKE VERIFIED; PHASE B HOLD.** Founder approval: Decision #060 APPROVED.
 
-Phase A delivered the safe atomic foundation. Migration 024 was applied to production on 2026-07-16 as `20260716142736_create_tracked_bet_024`, and the exact catalog contract was verified read-only. No runtime bet creation goes through the new RPC yet. Authenticated smoke is NOT APPROVED / NOT RUN, and Phase B (UI/API adoption) remains HOLD under Decision #060 pending separate CPO approval. This checkpoint does not consume a new decision number. Highest-numbered executed decision remains #059 until this track closes.
+Phase A delivered the safe atomic foundation. Migration 024 was applied to production on 2026-07-16 as `20260716142736_create_tracked_bet_024`, the exact catalog contract was verified read-only, and the authenticated smoke passed with one initial write and one exact semantic replay. Phase B (UI/API adoption) remains HOLD under Decision #060 pending separate CPO approval. This checkpoint does not consume a new decision number. Highest-numbered CLOSED decision remains #059 until this track closes.
 
 ## Objective
 
@@ -16,7 +16,7 @@ Give the tracker a single safe write path for both Single and Express (parlay) e
 
 1. `bet_legs.leg_index integer` — nullable, additive, `CHECK (leg_index IS NULL OR leg_index BETWEEN 1 AND 20)` **plus a partial `UNIQUE (bet_id, leg_index)` index** (`uq_bet_legs_bet_leg_index`, `WHERE leg_index IS NOT NULL`), so duplicate or out-of-range positions inside one bet are impossible at the schema level. Existing rows keep `NULL`; only the new RPC populates it. Without an ordinal column, coupon leg order cannot be preserved relationally (UUID ids and same-timestamp `created_at` give no deterministic order).
 2. `create_tracked_bet(p_legs jsonb, p_total_odds, p_stake, p_bookmaker, p_notes, p_source, p_idempotency_key)` — `SECURITY DEFINER`, empty pinned `search_path`, and schema-qualified `public.*` objects so caller-created temporary objects cannot shadow financial tables.
-3. Emergency rollback script `docs/decision-060-rollback.sql` (outside `supabase/migrations`, per the #048/#049 convention), exact-signature read-only catalog verification, and `scripts/verify-migration-024.sh`: an 11-step disposable PostgreSQL 17 apply/catalog/behavior/rollback/re-apply verifier. The rollback is one fail-closed transaction with executable preflight and postconditions. A production authenticated smoke is not part of the Phase A PR and requires a separate CPO-authorized execution.
+3. Emergency rollback script `docs/decision-060-rollback.sql` (outside `supabase/migrations`, per the #048/#049 convention), exact-signature read-only catalog verification, and `scripts/verify-migration-024.sh`: an 11-step disposable PostgreSQL 17 apply/catalog/behavior/rollback/re-apply verifier. The rollback is one fail-closed transaction with executable preflight and postconditions. The production authenticated smoke was outside the Phase A PR and ran on 2026-07-16 only after separate authorization.
 
 ### RPC contract (implemented exactly as pinned)
 
@@ -38,19 +38,27 @@ Give the tracker a single safe write path for both Single and Express (parlay) e
 - `scripts/test-domain-write-boundaries.mjs` — 1 new test (14/14 total): migration 024 is additive only — no direct DML grants on protected tables, no `CREATE/DROP POLICY`, no RLS disable, correct EXECUTE surface.
 - No regressions: provider-safety 97/97, analysis-quality-gate 26/26, auth-invite 16/16, rate-limit 12/12, csp-security 18/18, `tsc --noEmit` clean, lint 0 errors.
 
-## Production migration checkpoint (2026-07-16)
+## Production Phase A checkpoint (2026-07-16)
 
 - Migration 024 is applied as Supabase migration version `20260716142736_create_tracked_bet_024`.
 - The exact catalog contract was verified read-only.
-- `create_tracked_bet` RPC runtime calls = 0.
-- `bet_legs` rows with `leg_index IS NOT NULL` = 0.
-- Authenticated smoke is NOT APPROVED / NOT RUN.
+- The authenticated smoke used a dedicated non-login synthetic account.
+- The seed deposit was 100.
+- `create_tracked_bet` was called twice: 1 initial write + 1 exact semantic replay.
+- The first response returned `replayed=false` and balance 90.
+- The replay returned `replayed=true`, the same `bet_id`, and balance 90.
+- Before cleanup: bets = 1, legs = 1, transactions = 2, stake transactions = 1, decisions = 0.
+- The replay produced zero additional writes.
+- Canonical normalized bet/leg values and the metadata allowlist were verified.
+- The synthetic account and all related rows were deleted.
+- An independent post-transaction cleanup check confirmed users/profiles/bankrolls/transactions/bets/legs/decisions = 0.
+- All `bet_legs` rows with non-null `leg_index` were 0 after cleanup.
 - `create_quick_bet` is unchanged.
 - Phase B remains HOLD.
 
 ## Phase B (under Decision #060; separate CPO approval — NOT this PR)
 
-Migration 024 and its read-only catalog verification are complete. A controlled authenticated smoke on a dedicated account remains a separate, explicit CPO-authorized execution and has not been approved or run. Phase B remains HOLD; it may begin only after that checkpoint and separate CPO approval:
+Migration 024, its read-only catalog verification, and the authenticated smoke are complete. Phase B remains HOLD and requires separate explicit CPO approval before any UI/API work begins:
 
 - unified Single/Express form (`/bets/new`) switching from `create_quick_bet` to `create_tracked_bet`;
 - Scanner → editable legs → Bet flow feeding the same RPC (`source='scanner'`);
@@ -60,15 +68,17 @@ Migration 024 and its read-only catalog verification are complete. A controlled 
 
 Phase B stays under Decision #060 (no new decision number) and requires its own CPO approval before any UI/API work starts. It touches UI/API only — widening the RPC contract itself would require a new decision.
 
-## Explicit non-use after the production migration checkpoint
+## Explicit non-use after the Phase A production checkpoint
 
 ```txt
 production migration: APPLIED / CATALOG VERIFIED
 Supabase migration version: 20260716142736_create_tracked_bet_024
 catalog verification: READ-ONLY
-authenticated smoke: NOT APPROVED / NOT RUN
-create_tracked_bet RPC runtime calls: 0
-bet_legs rows with leg_index IS NOT NULL: 0
+authenticated smoke: VERIFIED
+create_tracked_bet smoke calls: 2 (1 initial write + 1 exact semantic replay)
+semantic replay additional writes: 0
+post-cleanup users/profiles/bankrolls/transactions/bets/legs/decisions: 0
+post-cleanup bet_legs rows with non-null leg_index: 0
 Phase B: HOLD
 UI/API changes: 0
 create_quick_bet: UNCHANGED
