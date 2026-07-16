@@ -2,9 +2,9 @@
 
 ## Status
 
-**ACTIVE / PHASE A IMPLEMENTATION.** Founder approval: Decision #060 APPROVED.
+**ACTIVE: APPLIED / CATALOG VERIFIED; authenticated smoke pending.** Founder approval: Decision #060 APPROVED.
 
-Phase A delivers the safe atomic foundation only. **The migration is NOT applied to production by the Phase A PR**, and no runtime bet creation goes through the new RPC yet. Phase B (UI/API adoption) remains under Decision #060 and starts only after a separate CPO approval, once Phase A is applied and verified — it does not consume a new decision number. Highest-numbered executed decision remains #059 until this track closes.
+Phase A delivered the safe atomic foundation. Migration 024 was applied to production on 2026-07-16 as `20260716142736_create_tracked_bet_024`, and the exact catalog contract was verified read-only. No runtime bet creation goes through the new RPC yet. Authenticated smoke is NOT APPROVED / NOT RUN, and Phase B (UI/API adoption) remains HOLD under Decision #060 pending separate CPO approval. This checkpoint does not consume a new decision number. Highest-numbered executed decision remains #059 until this track closes.
 
 ## Objective
 
@@ -38,9 +38,19 @@ Give the tracker a single safe write path for both Single and Express (parlay) e
 - `scripts/test-domain-write-boundaries.mjs` — 1 new test (14/14 total): migration 024 is additive only — no direct DML grants on protected tables, no `CREATE/DROP POLICY`, no RLS disable, correct EXECUTE surface.
 - No regressions: provider-safety 97/97, analysis-quality-gate 26/26, auth-invite 16/16, rate-limit 12/12, csp-security 18/18, `tsc --noEmit` clean, lint 0 errors.
 
+## Production migration checkpoint (2026-07-16)
+
+- Migration 024 is applied as Supabase migration version `20260716142736_create_tracked_bet_024`.
+- The exact catalog contract was verified read-only.
+- `create_tracked_bet` RPC runtime calls = 0.
+- `bet_legs` rows with `leg_index IS NOT NULL` = 0.
+- Authenticated smoke is NOT APPROVED / NOT RUN.
+- `create_quick_bet` is unchanged.
+- Phase B remains HOLD.
+
 ## Phase B (under Decision #060; separate CPO approval — NOT this PR)
 
-After migration 024 is applied to production and its read-only catalog contract is verified, a controlled authenticated smoke on a dedicated account remains a separate, explicit CPO-authorized execution. Only after that checkpoint may Phase B begin:
+Migration 024 and its read-only catalog verification are complete. A controlled authenticated smoke on a dedicated account remains a separate, explicit CPO-authorized execution and has not been approved or run. Phase B remains HOLD; it may begin only after that checkpoint and separate CPO approval:
 
 - unified Single/Express form (`/bets/new`) switching from `create_quick_bet` to `create_tracked_bet`;
 - Scanner → editable legs → Bet flow feeding the same RPC (`source='scanner'`);
@@ -50,15 +60,19 @@ After migration 024 is applied to production and its read-only catalog contract 
 
 Phase B stays under Decision #060 (no new decision number) and requires its own CPO approval before any UI/API work starts. It touches UI/API only — widening the RPC contract itself would require a new decision.
 
-## Explicit non-use (Phase A)
+## Explicit non-use after the production migration checkpoint
 
 ```txt
-production migration applied: NO (review-only file in the repo)
-runtime bet creation via create_tracked_bet: 0
+production migration: APPLIED / CATALOG VERIFIED
+Supabase migration version: 20260716142736_create_tracked_bet_024
+catalog verification: READ-ONLY
+authenticated smoke: NOT APPROVED / NOT RUN
+create_tracked_bet RPC runtime calls: 0
+bet_legs rows with leg_index IS NOT NULL: 0
+Phase B: HOLD
 UI/API changes: 0
-create_quick_bet changes: 0
+create_quick_bet: UNCHANGED
 provider calls: 0
-Supabase runtime calls/writes: 0
 Decision rows created: 0
 direct DML grants added: 0
 Decision #056 runtime: NOT APPROVED / NOT RUN

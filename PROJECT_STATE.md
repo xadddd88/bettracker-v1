@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-15 (Decision #060 Coupon-to-Tracker Phase A)
+> Last updated: 2026-07-16 (Decision #060 production migration checkpoint)
 
 ## 1. Executive Status
 
@@ -15,11 +15,13 @@
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
 | Latest completed operational milestone | **#059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope (EXECUTED / CLOSED, docs-evidence only; eligibility BLOCKED)** |
 | Highest-numbered executed decision | **#059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope** |
-| Active decisions | **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)**; **#060 — Founder-First Coupon-to-Tracker (Phase A implementation; migration 024 review-only, not applied)** |
+| Active decisions | **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)**; **#060 — Founder-First Coupon-to-Tracker (APPLIED / CATALOG VERIFIED; authenticated smoke pending; Phase B HOLD)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
 | Next unreserved decision | **#061** |
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 completed one canonical-linked base-response dry-run with zero writes. Decision #055 then closed the trust/storage contract. Decision #056's Class A structural-presence implementation is merged and deployed (PR #146); its production provider call remains not approved and has not been run. Decision #057 closed the results-ingestion and settlement trust contract (docs-evidence only; no results runtime, result writes, or automated settlement is approved).
+
+Decision #060 migration 024 was applied to production on 2026-07-16 as `20260716142736_create_tracked_bet_024`. The exact catalog contract was verified read-only. Authenticated smoke remains NOT APPROVED / NOT RUN, `create_tracked_bet` RPC runtime calls remain 0, `bet_legs` rows with `leg_index IS NOT NULL` remain 0, and Phase B remains HOLD.
 
 ## 2. Current Production Facts
 
@@ -172,12 +174,13 @@ results ingestion / result writes / automated settlement — HOLD (Decision #057
 probability / implied probability / edge / EV / recommendation signals — FP-001 gated
 external beta invitations — PAUSED
 CSP enforcement / nonce / strict-dynamic — NOT APPROVED in Phase A
+Decision #060 authenticated smoke / Phase B — NOT APPROVED / HOLD
 ```
 
 ## 7. Documentation and Migration Status
 
 - Decision #053 reconciled this file, README, the numbering ledger, and the migration inventory.
-- `supabase/migrations` contains numbered files through 024, with no 008 file. Migration 024 (`create_tracked_bet`, Decision #060 Phase A) is review-only and NOT applied to production yet.
+- `supabase/migrations` contains numbered files through 024, with no 008 file. Migration 024 (`create_tracked_bet`, Decision #060) is **APPLIED / CATALOG VERIFIED; authenticated smoke pending**. Production version: `20260716142736_create_tracked_bet_024`.
 - Production's timestamped migration ledger does not represent all earlier manually applied history.
 - A fresh-database bootstrap is **not yet certified**; see `docs/migration-state-reconciliation-053.md`.
 - Never run `001_initial_schema.sql` against production as a general setup command.
@@ -193,7 +196,7 @@ CSP enforcement / nonce / strict-dynamic — NOT APPROVED in Phase A
 #057 — Results Ingestion & Settlement Trust Contract — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY
 #058 — Settlement Metrics & Status Presentation Reconciliation — EXECUTED / CLOSED
 #059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY (eligibility BLOCKED)
-#060 — Founder-First Coupon-to-Tracker — ACTIVE / PHASE A IMPLEMENTATION (migration 024 review-only; Phase B UI/API under #060, separate approval)
+#060 — Founder-First Coupon-to-Tracker — APPLIED / CATALOG VERIFIED; AUTHENTICATED SMOKE PENDING; PHASE B HOLD
 #061 — next unreserved decision
 ```
 
