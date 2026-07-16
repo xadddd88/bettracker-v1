@@ -2,9 +2,9 @@
 
 ## Status
 
-**ACTIVE / PHASE A APPLIED, CATALOG VERIFIED, AUTHENTICATED SMOKE VERIFIED; PHASE B HOLD.** Founder approval: Decision #060 APPROVED.
+**ACTIVE / PHASE A APPLIED & VERIFIED; PHASE B IMPLEMENTATION (this PR).** Founder approval: Decision #060 APPROVED; Phase B implementation approved by CPO on 2026-07-16 (pinned base `origin/main = 1d173f1`).
 
-Phase A delivered the safe atomic foundation. Migration 024 was applied to production on 2026-07-16 as `20260716142736_create_tracked_bet_024`, the exact catalog contract was verified read-only, and the authenticated smoke passed with one initial write and one exact semantic replay. Phase B (UI/API adoption) remains HOLD under Decision #060 pending separate CPO approval. This checkpoint does not consume a new decision number. Highest-numbered CLOSED decision remains #059 until this track closes.
+Phase A delivered the safe atomic foundation. Migration 024 was applied to production on 2026-07-16 as `20260716142736_create_tracked_bet_024`, the exact catalog contract was verified read-only, and the authenticated smoke passed with one initial write and one exact semantic replay. Phase B (this PR) adopts the RPC in the UI/API: the unified Single/Express tracker form and the `POST /api/bets/tracked` write path described below. Phase B stays under Decision #060 — no new decision number. Highest-numbered CLOSED decision remains #059 until this track closes. The production runtime smoke of the Phase B flow is NOT part of this PR.
 
 ## Objective
 
@@ -56,35 +56,50 @@ Give the tracker a single safe write path for both Single and Express (parlay) e
 - `create_quick_bet` is unchanged.
 - Phase B remains HOLD.
 
-## Phase B (under Decision #060; separate CPO approval — NOT this PR)
+## Phase B (this PR — UI/API adoption, approved 2026-07-16)
 
-Migration 024, its read-only catalog verification, and the authenticated smoke are complete. Phase B remains HOLD and requires separate explicit CPO approval before any UI/API work begins:
+Founder-first unified Single/Express tracker: Scanner → editable legs → Bet, mobile-first, writing exclusively through the already-applied `public.create_tracked_bet()`.
 
-- unified Single/Express form (`/bets/new`) switching from `create_quick_bet` to `create_tracked_bet`;
-- Scanner → editable legs → Bet flow feeding the same RPC (`source='scanner'`);
-- mobile daily tracker flow;
-- API route(s) with zod validation mirroring the RPC contract, rate limiting per Decision #052, and client-generated idempotency keys;
-- `create_quick_bet` deprecation path decided separately.
-
-Phase B stays under Decision #060 (no new decision number) and requires its own CPO approval before any UI/API work starts. It touches UI/API only — widening the RPC contract itself would require a new decision.
-
-## Explicit non-use after the Phase A production checkpoint
+### Write path
 
 ```txt
-production migration: APPLIED / CATALOG VERIFIED
-Supabase migration version: 20260716142736_create_tracked_bet_024
-catalog verification: READ-ONLY
-authenticated smoke: VERIFIED
-create_tracked_bet smoke calls: 2 (1 initial write + 1 exact semantic replay)
-semantic replay additional writes: 0
-post-cleanup users/profiles/bankrolls/transactions/bets/legs/decisions: 0
-post-cleanup bet_legs rows with non-null leg_index: 0
-Phase B: HOLD
-UI/API changes: 0
-create_quick_bet: UNCHANGED
+Scanner response
+→ allowlisted camelCase-to-snake_case adapter (lib/bets/tracked-bet.ts)
+→ editable ordered LegDraft[] (array order = leg_index 1..n)
+→ strict client validation (shared zod schema)
+→ POST /api/bets/tracked
+→ auth.getUser (401 before the limiter and the RPC)
+→ Decision #052 rate limit (RATE_LIMITS.trackedBet, fail-closed 503, 429 + Retry-After)
+→ strict zod schema (.strict() on the request AND each leg — unknown keys fail closed)
+→ authenticated-session create_tracked_bet RPC (cookie client; service_role is never in the user flow)
+→ sanitized response (Insufficient balance → 422, Bankroll not found → 404,
+   Idempotency conflict → 409 Request conflict, RPC validation → 422,
+   unknown → 500 Transaction failed; no raw DB text)
+→ router.push('/bets/<bet_id>') + router.refresh() (success AND replay open the created bet)
+```
+
+- **Form (`/bets/new`):** 1 leg = Single, 2–20 legs = Express with add/edit/remove and preserved order; per-leg `sport/event_name/market_type/selection/odds`; `stake`, express `total_odds`, `bookmaker`, `notes`. Mobile-first `grid-cols-1 sm:grid-cols-2`, full-width controls, vertical actions at 320/375 px; desktop unchanged. The calculated express total is a UI PREVIEW only — the entered/coupon total is submitted and the RPC stays the financial authority. The payout preview no longer hardcodes a `$` symbol. The form holds no Supabase client and reads no financial tables.
+- **Scanner:** the existing `/api/ai/scanner` OCR flow (no new provider). Recognized legs become editable drafts through an allowlist adapter — ONLY the five contract fields are mapped; `rawText`/`statusText`/`scoreText`/`isLive`/`periodOrPhase` never leave the scan handler. A leg with unreadable odds stays empty — the coupon total is never silently copied onto legs. Scanned submissions carry `source='scanner'`; manual entry carries `source='manual'`.
+- **Idempotency lifecycle (pure state machine):** the lifecycle lives in `lib/bets/tracked-bet.ts` as a pure, I/O-free intent machine — payload fingerprint + UUID + status `ready | in_flight | conflict`, with the UUID generator INJECTED (the browser passes `() => crypto.randomUUID()`; tests pass a deterministic sequence). One key per payload snapshot; a double click is blocked while `in_flight`; network/429/503/5xx resolve `retryable` and KEEP the UUID+snapshot so an exact retry replays server-side; success clears the intent (a later submit mints a fresh UUID); a `409` resolves `conflict` — the UUID is never cleared or rotated, no auto-retry, the unchanged intent is blocked client-side with the fixed error `Request conflict`, and only a deliberate payload change starts a new intent with a new UUID. The form holds NO second lifecycle implementation — it only wires HTTP outcomes into machine transitions.
+- **Reads:** `/bets` and `/bets/[id]` order embedded legs by `leg_index` (`referencedTable: 'bet_legs'`), so an express displays in coupon order; legacy NULL-index rows are unaffected.
+- **Untouched:** `create_quick_bet` (all definitions), migrations, the RPC contract, Analyst/Scout/pricing surfaces, settlement/results. The Analyst Place Bet flow is explicitly NOT this slice.
+
+### Phase B tests (existing trusted suites)
+
+- `scripts/test-financial-safety.mjs` — 22 new Phase B tests (53/53 total). BEHAVIORAL intent-machine tests (11) import the compiled helper and drive real transitions with an injected deterministic UUID generator: first submit mints exactly one UUID; in-flight resubmit blocked; network/429/503/5xx keep UUID+snapshot; exact retry reuses the key; 409 → conflict keeping the key; unchanged post-409 resubmit blocked without a new UUID; payload change after 409 → new intent + new UUID; success clears the intent; post-success submit gets a fresh UUID; two identical runs produce identical key sequences; fingerprint stability. Route/behavioral API tests (11): 401 before limiter/RPC; 429 + `Retry-After` keyed `tracked-bet:<user>`; 503 fail-closed; strict-schema fail-closed (unknown request/leg fields, 21 legs, express without total odds, negative stake — zero RPC calls) with the 20-leg maximum accepted; manual Single mapping (derived total, key passthrough, no direct table access); scanner Express mapping (leg order, exactly five contract keys per leg, required total); nullable selection (absent + explicit null → null); sanitized business errors (422/404/409) and generic 500 with leak assertions; exact replay passthrough; form/route source assertions as SUPPLEMENTARY wiring checks only (route exists ONLY at `app/api/bets/tracked/route.ts`; the form submits ONLY to `/api/bets/tracked`; success and replay share `router.push('/bets/<bet_id>')`; the form uses `createSubmitIntent`/`beginSubmit`/`resolveSubmit`/`fingerprintPayload` with exactly one injected `crypto.randomUUID` and no component-local lifecycle refs; no service_role; no direct table access; strict shared schema without scanner noise); leg ordering + `create_quick_bet` regression.
+- `scripts/test-rate-limit.mjs` — `RATE_LIMITS.trackedBet` config + `/api/bets/tracked` wiring added to the Decision #052 route sweep (12/12 total).
+- No regressions: domain-write-boundaries 14/14 (its recursive sweep also proves the form no longer reads `bankrolls` directly), provider-safety 97/97, analysis-quality-gate 26/26, auth-invite 16/16, csp-security 18/18, `tsc --noEmit` clean, lint clean.
+
+## Explicit non-use (Phase B PR)
+
+```txt
+migrations / RPC changes: 0
+create_quick_bet: UNCHANGED (defined in 001/010/016; no remaining UI callers)
+direct DML on financial tables: 0
+service_role in the user flow: 0
 provider calls: 0
-Decision rows created: 0
-direct DML grants added: 0
+Analyst/Scout/pricing/probability/edge/EV surfaces: UNTOUCHED
+production runtime smoke of the Phase B flow: NOT in this PR
 Decision #056 runtime: NOT APPROVED / NOT RUN
 results ingestion / automated settlement: HOLD
 Decision #050 SMTP round-trip: PENDING
@@ -97,4 +112,4 @@ FP-001: ACTIVE
 - `supabase/migrations/016_atomic_financial_writes.sql` — idempotency + funds-guard patterns (Decision #047)
 - `supabase/migrations/018_enforce_domain_write_boundaries.sql` — write boundary this migration must not widen (Decision #048)
 - `docs/results-ingestion-settlement-trust-contract-decision-057.md` — settlement semantics remain gated; tracked parlays settle manually as whole bets until #057 gates open
-- `app/(app)/bets/new/page.tsx` — canonical sport allowlist source
+- `lib/bets/tracked-bet.ts` — shared strict client/server contract; canonical sport allowlist source (consumed by `app/(app)/bets/new/page.tsx` and `app/api/bets/route.ts`)
