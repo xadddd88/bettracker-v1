@@ -1,7 +1,7 @@
 # Decision Ledger / Numbering Governance
 
-Status: CURRENT — Decision #059 executed/closed by merge (docs/evidence only; result-presence eligibility BLOCKED); Decision #056 implementation merged/deployed, runtime provider call not approved / not run
-Last updated: 2026-07-14
+Status: CURRENT — Decision #060 active (Phase A implementation; migration not applied); Decision #059 executed/closed; Decision #056 implementation merged/deployed, runtime provider call not approved / not run
+Last updated: 2026-07-15
 
 ## Purpose
 
@@ -10,13 +10,15 @@ This file prevents decision-number collisions. Historical numbers are immutable:
 ## Current Number Map
 
 ```txt
-Occupied: #001-#019, #021-#031, #033-#059
+Occupied: #001-#019, #021-#031, #033-#060
 Do not reuse: #020
 Retired reservation / do not reuse: #032
 Highest-numbered executed: #059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope (docs-evidence only)
 Active approved: #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run
-                 (implementation merged/deployed; runtime provider call not approved / not run)
-Next unreserved: #060
+                 (implementation merged/deployed; runtime provider call not approved / not run);
+                 #060 — Founder-First Coupon-to-Tracker
+                 (ACTIVE / Phase A implementation; migration 024 not applied to production by the Phase A PR)
+Next unreserved: #061
 ```
 
 ## Recent Decisions
@@ -39,12 +41,13 @@ Next unreserved: #060
 | #057 | Results Ingestion & Settlement Trust Contract — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY; no runtime, writes, or automated settlement |
 | #058 | Settlement Metrics & Status Presentation Reconciliation (G4+G12) — EXECUTED / CLOSED by merge |
 | #059 | Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY; eligibility BLOCKED |
+| #060 | Founder-First Coupon-to-Tracker — ACTIVE / PHASE A IMPLEMENTATION; migration 024 review-only, runtime not started |
 
 ## Retired / Superseded Tracks
 
 - **#020:** never reuse. PR #90 tried to claim it for Third-Party Manual Context Policy, but that PR is closed without merge and the policy is not adopted.
 - **#032:** the old M1.3 filter-evidence reservation is retired after PR #106 was superseded. Keep the number unused to preserve audit history.
-- A revived third-party manual-context policy must use **#060 or later** in a fresh PR.
+- A revived third-party manual-context policy must use **#061 or later** in a fresh PR.
 
 ## Rules
 
@@ -59,4 +62,4 @@ Next unreserved: #060
 
 ## Current Holds
 
-Decision numbering does not grant runtime authority. Decision #056's implementation is merged and deployed, but its production provider call, writes, migrations, environment changes, persistence, odds ingestion, and downstream use remain unapproved and the call has not been run. Decision #057 is executed as docs-evidence only: results ingestion, result writes, automated settlement, and bankroll mutations remain unapproved. Decision #058 reconciled reporting metrics and status presentation only — it changed no payout/settlement calculation, settlement outcome, write path, or provider work. Decision #059 recorded a BLOCKED eligibility verdict and a future dry-run contract only — the result-presence dry-run has no implementation and no runtime authorization. FP-001 remains active. Decision #054 Phase B is not approved. Decision #050's founder SMTP round-trip remains pending.
+Decision numbering does not grant runtime authority. Decision #056's implementation is merged and deployed, but its production provider call, writes, migrations, environment changes, persistence, odds ingestion, and downstream use remain unapproved and the call has not been run. Decision #057 is executed as docs-evidence only: results ingestion, result writes, automated settlement, and bankroll mutations remain unapproved. Decision #058 reconciled reporting metrics and status presentation only — it changed no payout/settlement calculation, settlement outcome, write path, or provider work. Decision #059 recorded a BLOCKED eligibility verdict and a future dry-run contract only — the result-presence dry-run has no implementation and no runtime authorization. Decision #060 Phase A ships migration 024 as a review-only file: the migration is not applied to production by the Phase A PR, and no runtime bet creation uses the new RPC until Phase B is separately approved. FP-001 remains active. Decision #054 Phase B is not approved. Decision #050's founder SMTP round-trip remains pending.
