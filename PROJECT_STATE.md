@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-16 (Decision #060 Phase A production checkpoint)
+> Last updated: 2026-07-16 (Decision #060 Phase B — unified tracker UI/API implementation)
 
 ## 1. Executive Status
 
@@ -13,9 +13,9 @@
 | Production | `https://btdk.app` |
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
-| Latest completed operational milestone | **Decision #060 Phase A — migration applied, catalog verified, authenticated smoke verified; Phase B HOLD** |
+| Latest completed operational milestone | **Decision #060 Phase A — migration applied, catalog verified, authenticated smoke verified; Phase B implementation delivered for review** |
 | Highest-numbered closed decision | **#059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope** |
-| Active decisions | **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)**; **#060 — Founder-First Coupon-to-Tracker (ACTIVE / PHASE A APPLIED, CATALOG VERIFIED, AUTHENTICATED SMOKE VERIFIED; PHASE B HOLD)** |
+| Active decisions | **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)**; **#060 — Founder-First Coupon-to-Tracker (ACTIVE / PHASE A APPLIED & VERIFIED; PHASE B IMPLEMENTATION — unified Single/Express form + `/api/bets/tracked`)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
 | Next unreserved decision | **#061** |
 
@@ -23,7 +23,9 @@ The previous blocker "production has 0 SportMonks links" is obsolete. Identity m
 
 Decision #060 migration 024 was applied to production on 2026-07-16 as `20260716142736_create_tracked_bet_024`, and the exact catalog contract was verified read-only. The authenticated smoke used a dedicated non-login synthetic account with a seed deposit of 100. It called `create_tracked_bet` twice: the initial write returned `replayed=false` and balance 90; the exact semantic replay returned `replayed=true`, the same `bet_id`, and balance 90 with zero additional writes.
 
-Before cleanup, the synthetic account had 1 bet, 1 leg, 2 transactions, 1 stake transaction, and 0 decisions. Canonical normalized bet/leg values and the metadata allowlist were verified. The account and all related rows were deleted, and an independent post-transaction cleanup check confirmed 0 users, profiles, bankrolls, transactions, bets, legs, and decisions. All `bet_legs` rows with non-null `leg_index` were also 0 after cleanup. Phase B remains HOLD pending separate CPO approval.
+Before cleanup, the synthetic account had 1 bet, 1 leg, 2 transactions, 1 stake transaction, and 0 decisions. Canonical normalized bet/leg values and the metadata allowlist were verified. The account and all related rows were deleted, and an independent post-transaction cleanup check confirmed 0 users, profiles, bankrolls, transactions, bets, legs, and decisions. All `bet_legs` rows with non-null `leg_index` were also 0 after cleanup.
+
+Phase B (UI/API adoption) was approved on 2026-07-16 and is implemented: `/bets/new` is the unified Single/Express tracker form (Scanner → editable ordered legs → Bet, mobile-first), writing exclusively through the new authenticated `POST /api/bets/tracked` → `create_tracked_bet()` path with Decision #052 rate limiting, a strict shared zod contract mirror, client idempotency-key lifecycle, and sanitized errors. `create_quick_bet` remains defined and unchanged with zero remaining UI callers. The production runtime smoke of the Phase B flow is a separate authorization.
 
 ## 2. Current Production Facts
 
@@ -176,13 +178,13 @@ results ingestion / result writes / automated settlement — HOLD (Decision #057
 probability / implied probability / edge / EV / recommendation signals — FP-001 gated
 external beta invitations — PAUSED
 CSP enforcement / nonce / strict-dynamic — NOT APPROVED in Phase A
-Decision #060 Phase B — HOLD pending separate CPO approval
+Decision #060 Phase B runtime smoke — separate authorization (implementation delivered)
 ```
 
 ## 7. Documentation and Migration Status
 
 - Decision #053 reconciled this file, README, the numbering ledger, and the migration inventory.
-- `supabase/migrations` contains numbered files through 024, with no 008 file. Decision #060 is **ACTIVE / PHASE A APPLIED, CATALOG VERIFIED, AUTHENTICATED SMOKE VERIFIED; PHASE B HOLD**. Migration 024 production version: `20260716142736_create_tracked_bet_024`.
+- `supabase/migrations` contains numbered files through 024, with no 008 file. Decision #060 is **ACTIVE / PHASE A APPLIED & VERIFIED; PHASE B IMPLEMENTATION**. Migration 024 production version: `20260716142736_create_tracked_bet_024`. The Phase B PR adds NO migrations.
 - Production's timestamped migration ledger does not represent all earlier manually applied history.
 - A fresh-database bootstrap is **not yet certified**; see `docs/migration-state-reconciliation-053.md`.
 - Never run `001_initial_schema.sql` against production as a general setup command.
@@ -198,7 +200,7 @@ Decision #060 Phase B — HOLD pending separate CPO approval
 #057 — Results Ingestion & Settlement Trust Contract — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY
 #058 — Settlement Metrics & Status Presentation Reconciliation — EXECUTED / CLOSED
 #059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY (eligibility BLOCKED)
-#060 — Founder-First Coupon-to-Tracker — ACTIVE / PHASE A APPLIED, CATALOG VERIFIED, AUTHENTICATED SMOKE VERIFIED; PHASE B HOLD
+#060 — Founder-First Coupon-to-Tracker — ACTIVE / PHASE A APPLIED & VERIFIED; PHASE B IMPLEMENTATION (unified form + /api/bets/tracked; runtime smoke separately gated)
 #061 — next unreserved decision
 ```
 

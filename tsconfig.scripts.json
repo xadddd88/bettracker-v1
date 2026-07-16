@@ -22,6 +22,7 @@
     "app/api/admin/sports/enrichment/sportmonks-dry-run/route.ts",
     "app/api/admin/sports/enrichment/sportmonks-structural-presence-dry-run/route.ts",
     "app/api/bankroll/deposit/route.ts",
+    "app/api/bets/tracked/route.ts",
     "app/api/settings/route.ts",
     "app/api/onboarding/complete/route.ts",
     "app/api/auth/register/route.ts",

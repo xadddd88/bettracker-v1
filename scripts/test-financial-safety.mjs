@@ -790,6 +790,489 @@ test('migration 024: disposable PostgreSQL 17 verifier covers runtime and rollba
     'verifier must prove the lowercase equivalent conflicts');
 });
 
+// ── Decision #060 Phase B: submit-intent state machine (behavioral) ──
+// These tests import the COMPILED pure helper and drive real
+// transitions with an injected deterministic UUID generator — they
+// test behavior, not source text. The wiring test further below only
+// confirms the form actually uses this machine.
+
+console.log('\nDecision #060 Phase B — submit-intent state machine (behavioral):');
+
+function loadTrackedBetLib() {
+  const compiledPath = path.join(buildDir, 'lib/bets/tracked-bet.js');
+  try { delete require.cache[require.resolve(compiledPath)]; } catch { /* not loaded */ }
+  return require(compiledPath);
+}
+
+function makeUuidSequence() {
+  let n = 0;
+  const gen = () => `uuid-${++n}`;
+  gen.count = () => n;
+  return gen;
+}
+
+test('intent: first submit mints exactly one UUID and goes in_flight', () => {
+  const { createSubmitIntent, beginSubmit, fingerprintPayload } = loadTrackedBetLib();
+  const gen = makeUuidSequence();
+  const fp = fingerprintPayload({ stake: 50 });
+
+  const begin = beginSubmit(createSubmitIntent(), fp, gen);
+  assert.equal(begin.ok, true);
+  assert.equal(begin.key, 'uuid-1');
+  assert.equal(gen.count(), 1, 'exactly one UUID must be generated');
+  assert.deepEqual(begin.intent, { status: 'in_flight', fingerprint: fp, key: 'uuid-1' });
+});
+
+test('intent: resubmit while in_flight is blocked with no new UUID (double click)', () => {
+  const { createSubmitIntent, beginSubmit, fingerprintPayload } = loadTrackedBetLib();
+  const gen = makeUuidSequence();
+  const fp = fingerprintPayload({ stake: 50 });
+
+  const first = beginSubmit(createSubmitIntent(), fp, gen);
+  const second = beginSubmit(first.intent, fp, gen);
+  assert.equal(second.ok, false);
+  assert.equal(second.reason, 'in_flight');
+  assert.equal(gen.count(), 1, 'the double click must not mint a UUID');
+  assert.deepEqual(second.intent, first.intent, 'the in-flight intent must be untouched');
+});
+
+test('intent: network error / 429 / 503 / 5xx keep the UUID and snapshot', () => {
+  const { createSubmitIntent, beginSubmit, resolveSubmit, fingerprintPayload } = loadTrackedBetLib();
+  const gen = makeUuidSequence();
+  const fp = fingerprintPayload({ stake: 50 });
+
+  const begin = beginSubmit(createSubmitIntent(), fp, gen);
+  // One 'retryable' resolution models EVERY non-409 failure the form
+  // maps (network throw, 429, 503, 500) — the transition is identical.
+  const after = resolveSubmit(begin.intent, 'retryable');
+  assert.deepEqual(after, { status: 'ready', fingerprint: fp, key: 'uuid-1' },
+    'a retryable failure must keep the UUID and the payload snapshot');
+});
+
+test('intent: exact retry after a retryable failure reuses the SAME UUID', () => {
+  const { createSubmitIntent, beginSubmit, resolveSubmit, fingerprintPayload } = loadTrackedBetLib();
+  const gen = makeUuidSequence();
+  const fp = fingerprintPayload({ stake: 50 });
+
+  const first = beginSubmit(createSubmitIntent(), fp, gen);
+  const afterFailure = resolveSubmit(first.intent, 'retryable');
+  const retry = beginSubmit(afterFailure, fp, gen);
+  assert.equal(retry.ok, true);
+  assert.equal(retry.key, 'uuid-1', 'the exact retry must reuse the same UUID');
+  assert.equal(gen.count(), 1, 'no second UUID may be generated for an exact retry');
+});
+
+test('intent: a 409 moves the intent to conflict, keeping the UUID and snapshot', () => {
+  const { createSubmitIntent, beginSubmit, resolveSubmit, fingerprintPayload } = loadTrackedBetLib();
+  const gen = makeUuidSequence();
+  const fp = fingerprintPayload({ stake: 50 });
+
+  const begin = beginSubmit(createSubmitIntent(), fp, gen);
+  const conflicted = resolveSubmit(begin.intent, 'conflict');
+  assert.deepEqual(conflicted, { status: 'conflict', fingerprint: fp, key: 'uuid-1' },
+    'a conflict must never clear or rotate the UUID');
+});
+
+test('intent: unchanged payload after a 409 is blocked — no fetch decision, no new UUID', () => {
+  const { createSubmitIntent, beginSubmit, resolveSubmit, fingerprintPayload } = loadTrackedBetLib();
+  const gen = makeUuidSequence();
+  const fp = fingerprintPayload({ stake: 50 });
+
+  const begin = beginSubmit(createSubmitIntent(), fp, gen);
+  const conflicted = resolveSubmit(begin.intent, 'conflict');
+  const blocked = beginSubmit(conflicted, fp, gen);
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.reason, 'conflict_unchanged');
+  assert.equal(gen.count(), 1, 'the blocked resubmit must not mint a UUID');
+  assert.deepEqual(blocked.intent, conflicted, 'the conflicted intent must stay locked');
+});
+
+test('intent: changing the payload after a 409 starts a NEW intent with a NEW UUID', () => {
+  const { createSubmitIntent, beginSubmit, resolveSubmit, fingerprintPayload } = loadTrackedBetLib();
+  const gen = makeUuidSequence();
+  const fp1 = fingerprintPayload({ stake: 50 });
+  const fp2 = fingerprintPayload({ stake: 60 });
+
+  const begin = beginSubmit(createSubmitIntent(), fp1, gen);
+  const conflicted = resolveSubmit(begin.intent, 'conflict');
+  const fresh = beginSubmit(conflicted, fp2, gen);
+  assert.equal(fresh.ok, true);
+  assert.equal(fresh.key, 'uuid-2', 'the edited payload must get a fresh UUID');
+  assert.deepEqual(fresh.intent, { status: 'in_flight', fingerprint: fp2, key: 'uuid-2' });
+});
+
+test('intent: success clears the intent completely', () => {
+  const { createSubmitIntent, beginSubmit, resolveSubmit, fingerprintPayload } = loadTrackedBetLib();
+  const gen = makeUuidSequence();
+
+  const begin = beginSubmit(createSubmitIntent(), fingerprintPayload({ stake: 50 }), gen);
+  const done = resolveSubmit(begin.intent, 'success');
+  assert.deepEqual(done, { status: 'ready', fingerprint: null, key: null },
+    'success must clear the fingerprint and the key');
+});
+
+test('intent: a new submit after success gets a NEW UUID even for the same payload', () => {
+  const { createSubmitIntent, beginSubmit, resolveSubmit, fingerprintPayload } = loadTrackedBetLib();
+  const gen = makeUuidSequence();
+  const fp = fingerprintPayload({ stake: 50 });
+
+  const first = beginSubmit(createSubmitIntent(), fp, gen);
+  const done = resolveSubmit(first.intent, 'success');
+  const next = beginSubmit(done, fp, gen);
+  assert.equal(next.ok, true);
+  assert.equal(next.key, 'uuid-2', 'a completed intent must never leak its UUID into the next one');
+});
+
+test('intent: the injected UUID generator makes the whole lifecycle deterministic', () => {
+  const { createSubmitIntent, beginSubmit, resolveSubmit, fingerprintPayload } = loadTrackedBetLib();
+
+  const runScenario = () => {
+    const gen = makeUuidSequence();
+    const keys = [];
+    const fp1 = fingerprintPayload({ stake: 50 });
+    const fp2 = fingerprintPayload({ stake: 60 });
+
+    let step = beginSubmit(createSubmitIntent(), fp1, gen);          // uuid-1
+    keys.push(step.key);
+    let intent = resolveSubmit(step.intent, 'retryable');
+    step = beginSubmit(intent, fp1, gen);                            // exact retry → uuid-1
+    keys.push(step.key);
+    intent = resolveSubmit(step.intent, 'conflict');
+    step = beginSubmit(intent, fp2, gen);                            // new intent → uuid-2
+    keys.push(step.key);
+    intent = resolveSubmit(step.intent, 'success');
+    step = beginSubmit(intent, fp2, gen);                            // after success → uuid-3
+    keys.push(step.key);
+    return keys;
+  };
+
+  assert.deepEqual(runScenario(), ['uuid-1', 'uuid-1', 'uuid-2', 'uuid-3']);
+  assert.deepEqual(runScenario(), runScenario(), 'two identical runs must produce identical key sequences');
+});
+
+test('intent: fingerprintPayload is stable for equal payloads and distinct for different ones', () => {
+  const { fingerprintPayload } = loadTrackedBetLib();
+  const a1 = fingerprintPayload({ legs: [{ odds: 2 }], stake: 50 });
+  const a2 = fingerprintPayload({ legs: [{ odds: 2 }], stake: 50 });
+  const b  = fingerprintPayload({ legs: [{ odds: 2 }], stake: 51 });
+  assert.equal(a1, a2, 'equal payloads must share one fingerprint');
+  assert.notEqual(a1, b, 'different payloads must not collide');
+});
+
+// ── Decision #060 Phase B: /api/bets/tracked write path ──────────────
+// The unified Single/Express form writes ONLY through POST
+// /api/bets/tracked → create_tracked_bet() as the authenticated user.
+// These tests run the compiled route with the same stubbed server
+// client as the deposit tests, plus a controllable rate-limiter stub.
+
+console.log('\nDecision #060 Phase B — /api/bets/tracked route:');
+
+const TRACKED_ROUTE = 'app/api/bets/tracked/route.js';
+
+let rateState = null;
+
+function stubRateLimitModule() {
+  const p = path.join(buildDir, 'lib/rate-limit.js');
+  require.cache[require.resolve(p)] = {
+    id: p, filename: p, loaded: true,
+    exports: {
+      enforceRateLimit: async (key, windows) => {
+        rateState.calls.push({ key, windows });
+        return rateState.result;
+      },
+      RATE_LIMITS: { trackedBet: () => [{ limit: 10, seconds: 60 }] },
+    },
+  };
+}
+
+function clearTrackedBetModules() {
+  for (const rel of [TRACKED_ROUTE, 'lib/supabase/server.js', 'lib/analytics/server.js', 'lib/rate-limit.js', 'lib/bets/tracked-bet.js']) {
+    try { delete require.cache[require.resolve(path.join(buildDir, rel))]; } catch { /* not loaded */ }
+  }
+}
+
+async function withTrackedBetRoute(stub, rate, fn) {
+  return withCompiledAlias(async () => {
+    clearTrackedBetModules();
+    currentStub = stub;
+    rateState = { result: rate ?? { allowed: true, retryAfter: 0, unavailable: false }, calls: [] };
+    stubServerModules();
+    stubRateLimitModule();
+    const route = require(path.join(buildDir, TRACKED_ROUTE));
+    try {
+      return await fn(route, rateState);
+    } finally {
+      clearTrackedBetModules();
+      currentStub = null;
+      rateState = null;
+    }
+  });
+}
+
+const TRACKED_URL = 'https://example.test/api/bets/tracked';
+const TRACKED_KEY = '22222222-bbbb-4ccc-8ddd-333333333333';
+
+function singleLegBody(overrides = {}) {
+  return {
+    legs: [{ sport: 'soccer', event_name: 'Arsenal vs Coventry', market_type: '1X2', selection: 'home', odds: 2.1 }],
+    stake: 50,
+    source: 'manual',
+    idempotency_key: TRACKED_KEY,
+    ...overrides,
+  };
+}
+
+function trackedRpcOk(overrides = {}) {
+  return {
+    create_tracked_bet: {
+      data: { bet_id: 'bet-060', balance: 950, replayed: false, ...overrides },
+      error: null,
+    },
+  };
+}
+
+function trackedRpcError(message) {
+  return { create_tracked_bet: { data: null, error: { message } } };
+}
+
+await testAsync('tracked-bet: unauthenticated → 401 before the limiter and the financial RPC', async () => {
+  const stub = makeStubClient({ user: null });
+  await withTrackedBetRoute(stub, null, async ({ POST }, rate) => {
+    const response = await POST(jsonRequest(TRACKED_URL, singleLegBody()));
+    assert.equal(response.status, 401);
+    assert.equal(rate.calls.length, 0, 'limiter must not be consulted for anonymous requests');
+    assert.equal(stub.calls.rpc.length, 0, 'financial RPC must not run for anonymous requests');
+  });
+});
+
+await testAsync('tracked-bet: rate-limited → 429 + Retry-After, keyed per user, RPC not called', async () => {
+  const stub = makeStubClient({ rpcResults: trackedRpcOk() });
+  await withTrackedBetRoute(stub, { allowed: false, retryAfter: 30, unavailable: false }, async ({ POST }, rate) => {
+    const response = await POST(jsonRequest(TRACKED_URL, singleLegBody()));
+    assert.equal(response.status, 429);
+    assert.equal(response.headers.get('Retry-After'), '30');
+    assert.equal(rate.calls.length, 1);
+    assert.equal(rate.calls[0].key, 'tracked-bet:user-1', 'limiter must be keyed per user');
+    assert.equal(stub.calls.rpc.length, 0);
+  });
+});
+
+await testAsync('tracked-bet: limiter unavailable → 503 fail-closed, RPC not called', async () => {
+  const stub = makeStubClient({ rpcResults: trackedRpcOk() });
+  await withTrackedBetRoute(stub, { allowed: false, retryAfter: 60, unavailable: true }, async ({ POST }) => {
+    const response = await POST(jsonRequest(TRACKED_URL, singleLegBody()));
+    assert.equal(response.status, 503);
+    assert.equal(stub.calls.rpc.length, 0);
+  });
+});
+
+await testAsync('tracked-bet: strict schema fails closed — unknown fields, 21 legs, express without total odds', async () => {
+  const stub = makeStubClient({ rpcResults: trackedRpcOk() });
+  await withTrackedBetRoute(stub, null, async ({ POST }) => {
+    const leg = () => ({ sport: 'soccer', event_name: 'E', market_type: '1X2', odds: 2 });
+
+    let response = await POST(jsonRequest(TRACKED_URL, singleLegBody({ rawText: 'leak' })));
+    assert.equal(response.status, 400, 'unknown top-level field must fail closed');
+
+    response = await POST(jsonRequest(TRACKED_URL, singleLegBody({
+      legs: [{ ...leg(), statusText: 'Лайв' }],
+    })));
+    assert.equal(response.status, 400, 'unknown leg field must fail closed');
+
+    response = await POST(jsonRequest(TRACKED_URL, singleLegBody({
+      legs: Array.from({ length: 21 }, leg),
+      total_odds: 999,
+    })));
+    assert.equal(response.status, 400, '21 legs must fail closed');
+
+    response = await POST(jsonRequest(TRACKED_URL, singleLegBody({
+      legs: [leg(), leg()],
+    })));
+    assert.equal(response.status, 400, 'an express without total odds must fail closed');
+
+    response = await POST(jsonRequest(TRACKED_URL, singleLegBody({ stake: -5 })));
+    assert.equal(response.status, 400, 'negative stake must fail closed');
+
+    assert.equal(stub.calls.rpc.length, 0, 'no failed validation may reach the RPC');
+
+    // The 20-leg maximum itself is accepted.
+    response = await POST(jsonRequest(TRACKED_URL, singleLegBody({
+      legs: Array.from({ length: 20 }, (_, i) => ({ ...leg(), event_name: `E${i + 1}` })),
+      total_odds: 500,
+    })));
+    assert.equal(response.status, 200, '20 legs must be accepted');
+    assert.equal(stub.calls.rpc.length, 1);
+  });
+});
+
+await testAsync('tracked-bet: manual single maps to create_tracked_bet with derived total odds', async () => {
+  const stub = makeStubClient({ rpcResults: trackedRpcOk() });
+  await withTrackedBetRoute(stub, null, async ({ POST }) => {
+    const response = await POST(jsonRequest(TRACKED_URL, singleLegBody()));
+    const result = await readJsonResponse(response);
+
+    assert.equal(result.status, 200);
+    assert.equal(result.body.success, true);
+    assert.equal(result.body.bet_id, 'bet-060');
+    assert.equal(result.body.replayed, false);
+
+    assert.equal(stub.calls.rpc.length, 1);
+    const call = stub.calls.rpc[0];
+    assert.equal(call.name, 'create_tracked_bet');
+    assert.equal(call.args.p_total_odds, null, 'single must let the RPC derive total odds');
+    assert.equal(call.args.p_source, 'manual');
+    assert.equal(call.args.p_stake, 50);
+    assert.equal(call.args.p_idempotency_key, TRACKED_KEY, 'client idempotency key must pass through');
+    assert.deepEqual(call.args.p_legs, [{
+      sport: 'soccer', event_name: 'Arsenal vs Coventry', market_type: '1X2', selection: 'home', odds: 2.1,
+    }]);
+    assertNoFinancialTableAccess(stub);
+  });
+});
+
+await testAsync('tracked-bet: scanner express preserves leg order, exact contract keys, required total odds', async () => {
+  const stub = makeStubClient({ rpcResults: trackedRpcOk() });
+  await withTrackedBetRoute(stub, null, async ({ POST }) => {
+    const response = await POST(jsonRequest(TRACKED_URL, {
+      legs: [
+        { sport: 'soccer', event_name: 'L1', market_type: '1X2', selection: 'home', odds: 2.0 },
+        { sport: 'tennis', event_name: 'L2', market_type: 'winner', selection: null, odds: 1.5 },
+        { sport: 'cs2', event_name: 'L3', market_type: 'map', odds: 3.0 },
+      ],
+      total_odds: 9,
+      stake: 20,
+      source: 'scanner',
+      idempotency_key: TRACKED_KEY,
+    }));
+    assert.equal(response.status, 200);
+
+    const call = stub.calls.rpc[0];
+    assert.equal(call.args.p_total_odds, 9, 'express must pass the entered total odds');
+    assert.equal(call.args.p_source, 'scanner');
+    assert.deepEqual(call.args.p_legs.map((l) => l.event_name), ['L1', 'L2', 'L3'], 'leg order must be preserved');
+    for (const legPayload of call.args.p_legs) {
+      assert.deepEqual(Object.keys(legPayload).sort(), ['event_name', 'market_type', 'odds', 'selection', 'sport'],
+        'exactly the five contract keys may reach the RPC');
+    }
+    assert.equal(call.args.p_legs[1].selection, null, 'explicit null selection must stay null');
+    assert.equal(call.args.p_legs[2].selection, null, 'absent selection must collapse to null');
+    assertNoFinancialTableAccess(stub);
+  });
+});
+
+await testAsync('tracked-bet: business errors map sanitized — 422 / 404 / 409, no raw DB text', async () => {
+  for (const [message, status, expected] of [
+    ['Insufficient balance', 422, 'Insufficient balance'],
+    ['No default bankroll found', 404, 'Bankroll not found'],
+    ['Idempotency conflict', 409, 'Request conflict'],
+    ['Leg 2 has invalid odds', 422, 'Bet validation failed'],
+  ]) {
+    const stub = makeStubClient({ rpcResults: trackedRpcError(message) });
+    await withTrackedBetRoute(stub, null, async ({ POST }) => {
+      const response = await POST(jsonRequest(TRACKED_URL, singleLegBody({
+        legs: [
+          { sport: 'soccer', event_name: 'L1', market_type: '1X2', odds: 2 },
+          { sport: 'soccer', event_name: 'L2', market_type: '1X2', odds: 2 },
+        ],
+        total_odds: 4,
+      })));
+      const result = await readJsonResponse(response);
+      assert.equal(result.status, status, `${message} must map to ${status}`);
+      assert.equal(result.body.error, expected);
+    });
+  }
+});
+
+await testAsync('tracked-bet: unknown DB error → 500 generic; raw message never leaks', async () => {
+  const stub = makeStubClient({ rpcResults: trackedRpcError('deadlock detected on pk_bankrolls_secret_042') });
+  await withTrackedBetRoute(stub, null, async ({ POST }) => {
+    const response = await POST(jsonRequest(TRACKED_URL, singleLegBody()));
+    const result = await readJsonResponse(response);
+    assert.equal(result.status, 500);
+    assert.equal(result.body.error, 'Transaction failed');
+    assert.ok(!JSON.stringify(result.body).includes('deadlock'), 'raw DB text must not leak');
+    assert.ok(!JSON.stringify(result.body).includes('secret'), 'raw DB identifiers must not leak');
+  });
+});
+
+await testAsync('tracked-bet: exact replay passes through — 200, same bet id, replayed=true', async () => {
+  const stub = makeStubClient({ rpcResults: trackedRpcOk({ replayed: true }) });
+  await withTrackedBetRoute(stub, null, async ({ POST }) => {
+    const response = await POST(jsonRequest(TRACKED_URL, singleLegBody()));
+    const result = await readJsonResponse(response);
+    assert.equal(result.status, 200);
+    assert.equal(result.body.bet_id, 'bet-060');
+    assert.equal(result.body.replayed, true);
+  });
+});
+
+test('tracked-bet: form and route sources — API-only path, idempotency lifecycle, no service_role', () => {
+  // The route exists ONLY at the agreed path.
+  assert.ok(existsSync(path.join(repoRoot, 'app/api/bets/tracked/route.ts')), 'route must live at app/api/bets/tracked/route.ts');
+  assert.ok(!existsSync(path.join(repoRoot, 'app/api/bets/route.ts')), 'no route may exist at app/api/bets/route.ts');
+
+  const page = readFileSync(path.join(repoRoot, 'app/(app)/bets/new/page.tsx'), 'utf8');
+  assert.ok(!page.includes('create_quick_bet'), 'the form must no longer reference create_quick_bet');
+  assert.ok(page.includes("fetch('/api/bets/tracked'"), 'the form must submit through POST /api/bets/tracked');
+  assert.ok(!/fetch\('\/api\/bets'/.test(page), 'the form must not post to the unapproved /api/bets path');
+  assert.ok(!/@\/lib\/supabase\/client/.test(page), 'the form must not talk to Supabase directly');
+  assert.ok(!/\.from\('/.test(page), 'the form must not read financial tables directly');
+  // Wiring (supplementary — the LIFECYCLE ITSELF is proven by the
+  // behavioral state-machine tests above): the form must use the pure
+  // helper and hold no second lifecycle implementation of its own.
+  assert.ok(page.includes('createSubmitIntent()'), 'the form must initialize the shared intent machine');
+  assert.ok(page.includes('beginSubmit('), 'submits must go through beginSubmit');
+  assert.ok(page.includes('fingerprintPayload(parsed.data)'), 'the fingerprint must come from the shared helper');
+  assert.ok(page.includes('() => crypto.randomUUID()'), 'the browser UUID generator must be injected, not hardcoded in logic');
+  assert.equal((page.match(/crypto\.randomUUID/g) ?? []).length, 1, 'exactly one injected generator — no parallel key source');
+  assert.ok(/res\.status === 409[\s\S]{0,300}resolveSubmit\(intentRef\.current, 'conflict'\)/.test(page),
+    'a 409 must resolve through the machine as conflict');
+  assert.ok(page.includes("resolveSubmit(intentRef.current, 'success')"), 'success must resolve through the machine');
+  assert.equal((page.match(/resolveSubmit\(intentRef\.current, 'retryable'\)/g) ?? []).length, 2,
+    'HTTP failures and network throws must both resolve as retryable');
+  assert.ok(page.includes("begin.reason === 'conflict_unchanged'"), 'the conflict-unchanged block must be handled');
+  assert.ok(page.includes("setErrors({ _root: 'Request conflict' })"), 'the fixed Request conflict error must be shown');
+  assert.ok(!/keyRef|lastPayloadRef|conflictLockRef|inFlightRef/.test(page),
+    'no second, component-local lifecycle implementation may exist');
+  assert.ok(page.includes('disabled={loading}'), 'submit must be locked while in flight');
+  // Success AND replay share one navigation path to the created bet.
+  assert.ok(page.includes('router.push(`/bets/${json.bet_id}`)'), 'success must open the created bet detail');
+  assert.ok(!page.includes("router.push('/bets')"), 'success must not navigate to the generic bets list');
+  assert.ok(!/json\.replayed/.test(page), 'replay must take the same navigation path as success');
+  assert.ok(page.includes('router.refresh()'), 'success must refresh server data');
+  assert.ok(!/[^\w](\$\{|\$)\s*\(?stakeNum/.test(page.replace(/\$\{/g, '${')), 'payout preview must not hardcode a $ symbol');
+  assert.ok(page.includes('MAX_TRACKED_BET_LEGS'), 'the 20-leg cap must gate the editor');
+
+  const route = readFileSync(path.join(repoRoot, 'app/api/bets/tracked/route.ts'), 'utf8');
+  const routeCode = route.split('\n').filter((l) => !l.trimStart().startsWith('//')).join('\n');
+  assert.ok(route.includes("from '@/lib/supabase/server'"), 'route must use the cookie-session client');
+  assert.ok(!/createAdminClient|service_role|SERVICE_ROLE/.test(routeCode), 'service_role must never appear in the user flow');
+  assert.ok(route.includes('trackedBetRequestSchema'), 'route must validate with the shared strict schema');
+  assert.ok(route.includes("rpc('create_tracked_bet'"), 'route must write through create_tracked_bet');
+  assert.ok(!/\.from\('/.test(route), 'route must not touch financial tables directly');
+
+  const shared = readFileSync(path.join(repoRoot, 'lib/bets/tracked-bet.ts'), 'utf8');
+  const sharedCode = shared.split('\n').filter((l) => !l.trimStart().startsWith('//')).join('\n');
+  assert.ok(/\.strict\(\)/.test(shared), 'shared schemas must be strict (unknown keys fail closed)');
+  for (const noise of ['rawText', 'statusText', 'scoreText', 'isLive', 'periodOrPhase']) {
+    assert.ok(!sharedCode.includes(noise), `scanner noise field ${noise} must not be modeled in the contract`);
+  }
+});
+
+test('tracked-bet: legs render in coupon order; create_quick_bet stays untouched', () => {
+  for (const rel of ['app/(app)/bets/page.tsx', 'app/(app)/bets/[id]/page.tsx']) {
+    const src = readFileSync(path.join(repoRoot, rel), 'utf8');
+    assert.ok(src.includes(".order('leg_index', { referencedTable: 'bet_legs'"),
+      `${rel}: embedded legs must be ordered by leg_index`);
+  }
+  const migration016 = readFileSync(path.join(repoRoot, 'supabase/migrations/016_atomic_financial_writes.sql'), 'utf8');
+  assert.ok(migration016.includes('CREATE OR REPLACE FUNCTION create_quick_bet'),
+    'create_quick_bet must remain defined and unchanged in migration 016');
+  const migration024 = readFileSync(path.join(repoRoot, 'supabase/migrations/024_create_tracked_bet.sql'), 'utf8');
+  assert.ok(migration024.includes('CREATE OR REPLACE FUNCTION public.create_tracked_bet'),
+    'migration 024 must remain the single tracked-bet write path');
+});
+
 console.log(`\n${passed + failed} tests — ${passed} passed, ${failed} failed\n`);
 
 if (failed > 0) {

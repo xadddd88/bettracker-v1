@@ -147,9 +147,9 @@ await testAsync('rate-limit: canonicalClientIp behavior — valid IPs pass, garb
   });
 });
 
-test('rate-limit: RATE_LIMITS config exposes all five routes with sane windows', () => {
+test('rate-limit: RATE_LIMITS config exposes all six flows with sane windows', () => {
   const src = readFileSync(path.join(repoRoot, 'lib/rate-limit.ts'), 'utf8');
-  for (const route of ['scanner', 'analyst', 'scout', 'coach', 'register']) {
+  for (const route of ['scanner', 'analyst', 'scout', 'coach', 'register', 'trackedBet']) {
     assert.ok(new RegExp(`${route}: \\(\\): RateWindow\\[\\]`).test(src), `RATE_LIMITS.${route} missing`);
   }
   assert.ok(/seconds: 86_400/.test(src), 'day window present');
@@ -165,6 +165,8 @@ test('routes: no in-memory rate-limit Map remains; all call enforceRateLimit', (
     'app/api/scout/route.ts':        'scout:',
     'app/api/coach/route.ts':        'coach:',
     'app/api/auth/register/route.ts':'register:',
+    // Decision #060 Phase B: the tracked-bet write path is limited too.
+    'app/api/bets/tracked/route.ts': 'tracked-bet:',
   };
   for (const [rel, keyPrefix] of Object.entries(routes)) {
     const src = readFileSync(path.join(repoRoot, rel), 'utf8');

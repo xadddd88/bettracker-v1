@@ -95,6 +95,10 @@ export const RATE_LIMITS = {
     { limit: envInt('RATE_LIMIT_REGISTER_PER_MINUTE', 5), seconds: 60 },
     { limit: envInt('RATE_LIMIT_REGISTER_PER_HOUR', 15),  seconds: 3_600 },
   ],
+  trackedBet: (): RateWindow[] => [
+    { limit: envInt('RATE_LIMIT_TRACKED_BET_PER_MINUTE', 10), seconds: 60 },
+    { limit: envInt('RATE_LIMIT_TRACKED_BET_PER_DAY', 200),   seconds: 86_400 },
+  ],
   cspReport: (): RateWindow[] => [
     { limit: envInt('RATE_LIMIT_CSP_REPORT_PER_MINUTE', 60), seconds: 60 },
     { limit: envInt('RATE_LIMIT_CSP_REPORT_PER_HOUR', 500),  seconds: 3_600 },
