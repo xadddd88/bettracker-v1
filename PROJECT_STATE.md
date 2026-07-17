@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-17 (Decision #060 — Phase B production smoke verified and decision closed)
+> Last updated: 2026-07-17 (Decision #061 Phase A1 — fail-closed tracker input lifecycle implemented, pending merge)
 
 ## 1. Executive Status
 
@@ -15,9 +15,9 @@
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
 | Latest completed operational milestone | **Decision #060 — Phase B merged/deployed; one authenticated production API smoke verified with complete cleanup** |
 | Highest-numbered closed decision | **#060 — Founder-First Coupon-to-Tracker** |
-| Active decisions | **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
+| Active decisions | **#061 — Founder Daily Flow Acceptance (Phase A1 fail-closed tracker input lifecycle implemented, pending merge; E2E harness deferred)**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
-| Next unreserved decision | **#061** |
+| Next unreserved decision | **#062** |
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 completed one canonical-linked base-response dry-run with zero writes. Decision #055 then closed the trust/storage contract. Decision #056's Class A structural-presence implementation is merged and deployed (PR #146); its production provider call remains not approved and has not been run. Decision #057 closed the results-ingestion and settlement trust contract (docs-evidence only; no results runtime, result writes, or automated settlement is approved).
 
@@ -30,6 +30,8 @@ Phase B (UI/API adoption) was approved on 2026-07-16, merged via PR #159 as `192
 The separately authorized Phase B production smoke verified the authenticated API path from 2026-07-16T18:24:10Z to 18:24:22Z. Exactly one `POST /api/bets/tracked` returned HTTP 200 for a manual Single (`stake=1`, `odds=2`, `replayed=false`), changed the seeded balance from 100 to 99, created exactly 1 bet, 1 ordered leg (`leg_index=1`), 1 stake transaction, and 0 Decision rows, and stored only the metadata keys `{leg_count, request_hash, source}`. This was an API-level smoke; no authenticated browser/UI automation was performed.
 
 One preliminary password-auth attempt failed before any tracked-bet POST because the temporary Auth fixture required token-field normalization; it produced no bet or stake write. After the successful smoke, global sign-out left 0 active sessions and deletion of the temporary user cascade-cleaned users, identities, sessions, profiles, bankrolls, transactions, bets, legs, and decisions to zero. Provider calls were 0. Decision #060 is EXECUTED / VERIFIED / CLOSED; no additional synthetic smoke is authorized by this record.
+
+Decision #061 (Founder Daily Flow Acceptance) is ACTIVE. Its Phase A read-only assessment found three P0/P1 correctness defects in the tracker input lifecycle; Phase A1 (implemented as v2 on `fdb1120` after PR #161, pending merge) closes them client-side only: the scanner adapter fails closed on >20 raw legs as a discriminated union (no truncation, no partial import, fixed non-echoing refusal message) and the refusal arms a submit gate checked before validation, UUID minting, and any network call — the leftover previous draft cannot be saved as the wrong bet until a valid scan replaces it or a deliberate manual payload edit takes ownership and switches source to manual; a repeat scan fully replaces every scanner-derived field (stale stake/bookmaker can no longer carry over; notes stay user-owned); and one `busy` lock (`<fieldset disabled>` + `aria-busy` + synchronous ref guards on all scan entry points and submit) freezes the whole draft during scans and in-flight financial submits without ever cancelling the financial fetch. The Playwright/Supabase-stub E2E harness proposed in Phase A is deferred, not approved. Phase A1 changed no migrations, RPCs, schemas, or API routes.
 
 ## 2. Current Production Facts
 
@@ -183,6 +185,7 @@ probability / implied probability / edge / EV / recommendation signals — FP-00
 external beta invitations — PAUSED
 CSP enforcement / nonce / strict-dynamic — NOT APPROVED in Phase A
 Decision #060 — EXECUTED / VERIFIED / CLOSED; no further synthetic runtime smoke authorized
+Decision #061 — Playwright / Supabase-stub E2E harness — DEFERRED, NOT APPROVED
 ```
 
 ## 7. Documentation and Migration Status
@@ -205,7 +208,8 @@ Decision #060 — EXECUTED / VERIFIED / CLOSED; no further synthetic runtime smo
 #058 — Settlement Metrics & Status Presentation Reconciliation — EXECUTED / CLOSED
 #059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY (eligibility BLOCKED)
 #060 — Founder-First Coupon-to-Tracker — EXECUTED / VERIFIED / CLOSED 2026-07-16 (Phase A + Phase B production API smoke)
-#061 — next unreserved decision
+#061 — Founder Daily Flow Acceptance — ACTIVE; Phase A1 fail-closed tracker input lifecycle implemented, pending merge
+#062 — next unreserved decision
 ```
 
 PR #90 is closed without merge; its policy is not adopted. Decision #020 is never reused.

@@ -2137,7 +2137,7 @@ Reference: `docs/finished-fixture-result-presence-dry-run-scope-decision-059.md`
 **Date:** 2026-07-15
 **Proposed by:** CPO + Founder
 **Approved by:** Founder (Decision #060 APPROVED)
-**Status:** EXECUTED / VERIFIED / CLOSED 2026-07-16. Migration 024 was applied and its exact catalog contract and authenticated Phase A RPC smoke were verified. Phase B was approved by the CPO, merged via PR #159 as `1926d9a82759cd1e4e97378ca15addf010c0bf28`, deployed READY, and verified by one separately authorized authenticated production API smoke. Decision #060 is the highest-numbered CLOSED decision; #061 remains next unreserved.
+**Status:** EXECUTED / VERIFIED / CLOSED 2026-07-16. Migration 024 was applied and its exact catalog contract and authenticated Phase A RPC smoke were verified. Phase B was approved by the CPO, merged via PR #159 as `1926d9a82759cd1e4e97378ca15addf010c0bf28`, deployed READY, and verified by one separately authorized authenticated production API smoke. Decision #060 is the highest-numbered CLOSED decision. At closure (2026-07-16), #061 was the next unreserved number; #061 has since been occupied and is ACTIVE (Founder Daily Flow Acceptance), and the current next unreserved decision is #062.
 
 **Decision:** Deliver one safe atomic write path and a unified mobile-first tracker form for Single and Express/parlay entries: Scanner → editable ordered legs → Bet, while keeping the legacy `create_quick_bet` function unchanged.
 
@@ -2159,9 +2159,27 @@ Reference: `docs/finished-fixture-result-presence-dry-run-scope-decision-059.md`
 
 **Post-execution boundaries:** migrations / RPC changes in Phase B 0; direct DML on financial tables 0; service_role in the user flow 0; provider calls 0; `create_quick_bet` remains unchanged; Analyst/Scout/pricing/probability/edge/EV untouched. No additional synthetic production smoke is authorized by this record. Decision #056 runtime remains NOT APPROVED / NOT RUN. Results ingestion and automated settlement remain HOLD. Decision #050 SMTP round-trip remains PENDING. CSP Phase B remains NOT APPROVED. FP-001 remains ACTIVE.
 
-**Numbering:** Decision #060 occupied and CLOSED; next unreserved decision #061.
+**Numbering:** Decision #060 occupied and CLOSED. At closure, #061 was the next unreserved number; #061 is now occupied and ACTIVE (Founder Daily Flow Acceptance), and the current next unreserved decision is #062.
 
 Reference: `docs/coupon-to-tracker-scope-decision-060.md`
+
+## Decision #061 — Founder Daily Flow Acceptance
+**Date:** 2026-07-17
+**Proposed by:** CPO + Founder
+**Approved by:** CPO (Phase A read-only report ACCEPTED; Phase A1 verdict IMPLEMENTATION CONTINUE)
+**Status:** ACTIVE — Phase A1 (fail-closed tracker input lifecycle) implemented as v2 on pinned base `fdb11200408fc8e7816a08a2327f6c4c5366b0c9` (origin/main after PR #161), pending merge.
+
+**Decision:** Accept the founder's daily flow (sign in → scan/type a coupon at `/bets/new` → review → Save → `/bets/<bet_id>` → totals on `/bets` and the dashboard) as reliable for everyday use. Phase A produced a read-only starting-point assessment; its proposed hermetic local E2E harness (Playwright + Supabase stub at 320/375/1280 px) is DEFERRED by CPO verdict. Phase A1 closes the three P0/P1 correctness defects that assessment found in the tracker input lifecycle, before any further #061 work.
+
+**Phase A1 contract (implemented):** (1) P0 scanner overflow fail-closed — `scannerDataToDrafts` no longer truncates via `.slice(0, 20)`; it returns a discriminated union (`ok: true` with legs/totalOdds/stake/bookmaker, or `{ ok: false, reason: 'too_many_legs' }`) with the bound checked on the RAW leg count BEFORE any filter/slice/map, so empty-name filtering can never shrink an oversized coupon into an importable one; the page branches on `ok` before touching any state — an oversized coupon imports NOTHING and shows the fixed non-echoing message `Coupon has more than 20 legs and was not imported.` The refusal also ARMS a submit gate (`scannerOverflowBlocked`, CPO v1 review): the leftover previous draft would still pass zod, so `handleSubmit` checks the gate BEFORE validation, before any idempotency UUID is minted, and before any network call — an unchanged form after overflow produces 0 requests and 0 UUIDs while the fixed message stays visible; the gate unlocks ONLY via a later valid scan (full replacement) or a deliberate manual payload edit through the single `markManualEdit` funnel, which also switches `source` to `manual`. (2) P1 repeat-scan full replacement — a successful scan sets legs/totalOdds/stake/bookmaker/source unconditionally and lifts the gate; absent values arrive as explicit empty strings and clear stale ones from the previous coupon; notes are user-owned and never scanner-written. (3) P1 busy lock — `busy = loading || scanning` drives one native `<fieldset disabled>` boundary (`display: contents`, so the flex layout and existing indentation stay untouched; plus `aria-busy` on form and scanner zone) locking all fields, Add/Remove leg, Cancel, and Save at once; synchronous ref guards (`scanningRef`, `intentRef.status === 'in_flight'`) cover all three scan entry points (drop-zone click, file input, Ctrl+V paste) and `handleSubmit` refuses during scans; the financial fetch is NEVER cancelled — the Decision #060 intent machine keeps its UUID/snapshot semantics untouched.
+
+**Tests:** financial-safety +12 (65/65), in two distinct classes. (a) 5 BEHAVIORAL compiled-adapter tests — they execute the compiled `scannerDataToDrafts` against synthetic coupons and assert real return values (20-leg full import in coupon order; 21-leg wholesale refusal via deepEqual; raw-count overflow under empty-name filtering; full-replacement empty strings; single-leg/legacy fallback). (b) 7 STATIC source/wiring assertions — regex/index checks over the page source text, not executed behavior (ok-check ordering before every state write + fixed message + no truncation path; submit-gate ordering before `.safeParse(`/`beginSubmit(`/fetch with 0 requests and 0 UUIDs while blocked; exact unlock surface — one arm site, two unlock sites, 7 payload-edit sites through `markManualEdit`, manual unlock switches source to manual, no `clearError` bypass; unconditional stake/bookmaker + scanner-never-writes-notes; fieldset/aria-busy/button lock; 3 synchronous entry-point guards + no AbortController + finally release; route/RPC/migration-024/intent-machine surface untouched). A browser-level proof that overflow→Save actually produces zero requests in a running DOM is DEFERRED to Phase A2 and was NOT executed in Phase A1. No regressions: domain-write-boundaries 14/14, rate-limit 12/12, provider-safety 97/97, analysis-quality-gate 26/26, auth-invite 16/16, csp-security 18/18, tsc + lint clean.
+
+**Boundaries:** 0 production/Supabase/provider calls; 0 migrations, RPC, or schema changes; `create_tracked_bet`, `create_quick_bet`, and `POST /api/bets/tracked` unchanged; Playwright/Supabase-stub harness NOT implemented (deferred); settlement/results HOLD; Decision #056 runtime NOT APPROVED; FP-001 ACTIVE; one Draft PR — Ready/merge require CPO approval.
+
+**Numbering:** Decision #061 occupied and ACTIVE; next unreserved decision #062.
+
+Reference: `docs/daily-flow-acceptance-decision-061.md`
 
 ---
 
