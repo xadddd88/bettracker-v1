@@ -60,6 +60,13 @@ export default function NewBetPage() {
   // before any network call; the server-side replay is the backstop.
   const intentRef = useRef<SubmitIntent>(createSubmitIntent())
 
+  // Synchronous scan lock (Decision #061 Phase A1). React state is
+  // async and stale inside useCallback closures, so the busy guards
+  // read refs: scanningRef for scans, intentRef.status === 'in_flight'
+  // for financial submits. The `busy` value below is the render mirror
+  // that disables the whole form via <fieldset disabled>.
+  const scanningRef = useRef(false)
+
   const [loading,  setLoading]  = useState(false)
   const [scanning, setScanning] = useState(false)
   const [scanMsg,  setScanMsg]  = useState('')
@@ -72,17 +79,44 @@ export default function NewBetPage() {
   const [notes, setNotes]         = useState('')
   const [source, setSource]       = useState<'manual' | 'scanner'>('manual')
 
+  // Decision #061 Phase A1: after a refused oversized coupon the form
+  // still holds the PREVIOUS draft — saving it would bet on the wrong
+  // coupon. While true, handleSubmit refuses before validation, before
+  // any UUID is minted and before any network call. A later valid scan
+  // clears it; a deliberate manual payload edit clears it too but
+  // switches source to manual (the draft stops being a scanner import).
+  const [scannerOverflowBlocked, setScannerOverflowBlocked] = useState(false)
+
   const isExpress    = legs.length >= 2
   const previewTotal = computeExpressPreviewTotal(legs)
+
+  // Decision #061 Phase A1 busy lock: while a financial submit is in
+  // flight OR a scan is running, the whole draft is read-only — no
+  // edits, no leg mutations, no re-scan, no Cancel, no second Save.
+  // The financial fetch itself is NEVER cancelled: on a network-
+  // unknown result the intent machine keeps the UUID and snapshot.
+  const busy = loading || scanning
 
   function clearError(key: string) {
     setErrors(e => ({ ...e, [key]: undefined, _root: undefined }))
   }
 
+  // Every manual payload edit funnels through here: it clears the
+  // field error and — if an oversized coupon was just refused — lifts
+  // the overflow block, taking manual ownership of the draft.
+  function markManualEdit(key: string) {
+    clearError(key)
+    if (scannerOverflowBlocked) {
+      setScannerOverflowBlocked(false)
+      setSource('manual')
+      setScanMsg('')
+    }
+  }
+
   // ── Leg operations (array order IS the leg order) ──────────
   function updateLeg(index: number, field: keyof LegDraft, value: string) {
     setLegs(current => current.map((leg, i) => (i === index ? { ...leg, [field]: value } : leg)))
-    clearError(`legs.${index}.${field}`)
+    markManualEdit(`legs.${index}.${field}`)
   }
 
   function addLeg() {
@@ -91,16 +125,20 @@ export default function NewBetPage() {
         ? current
         : [...current, emptyLegDraft(current[current.length - 1]?.sport ?? 'soccer')]
     )
-    clearError('legs')
+    markManualEdit('legs')
   }
 
   function removeLeg(index: number) {
     setLegs(current => (current.length <= 1 ? current : current.filter((_, i) => i !== index)))
-    clearError('legs')
+    markManualEdit('legs')
   }
 
   // ── Scanner (existing OCR flow; recognized legs become editable) ──
   const runScanner = useCallback(async (file: File) => {
+    // Busy guard (synchronous): never start a scan while a financial
+    // submit is in flight or another scan is running.
+    if (scanningRef.current || intentRef.current.status === 'in_flight') return
+    scanningRef.current = true
     setScanning(true)
     setScanMsg('Scanning coupon...')
 
@@ -121,12 +159,29 @@ export default function NewBetPage() {
 
       // Allowlisted adapter: only sport/event/market/selection/odds
       // reach the drafts — OCR/live noise never leaves this handler.
+      // FAIL CLOSED (Decision #061 Phase A1): the ok check runs BEFORE
+      // any draft state is applied. An oversized coupon imports
+      // NOTHING — legs, total odds, stake, bookmaker and source all
+      // stay exactly as they were — and the overflow gate locks Save,
+      // so the leftover draft cannot be submitted as the wrong bet.
+      // The fixed message never echoes coupon content or a leg count.
       const mapped = scannerDataToDrafts(json.data)
+      if (!mapped.ok) {
+        setScannerOverflowBlocked(true)
+        setScanMsg('Coupon has more than 20 legs and was not imported.')
+        return
+      }
+      // Full-replacement policy: a successful scan replaces EVERY
+      // scanner-derived field and lifts the overflow gate. Absent
+      // values arrive as empty strings and clear stale ones from the
+      // previous coupon — nothing carries over. Notes are user-owned
+      // manual input and are deliberately kept.
       setLegs(mapped.legs)
       setTotalOdds(mapped.totalOdds)
-      if (mapped.stake) setStake(mapped.stake)
-      if (mapped.bookmaker) setBookmaker(mapped.bookmaker)
+      setStake(mapped.stake)
+      setBookmaker(mapped.bookmaker)
       setSource('scanner')
+      setScannerOverflowBlocked(false)
       setErrors({})
       setScanMsg(
         mapped.legs.length >= 2
@@ -136,12 +191,16 @@ export default function NewBetPage() {
     } catch {
       setScanMsg('Scan error — try again')
     } finally {
+      scanningRef.current = false
       setScanning(false)
     }
   }, [])
 
   // Ctrl+V paste
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    // Busy guard: pasting a screenshot must not start a scan while a
+    // financial submit is in flight or another scan is running.
+    if (scanningRef.current || intentRef.current.status === 'in_flight') return
     const items = Array.from(e.clipboardData.items)
     const imageItem = items.find(i => i.type.startsWith('image/'))
     if (imageItem) {
@@ -152,6 +211,10 @@ export default function NewBetPage() {
 
   // File picker
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (scanningRef.current || intentRef.current.status === 'in_flight') {
+      e.target.value = ''
+      return
+    }
     const file = e.target.files?.[0]
     if (file) runScanner(file)
     e.target.value = ''
@@ -160,6 +223,16 @@ export default function NewBetPage() {
   // ── Submit ─────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    // Busy guard: the draft cannot be submitted while a scan is
+    // rewriting it. In-flight financial submits are blocked by the
+    // intent machine below; the fetch itself is never cancelled.
+    if (scanningRef.current) return
+    // Overflow gate (Decision #061 Phase A1): checked BEFORE
+    // validation, before any UUID is minted and before any network
+    // call. After a refused oversized coupon, zero requests leave
+    // this page and the fixed refusal message stays visible until a
+    // valid scan or a deliberate manual edit unlocks the draft.
+    if (scannerOverflowBlocked) return
     setErrors({})
 
     const payload = {
@@ -265,20 +338,24 @@ export default function NewBetPage() {
         <p className="text-sm text-gray-500 mt-1">Paste a screenshot or fill in manually</p>
       </div>
 
-      {/* ── Scanner zone ──────────────────────────────────── */}
+      {/* ── Scanner zone (locked while busy) ──────────────── */}
       <div
-        className={`mb-4 border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition-colors ${
+        aria-busy={busy}
+        className={`mb-4 border-2 border-dashed rounded-xl px-4 py-5 text-center transition-colors ${
           scanning
             ? 'border-indigo-500 bg-indigo-950/30'
-            : 'border-gray-700 hover:border-indigo-600 hover:bg-gray-800/40'
+            : busy
+              ? 'border-gray-800 opacity-60 cursor-not-allowed'
+              : 'border-gray-700 hover:border-indigo-600 hover:bg-gray-800/40 cursor-pointer'
         }`}
-        onClick={() => !scanning && fileRef.current?.click()}
+        onClick={() => !busy && fileRef.current?.click()}
       >
         <input
           ref={fileRef}
           type="file"
           accept="image/*"
           className="hidden"
+          disabled={busy}
           onChange={handleFileChange}
         />
         {scanning ? (
@@ -313,7 +390,14 @@ export default function NewBetPage() {
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="card flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="card flex flex-col gap-4" aria-busy={busy}>
+        {/* Decision #061 Phase A1: ONE native disabled boundary. While
+            a scan or a financial submit is running, every input, select,
+            textarea and button inside — leg fields, Add leg, Remove leg,
+            Cancel and Save — is disabled at once by the browser itself,
+            so no individual control can be forgotten. display:contents
+            keeps the children in the form's flex layout unchanged. */}
+        <fieldset disabled={busy} className="contents">
         {/* ── Legs (order preserved) ──────────────────────── */}
         {legs.map((leg, index) => (
           <div key={index} className="border border-gray-800 rounded-xl p-3 sm:p-4 flex flex-col gap-3">
@@ -324,9 +408,10 @@ export default function NewBetPage() {
               {legs.length > 1 && (
                 <button
                   type="button"
-                  className="text-xs text-gray-500 hover:text-red-400 px-2 py-1"
+                  className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 disabled:opacity-50"
                   onClick={() => removeLeg(index)}
                   aria-label={`Remove leg ${index + 1}`}
+                  disabled={busy}
                 >
                   ✕ Remove
                 </button>
@@ -405,7 +490,7 @@ export default function NewBetPage() {
           type="button"
           className="btn-ghost w-full sm:w-fit"
           onClick={addLeg}
-          disabled={legs.length >= MAX_TRACKED_BET_LEGS}
+          disabled={busy || legs.length >= MAX_TRACKED_BET_LEGS}
         >
           + Add leg{legs.length >= MAX_TRACKED_BET_LEGS ? ` (max ${MAX_TRACKED_BET_LEGS})` : ''}
         </button>
@@ -418,7 +503,7 @@ export default function NewBetPage() {
               className={`input w-full ${errors.total_odds ? 'border-red-600' : ''}`}
               type="number" step="0.0001" min="1.01" inputMode="decimal" placeholder="7.25"
               value={totalOdds}
-              onChange={e => { setTotalOdds(e.target.value); clearError('total_odds') }}
+              onChange={e => { setTotalOdds(e.target.value); markManualEdit('total_odds') }}
             />
             {previewTotal != null && (
               <p className="text-xs text-gray-500 mt-1">
@@ -437,7 +522,7 @@ export default function NewBetPage() {
               className={`input w-full ${errors.stake ? 'border-red-600' : ''}`}
               type="number" step="0.01" min="0.01" inputMode="decimal" placeholder="50"
               value={stake}
-              onChange={e => { setStake(e.target.value); clearError('stake') }}
+              onChange={e => { setStake(e.target.value); markManualEdit('stake') }}
             />
             {errors.stake && <p className="text-xs text-red-400 mt-1">{errors.stake}</p>}
           </div>
@@ -447,7 +532,7 @@ export default function NewBetPage() {
             <select
               className="input w-full"
               value={bookmaker}
-              onChange={e => { setBookmaker(e.target.value); clearError('bookmaker') }}
+              onChange={e => { setBookmaker(e.target.value); markManualEdit('bookmaker') }}
             >
               <option value="">—</option>
               {BOOKMAKERS.map(b => <option key={b} value={b}>{b}</option>)}
@@ -459,7 +544,7 @@ export default function NewBetPage() {
             <textarea
               className="input w-full resize-none" rows={2} placeholder="Optional..."
               value={notes}
-              onChange={e => { setNotes(e.target.value); clearError('notes') }}
+              onChange={e => { setNotes(e.target.value); markManualEdit('notes') }}
             />
           </div>
         </div>
@@ -478,13 +563,19 @@ export default function NewBetPage() {
         )}
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <button type="submit" className="btn-primary w-full sm:flex-1" disabled={loading}>
+          <button type="submit" className="btn-primary w-full sm:flex-1" disabled={busy}>
             {loading ? 'Saving...' : isExpress ? `Save Express (${legs.length} legs)` : 'Save Bet'}
           </button>
-          <button type="button" className="btn-ghost w-full sm:w-auto" onClick={() => router.back()}>
+          <button
+            type="button"
+            className="btn-ghost w-full sm:w-auto"
+            onClick={() => router.back()}
+            disabled={busy}
+          >
             Cancel
           </button>
         </div>
+        </fieldset>
       </form>
     </div>
   )

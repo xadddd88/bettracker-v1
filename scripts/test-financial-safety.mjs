@@ -1234,7 +1234,7 @@ test('tracked-bet: form and route sources — API-only path, idempotency lifecyc
   assert.ok(page.includes("setErrors({ _root: 'Request conflict' })"), 'the fixed Request conflict error must be shown');
   assert.ok(!/keyRef|lastPayloadRef|conflictLockRef|inFlightRef/.test(page),
     'no second, component-local lifecycle implementation may exist');
-  assert.ok(page.includes('disabled={loading}'), 'submit must be locked while in flight');
+  assert.ok(page.includes('disabled={busy}'), 'submit must be locked while busy (in flight or scanning)');
   // Success AND replay share one navigation path to the created bet.
   assert.ok(page.includes('router.push(`/bets/${json.bet_id}`)'), 'success must open the created bet detail');
   assert.ok(!page.includes("router.push('/bets')"), 'success must not navigate to the generic bets list');
@@ -1271,6 +1271,172 @@ test('tracked-bet: legs render in coupon order; create_quick_bet stays untouched
   const migration024 = readFileSync(path.join(repoRoot, 'supabase/migrations/024_create_tracked_bet.sql'), 'utf8');
   assert.ok(migration024.includes('CREATE OR REPLACE FUNCTION public.create_tracked_bet'),
     'migration 024 must remain the single tracked-bet write path');
+});
+
+// ── Decision #061 Phase A1: fail-closed tracker input lifecycle ──────
+// Scanner overflow, full-replacement policy, and the busy lock. The
+// adapter tests are BEHAVIORAL — they run the compiled helper with
+// synthetic coupons; the page tests confirm the component actually
+// wires those behaviors (fail-closed branch, fieldset lock).
+
+console.log('\nDecision #061 Phase A1 — fail-closed tracker input lifecycle:');
+
+function scannedLeg(i) {
+  return { sport: 'soccer', eventName: `Event ${i}`, marketType: '1X2', selection: 'Home', odds: 1.5 + i / 100 };
+}
+
+test('scanner: a 20-leg coupon imports fully — all 20 legs, in coupon order', () => {
+  const { scannerDataToDrafts, MAX_TRACKED_BET_LEGS } = loadTrackedBetLib();
+  assert.equal(MAX_TRACKED_BET_LEGS, 20);
+  const legs = Array.from({ length: 20 }, (_, i) => scannedLeg(i + 1));
+  const result = scannerDataToDrafts({ sport: 'soccer', odds: 12.3, stake: 50, bookmaker: 'Bet365', legs });
+  assert.equal(result.ok, true);
+  assert.equal(result.legs.length, 20, 'no leg may be dropped at exactly the cap');
+  assert.deepEqual(result.legs.map((l) => l.event_name), legs.map((l) => l.eventName), 'coupon order must be preserved');
+  assert.equal(result.totalOdds, '12.3');
+  assert.equal(result.stake, '50');
+  assert.equal(result.bookmaker, 'Bet365');
+});
+
+test('scanner: a 21-leg coupon fails closed — no truncation, no partial import', () => {
+  const { scannerDataToDrafts } = loadTrackedBetLib();
+  const legs = Array.from({ length: 21 }, (_, i) => scannedLeg(i + 1));
+  const result = scannerDataToDrafts({ sport: 'soccer', odds: 99.9, stake: 50, bookmaker: 'Bet365', legs });
+  assert.deepEqual(result, { ok: false, reason: 'too_many_legs' },
+    'overflow must return ONLY the refusal — no legs, totalOdds, stake or bookmaker may leak out');
+});
+
+test('scanner: overflow is checked on the RAW count — empty-name filtering cannot shrink 21 legs into an import', () => {
+  const { scannerDataToDrafts } = loadTrackedBetLib();
+  const legs = Array.from({ length: 21 }, (_, i) => (i < 3 ? { ...scannedLeg(i + 1), eventName: '   ' } : scannedLeg(i + 1)));
+  const result = scannerDataToDrafts({ sport: 'soccer', odds: 8.5, stake: 25, bookmaker: 'Stake', legs });
+  assert.deepEqual(result, { ok: false, reason: 'too_many_legs' },
+    '21 raw legs must be refused even when filtering would leave <= 20');
+});
+
+test('scanner: full replacement — a coupon without stake/bookmaker/total returns empty strings, never stale carriers', () => {
+  const { scannerDataToDrafts } = loadTrackedBetLib();
+  const result = scannerDataToDrafts({ sport: 'soccer', legs: [scannedLeg(1), scannedLeg(2)] });
+  assert.equal(result.ok, true);
+  assert.equal(result.stake, '', 'absent stake must map to an explicit empty value');
+  assert.equal(result.bookmaker, '', 'absent bookmaker must map to an explicit empty value');
+  assert.equal(result.totalOdds, '', 'absent total odds must map to an explicit empty value');
+});
+
+test('scanner: single-leg coupon never gets a total odds value; legacy flattened fallback still imports', () => {
+  const { scannerDataToDrafts } = loadTrackedBetLib();
+  const single = scannerDataToDrafts({ sport: 'tennis', odds: 1.8, stake: 10, legs: [scannedLeg(1)] });
+  assert.equal(single.ok, true);
+  assert.equal(single.totalOdds, '', 'total odds is an express-only field');
+  const legacy = scannerDataToDrafts({ sport: 'tennis', event_name: 'A vs B', market_type: 'Winner', odds: 2.1 });
+  assert.equal(legacy.ok, true);
+  assert.equal(legacy.legs.length, 1);
+  assert.equal(legacy.legs[0].event_name, 'A vs B');
+});
+
+test('page: overflow branch runs BEFORE any state write, with the fixed non-echoing message', () => {
+  const page = readFileSync(path.join(repoRoot, 'app/(app)/bets/new/page.tsx'), 'utf8');
+  const okCheck = page.indexOf('if (!mapped.ok)');
+  assert.ok(okCheck !== -1, 'the page must branch on the discriminated union');
+  assert.ok(page.includes("setScanMsg('Coupon has more than 20 legs and was not imported.')"),
+    'the refusal message must be fixed text (no coupon content, no leg count echo)');
+  for (const write of ['setLegs(mapped.legs)', 'setTotalOdds(mapped.totalOdds)', 'setStake(mapped.stake)',
+    'setBookmaker(mapped.bookmaker)', "setSource('scanner')"]) {
+    const idx = page.indexOf(write);
+    assert.ok(idx !== -1, `scan success must apply ${write}`);
+    assert.ok(okCheck < idx, `${write} must come AFTER the ok check — nothing may be applied on overflow`);
+  }
+  assert.ok(!page.includes('.slice(0, MAX_TRACKED_BET_LEGS)'), 'no truncation path may exist in the page');
+});
+
+test('page: repeat scan is a full replacement — stake/bookmaker set unconditionally, notes never scanner-written', () => {
+  const page = readFileSync(path.join(repoRoot, 'app/(app)/bets/new/page.tsx'), 'utf8');
+  assert.ok(!/if\s*\(mapped\.stake\)/.test(page), 'stake must not be conditionally preserved from the previous coupon');
+  assert.ok(!/if\s*\(mapped\.bookmaker\)/.test(page), 'bookmaker must not be conditionally preserved');
+  const scanner = page.slice(page.indexOf('const runScanner'), page.indexOf('// Ctrl+V paste'));
+  assert.ok(!scanner.includes('setNotes'), 'notes are user-owned — the scanner must never write them');
+});
+
+test('page: busy lock — one fieldset boundary disables fields, leg mutations, Cancel and Save together', () => {
+  const page = readFileSync(path.join(repoRoot, 'app/(app)/bets/new/page.tsx'), 'utf8');
+  assert.ok(page.includes('const busy = loading || scanning'), 'busy must cover BOTH the financial submit and the scan');
+  assert.ok(page.includes('<fieldset disabled={busy}'), 'the form body must sit inside one disabled fieldset');
+  assert.ok(page.includes('</fieldset>'), 'the fieldset must wrap the whole form body');
+  assert.ok((page.match(/aria-busy=\{busy\}/g) ?? []).length >= 2, 'form and scanner zone must announce aria-busy');
+  assert.ok(page.includes('disabled={busy || legs.length >= MAX_TRACKED_BET_LEGS}'), 'Add leg must respect the busy lock');
+  assert.ok(/aria-label=\{`Remove leg \$\{index \+ 1\}`\}\s*\n\s*disabled=\{busy\}/.test(page), 'Remove leg must respect the busy lock');
+  assert.ok(/onClick=\{\(\) => router\.back\(\)\}\s*\n\s*disabled=\{busy\}/.test(page), 'Cancel must be locked while busy');
+  assert.ok(page.includes('disabled={busy}>') || /type="submit"[^>]*disabled=\{busy\}/.test(page), 'Save must be locked while busy');
+});
+
+test('page: scanner entry points hold synchronous busy guards; the financial fetch is never cancelled', () => {
+  const page = readFileSync(path.join(repoRoot, 'app/(app)/bets/new/page.tsx'), 'utf8');
+  assert.ok(page.includes('const scanningRef = useRef(false)'), 'the scan lock must be a synchronous ref');
+  assert.equal((page.match(/if \(scanningRef\.current \|\| intentRef\.current\.status === 'in_flight'\)/g) ?? []).length, 3,
+    'runScanner, paste and file-picker must each guard on scan + in-flight submit');
+  const submit = page.slice(page.indexOf('async function handleSubmit'), page.indexOf('const stakeNum'));
+  assert.ok(submit.includes('if (scanningRef.current) return'), 'submit must refuse while a scan is rewriting the draft');
+  assert.ok(!/AbortController|\.abort\(|signal:/.test(page), 'the financial fetch must never be aborted/cancelled');
+  const finallyBlock = page.slice(page.indexOf('} finally {'), page.indexOf('}, [])'));
+  assert.ok(finallyBlock.includes('scanningRef.current = false') && finallyBlock.includes('setScanning(false)'),
+    'the scan lock must always release, success or failure');
+});
+
+test('page: overflow gate blocks Save — checked before validation, before any UUID, before any network call', () => {
+  const page = readFileSync(path.join(repoRoot, 'app/(app)/bets/new/page.tsx'), 'utf8');
+  // The refused scan arms the gate INSIDE the fail-closed branch,
+  // before it returns.
+  const overflowBranch = page.slice(page.indexOf('if (!mapped.ok)'), page.indexOf('// Full-replacement'));
+  assert.ok(overflowBranch.includes('setScannerOverflowBlocked(true)'),
+    'a refused oversized coupon must arm the submit gate');
+  // The gate fires before EVERYTHING that could produce a request:
+  // zod validation, UUID minting via beginSubmit, and the fetch.
+  const submit = page.slice(page.indexOf('async function handleSubmit'), page.indexOf('const stakeNum'));
+  const gate = submit.indexOf('if (scannerOverflowBlocked) return');
+  assert.ok(gate !== -1, 'handleSubmit must hold the overflow gate');
+  assert.ok(gate < submit.indexOf('.safeParse('), 'gate must precede zod validation');
+  assert.ok(gate < submit.indexOf('beginSubmit('), 'gate must precede UUID minting — no key may be created');
+  assert.ok(gate < submit.indexOf("fetch('/api/bets/tracked'"), 'gate must precede the network call — 0 requests while blocked');
+  // While blocked the gate returns SILENTLY: the fixed refusal message
+  // stays on screen (nothing may overwrite or clear it on submit).
+  const gated = submit.slice(0, gate);
+  assert.ok(!gated.includes('setScanMsg') && !gated.includes('setErrors'),
+    'nothing before the gate may rewrite the visible refusal message');
+});
+
+test('page: overflow gate unlocks ONLY via a valid scan or a manual payload edit that switches source to manual', () => {
+  const page = readFileSync(path.join(repoRoot, 'app/(app)/bets/new/page.tsx'), 'utf8');
+  // Unlock path 1: a later valid scan fully replaces the draft and
+  // lifts the gate inside the success branch.
+  const successBranch = page.slice(page.indexOf('// Full-replacement'), page.indexOf('} catch {'));
+  assert.ok(successBranch.includes('setScannerOverflowBlocked(false)'), 'a valid scan must lift the gate');
+  // Unlock path 2: every manual payload edit funnels through
+  // markManualEdit, which lifts the gate AND flips source to manual.
+  const marker = page.slice(page.indexOf('function markManualEdit'), page.indexOf('// ── Leg operations'));
+  assert.ok(marker.includes('if (scannerOverflowBlocked)'), 'manual unlock must be conditional on the armed gate');
+  assert.ok(marker.includes('setScannerOverflowBlocked(false)'), 'manual edit must lift the gate');
+  assert.ok(marker.includes("setSource('manual')"), 'a manual unlock must switch source to manual');
+  const editSites = (page.match(/markManualEdit\(/g) ?? []).length;
+  assert.equal(editSites, 8, 'definition + 7 payload-edit sites (leg fields, add/remove leg, total odds, stake, bookmaker, notes)');
+  assert.ok(!/clearError\('/.test(page.slice(page.indexOf('function updateLeg'))),
+    'no payload-edit path may bypass markManualEdit by calling clearError directly');
+  // No third unlock path exists.
+  assert.equal((page.match(/setScannerOverflowBlocked\(false\)/g) ?? []).length, 2,
+    'exactly two unlock sites: valid scan and manual edit');
+  assert.equal((page.match(/setScannerOverflowBlocked\(true\)/g) ?? []).length, 1,
+    'exactly one arm site: the refused oversized coupon');
+});
+
+test('#061 A1: write path untouched — route, RPC, migration 024 and the intent machine keep their Phase B surface', () => {
+  const route = readFileSync(path.join(repoRoot, 'app/api/bets/tracked/route.ts'), 'utf8');
+  assert.ok(route.includes("rpc('create_tracked_bet'"), 'route must still write only through create_tracked_bet');
+  assert.ok(route.includes('trackedBetRequestSchema'), 'route must still validate with the shared strict schema');
+  const migration = readFileSync(path.join(repoRoot, 'supabase/migrations/024_create_tracked_bet.sql'), 'utf8');
+  assert.ok(/IF v_leg_count < 1 OR v_leg_count > 20 THEN/.test(migration), 'server-side 1..20 leg bound must be unchanged');
+  const lib = loadTrackedBetLib();
+  for (const fn of ['createSubmitIntent', 'beginSubmit', 'resolveSubmit', 'fingerprintPayload', 'scannerDataToDrafts']) {
+    assert.equal(typeof lib[fn], 'function', `${fn} must remain exported from the shared helper`);
+  }
 });
 
 console.log(`\n${passed + failed} tests — ${passed} passed, ${failed} failed\n`);

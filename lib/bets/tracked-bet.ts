@@ -262,19 +262,26 @@ function canonicalSport(candidate: string | null | undefined, fallback: TrackedB
     : fallback
 }
 
-export interface ScannerDraftResult {
-  legs:      LegDraft[]
-  totalOdds: string
-  stake:     string
-  bookmaker: string
-}
+// Decision #061 Phase A1: the adapter is FAIL CLOSED. An oversized
+// coupon is rejected wholesale as a discriminated union — never
+// truncated, never partially imported. The caller must check `ok`
+// BEFORE applying any field to form state.
+export type ScannerDraftResult =
+  | { ok: true; legs: LegDraft[]; totalOdds: string; stake: string; bookmaker: string }
+  | { ok: false; reason: 'too_many_legs' }
 
 export function scannerDataToDrafts(data: ScannerDataLike): ScannerDraftResult {
+  // Checked on the RAW leg count, BEFORE any filter/slice/map: a
+  // 21+-leg coupon must not shrink into an importable one through
+  // empty-name filtering, and nothing may be silently dropped.
+  if ((data.legs?.length ?? 0) > MAX_TRACKED_BET_LEGS) {
+    return { ok: false, reason: 'too_many_legs' }
+  }
+
   const fallbackSport = canonicalSport(data.sport, 'soccer')
 
   const scannedLegs = (data.legs ?? [])
     .filter(leg => (leg.eventName ?? '').trim() !== '')
-    .slice(0, MAX_TRACKED_BET_LEGS)
     .map(leg => ({
       sport:       canonicalSport(leg.sport, fallbackSport),
       event_name:  (leg.eventName ?? '').trim(),
@@ -285,6 +292,7 @@ export function scannerDataToDrafts(data: ScannerDataLike): ScannerDraftResult {
 
   if (scannedLegs.length > 0) {
     return {
+      ok: true,
       legs: scannedLegs,
       // data.odds is the coupon TOTAL. For a single leg the leg's own
       // odds already carry it; only an express needs it as the
@@ -297,6 +305,7 @@ export function scannerDataToDrafts(data: ScannerDataLike): ScannerDraftResult {
 
   // Legacy flattened fallback: one editable leg from the summary.
   return {
+    ok: true,
     legs: [{
       sport:       fallbackSport,
       event_name:  (data.event_name ?? '').trim(),
