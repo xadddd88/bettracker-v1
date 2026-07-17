@@ -63,8 +63,8 @@ export default async function BetDetailPage({
         </div>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
-          {leg?.market_type && <Row label="Market"    value={leg.market_type} />}
-          {leg?.selection   && <Row label="Selection" value={leg.selection} />}
+          {!isParlay && leg?.market_type && <Row label="Market"    value={leg.market_type} />}
+          {!isParlay && leg?.selection   && <Row label="Selection" value={leg.selection} />}
           {bet.total_odds != null && (
             <Row label="Odds" value={bet.total_odds.toFixed(2)} />
           )}
