@@ -34,6 +34,19 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b830dceb-1f96-4c09-b02d-fd2415c14a02"
+      }
+    },
+    "owner": "xaddds-team",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b830dceb-1f96-4c09-b02d-fd2415c14a02"
     }
   }
 }
