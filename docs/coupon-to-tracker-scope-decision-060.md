@@ -2,15 +2,15 @@
 
 ## Status
 
-**ACTIVE / PHASE A APPLIED & VERIFIED; PHASE B IMPLEMENTATION (this PR).** Founder approval: Decision #060 APPROVED; Phase B implementation approved by CPO on 2026-07-16 (pinned base `origin/main = 1d173f1`).
+**EXECUTED / VERIFIED / CLOSED 2026-07-16.** Founder approval: Decision #060 APPROVED. Phase A was applied and verified in production. Phase B was approved by the CPO, merged via PR #159 as `1926d9a82759cd1e4e97378ca15addf010c0bf28`, deployed READY, and verified by one separately authorized authenticated production API smoke.
 
-Phase A delivered the safe atomic foundation. Migration 024 was applied to production on 2026-07-16 as `20260716142736_create_tracked_bet_024`, the exact catalog contract was verified read-only, and the authenticated smoke passed with one initial write and one exact semantic replay. Phase B (this PR) adopts the RPC in the UI/API: the unified Single/Express tracker form and the `POST /api/bets/tracked` write path described below. Phase B stays under Decision #060 — no new decision number. Highest-numbered CLOSED decision remains #059 until this track closes. The production runtime smoke of the Phase B flow is NOT part of this PR.
+Decision #060 delivered the atomic foundation and the unified Single/Express UI/API adoption described below. The smoke completed with exactly one tracked-bet POST, expected financial state, zero Decision rows, sign-out, and full synthetic-data cleanup. Decision #060 is now the highest-numbered CLOSED decision; #061 remains the next unreserved number.
 
 ## Objective
 
-Give the tracker a single safe write path for both Single and Express (parlay) entries — the future unified Scanner → editable legs → Bet form and the mobile daily tracker flow — without touching the existing `create_quick_bet` or any current UI/API.
+Give the tracker one safe atomic write path and a unified mobile-first form for both Single and Express (parlay) entries: Scanner → editable ordered legs → Bet, while keeping the legacy `create_quick_bet` function unchanged.
 
-## Phase A (this PR)
+## Phase A — atomic foundation
 
 ### Additive migration `supabase/migrations/024_create_tracked_bet.sql`
 
@@ -56,7 +56,7 @@ Give the tracker a single safe write path for both Single and Express (parlay) e
 - `create_quick_bet` is unchanged.
 - Phase B remains HOLD.
 
-## Phase B (this PR — UI/API adoption, approved 2026-07-16)
+## Phase B — UI/API adoption (approved 2026-07-16)
 
 Founder-first unified Single/Express tracker: Scanner → editable legs → Bet, mobile-first, writing exclusively through the already-applied `public.create_tracked_bet()`.
 
@@ -90,16 +90,25 @@ Scanner response
 - `scripts/test-rate-limit.mjs` — `RATE_LIMITS.trackedBet` config + `/api/bets/tracked` wiring added to the Decision #052 route sweep (12/12 total).
 - No regressions: domain-write-boundaries 14/14 (its recursive sweep also proves the form no longer reads `bankrolls` directly), provider-safety 97/97, analysis-quality-gate 26/26, auth-invite 16/16, csp-security 18/18, `tsc --noEmit` clean, lint clean.
 
-## Explicit non-use (Phase B PR)
+## Production Phase B checkpoint (2026-07-16)
+
+- **Deployment:** PR #159 merged as `1926d9a82759cd1e4e97378ca15addf010c0bf28`; the production deployment reached READY.
+- **Execution window:** 2026-07-16T18:24:10Z–18:24:22Z. A temporary authenticated synthetic user issued exactly one `POST /api/bets/tracked`; HTTP 200 returned `replayed=false`.
+- **Financial/result state:** manual Single, stake 1, odds 2, balance 100→99; exactly 1 bet, 1 leg with `leg_index=1`, 1 stake transaction, and 0 Decision rows. Stake metadata contained exactly `leg_count`, `request_hash`, and `source`.
+- **Preflight note:** one earlier password-auth attempt failed before any tracked-bet POST because the temporary Auth fixture required token-field normalization. It caused no bet or stake write and did not consume the one authorized tracked-bet call.
+- **Cleanup:** global sign-out left 0 active sessions; deleting the temporary user cascade-cleaned users, identities, sessions, profiles, bankrolls, transactions, bets, legs, and decisions to zero. Provider calls were 0.
+- **Coverage boundary:** this was an authenticated production API-level smoke of the real cookie-session route and RPC. Authenticated browser/UI automation was not performed.
+
+## Post-execution boundaries
 
 ```txt
-migrations / RPC changes: 0
+migrations / RPC changes in Phase B: 0
 create_quick_bet: UNCHANGED (defined in 001/010/016; no remaining UI callers)
 direct DML on financial tables: 0
 service_role in the user flow: 0
 provider calls: 0
+additional synthetic production smoke: NOT AUTHORIZED by this record
 Analyst/Scout/pricing/probability/edge/EV surfaces: UNTOUCHED
-production runtime smoke of the Phase B flow: NOT in this PR
 Decision #056 runtime: NOT APPROVED / NOT RUN
 results ingestion / automated settlement: HOLD
 Decision #050 SMTP round-trip: PENDING
@@ -112,4 +121,4 @@ FP-001: ACTIVE
 - `supabase/migrations/016_atomic_financial_writes.sql` — idempotency + funds-guard patterns (Decision #047)
 - `supabase/migrations/018_enforce_domain_write_boundaries.sql` — write boundary this migration must not widen (Decision #048)
 - `docs/results-ingestion-settlement-trust-contract-decision-057.md` — settlement semantics remain gated; tracked parlays settle manually as whole bets until #057 gates open
-- `lib/bets/tracked-bet.ts` — shared strict client/server contract; canonical sport allowlist source (consumed by `app/(app)/bets/new/page.tsx` and `app/api/bets/route.ts`)
+- `lib/bets/tracked-bet.ts` — shared strict client/server contract; canonical sport allowlist source (consumed by `app/(app)/bets/new/page.tsx` and `app/api/bets/tracked/route.ts`)
