@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-16 (Decision #060 Phase B — unified tracker UI/API implementation)
+> Last updated: 2026-07-17 (Decision #060 — Phase B production smoke verified and decision closed)
 
 ## 1. Executive Status
 
@@ -13,9 +13,9 @@
 | Production | `https://btdk.app` |
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
-| Latest completed operational milestone | **Decision #060 Phase A — migration applied, catalog verified, authenticated smoke verified; Phase B implementation delivered for review** |
-| Highest-numbered closed decision | **#059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope** |
-| Active decisions | **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)**; **#060 — Founder-First Coupon-to-Tracker (ACTIVE / PHASE A APPLIED & VERIFIED; PHASE B IMPLEMENTATION — unified Single/Express form + `/api/bets/tracked`)** |
+| Latest completed operational milestone | **Decision #060 — Phase B merged/deployed; one authenticated production API smoke verified with complete cleanup** |
+| Highest-numbered closed decision | **#060 — Founder-First Coupon-to-Tracker** |
+| Active decisions | **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
 | Next unreserved decision | **#061** |
 
@@ -25,7 +25,11 @@ Decision #060 migration 024 was applied to production on 2026-07-16 as `20260716
 
 Before cleanup, the synthetic account had 1 bet, 1 leg, 2 transactions, 1 stake transaction, and 0 decisions. Canonical normalized bet/leg values and the metadata allowlist were verified. The account and all related rows were deleted, and an independent post-transaction cleanup check confirmed 0 users, profiles, bankrolls, transactions, bets, legs, and decisions. All `bet_legs` rows with non-null `leg_index` were also 0 after cleanup.
 
-Phase B (UI/API adoption) was approved on 2026-07-16 and is implemented: `/bets/new` is the unified Single/Express tracker form (Scanner → editable ordered legs → Bet, mobile-first), writing exclusively through the new authenticated `POST /api/bets/tracked` → `create_tracked_bet()` path with Decision #052 rate limiting, a strict shared zod contract mirror, client idempotency-key lifecycle, and sanitized errors. `create_quick_bet` remains defined and unchanged with zero remaining UI callers. The production runtime smoke of the Phase B flow is a separate authorization.
+Phase B (UI/API adoption) was approved on 2026-07-16, merged via PR #159 as `1926d9a82759cd1e4e97378ca15addf010c0bf28`, and deployed READY: `/bets/new` is the unified Single/Express tracker form (Scanner → editable ordered legs → Bet, mobile-first), writing exclusively through authenticated `POST /api/bets/tracked` → `create_tracked_bet()` with Decision #052 rate limiting, a strict shared zod contract mirror, a pure client idempotency state machine, and sanitized errors. `create_quick_bet` remains defined and unchanged with zero remaining UI callers.
+
+The separately authorized Phase B production smoke verified the authenticated API path from 2026-07-16T18:24:10Z to 18:24:22Z. Exactly one `POST /api/bets/tracked` returned HTTP 200 for a manual Single (`stake=1`, `odds=2`, `replayed=false`), changed the seeded balance from 100 to 99, created exactly 1 bet, 1 ordered leg (`leg_index=1`), 1 stake transaction, and 0 Decision rows, and stored only the metadata keys `{leg_count, request_hash, source}`. This was an API-level smoke; no authenticated browser/UI automation was performed.
+
+One preliminary password-auth attempt failed before any tracked-bet POST because the temporary Auth fixture required token-field normalization; it produced no bet or stake write. After the successful smoke, global sign-out left 0 active sessions and deletion of the temporary user cascade-cleaned users, identities, sessions, profiles, bankrolls, transactions, bets, legs, and decisions to zero. Provider calls were 0. Decision #060 is EXECUTED / VERIFIED / CLOSED; no additional synthetic smoke is authorized by this record.
 
 ## 2. Current Production Facts
 
@@ -178,13 +182,13 @@ results ingestion / result writes / automated settlement — HOLD (Decision #057
 probability / implied probability / edge / EV / recommendation signals — FP-001 gated
 external beta invitations — PAUSED
 CSP enforcement / nonce / strict-dynamic — NOT APPROVED in Phase A
-Decision #060 Phase B runtime smoke — separate authorization (implementation delivered)
+Decision #060 — EXECUTED / VERIFIED / CLOSED; no further synthetic runtime smoke authorized
 ```
 
 ## 7. Documentation and Migration Status
 
 - Decision #053 reconciled this file, README, the numbering ledger, and the migration inventory.
-- `supabase/migrations` contains numbered files through 024, with no 008 file. Decision #060 is **ACTIVE / PHASE A APPLIED & VERIFIED; PHASE B IMPLEMENTATION**. Migration 024 production version: `20260716142736_create_tracked_bet_024`. The Phase B PR adds NO migrations.
+- `supabase/migrations` contains numbered files through 024, with no 008 file. Decision #060 is **EXECUTED / VERIFIED / CLOSED**. Migration 024 production version: `20260716142736_create_tracked_bet_024`; Phase B added no migrations.
 - Production's timestamped migration ledger does not represent all earlier manually applied history.
 - A fresh-database bootstrap is **not yet certified**; see `docs/migration-state-reconciliation-053.md`.
 - Never run `001_initial_schema.sql` against production as a general setup command.
@@ -200,7 +204,7 @@ Decision #060 Phase B runtime smoke — separate authorization (implementation d
 #057 — Results Ingestion & Settlement Trust Contract — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY
 #058 — Settlement Metrics & Status Presentation Reconciliation — EXECUTED / CLOSED
 #059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY (eligibility BLOCKED)
-#060 — Founder-First Coupon-to-Tracker — ACTIVE / PHASE A APPLIED & VERIFIED; PHASE B IMPLEMENTATION (unified form + /api/bets/tracked; runtime smoke separately gated)
+#060 — Founder-First Coupon-to-Tracker — EXECUTED / VERIFIED / CLOSED 2026-07-16 (Phase A + Phase B production API smoke)
 #061 — next unreserved decision
 ```
 
