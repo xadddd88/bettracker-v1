@@ -2167,7 +2167,7 @@ Reference: `docs/coupon-to-tracker-scope-decision-060.md`
 **Date:** 2026-07-17
 **Proposed by:** CPO + Founder
 **Approved by:** CPO (Phase A read-only report ACCEPTED; Phase A1 verdict IMPLEMENTATION CONTINUE)
-**Status:** ACTIVE — Phase A1 (fail-closed tracker input lifecycle) implemented as v2 on pinned base `fdb11200408fc8e7816a08a2327f6c4c5366b0c9` (origin/main after PR #161), pending merge.
+**Status:** ACTIVE — Phase A1 (fail-closed tracker input lifecycle) merged via PR #162 as `a6d4ebbefcf49af71729c64cd33886d0592cf1fd` and deployed READY. Phase A2 browser E2E remains DEFERRED / NOT APPROVED.
 
 **Decision:** Accept the founder's daily flow (sign in → scan/type a coupon at `/bets/new` → review → Save → `/bets/<bet_id>` → totals on `/bets` and the dashboard) as reliable for everyday use. Phase A produced a read-only starting-point assessment; its proposed hermetic local E2E harness (Playwright + Supabase stub at 320/375/1280 px) is DEFERRED by CPO verdict. Phase A1 closes the three P0/P1 correctness defects that assessment found in the tracker input lifecycle, before any further #061 work.
 
@@ -2175,7 +2175,9 @@ Reference: `docs/coupon-to-tracker-scope-decision-060.md`
 
 **Tests:** financial-safety +12 (65/65), in two distinct classes. (a) 5 BEHAVIORAL compiled-adapter tests — they execute the compiled `scannerDataToDrafts` against synthetic coupons and assert real return values (20-leg full import in coupon order; 21-leg wholesale refusal via deepEqual; raw-count overflow under empty-name filtering; full-replacement empty strings; single-leg/legacy fallback). (b) 7 STATIC source/wiring assertions — regex/index checks over the page source text, not executed behavior (ok-check ordering before every state write + fixed message + no truncation path; submit-gate ordering before `.safeParse(`/`beginSubmit(`/fetch with 0 requests and 0 UUIDs while blocked; exact unlock surface — one arm site, two unlock sites, 7 payload-edit sites through `markManualEdit`, manual unlock switches source to manual, no `clearError` bypass; unconditional stake/bookmaker + scanner-never-writes-notes; fieldset/aria-busy/button lock; 3 synchronous entry-point guards + no AbortController + finally release; route/RPC/migration-024/intent-machine surface untouched). A browser-level proof that overflow→Save actually produces zero requests in a running DOM is DEFERRED to Phase A2 and was NOT executed in Phase A1. No regressions: domain-write-boundaries 14/14, rate-limit 12/12, provider-safety 97/97, analysis-quality-gate 26/26, auth-invite 16/16, csp-security 18/18, tsc + lint clean.
 
-**Boundaries:** 0 production/Supabase/provider calls; 0 migrations, RPC, or schema changes; `create_tracked_bet`, `create_quick_bet`, and `POST /api/bets/tracked` unchanged; Playwright/Supabase-stub harness NOT implemented (deferred); settlement/results HOLD; Decision #056 runtime NOT APPROVED; FP-001 ACTIVE; one Draft PR — Ready/merge require CPO approval.
+**Merge and deployment checkpoint:** PR #162 accepted head `9fd1441f70bb782d51f444a0be85a405c8123ff0` and merged as `a6d4ebbefcf49af71729c64cd33886d0592cf1fd`; all 7 resulting blob hashes match the accepted head. Production deployment `dpl_CkCEBy243hsJDcymMgZycZnby8Pw` reached READY with 0 post-deployment runtime errors. No production smoke or scanner/API/Supabase runtime call or write was performed for Phase A1. Browser-level verification was not performed.
+
+**Boundaries:** 0 production/Supabase/provider calls; 0 migrations, RPC, or schema changes; `create_tracked_bet`, `create_quick_bet`, and `POST /api/bets/tracked` unchanged; Playwright/Supabase-stub harness NOT implemented (deferred); settlement/results HOLD; Decision #056 runtime NOT APPROVED; FP-001 ACTIVE. Phase A1 is merged/deployed, while Decision #061 remains ACTIVE because Phase A2 is DEFERRED / NOT APPROVED.
 
 **Numbering:** Decision #061 occupied and ACTIVE; next unreserved decision #062.
 
