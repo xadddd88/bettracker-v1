@@ -1,6 +1,6 @@
 # Decision Ledger / Numbering Governance
 
-Status: CURRENT — Decision #061 ACTIVE (Phase A1 merged via PR #162 as `a6d4ebb`, deployed READY; Phase A2 browser E2E deferred / not approved); Decision #060 EXECUTED / VERIFIED / CLOSED 2026-07-16; Decision #056 implementation merged/deployed, runtime provider call not approved / not run
+Status: CURRENT — Decision #062 ACTIVE (Mobile Phase 0 implementation in review); Decision #061 ACTIVE (Phase A1 merged via PR #162 as `a6d4ebb`, deployed READY; Phase A2 browser E2E remains outside main); Decision #060 EXECUTED / VERIFIED / CLOSED 2026-07-16; Decision #056 implementation merged/deployed, runtime provider call not approved / not run
 Last updated: 2026-07-17
 
 ## Purpose
@@ -10,15 +10,16 @@ This file prevents decision-number collisions. Historical numbers are immutable:
 ## Current Number Map
 
 ```txt
-Occupied: #001-#019, #021-#031, #033-#061
+Occupied: #001-#019, #021-#031, #033-#062
 Do not reuse: #020
 Retired reservation / do not reuse: #032
 Highest-numbered closed: #060 — Founder-First Coupon-to-Tracker (Phase A + Phase B production API smoke verified)
 Active approved: #061 — Founder Daily Flow Acceptance (Phase A1 fail-closed tracker input lifecycle;
                  Playwright/Supabase-stub harness deferred)
+                 #062 — Mobile Phase 0 (password auth/session + read-only bets)
                  #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run
                  (implementation merged/deployed; runtime provider call not approved / not run)
-Next unreserved: #062
+Next unreserved: #063
 ```
 
 ## Recent Decisions
@@ -43,12 +44,13 @@ Next unreserved: #062
 | #059 | Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY; eligibility BLOCKED |
 | #060 | Founder-First Coupon-to-Tracker — EXECUTED / VERIFIED / CLOSED 2026-07-16; Phase A + Phase B production API smoke verified |
 | #061 | Founder Daily Flow Acceptance — ACTIVE; Phase A read-only assessment delivered; Phase A1 merged via PR #162 as `a6d4ebb`, deployed READY; Phase A2 browser E2E deferred / not approved |
+| #062 | Mobile Phase 0 — ACTIVE; native password auth/session + read-only bet list/detail implementation in review; replacement native build not yet approved |
 
 ## Retired / Superseded Tracks
 
 - **#020:** never reuse. PR #90 tried to claim it for Third-Party Manual Context Policy, but that PR is closed without merge and the policy is not adopted.
 - **#032:** the old M1.3 filter-evidence reservation is retired after PR #106 was superseded. Keep the number unused to preserve audit history.
-- A revived third-party manual-context policy must use **#062 or later** in a fresh PR.
+- A revived third-party manual-context policy must use **#063 or later** in a fresh PR.
 
 ## Rules
 

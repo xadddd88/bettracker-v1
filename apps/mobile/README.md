@@ -1,56 +1,44 @@
-# Welcome to your Expo app 👋
+# xaddd mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo SDK 57 development client for the Founder-first BetTracker flow.
 
-## Get started
+## Decision #062 Phase 0
 
-1. Install dependencies
+Phase 0 is intentionally read-only:
 
-   ```bash
-   npm install
-   ```
+- email/password sign-in;
+- encrypted persisted session and foreground token refresh;
+- owner-scoped bet list and bet detail through Supabase RLS;
+- Single and Express presentation with ordered `leg_index` values;
+- local logout.
 
-2. Start the app
+Scanner, bet creation, settlement, deposits, analytics, provider calls, and every financial write are outside this phase.
 
-   ```bash
-   npx expo start
-   ```
+## Local environment
 
-In the output, you'll find options to open the app in a
+Create `apps/mobile/.env.local` locally (it is ignored by git):
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```dotenv
+EXPO_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLIC_PUBLISHABLE_KEY
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Only a Supabase publishable key may be used. Never place a secret/service-role, provider, or operator key in an Expo environment variable.
 
-### Other setup steps
+Install and start the existing development client:
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```powershell
+cd C:\BT\apps\mobile
+npm.cmd install
+npx.cmd expo start --dev-client --tunnel
+```
 
-## Learn more
+## Validation
 
-To learn more about developing your project with Expo, look at the following resources:
+```powershell
+npm.cmd run typecheck
+npm.cmd test
+npm.cmd run lint
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Adding `expo-secure-store` changes the native binary. The previously installed Android build does not contain it; make one separately approved replacement development build after this implementation is accepted. iOS remains blocked until the Apple Developer membership becomes active and the device is registered.

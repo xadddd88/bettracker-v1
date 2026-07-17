@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-17 (Decision #061 Phase A1 merged via PR #162 as `a6d4ebb`, deployed READY; Phase A2 deferred / not approved)
+> Last updated: 2026-07-17 (Decision #062 Mobile Phase 0 implementation in review; no replacement native build or production mobile acceptance yet)
 
 ## 1. Executive Status
 
@@ -15,9 +15,9 @@
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
 | Latest completed operational milestone | **Decision #061 Phase A1 — merged via PR #162 as `a6d4ebb`, deployed READY** |
 | Highest-numbered closed decision | **#060 — Founder-First Coupon-to-Tracker** |
-| Active decisions | **#061 — Founder Daily Flow Acceptance (Phase A1 merged/deployed; Phase A2 browser E2E deferred / not approved)**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
+| Active decisions | **#062 — Mobile Phase 0 (implementation in review; read-only)**; **#061 — Founder Daily Flow Acceptance**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
-| Next unreserved decision | **#062** |
+| Next unreserved decision | **#063** |
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 completed one canonical-linked base-response dry-run with zero writes. Decision #055 then closed the trust/storage contract. Decision #056's Class A structural-presence implementation is merged and deployed (PR #146); its production provider call remains not approved and has not been run. Decision #057 closed the results-ingestion and settlement trust contract (docs-evidence only; no results runtime, result writes, or automated settlement is approved).
 
@@ -209,7 +209,8 @@ Decision #061 — Playwright / Supabase-stub E2E harness — DEFERRED, NOT APPRO
 #059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY (eligibility BLOCKED)
 #060 — Founder-First Coupon-to-Tracker — EXECUTED / VERIFIED / CLOSED 2026-07-16 (Phase A + Phase B production API smoke)
 #061 — Founder Daily Flow Acceptance — ACTIVE; Phase A1 merged via PR #162 as a6d4ebb, deployed READY; Phase A2 browser E2E deferred / not approved
-#062 — next unreserved decision
+#062 — Mobile Phase 0 — ACTIVE; implementation in review; read-only auth/session + bets list/detail; replacement native build not yet approved
+#063 — next unreserved decision
 ```
 
 PR #90 is closed without merge; its policy is not adopted. Decision #020 is never reused.

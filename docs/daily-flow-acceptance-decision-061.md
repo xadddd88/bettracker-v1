@@ -175,4 +175,4 @@ behavioral adapter tests.
 ## Governance
 
 Decision #061 is ACTIVE (Phase A1). The highest-numbered closed decision
-remains #060. The next unreserved decision number is **#062**.
+remains #060. Decision #062 is now occupied and ACTIVE (Mobile Phase 0); the next unreserved decision number is **#063**.

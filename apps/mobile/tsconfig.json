@@ -21,6 +21,7 @@
     "src/app/explore.tsx",
     "src/components",
     "src/constants",
-    "src/hooks"
+    "src/hooks",
+    "tests"
   ]
 }
