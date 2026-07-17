@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-17 (Decision #061 Phase A1 — fail-closed tracker input lifecycle implemented, pending merge)
+> Last updated: 2026-07-17 (Decision #061 Phase A1 merged via PR #162 as `a6d4ebb`, deployed READY; Phase A2 deferred / not approved)
 
 ## 1. Executive Status
 
@@ -13,9 +13,9 @@
 | Production | `https://btdk.app` |
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
-| Latest completed operational milestone | **Decision #060 — Phase B merged/deployed; one authenticated production API smoke verified with complete cleanup** |
+| Latest completed operational milestone | **Decision #061 Phase A1 — merged via PR #162 as `a6d4ebb`, deployed READY** |
 | Highest-numbered closed decision | **#060 — Founder-First Coupon-to-Tracker** |
-| Active decisions | **#061 — Founder Daily Flow Acceptance (Phase A1 fail-closed tracker input lifecycle implemented, pending merge; E2E harness deferred)**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
+| Active decisions | **#061 — Founder Daily Flow Acceptance (Phase A1 merged/deployed; Phase A2 browser E2E deferred / not approved)**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
 | Next unreserved decision | **#062** |
 
@@ -31,7 +31,7 @@ The separately authorized Phase B production smoke verified the authenticated AP
 
 One preliminary password-auth attempt failed before any tracked-bet POST because the temporary Auth fixture required token-field normalization; it produced no bet or stake write. After the successful smoke, global sign-out left 0 active sessions and deletion of the temporary user cascade-cleaned users, identities, sessions, profiles, bankrolls, transactions, bets, legs, and decisions to zero. Provider calls were 0. Decision #060 is EXECUTED / VERIFIED / CLOSED; no additional synthetic smoke is authorized by this record.
 
-Decision #061 (Founder Daily Flow Acceptance) is ACTIVE. Its Phase A read-only assessment found three P0/P1 correctness defects in the tracker input lifecycle; Phase A1 (implemented as v2 on `fdb1120` after PR #161, pending merge) closes them client-side only: the scanner adapter fails closed on >20 raw legs as a discriminated union (no truncation, no partial import, fixed non-echoing refusal message) and the refusal arms a submit gate checked before validation, UUID minting, and any network call — the leftover previous draft cannot be saved as the wrong bet until a valid scan replaces it or a deliberate manual payload edit takes ownership and switches source to manual; a repeat scan fully replaces every scanner-derived field (stale stake/bookmaker can no longer carry over; notes stay user-owned); and one `busy` lock (`<fieldset disabled>` + `aria-busy` + synchronous ref guards on all scan entry points and submit) freezes the whole draft during scans and in-flight financial submits without ever cancelling the financial fetch. The Playwright/Supabase-stub E2E harness proposed in Phase A is deferred, not approved. Phase A1 changed no migrations, RPCs, schemas, or API routes.
+Decision #061 (Founder Daily Flow Acceptance) is ACTIVE. Its Phase A read-only assessment found three P0/P1 correctness defects in the tracker input lifecycle; Phase A1 was merged via PR #162 as `a6d4ebbefcf49af71729c64cd33886d0592cf1fd` and deployed READY as `dpl_CkCEBy243hsJDcymMgZycZnby8Pw`. The accepted implementation head is `9fd1441f70bb782d51f444a0be85a405c8123ff0`, and all 7 resulting blob hashes match that head. Phase A1 closes the defects client-side only: the scanner adapter fails closed on >20 raw legs as a discriminated union (no truncation, no partial import, fixed non-echoing refusal message) and the refusal arms a submit gate checked before validation, UUID minting, and any network call — the leftover previous draft cannot be saved as the wrong bet until a valid scan replaces it or a deliberate manual payload edit takes ownership and switches source to manual; a repeat scan fully replaces every scanner-derived field (stale stake/bookmaker can no longer carry over; notes stay user-owned); and one `busy` lock (`<fieldset disabled>` + `aria-busy` + synchronous ref guards on all scan entry points and submit) freezes the whole draft during scans and in-flight financial submits without ever cancelling the financial fetch. Post-deployment runtime errors were 0. No production smoke or scanner/API/Supabase runtime call or write was performed for Phase A1. The Playwright/Supabase-stub browser E2E harness proposed in Phase A remains deferred and was not approved or run. Phase A1 changed no migrations, RPCs, schemas, or API routes.
 
 ## 2. Current Production Facts
 
@@ -208,7 +208,7 @@ Decision #061 — Playwright / Supabase-stub E2E harness — DEFERRED, NOT APPRO
 #058 — Settlement Metrics & Status Presentation Reconciliation — EXECUTED / CLOSED
 #059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY (eligibility BLOCKED)
 #060 — Founder-First Coupon-to-Tracker — EXECUTED / VERIFIED / CLOSED 2026-07-16 (Phase A + Phase B production API smoke)
-#061 — Founder Daily Flow Acceptance — ACTIVE; Phase A1 fail-closed tracker input lifecycle implemented, pending merge
+#061 — Founder Daily Flow Acceptance — ACTIVE; Phase A1 merged via PR #162 as a6d4ebb, deployed READY; Phase A2 browser E2E deferred / not approved
 #062 — next unreserved decision
 ```
 

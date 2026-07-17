@@ -1,9 +1,10 @@
 # Decision #061 — Founder Daily Flow Acceptance
 
 Status: ACTIVE — Phase A read-only assessment delivered 2026-07-17; Phase A1
-(fail-closed tracker input lifecycle) implemented as v2 on pinned base
-`fdb11200408fc8e7816a08a2327f6c4c5366b0c9` (origin/main after PR #161),
-pending merge. Owner: CPO + Founder. Implementation: Claude.
+(fail-closed tracker input lifecycle) merged via PR #162 as
+`a6d4ebbefcf49af71729c64cd33886d0592cf1fd` and deployed READY. Phase A2
+browser E2E remains DEFERRED / NOT APPROVED. Owner: CPO + Founder.
+Implementation: Claude.
 
 ## Purpose
 
@@ -143,6 +144,18 @@ such run happened in Phase A1; the gate's runtime behavior is currently
 evidenced only by the static ordering assertions above and the
 behavioral adapter tests.
 
+## Merge and deployment checkpoint
+
+- PR #162 merged as `a6d4ebbefcf49af71729c64cd33886d0592cf1fd`.
+- Accepted head: `9fd1441f70bb782d51f444a0be85a405c8123ff0`.
+- All 7 resulting blob hashes match the accepted head.
+- Production deployment `dpl_CkCEBy243hsJDcymMgZycZnby8Pw` reached READY.
+- Runtime errors after deployment: 0.
+- Phase A1 performed no production smoke and no scanner/API/Supabase runtime
+  calls or writes.
+- Browser-level verification was not performed. Phase A2 remains DEFERRED /
+  NOT APPROVED.
+
 ## Boundaries (Phase A1)
 
 - Files changed: `lib/bets/tracked-bet.ts` (adapter only — the intent
@@ -156,7 +169,8 @@ behavioral adapter tests.
 - Playwright / Supabase-stub E2E harness NOT implemented (deferred).
 - Settlement/results remain HOLD; Decision #056 runtime remains NOT
   APPROVED; FP-001 remains ACTIVE.
-- One Draft PR; Ready-for-review and merge require CPO approval.
+- Phase A1 merged via PR #162 as `a6d4ebb` and was deployed READY. Decision
+  #061 remains ACTIVE because Phase A2 browser E2E is deferred / not approved.
 
 ## Governance
 
