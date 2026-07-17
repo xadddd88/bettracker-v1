@@ -9,9 +9,11 @@ import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
 
 const SPORT_ICON: Record<string, string> = {
   football:   '⚽',
+  soccer:     '⚽',
   tennis:     '🎾',
   basketball: '🏀',
   hockey:     '🏒',
+  ice_hockey: '🏒',
   other:      '🎯',
 }
 
@@ -140,7 +142,7 @@ export default async function BetsPage() {
 
             return (
               <div key={bet.id}>
-              <Link href={`/bets/${bet.id}`} className="flex items-center gap-4 px-4 py-4 hover:bg-gray-800/30 transition-colors">
+              <Link href={`/bets/${bet.id}`} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2 px-4 py-4 hover:bg-gray-800/30 transition-colors sm:flex sm:items-center sm:gap-4">
 
                 {/* Sport icon */}
                 <div className="text-xl flex-shrink-0 w-7 text-center">
@@ -157,47 +159,49 @@ export default async function BetsPage() {
                     <span className="text-xs text-gray-600">·</span>
                     <span className="text-xs text-gray-600">{date}</span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 sm:hidden">
-                    <span className="text-[11px] text-gray-500">
-                      Odds <span className="font-mono text-gray-300">{bet.total_odds?.toFixed(2) || '—'}</span>
-                    </span>
-                    <span className="text-[11px] text-gray-500">
-                      Stake <span className="text-gray-300">{sym}{bet.stake}</span>
-                    </span>
-                  </div>
                 </div>
 
-                {/* Odds */}
-                <div className="flex-shrink-0 text-right hidden sm:block">
-                  <div className="text-xs text-gray-500 mb-0.5">Odds</div>
-                  <div className="text-sm font-mono text-white">
-                    {bet.total_odds?.toFixed(2) || '—'}
-                  </div>
-                </div>
-
-                {/* Stake */}
-                <div className="flex-shrink-0 text-right hidden sm:block">
-                  <div className="text-xs text-gray-500 mb-0.5">Stake</div>
-                  <div className="text-sm text-gray-200">{sym}{bet.stake}</div>
-                </div>
-
-                {/* Status */}
-                <div className="flex-shrink-0">
-                  <span className={`inline-block text-xs px-2.5 py-1 rounded-full font-medium ${status.bg} ${status.text}`}>
-                    {status.label}
+                {/* Mobile metadata row; contents restores the desktop flex row. */}
+                <div className="col-start-2 min-w-0 flex flex-wrap items-center gap-x-3 gap-y-1 sm:contents">
+                  <span className="text-[11px] text-gray-500 sm:hidden">
+                    Odds <span className="font-mono text-gray-300">{bet.total_odds?.toFixed(2) || '—'}</span>
                   </span>
-                </div>
+                  <span className="text-[11px] text-gray-500 sm:hidden">
+                    Stake <span className="text-gray-300">{sym}{bet.stake}</span>
+                  </span>
 
-                {/* P&L — settlement P&L is only defined for won/lost/void
-                    (Decision #058); unsupported/unknown statuses show “—” */}
-                <div className="flex-shrink-0 w-20 text-right">
-                  {bet.pnl == null || !isSupportedSettlementStatus(bet.status) ? (
-                    <span className="text-gray-600 text-sm">—</span>
-                  ) : (
-                    <span className={`text-sm font-bold ${bet.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {bet.pnl >= 0 ? '+' : ''}{sym}{bet.pnl.toFixed(2)}
+                  {/* Odds */}
+                  <div className="flex-shrink-0 text-right hidden sm:block">
+                    <div className="text-xs text-gray-500 mb-0.5">Odds</div>
+                    <div className="text-sm font-mono text-white">
+                      {bet.total_odds?.toFixed(2) || '—'}
+                    </div>
+                  </div>
+
+                  {/* Stake */}
+                  <div className="flex-shrink-0 text-right hidden sm:block">
+                    <div className="text-xs text-gray-500 mb-0.5">Stake</div>
+                    <div className="text-sm text-gray-200">{sym}{bet.stake}</div>
+                  </div>
+
+                  {/* Status */}
+                  <div className="flex-shrink-0">
+                    <span className={`inline-block text-xs px-2.5 py-1 rounded-full font-medium ${status.bg} ${status.text}`}>
+                      {status.label}
                     </span>
-                  )}
+                  </div>
+
+                  {/* P&L — settlement P&L is only defined for won/lost/void
+                      (Decision #058); unsupported/unknown statuses show “—” */}
+                  <div className="flex-shrink-0 text-right sm:w-20">
+                    {bet.pnl == null || !isSupportedSettlementStatus(bet.status) ? (
+                      <span className="text-gray-600 text-sm">—</span>
+                    ) : (
+                      <span className={`text-sm font-bold ${bet.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {bet.pnl >= 0 ? '+' : ''}{sym}{bet.pnl.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
               </Link>
