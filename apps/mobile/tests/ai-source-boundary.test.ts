@@ -421,12 +421,14 @@ test('AI capture screen applies Android top safe area without a second bottom in
   assert.doesNotMatch(source, /safeAreaInsets\.bottom/);
 });
 
-test('bottom navigation remains the sole owner of the bottom safe area', () => {
-  const path = join(root, 'src/ui/bottom-navigation.tsx');
+test('Expo Tabs owns the bottom safe area without an overlaid custom bar', () => {
+  const path = join(root, 'src/app/(app)/_layout.tsx');
   const source = readFileSync(path, 'utf8');
 
-  assert.match(source, /edges=\{\['bottom'\]\}/);
-  assert.doesNotMatch(source, /edges=\{\[[^\]]*['"]top['"]/);
+  assert.match(source, /import \{ Tabs \} from 'expo-router'/);
+  assert.match(source, /tabBarStyle/);
+  assert.doesNotMatch(source, /position:\s*['"]absolute['"]/);
+  assert.equal(existsSync(join(root, 'src/ui/bottom-navigation.tsx')), false);
 });
 
 test('native capture adapter converts local images to JPEG without leaking raw diagnostics', () => {
@@ -460,27 +462,26 @@ test('native capture adapter converts local images to JPEG without leaking raw d
   assert.doesNotMatch(source, /RAW_NATIVE_ERROR/);
 });
 
-test('authenticated layout keeps its Stack and adds persistent accessible Bets and AI navigation', () => {
+test('authenticated layout exposes five accessible tabs and keeps Tracker detail in a Stack', () => {
   const layoutPath = join(root, 'src/app/(app)/_layout.tsx');
-  const navigationPath = join(root, 'src/ui/bottom-navigation.tsx');
+  const trackerLayoutPath = join(root, 'src/app/(app)/bets/_layout.tsx');
   const layout = readFileSync(layoutPath, 'utf8');
+  const trackerLayout = readFileSync(trackerLayoutPath, 'utf8');
 
-  assert.ok(existsSync(navigationPath), 'bottom navigation source must exist');
-  const navigation = readFileSync(navigationPath, 'utf8');
+  assert.match(layout, /<Tabs/);
+  for (const route of ['home', 'ai', 'bets', 'stats', 'more']) {
+    assert.match(layout, new RegExp(`name=["']${route}["']`));
+  }
+  for (const label of ['Home', 'AI Analyzer', 'Tracker', 'Stats', 'More']) {
+    assert.match(layout, new RegExp(`tabBarAccessibilityLabel:\\s*["']${label}["']`));
+  }
+  assert.match(layout, /tabBarItemStyle:\s*\{\s*minHeight:\s*52/);
+  assert.match(layout, /name="index" options=\{\{ href: null \}\}/);
 
-  assert.match(layout, /<Stack/);
-  assert.match(layout, /name="bets\/index"/);
-  assert.match(layout, /name="bets\/\[id\]"/);
-  assert.match(layout, /name="ai\/index"/);
-  assert.match(layout, /<BottomNavigation/);
-
-  assert.match(navigation, /label:\s*'Bets'/);
-  assert.match(navigation, /label:\s*'AI'/);
-  assert.match(navigation, /href:\s*'\/\(app\)\/bets'/);
-  assert.match(navigation, /href:\s*'\/\(app\)\/ai'/);
-  assert.match(navigation, /accessibilityRole="tab"/);
-  assert.match(navigation, /accessibilityState=\{\{\s*selected:\s*active\s*\}\}/);
-  assert.match(navigation, /minHeight:\s*44/);
+  assert.match(trackerLayout, /<Stack/);
+  assert.match(trackerLayout, /name="index"/);
+  assert.match(trackerLayout, /name="\[id\]"/);
+  assert.match(trackerLayout, /name="new"/);
 });
 
 test('AI capture screen exposes the approved local-only responsive states', () => {

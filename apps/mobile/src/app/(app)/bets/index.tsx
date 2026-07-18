@@ -20,7 +20,7 @@ import { colors } from '@/ui/theme';
 
 export default function BetsScreen() {
   const router = useRouter();
-  const { session, signOut } = useAuth();
+  const { session } = useAuth();
   const userId = session?.user.id;
   const [bets, setBets] = useState<BetDto[]>([]);
   const [currency, setCurrency] = useState('USD');
@@ -58,11 +58,26 @@ export default function BetsScreen() {
         <View style={styles.headerCopy}>
           <Text style={styles.eyebrow}>FOUNDER TRACKER</Text>
           <Text style={styles.title}>Your bets</Text>
-          <Text style={styles.subtitle}>Read-only · {bets.length} tracked</Text>
+          <Text style={styles.subtitle}>{bets.length} tracked · ordered coupon view</Text>
         </View>
-        <Pressable accessibilityRole="button" hitSlop={8} onPress={() => void signOut()} style={styles.signOut}>
-          <Text style={styles.signOutText}>Log out</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            accessibilityLabel="Scan coupon"
+            accessibilityRole="button"
+            onPress={() => router.push('/(app)/ai')}
+            style={({ pressed }) => [styles.headerButton, pressed && styles.cardPressed]}
+          >
+            <Text style={styles.headerButtonText}>Scan</Text>
+          </Pressable>
+          <Pressable
+            accessibilityLabel="Add bet"
+            accessibilityRole="button"
+            onPress={() => router.push('/(app)/bets/new')}
+            style={({ pressed }) => [styles.headerButtonPrimary, pressed && styles.cardPressed]}
+          >
+            <Text style={styles.headerButtonPrimaryText}>+ Add</Text>
+          </Pressable>
+        </View>
       </View>
 
       {loading ? (
@@ -85,7 +100,14 @@ export default function BetsScreen() {
           ListEmptyComponent={
             <View style={styles.centered}>
               <Text style={styles.emptyTitle}>No tracked bets yet</Text>
-              <Text style={styles.muted}>Bets created on the web will appear here.</Text>
+              <Text style={styles.muted}>Prepare your first local draft or add a bet on the web.</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/(app)/bets/new')}
+                style={({ pressed }) => [styles.emptyButton, pressed && styles.cardPressed]}
+              >
+                <Text style={styles.emptyButtonText}>Prepare a bet</Text>
+              </Pressable>
             </View>
           }
           ListHeaderComponent={error ? <Text style={styles.inlineError}>{error}</Text> : null}
@@ -146,13 +168,16 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: colors.background, flex: 1 },
-  header: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingVertical: 16 },
+  header: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 18, paddingVertical: 16 },
   headerCopy: { flex: 1, minWidth: 0 },
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1.8 },
   title: { color: colors.text, fontSize: 28, fontWeight: '800', marginTop: 4 },
   subtitle: { color: colors.muted, fontSize: 13, marginTop: 3 },
-  signOut: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 8 },
-  signOutText: { color: colors.secondaryText, fontSize: 14, fontWeight: '600' },
+  headerActions: { flexDirection: 'row', gap: 8 },
+  headerButton: { alignItems: 'center', borderColor: colors.border, borderRadius: 9, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 12 },
+  headerButtonText: { color: colors.secondaryText, fontSize: 12, fontWeight: '800' },
+  headerButtonPrimary: { alignItems: 'center', backgroundColor: colors.accent, borderRadius: 9, justifyContent: 'center', minHeight: 44, paddingHorizontal: 12 },
+  headerButtonPrimaryText: { color: colors.background, fontSize: 12, fontWeight: '900' },
   list: { gap: 12, paddingBottom: 28, paddingHorizontal: 16 },
   emptyList: { flexGrow: 1 },
   centered: { alignItems: 'center', flex: 1, gap: 14, justifyContent: 'center', padding: 28 },
@@ -160,6 +185,8 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, fontSize: 15, lineHeight: 22, textAlign: 'center' },
   inlineError: { color: colors.danger, fontSize: 13, lineHeight: 19, paddingVertical: 8 },
   emptyTitle: { color: colors.text, fontSize: 19, fontWeight: '700' },
+  emptyButton: { alignItems: 'center', backgroundColor: colors.accent, borderRadius: 10, justifyContent: 'center', minHeight: 44, paddingHorizontal: 18 },
+  emptyButtonText: { color: colors.background, fontSize: 13, fontWeight: '900' },
   retryButton: { backgroundColor: colors.accent, borderRadius: 10, justifyContent: 'center', minHeight: 44, paddingHorizontal: 20 },
   retryText: { color: colors.background, fontWeight: '800' },
   card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, gap: 12, padding: 16 },
