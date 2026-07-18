@@ -170,17 +170,19 @@ function assertNetworkFreeSource(path: string, source: string) {
     }
 
     if (ts.isPropertyAccessExpression(node)) {
+      const receiver = unwrapExpression(node.expression);
+
       if (
-        ts.isIdentifier(node.expression) &&
-        NETWORK_GLOBALS.has(node.expression.text) &&
+        ts.isIdentifier(receiver) &&
+        NETWORK_GLOBALS.has(receiver.text) &&
         NETWORK_PROPERTIES.has(node.name.text)
       ) {
-        fail(`${node.expression.text}.${node.name.text}`);
+        fail(`${receiver.text}.${node.name.text}`);
       }
 
       if (
-        ts.isIdentifier(node.expression) &&
-        node.expression.text === 'Linking' &&
+        ts.isIdentifier(receiver) &&
+        receiver.text === 'Linking' &&
         node.name.text === 'openURL'
       ) {
         fail('Linking.openURL');
@@ -188,21 +190,27 @@ function assertNetworkFreeSource(path: string, source: string) {
     }
 
     if (ts.isElementAccessExpression(node)) {
+      const receiver = unwrapExpression(node.expression);
+      const key = unwrapExpression(node.argumentExpression);
       const property = staticStringValue(node.argumentExpression);
 
-      if (
-        ts.isIdentifier(node.expression) &&
-        NETWORK_GLOBALS.has(node.expression.text) &&
-        (property === null || NETWORK_PROPERTIES.has(property))
-      ) {
-        fail(`${node.expression.text}[computed network property]`);
+      if (property !== null && NETWORK_PROPERTIES.has(property)) {
+        fail(`['${property}'] network property key on any receiver`);
+      }
+
+      if (!ts.isStringLiteralLike(key) && !ts.isNumericLiteral(key)) {
+        fail('computed element access key (only literal string and numeric keys are allowed)');
       }
 
       if (
-        ts.isIdentifier(node.expression) &&
-        node.expression.text === 'Linking' &&
-        property === 'openURL'
+        ts.isIdentifier(receiver) &&
+        NETWORK_GLOBALS.has(receiver.text) &&
+        (property === null || NETWORK_PROPERTIES.has(property))
       ) {
+        fail(`${receiver.text}[computed network property]`);
+      }
+
+      if (ts.isIdentifier(receiver) && receiver.text === 'Linking' && property === 'openURL') {
         fail('Linking[openURL]');
       }
     }
@@ -213,10 +221,35 @@ function assertNetworkFreeSource(path: string, source: string) {
   visit(sourceFile);
 }
 
+function unwrapExpression(node: ts.Expression): ts.Expression {
+  let current = node;
+
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isNonNullExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    ts.isSatisfiesExpression(current)
+  ) {
+    current = current.expression;
+  }
+
+  return current;
+}
+
 function staticStringValue(node: ts.Expression | undefined): string | null {
   if (!node) return null;
   if (ts.isStringLiteralLike(node)) return node.text;
-  if (ts.isParenthesizedExpression(node)) return staticStringValue(node.expression);
+
+  if (
+    ts.isParenthesizedExpression(node) ||
+    ts.isAsExpression(node) ||
+    ts.isNonNullExpression(node) ||
+    ts.isTypeAssertionExpression(node) ||
+    ts.isSatisfiesExpression(node)
+  ) {
+    return staticStringValue(node.expression);
+  }
 
   if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
     const left = staticStringValue(node.left);
@@ -291,6 +324,18 @@ const NETWORK_BOUNDARY_FIXTURES = [
   {
     name: 'computed globalThis fetch',
     source: `globalThis['fe' + 'tch']('https://example.test');`,
+  },
+  {
+    name: 'parenthesized receiver computed fetch',
+    source: `(globalThis)['fe' + 'tch']('https://example.test');`,
+  },
+  {
+    name: 'type-cast receiver computed fetch',
+    source: `(globalThis as Record<string, unknown>)['fe' + 'tch'];`,
+  },
+  {
+    name: 'aliased receiver computed fetch',
+    source: `const g = globalThis; g['fe' + 'tch'];`,
   },
   {
     name: 'computed global XMLHttpRequest',
