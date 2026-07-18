@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/auth/auth-context';
 import { fetchBet, fetchCurrency } from '@/bets/data';
 import { readErrorMessage } from '@/bets/errors';
-import { couponPresentation, type BetDto, formatMoney } from '@/bets/models';
+import { betFinancialSummary, couponPresentation, type BetDto, formatMoney } from '@/bets/models';
 import { STATUS_PRESENTATION } from '@/bets/presentation';
 import { colors } from '@/ui/theme';
 
@@ -74,6 +74,7 @@ export default function BetDetailScreen() {
   const status = STATUS_PRESENTATION[bet.status];
   const firstLeg = bet.legs[0];
   const coupon = couponPresentation(bet);
+  const financialSummary = betFinancialSummary(bet, currency);
   const totalOdds = bet.totalOdds?.toFixed(2) ?? firstLeg?.odds.toFixed(2) ?? '—';
 
   return (
@@ -95,8 +96,8 @@ export default function BetDetailScreen() {
           <SummaryMetric label="Total odds" value={totalOdds} />
           <View style={styles.summaryDivider} />
           <SummaryMetric
-            label={bet.pnl !== null ? 'P&L' : 'Payout'}
-            value={formatMoney(bet.pnl ?? bet.potentialPayout ?? 0, currency)}
+            label={financialSummary.label}
+            value={financialSummary.value}
           />
         </View>
 

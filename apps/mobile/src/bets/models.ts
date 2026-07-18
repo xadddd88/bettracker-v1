@@ -158,6 +158,20 @@ export function formatMoney(value: number, currency: string): string {
   return `${sign}${symbol}${Math.abs(value).toFixed(2)}`;
 }
 
+export function betFinancialSummary(
+  bet: Pick<BetDto, 'pnl' | 'potentialPayout'>,
+  currency: string,
+): { label: 'P&L' | 'Payout'; value: string } {
+  if (bet.pnl !== null) {
+    return { label: 'P&L', value: formatMoney(bet.pnl, currency) };
+  }
+
+  return {
+    label: 'Payout',
+    value: bet.potentialPayout === null ? '—' : formatMoney(bet.potentialPayout, currency),
+  };
+}
+
 export function betTitle(bet: BetDto): string {
   if (bet.legs.length === 0) return 'Tracked bet';
   if (bet.legs.length === 1) return bet.legs[0].eventName;

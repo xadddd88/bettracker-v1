@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { couponPresentation, currencySymbol, mapBetRow, resolveBetStatus } from '../src/bets/models';
+import {
+  betFinancialSummary,
+  couponPresentation,
+  currencySymbol,
+  mapBetRow,
+  resolveBetStatus,
+} from '../src/bets/models';
 import { sanitizeAuthError, shouldRefreshForAppState } from '../src/auth/policy';
 import { readErrorMessage, sanitizeReadError } from '../src/bets/errors';
 
@@ -89,6 +95,21 @@ test('formats supported and fallback currencies', () => {
   assert.equal(currencySymbol('UAH'), '₴');
   assert.equal(currencySymbol('GBP'), '£');
   assert.equal(currencySymbol('JPY'), 'JPY ');
+});
+
+test('financial summary never invents a zero payout', () => {
+  assert.deepEqual(
+    betFinancialSummary({ pnl: null, potentialPayout: null }, 'USD'),
+    { label: 'Payout', value: '—' },
+  );
+  assert.deepEqual(
+    betFinancialSummary({ pnl: null, potentialPayout: 25 }, 'EUR'),
+    { label: 'Payout', value: '€25.00' },
+  );
+  assert.deepEqual(
+    betFinancialSummary({ pnl: -4, potentialPayout: 25 }, 'USD'),
+    { label: 'P&L', value: '-$4.00' },
+  );
 });
 
 test('auth and read errors are sanitized', () => {
