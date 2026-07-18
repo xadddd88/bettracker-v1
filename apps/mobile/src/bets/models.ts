@@ -37,6 +37,22 @@ export interface BetDto {
   totalOdds: number | null;
 }
 
+export interface CouponLeg {
+  eventName: string;
+  id: string;
+  index: number;
+  marketType: string | null;
+  odds: number | null;
+  selection: string | null;
+}
+
+export interface CouponPresentation {
+  isExpress: boolean;
+  isLegacy: boolean;
+  label: string;
+  legs: CouponLeg[];
+}
+
 interface RawLeg {
   event_name: string;
   id: string;
@@ -146,4 +162,67 @@ export function betTitle(bet: BetDto): string {
   if (bet.legs.length === 0) return 'Tracked bet';
   if (bet.legs.length === 1) return bet.legs[0].eventName;
   return `${bet.legs.length}-leg Express`;
+}
+
+function legacyExpressCount(marketType: string | null): number | null {
+  if (!marketType) return null;
+  const match = marketType.match(/(?:express|експрес)\s*\(\s*(\d+)\s*(?:legs?|ног)/i);
+  if (!match) return null;
+  const count = Number(match[1]);
+  return Number.isInteger(count) && count >= 2 && count <= 20 ? count : null;
+}
+
+function splitLegacyParts(value: string | null, expected: number): string[] | null {
+  if (!value) return null;
+  const parts = value.split(/\s+\+\s+/).map((part) => part.trim()).filter(Boolean);
+  return parts.length === expected ? parts : null;
+}
+
+export function couponPresentation(bet: BetDto): CouponPresentation {
+  const mappedLegs = bet.legs.map((leg, index): CouponLeg => ({
+    eventName: leg.eventName,
+    id: leg.id,
+    index: leg.legIndex ?? index + 1,
+    marketType: leg.marketType,
+    odds: leg.odds,
+    selection: leg.selection,
+  }));
+
+  if (mappedLegs.length > 1) {
+    return {
+      isExpress: true,
+      isLegacy: false,
+      label: `Express · ${mappedLegs.length} legs`,
+      legs: mappedLegs,
+    };
+  }
+
+  const onlyLeg = bet.legs[0];
+  const expected = legacyExpressCount(onlyLeg?.marketType ?? null);
+  const events = expected && onlyLeg ? splitLegacyParts(onlyLeg.eventName, expected) : null;
+  const selections = expected && onlyLeg ? splitLegacyParts(onlyLeg.selection, expected) : null;
+
+  if (onlyLeg && expected && events && selections) {
+    return {
+      isExpress: true,
+      isLegacy: true,
+      label: `Express · ${expected} legs`,
+      legs: events.map((eventName, index) => ({
+        eventName,
+        id: `${onlyLeg.id}-legacy-${index + 1}`,
+        index: index + 1,
+        marketType: null,
+        odds: null,
+        selection: selections[index],
+      })),
+    };
+  }
+
+  const legacyExpress = bet.betType === 'parlay' || expected !== null;
+  return {
+    isExpress: legacyExpress,
+    isLegacy: legacyExpress,
+    label: legacyExpress ? 'Legacy Express' : 'Single',
+    legs: mappedLegs,
+  };
 }
