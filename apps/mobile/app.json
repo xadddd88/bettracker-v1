@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "xaddd",
+    "slug": "xaddd",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/android-icon-monochrome.png",
+    "scheme": "xaddd",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/images/android-icon-monochrome.png",
+      "bundleIdentifier": "com.dmitriykhodakivskyi.xaddd"
+    },
+    "android": {
+      "package": "com.dmitriykhodakivskyi.xaddd",
+      "icon": "./assets/images/android-icon-monochrome.png",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#208AEF",
+          "image": "./assets/images/android-icon-monochrome.png",
+          "imageWidth": 76
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b830dceb-1f96-4c09-b02d-fd2415c14a02"
+      }
+    },
+    "owner": "xaddds-team",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b830dceb-1f96-4c09-b02d-fd2415c14a02"
+    }
+  }
+}
