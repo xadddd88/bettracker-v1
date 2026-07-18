@@ -30,7 +30,15 @@
           "imageWidth": 76
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow xaddd to photograph a coupon or event screenshot for local preparation.",
+          "photosPermission": "Allow xaddd to choose a coupon or event screenshot for local preparation.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
