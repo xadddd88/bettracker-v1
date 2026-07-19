@@ -63,18 +63,22 @@ export default async function BetsPage() {
   const totalStaked = bets.reduce((s, b) => s + b.stake, 0)
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <PageView event={EVENTS.BETS_LIST_VIEWED} props={{ bet_count: bets.length }} />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="grid gap-6 border-y border-black py-6 sm:grid-cols-[1fr_auto] sm:items-end">
         <div>
-          <h1 className="text-2xl font-bold text-white">Bets</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {bets.length} bets · {m.settledCount} settled · live P&amp;L tracking
+          <p className="editorial-kicker">03 / Decision archive</p>
+          <h1 className="mt-3 font-display text-[clamp(3.4rem,9vw,7.5rem)] font-black uppercase leading-[0.8] tracking-[-0.075em]">Tracker</h1>
+          <p className="mt-5 max-w-xl text-sm text-black/55">
+            {bets.length} records / {m.settledCount} settled / live P&amp;L tracking
           </p>
         </div>
-        <Link href="/bets/new" className="btn-primary">+ Add Bet</Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/ai" className="btn-ghost">Scan coupon</Link>
+          <Link href="/bets/new" className="btn-primary">Add bet ↗</Link>
+        </div>
       </div>
 
       {/* Summary strip */}

@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/server'
 import type { Bet } from '@/types'
 import BankrollWidget from './BankrollWidget'
 import { PageView } from '@/lib/analytics/PageView'
@@ -43,209 +43,209 @@ export default async function DashboardPage() {
   ])
 
   const bets: Bet[] = betsData || []
-
-  const today        = new Date().toISOString().slice(0, 10)
+  const today = new Date().toISOString().slice(0, 10)
   const primaryEvent = getPrimaryEvent(today)
-
-  // Canonical settlement metrics (Decision #058) — same shared formulas as
-  // the bets page, analytics, and coach.
-  const m = calcSettlementMetrics(bets)
-  const pendingBets = bets.filter(b => b.status === 'pending')
-
+  const metrics = calcSettlementMetrics(bets)
+  const pendingBets = bets.filter(bet => bet.status === 'pending')
   const currency = bankroll?.currency || 'USD'
   const sym = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'UAH' ? '₴' : currency
-
-  const statCards = [
-    {
-      label: 'Win Rate',
-      value: m.winRate != null ? `${m.winRate.toFixed(1)}%` : '—',
-      color: '',
-      sub: 'Won / (won + lost)',
-    },
-    {
-      label: 'ROI',
-      value: m.roi != null ? `${m.roi >= 0 ? '+' : ''}${m.roi.toFixed(1)}%` : '—',
-      color: m.roi != null ? (m.roi >= 0 ? 'text-green-400' : 'text-red-400') : '',
-      sub: 'Return on won + lost stake',
-    },
-    {
-      label: 'Net Profit',
-      value: m.settledCount > 0
-        ? `${m.netProfit >= 0 ? '+' : ''}${sym}${m.netProfit.toFixed(2)}`
-        : '—',
-      color: m.settledCount > 0 ? (m.netProfit >= 0 ? 'text-green-400' : 'text-red-400') : '',
-      sub: 'Settled bets only',
-    },
-    {
-      label: 'Pending',
-      value: `${sym}${m.pendingStake.toFixed(2)}`,
-      color: '',
-      sub: `${m.pendingCount} open bet${m.pendingCount !== 1 ? 's' : ''}`,
-    },
-  ]
-
-  const recent = bets.slice(0, 6)
+  const recent = bets.slice(0, 5)
 
   const nextAction: NextAction = (() => {
     if (bets.length === 0) {
       return {
-        type:   'first_analysis',
-        icon:   '🤖',
-        label:  'Analyze your first match',
-        detail: 'Get AI-powered edge, confidence, and risk scoring in seconds.',
-        href:   '/ai',
+        type: 'first_analysis',
+        icon: '01',
+        label: 'Analyze your first match',
+        detail: 'Begin with evidence, context and a structured decision.',
+        href: '/ai',
       }
     }
     if ((watchlistCount ?? 0) > 0) {
       return {
-        type:   'review_watchlist',
-        icon:   '👁️',
-        label:  `Review ${watchlistCount} watchlisted decision${watchlistCount === 1 ? '' : 's'}`,
-        detail: 'Opportunities you saved are waiting for a decision.',
-        href:   '/decisions',
+        type: 'review_watchlist',
+        icon: '02',
+        label: `Review ${watchlistCount} watchlisted decision${watchlistCount === 1 ? '' : 's'}`,
+        detail: 'Return to saved opportunities before the market moves.',
+        href: '/decisions',
       }
     }
     if (pendingBets.length > 0) {
       return {
-        type:   'settle_bets',
-        icon:   '🎯',
-        label:  `Settle ${pendingBets.length} pending bet${pendingBets.length === 1 ? '' : 's'}`,
-        detail: 'Record your results to keep analytics accurate.',
-        href:   '/bets',
+        type: 'settle_bets',
+        icon: '03',
+        label: `Settle ${pendingBets.length} pending bet${pendingBets.length === 1 ? '' : 's'}`,
+        detail: 'Keep the portfolio record complete and trustworthy.',
+        href: '/bets',
       }
     }
     return {
-      type:   'scout',
-      icon:   '🔍',
-      label:  'Scout for new value bets',
-      detail: 'AI-powered opportunity discovery across sports and leagues.',
-      href:   '/scout',
+      type: 'scout',
+      icon: '04',
+      label: 'Scout for new value bets',
+      detail: 'Build the next decision from current opportunities.',
+      href: '/scout',
     }
   })()
 
-  const showOnboarding = !profile?.onboarding_completed
-
   return (
-    <div className="flex flex-col gap-5 lg:gap-6">
+    <div className="flex flex-col">
       <PageView event={EVENTS.DASHBOARD_VIEWED} props={{ bet_count: bets.length }} />
+      {!profile?.onboarding_completed && <div className="mb-5"><OnboardingCard /></div>}
 
-      {/* First-run onboarding card */}
-      {showOnboarding && <OnboardingCard />}
+      <header className="flex min-h-12 items-center border-y border-black px-3 md:px-4">
+        <div className="font-display text-lg font-black tracking-[-0.06em]">XADDD</div>
+        <div className="ml-4 flex-1 font-mono text-[8px] font-bold tracking-[0.18em] text-black/45">FOUNDER EDITION / WEB</div>
+        <Link href="/settings" className="flex min-h-11 items-center text-[9px] font-black uppercase tracking-[0.12em] hover:underline">
+          Account
+        </Link>
+      </header>
 
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-white font-display">Dashboard</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            {bets.length} bets tracked · {watchlistCount || 0} on watchlist
-          </p>
+      <section className="editorial-dark relative min-h-[520px] overflow-hidden border-x border-black p-5 md:min-h-[620px] md:p-10">
+        <div className="pointer-events-none absolute -right-4 top-12 select-none font-display text-[clamp(7rem,23vw,22rem)] font-black leading-none tracking-[-0.1em] text-white/[0.055]" aria-hidden>
+          DECIDE
         </div>
-        <div className="flex gap-2 shrink-0">
-          <Link href="/ai" className="btn-ghost text-sm">Analyze</Link>
-          <Link href="/bets/new" className="btn-primary text-sm">+ Add Bet</Link>
+        <div className="relative z-10 flex h-full min-h-[480px] flex-col md:min-h-[540px]">
+          <div className="flex justify-between font-mono text-[9px] font-bold tracking-[0.18em] text-white">
+            <span>SYSTEM 001</span>
+            <span>LIVE PORTFOLIO</span>
+          </div>
+          <div className="my-auto py-12">
+            <p className="mb-5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#e8ff00]">Decision intelligence</p>
+            <h1 className="max-w-5xl font-display text-[clamp(3.4rem,8vw,8.6rem)] font-black uppercase leading-[0.78] tracking-[-0.075em] text-white">
+              Betting<br />decisions<br />in focus
+            </h1>
+            <p className="mt-8 max-w-md text-sm leading-6 text-white/65 md:text-base">
+              Capture the evidence. Review the context. Track the outcome.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:max-w-xl">
+            <Link href="/ai" className="editorial-action border-white bg-white text-black">Scan now</Link>
+            <Link href="/bets" className="editorial-action border-white text-white">Open tracker</Link>
+          </div>
+        </div>
+      </section>
+
+      <div className="editorial-ticker" aria-label="Analyze, verify, track">
+        <div className="editorial-ticker-track">
+          <div className="editorial-ticker-copy">Analyze / Verify / Track / Analyze / Verify / Track /</div>
+          <div className="editorial-ticker-copy" aria-hidden>Analyze / Verify / Track / Analyze / Verify / Track /</div>
         </div>
       </div>
 
-      {/* Balance hero */}
-      <BankrollWidget balance={bankroll?.balance || 0} sym={sym} />
+      <section className="border-x border-b border-black bg-[#f5f5f0] px-4 py-8 md:px-8 md:py-12">
+        <SectionHeader index="01" label="Portfolio" detail={`${metrics.pendingCount} OPEN`} />
+        <div className="mt-5">
+          <BankrollWidget balance={bankroll?.balance || 0} sym={sym} />
+        </div>
+        <div className="mt-8 grid grid-cols-2 border-y border-black md:grid-cols-4">
+          <Metric label="Net P&L" value={metrics.settledCount ? `${metrics.netProfit >= 0 ? '+' : ''}${sym}${metrics.netProfit.toFixed(2)}` : '—'} />
+          <Metric label="Tracked" value={String(bets.length).padStart(2, '0')} />
+          <Metric label="Settled" value={String(metrics.settledCount).padStart(2, '0')} />
+          <Metric label="ROI" value={metrics.roi == null ? '—' : `${metrics.roi >= 0 ? '+' : ''}${metrics.roi.toFixed(1)}%`} />
+        </div>
+      </section>
 
-      {/* Event Pulse + Next best action — paired side by side on desktop so the
-          dashboard doesn't read as two full-width stretched mobile cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 items-stretch">
-        {primaryEvent && <EventPulseCard event={primaryEvent} />}
-        <div className={`grid ${!primaryEvent ? 'lg:col-span-2' : ''}`}>
+      <section className="grid border-x border-b border-black sm:grid-cols-2">
+        <Link href="/ai" className="group relative min-h-36 bg-white p-5 transition-colors hover:bg-[#e8ff00] sm:border-r sm:border-black">
+          <span className="font-mono text-[9px] text-black/45">A</span>
+          <span className="absolute right-5 top-4 text-2xl transition-transform group-hover:translate-x-1 group-hover:-translate-y-1">↗</span>
+          <span className="absolute bottom-5 left-5 font-display text-xl font-black uppercase tracking-[-0.04em]">Scan coupon</span>
+        </Link>
+        <Link href="/bets/new" className="editorial-dark group relative min-h-36 bg-[#050505] p-5 text-white transition-colors hover:bg-[#e8ff00] hover:text-black">
+          <span className="font-mono text-[9px] opacity-45">B</span>
+          <span className="absolute right-5 top-4 text-2xl transition-transform group-hover:translate-x-1 group-hover:-translate-y-1">↗</span>
+          <span className="absolute bottom-5 left-5 font-display text-xl font-black uppercase tracking-[-0.04em]">Add bet</span>
+        </Link>
+      </section>
+
+      {(primaryEvent || nextAction) && (
+        <section className="grid gap-px border-x border-b border-black bg-black p-px lg:grid-cols-2">
+          {primaryEvent && <EventPulseCard event={primaryEvent} />}
           <NextBestAction action={nextAction} />
-        </div>
-      </div>
+        </section>
+      )}
 
-      {/* Secondary stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {statCards.map(({ label, value, color, sub }) => (
-          <div key={label} className="stat-card">
-            <div className="stat-label">{label}</div>
-            <div className={`stat-value text-xl ${color || 'text-white'}`}>{value}</div>
-            <div className="text-xs text-gray-600">{sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Recent bets */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-white font-display">Recent Bets</h2>
-          <Link href="/bets" className="text-xs text-amber-400 hover:text-amber-300 transition-colors">
-            View all →
-          </Link>
-        </div>
-
-        {recent.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="font-medium text-white mb-1">No bets yet</p>
-            <p className="text-slate-500 text-sm mb-5">Run the AI Analyst to get a recommendation, then place your first bet.</p>
-            <div className="flex gap-3 justify-center">
-              <Link href="/ai" className="btn-ghost text-sm">Analyze match</Link>
-              <Link href="/bets/new" className="btn-primary text-sm">+ Quick add</Link>
+      <section className="border-x border-b border-black bg-white px-4 py-8 md:px-8 md:py-12">
+        <SectionHeader index="02" label="Recent bets" detail={`${recent.length} RECORDS`} />
+        <div className="mt-4 border-t border-black">
+          {recent.length === 0 ? (
+            <div className="grid min-h-56 place-items-center py-12 text-center">
+              <div>
+                <p className="font-display text-4xl font-black uppercase tracking-[-0.06em]">No records</p>
+                <p className="mt-3 text-sm text-black/55">Scan a coupon or prepare the first decision.</p>
+                <Link href="/ai" className="btn-primary mt-6">Start with AI</Link>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="flex flex-col divide-y divide-night-700/60">
-            {recent.map((bet) => {
-              const leg = bet.legs?.[0]
-              const multiLeg = (bet.legs?.length || 0) > 1
-              return (
-                <div key={bet.id}>
-                  <Link
-                    href={`/bets/${bet.id}`}
-                    className="flex items-center gap-3 py-3 hover:opacity-75 transition-opacity"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-white truncate">
-                        {multiLeg ? `Express (${bet.legs!.length} events)` : leg?.event_name || '—'}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-0.5">
-                        {multiLeg
-                          ? bet.legs!.map(l => l.selection || l.market_type).join(' · ')
-                          : (leg?.market_type || '—')}
-                        {leg && !multiLeg && (
-                          <span className="font-mono"> @{leg.odds.toFixed(2)}</span>
-                        )}
-                      </div>
+          ) : recent.map((bet, index) => {
+            const leg = bet.legs?.[0]
+            const multiLeg = (bet.legs?.length || 0) > 1
+            return (
+              <div key={bet.id} className="border-b border-black">
+                <Link href={`/bets/${bet.id}`} className="group grid min-h-24 grid-cols-[32px_1fr_auto] items-center gap-3 py-4 transition-colors hover:bg-[#e8ff00] md:grid-cols-[48px_minmax(0,1fr)_110px_110px] md:px-3">
+                  <span className="font-mono text-[9px] text-black/45">{String(index + 1).padStart(2, '0')}</span>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-black uppercase tracking-[0.02em]">
+                      {multiLeg ? `Express / ${bet.legs!.length} legs` : leg?.event_name || 'Untitled record'}
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-xs text-slate-400 font-mono">{sym}{bet.stake}</div>
-                      <StatusBadge status={bet.status} />
+                    <div className="mt-1 truncate text-xs text-black/55">
+                      {multiLeg ? bet.legs!.map(item => item.selection || item.market_type).join(' / ') : leg?.market_type || '—'}
                     </div>
+                  </div>
+                  <div className="text-right font-mono text-xs md:text-left">
+                    <div className="text-[8px] uppercase tracking-[0.14em] text-black/45">Stake</div>
+                    <div className="mt-1">{sym}{bet.stake}</div>
+                  </div>
+                  <div className="hidden text-right md:block">
+                    <StatusBadge status={bet.status} />
                     {isSupportedSettlementStatus(bet.status) && bet.pnl != null && (
-                      <div className={`text-sm font-semibold font-mono w-16 text-right ${bet.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      <div className={`mt-1 font-mono text-xs ${bet.pnl >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                         {bet.pnl >= 0 ? '+' : ''}{sym}{bet.pnl.toFixed(2)}
                       </div>
                     )}
-                  </Link>
-                  {bet.status === 'pending' && <QuickSettle betId={bet.id} />}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
+                  </div>
+                </Link>
+                {bet.status === 'pending' && <QuickSettle betId={bet.id} />}
+              </div>
+            )
+          })}
+        </div>
+        <Link href="/bets" className="editorial-action mt-6">View complete archive →</Link>
+      </section>
+    </div>
+  )
+}
+
+function SectionHeader({ detail, index, label }: { detail: string; index: string; label: string }) {
+  return (
+    <div className="grid grid-cols-[32px_1fr_auto] items-center gap-3">
+      <span className="font-mono text-[9px] text-black/45">{index}</span>
+      <h2 className="font-mono text-[10px] font-black uppercase tracking-[0.18em]">{label}</h2>
+      <span className="font-mono text-[9px] font-bold">{detail}</span>
+    </div>
+  )
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-h-24 border-r border-black p-4 last:border-r-0 even:border-r-0 md:even:border-r md:last:border-r-0">
+      <div className="font-mono text-[8px] font-bold uppercase tracking-[0.16em] text-black/45">{label}</div>
+      <div className="mt-3 font-display text-xl font-black tracking-[-0.04em] md:text-2xl">{value}</div>
     </div>
   )
 }
 
 function StatusBadge({ status }: { status: string }) {
-  // Canonical resolver (Decision #058): explicit entry for every status key,
-  // 'Unknown' label for unrecognized values — no raw text, no misleading
-  // fallback.
   const styles: Record<BetStatusKey, string> = {
-    won:        'text-green-400',
-    lost:       'text-red-400',
-    pending:    'text-violet-400',
-    void:       'text-slate-500',
-    push:       'text-blue-400',
-    cashed_out: 'text-purple-400',
-    partial:    'text-slate-300',
-    unknown:    'text-slate-500',
+    won: 'text-green-700',
+    lost: 'text-red-700',
+    pending: 'text-amber-700',
+    void: 'text-black/45',
+    push: 'text-blue-700',
+    cashed_out: 'text-purple-700',
+    partial: 'text-black/70',
+    unknown: 'text-black/45',
   }
   const resolved = resolveBetStatus(status)
-  return <span className={`text-xs ${styles[resolved.key]}`}>{resolved.label}</span>
+  return <span className={`font-mono text-[9px] font-black uppercase tracking-[0.12em] ${styles[resolved.key]}`}>{resolved.label}</span>
 }
