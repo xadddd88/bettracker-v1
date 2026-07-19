@@ -237,6 +237,8 @@ export function couponPresentation(bet: BetDto): CouponPresentation {
     isExpress: legacyExpress,
     isLegacy: legacyExpress,
     label: legacyExpress ? 'Legacy Express' : 'Single',
-    legs: mappedLegs,
+    legs: legacyExpress
+      ? mappedLegs.map((leg) => ({ ...leg, odds: null }))
+      : mappedLegs,
   };
 }

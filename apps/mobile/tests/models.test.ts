@@ -89,6 +89,7 @@ test('fails closed when a legacy Express cannot be split unambiguously', () => {
   assert.equal(coupon.isLegacy, true);
   assert.equal(coupon.legs.length, 1);
   assert.equal(coupon.legs[0].eventName, 'Event A + Event B + Event C + Event D');
+  assert.equal(coupon.legs[0].odds, null);
 });
 
 test('formats supported and fallback currencies', () => {
