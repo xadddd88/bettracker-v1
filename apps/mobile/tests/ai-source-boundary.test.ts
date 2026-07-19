@@ -6,16 +6,9 @@ import ts from 'typescript';
 
 const root = process.cwd();
 
-const ALLOWED_AI_EXTERNAL_IMPORTS = new Set([
-  'expo-image',
+const ALLOWED_CAPTURE_EXTERNAL_IMPORTS = new Set([
   'expo-image-manipulator',
   'expo-image-picker',
-  'expo-network',
-  'expo-symbols',
-  'react',
-  'react-native',
-  'react-native-reanimated',
-  'react-native-safe-area-context',
 ]);
 
 type ImportGraph = {
@@ -290,15 +283,12 @@ test('Mobile Phase 1B declares compatible capture dependencies and permissions',
   assert.equal(imagePickerPlugin[1].microphonePermission, false);
 });
 
-test('Mobile Phase 1B AI source is local-only and contains the approved holding state', () => {
-  const entrypoint = join(root, 'src/app/(app)/ai/index.tsx');
+test('Mobile Phase 1B capture pipeline remains local-only', () => {
+  const entrypoint = join(root, 'src/ai/image-capture.ts');
   const graph = collectImportGraph(entrypoint);
   const expectedTransitiveFiles = [
     entrypoint,
-    join(root, 'src/ai/capture-lock.ts'),
     join(root, 'src/ai/image-policy.ts'),
-    join(root, 'src/ai/image-capture.ts'),
-    join(root, 'src/ui/theme.ts'),
   ];
 
   for (const path of expectedTransitiveFiles) {
@@ -307,14 +297,46 @@ test('Mobile Phase 1B AI source is local-only and contains the approved holding 
 
   assert.deepEqual(
     [...graph.externalImports].sort(),
-    [...ALLOWED_AI_EXTERNAL_IMPORTS].sort(),
-    'AI entrypoint external imports must stay on the approved local-only allowlist',
+    [...ALLOWED_CAPTURE_EXTERNAL_IMPORTS].sort(),
+    'capture pipeline imports must stay on the approved local-only allowlist',
   );
-
-  const source = [...graph.files].map(readSourceFile).join('\n');
-
-  assert.match(source, /Secure AI connection is being prepared/);
   assertNetworkFreeGraph(graph, readSourceFile);
+});
+
+test('Mobile scanner uses one audited authenticated network seam', () => {
+  const screenPath = join(root, 'src/app/(app)/ai/index.tsx');
+  const clientPath = join(root, 'src/ai/scanner-client.ts');
+  const modelPath = join(root, 'src/ai/scanner-model.ts');
+  const apiClientPath = join(root, 'src/lib/api-client.ts');
+  const screen = readSourceFile(screenPath);
+  const client = readSourceFile(clientPath);
+  const model = readSourceFile(modelPath);
+  const apiClient = readSourceFile(apiClientPath);
+
+  assert.match(screen, /from ['"]@\/ai\/scanner-client['"]/);
+  assert.match(screen, /scanPreparedCoupon\(prepared\)/);
+  assert.doesNotMatch(screen, /\bfetch\b|\bsupabase\b|\/api\/|service[_-]?role|ANTHROPIC_API_KEY|OPENAI_API_KEY/i);
+
+  assert.match(client, /from ['"]@\/lib\/api-client['"]/);
+  assert.match(client, /from ['"]@\/lib\/supabase['"]/);
+  assert.match(client, /path:\s*['"]\/api\/ai\/scanner['"]/);
+  assert.match(client, /auth\.getSession\(\)/);
+  assert.match(client, /auth\.refreshSession\(\)/);
+  assert.deepEqual(
+    moduleSpecifiers(clientPath, client).sort(),
+    ['./image-capture', './scanner-model', '@/lib/api-client', '@/lib/supabase'].sort(),
+    'scanner client imports must stay on the audited allowlist',
+  );
+  assert.doesNotMatch(client, /\bfetch\b|service[_-]?role|ANTHROPIC_API_KEY|OPENAI_API_KEY|console\./i);
+
+  assert.match(apiClient, /Authorization:\s*`Bearer \$\{token\}`/);
+  assert.match(apiClient, /await fetchImpl\(/);
+  assert.equal((apiClient.match(/await fetchImpl\(/g) ?? []).length, 1, 'all mobile API requests must use the single request helper');
+  assert.doesNotMatch(apiClient, /\bsupabase\b|service[_-]?role|ANTHROPIC_API_KEY|OPENAI_API_KEY|console\./i);
+
+  assert.match(model, /MAX_SCANNER_LEGS\s*=\s*20/);
+  assert.match(model, /MAX_SCANNER_REQUEST_BYTES\s*=\s*4_400_000/);
+  assert.doesNotMatch(model, /rawText|console\./);
 });
 
 const NETWORK_BOUNDARY_FIXTURES = [
@@ -492,7 +514,7 @@ test('authenticated layout exposes three focused tabs and keeps Tracker detail i
   assert.match(trackerLayout, /name="new"/);
 });
 
-test('AI capture screen exposes the approved local-only responsive states', () => {
+test('AI capture screen exposes secure scanner and responsive states', () => {
   const path = join(root, 'src/app/(app)/ai/index.tsx');
   assert.ok(existsSync(path), 'AI capture screen must exist');
 
@@ -512,7 +534,9 @@ test('AI capture screen exposes the approved local-only responsive states', () =
   }
 
   for (const message of [
-    'Secure AI connection is being prepared',
+    'Analyzing coupon securely',
+    'Coupon analysis is ready.',
+    'Event analysis is not connected yet.',
     'You are offline',
     'Selection cancelled. Current image unchanged.',
     'Camera access is off.',
@@ -525,7 +549,9 @@ test('AI capture screen exposes the approved local-only responsive states', () =
 
   assert.match(source, /useNetworkState\(\)/);
   assert.match(source, /useRef\(false\)/);
-  assert.match(source, /runWithCaptureLock\s*\(\s*captureLockRef/);
+  assert.match(source, /runWithCaptureLock\s*\(\s*operationLockRef/);
+  assert.match(source, /accessibilityLabel="Coupon analysis result"/);
+  assert.match(source, /NO FINANCIAL RECORD IS SAVED AUTOMATICALLY/);
   assert.match(source, /contentInsetAdjustmentBehavior="automatic"/);
   assert.match(source, /contentFit="contain"/);
   assert.match(source, /Linking\.openSettings\(\)/);
