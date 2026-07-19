@@ -13,7 +13,10 @@ import {
 } from '@/lib/ai/analysis-quality-gate'
 import { currencySymbol } from '@/lib/money'
 import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
-import type { AnalystResearchBrief, AnalystResearchSource } from '@/lib/ai/analyst-research'
+import {
+  parseStoredAnalystResearchBrief,
+  parseStoredAnalystResearchSources,
+} from '@/lib/ai/analyst-research'
 
 // Canonical resolver keys (Decision #058): explicit color for every status —
 // unknown values render as 'Unknown', never as raw text or a settled look.
@@ -35,8 +38,8 @@ interface AnalysisRunRow {
     quality_gate?: AnalysisQualityGateResult | null
     trust_view?: AnalystTrustView | null
     edge_bucket?: string | null
-    research_brief?: AnalystResearchBrief | null
-    research_sources?: AnalystResearchSource[]
+    research_brief?: unknown
+    research_sources?: unknown
     web_search_used?: boolean
   } | null
 }
@@ -111,18 +114,6 @@ function localizedRiskLabel(risk: string | null, fallback: string | null, trustV
   return fallback
 }
 
-function safeResearchSources(sources: AnalystResearchSource[] | undefined): AnalystResearchSource[] {
-  if (!Array.isArray(sources)) return []
-  return sources.filter(source => {
-    try {
-      const url = new URL(source.url)
-      return url.protocol === 'https:' || url.protocol === 'http:'
-    } catch {
-      return false
-    }
-  }).slice(0, 8)
-}
-
 function ScoreBar({ score }: { score: number }) {
   const color = score > 0 ? 'bg-green-500' : score < 0 ? 'bg-red-500' : 'bg-gray-500'
   return (
@@ -188,8 +179,8 @@ export default async function DecisionDetailPage({
   const action = ACTION_CONFIG[d.final_action] ?? ACTION_CONFIG.pending
   const linkedBet = d.bet_legs?.[0]?.bets ?? null
   const analysisOutput = d.ai_analysis_runs?.[0]?.output_json ?? null
-  const researchBrief = analysisOutput?.research_brief ?? null
-  const researchSources = safeResearchSources(analysisOutput?.research_sources)
+  const researchBrief = parseStoredAnalystResearchBrief(analysisOutput?.research_brief)
+  const researchSources = parseStoredAnalystResearchSources(analysisOutput?.research_sources)
   const qualityGate = analysisOutput?.quality_gate ?? null
   const storedTrustView = getDecisionTrustView(d, qualityGate)
   const showPricing = shouldShowPricingStats({
@@ -311,7 +302,10 @@ export default async function DecisionDetailPage({
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {researchSources.map(source => (
                   <a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer" className="border border-black bg-white px-3 py-3 text-sm font-bold text-black underline underline-offset-4 hover:bg-[#e8ff00]">
-                    {source.title}
+                    <span className="block">{source.title}</span>
+                    <span className="mt-1 block font-mono text-[9px] font-black uppercase tracking-[0.08em] no-underline opacity-50">
+                      {new URL(source.url).hostname}
+                    </span>
                   </a>
                 ))}
               </div>

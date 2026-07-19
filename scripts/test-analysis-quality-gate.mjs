@@ -43,9 +43,13 @@ const {
 } = scannerModule;
 const researchModule = require(path.join(buildDir, 'lib/ai/analyst-research.js'));
 const {
+  alignAnalystResearchBriefToCoupon,
   buildAnalystResearchMessage,
+  completePausedAnthropicTurn,
   containsAnalystPricingClaim,
   extractAnalystResearchSources,
+  parseStoredAnalystResearchBrief,
+  parseStoredAnalystResearchSources,
   usedSuccessfulWebSearch,
 } = researchModule;
 
@@ -55,6 +59,18 @@ let failed = 0;
 function test(name, fn) {
   try {
     fn();
+    console.log(`  ok  ${name}`);
+    passed++;
+  } catch (err) {
+    console.error(`  fail ${name}`);
+    console.error(`       ${err.message}`);
+    failed++;
+  }
+}
+
+async function asyncTest(name, fn) {
+  try {
+    await fn();
     console.log(`  ok  ${name}`);
     passed++;
   } catch (err) {
@@ -1000,12 +1016,77 @@ test('Analyst research message preserves Bet Builder legs and coupon time contex
 
   assert.ok(message.includes('Exact date/time text visible on coupon: Сьогодні, 22:10'), message);
   assert.ok(message.includes('User timezone: Europe/Kyiv'), message);
+  assert.ok(message.includes('Offered total odds: 2.91'), message);
   assert.ok(message.includes('Leg 1: event=Іспанія - Аргентина | market=Тотал | selection=Більше 2.5'), message);
   assert.ok(message.includes('Leg 2: event=Іспанія - Аргентина | market=Кутові. Тотал | selection=Більше 6.5'), message);
   assert.ok(message.includes('correlation'), message);
 });
 
-test('Analyst research source extraction keeps cited HTTP sources and drops unsafe URLs', () => {
+function exactBuilderResearchBrief() {
+  return {
+    headline: 'Conditional Bet Builder review',
+    summary: 'The two legs depend on the same match script and need separate verification.',
+    builderRisk: 'An early goal can change both attacking pressure and corner volume.',
+    verdict: 'Verify the fixture and current inputs before kickoff.',
+    dataGaps: ['Exact competition'],
+    legs: [
+      {
+        legNumber: 2,
+        eventName: 'Іспанія - Аргентина',
+        marketType: 'Кутові. Тотал',
+        selection: 'Більше 6.5',
+        assessment: 'Seven corners are required.',
+        evidence: ['Conditional match logic only'],
+        risks: ['Low attacking width'],
+        fixtureStatus: 'scheduled',
+        dataCoverage: { liveInjuries: true, teamNews: true, recentForm: true, lineMovement: true },
+      },
+      {
+        legNumber: 1,
+        eventName: 'Іспанія - Аргентина',
+        marketType: 'Тотал',
+        selection: 'Більше 2.5',
+        assessment: 'Three goals are required.',
+        evidence: ['Conditional scoring logic only'],
+        risks: ['Low-tempo opening'],
+        fixtureStatus: 'scheduled',
+        dataCoverage: { liveInjuries: true, teamNews: true, recentForm: true, lineMovement: true },
+      },
+    ],
+  };
+}
+
+test('Analyst aligns reordered model legs by leg number and discards unbound coverage', () => {
+  const aligned = alignAnalystResearchBriefToCoupon(exactBuilderResearchBrief(), [
+    { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5' },
+    { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5' },
+  ]);
+
+  assert.ok(aligned);
+  assert.equal(aligned.legs[0].assessment, 'Three goals are required.');
+  assert.equal(aligned.legs[1].assessment, 'Seven corners are required.');
+  assert.deepEqual(aligned.legs.map(leg => leg.dataCoverage), [
+    { liveInjuries: false, teamNews: false, recentForm: false, lineMovement: false },
+    { liveInjuries: false, teamNews: false, recentForm: false, lineMovement: false },
+  ]);
+  assert.deepEqual(aligned.legs.map(leg => leg.fixtureStatus), ['unknown', 'unknown']);
+});
+
+test('Analyst rejects duplicate numbers and mismatched leg identity instead of swapping commentary', () => {
+  const couponLegs = [
+    { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5' },
+    { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5' },
+  ];
+  const duplicate = exactBuilderResearchBrief();
+  duplicate.legs[0].legNumber = 1;
+  assert.equal(alignAnalystResearchBriefToCoupon(duplicate, couponLegs), null);
+
+  const mismatched = exactBuilderResearchBrief();
+  mismatched.legs[0].selection = 'Більше 2.5';
+  assert.equal(alignAnalystResearchBriefToCoupon(mismatched, couponLegs), null);
+});
+
+test('Analyst research source extraction keeps only cited public HTTPS sources', () => {
   const content = [
     {
       type: 'text',
@@ -1013,6 +1094,10 @@ test('Analyst research source extraction keeps cited HTTP sources and drops unsa
       citations: [
         { type: 'web_search_result_location', url: 'https://example.com/report', title: ' Match report ', cited_text: '  Current team news. ' },
         { type: 'web_search_result_location', url: 'javascript:alert(1)', title: 'Unsafe', cited_text: 'nope' },
+        { type: 'web_search_result_location', url: 'http://example.com/plain', title: 'Plain HTTP', cited_text: 'nope' },
+        { type: 'web_search_result_location', url: 'https://user:pass@example.com/private', title: 'Credentials', cited_text: 'nope' },
+        { type: 'web_search_result_location', url: 'https://127.0.0.1/internal', title: 'Loopback', cited_text: 'nope' },
+        { type: 'web_search_result_location', url: 'https://192.168.1.5/internal', title: 'Private', cited_text: 'nope' },
       ],
     },
     {
@@ -1027,8 +1112,8 @@ test('Analyst research source extraction keeps cited HTTP sources and drops unsa
   assert.equal(usedSuccessfulWebSearch(content), true);
   assert.deepEqual(extractAnalystResearchSources(content), [
     { title: 'Match report', url: 'https://example.com/report', citedText: 'Current team news.' },
-    { title: 'Schedule', url: 'https://example.org/schedule', citedText: null },
   ]);
+  assert.equal(usedSuccessfulWebSearch([{ type: 'web_search_tool_result', content: [{ type: 'web_search_result', url: 'https://example.org/uncited' }] }]), false);
   assert.equal(usedSuccessfulWebSearch([{ type: 'web_search_tool_result', content: { type: 'web_search_tool_result_error' } }]), false);
 });
 
@@ -1055,6 +1140,50 @@ test('Analyst research rejects probability and edge claims but permits ordinary 
   assert.equal(containsAnalystPricingClaim(brief), false);
   assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'Model probability is 42% and the edge is -5%.' }), true);
   assert.equal(containsAnalystPricingClaim({ ...brief, summary: 'Реальна ймовірність 41,5% дає негативну перевагу.' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'probability 0.42' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'EV +0.12 units' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'edge -0.05' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'probabilidad 42%' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'вероятность 42%' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'Wahrscheinlichkeit 0,42' }), true);
+});
+
+test('saved research parser rejects partial nested JSON and unsafe stored sources', () => {
+  const valid = exactBuilderResearchBrief();
+  assert.ok(parseStoredAnalystResearchBrief(valid));
+  assert.equal(parseStoredAnalystResearchBrief({ ...valid, legs: [{ legNumber: 1 }] }), null);
+  assert.equal(parseStoredAnalystResearchBrief({ ...valid, legs: [{ ...valid.legs[0], risks: 'not-an-array' }] }), null);
+  assert.deepEqual(parseStoredAnalystResearchSources([
+    { title: 'Report', url: 'https://example.com/report', citedText: null },
+    { title: 'Internal', url: 'https://127.0.0.1/admin', citedText: null },
+    { title: 'Plain', url: 'http://example.com/report', citedText: null },
+  ]), [{ title: 'Report', url: 'https://example.com/report', citedText: null }]);
+});
+
+await asyncTest('Anthropic pause_turn continuation preserves protocol state and is bounded', async () => {
+  const seen = [];
+  const completed = await completePausedAnthropicTurn(
+    { stop_reason: 'pause_turn', content: ['first'] },
+    async (content, continuation) => {
+      seen.push({ content, continuation });
+      return continuation === 1
+        ? { stop_reason: 'pause_turn', content: ['second'] }
+        : { stop_reason: 'end_turn', content: ['done'] };
+    },
+  );
+  assert.deepEqual(seen, [
+    { content: ['first'], continuation: 1 },
+    { content: ['second'], continuation: 2 },
+  ]);
+  assert.deepEqual(completed, { stop_reason: 'end_turn', content: ['done'] });
+  await assert.rejects(
+    completePausedAnthropicTurn(
+      { stop_reason: 'pause_turn', content: ['first'] },
+      async content => ({ stop_reason: 'pause_turn', content }),
+      1,
+    ),
+    /continuation limit/,
+  );
 });
 
 test('editorial black action surfaces explicitly retain readable foreground text', () => {
@@ -1072,12 +1201,15 @@ test('web Analyst transports coupon legs and time into the research pipeline', (
   assert.match(routeSource, /buildAnalystResearchMessage\(\{[\s\S]*?couponEventTime:\s*input\.coupon_event_time[\s\S]*?legs:\s*input\.legs/);
   assert.match(routeSource, /type:\s*'web_search_20250305'/);
   assert.match(routeSource, /research_brief:\s*researchBrief/);
+  assert.match(routeSource, /research_sources:\s*researchSources/);
+  assert.match(routeSource, /offered_odds:\s*input\.offered_odds/);
   assert.match(pageSource, /coupon_event_time:\s*form\.event_time/);
   assert.match(pageSource, /client_timezone:\s*Intl\.DateTimeFormat/);
   assert.match(pageSource, /a\.research_brief\.legs\.map/);
   assert.match(pageSource, /ЦІНУ НЕ ПІДТВЕРДЖЕНО/);
   assert.match(decisionDetailSource, /researchBrief\.legs\.map/);
-  assert.match(decisionDetailSource, /safeResearchSources/);
+  assert.match(decisionDetailSource, /parseStoredAnalystResearchBrief/);
+  assert.match(decisionDetailSource, /parseStoredAnalystResearchSources/);
 });
 
 if (failed > 0) {

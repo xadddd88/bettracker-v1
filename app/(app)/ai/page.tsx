@@ -899,7 +899,10 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                         rel="noopener noreferrer"
                         className="border border-black bg-white px-3 py-3 text-sm font-bold text-black underline decoration-1 underline-offset-4 hover:bg-[#e8ff00]"
                       >
-                        {source.title}
+                        <span className="block">{source.title}</span>
+                        <span className="mt-1 block font-mono text-[9px] font-black uppercase tracking-[0.08em] no-underline opacity-50">
+                          {new URL(source.url).hostname}
+                        </span>
                       </a>
                     ))}
                   </div>

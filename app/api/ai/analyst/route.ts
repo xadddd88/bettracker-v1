@@ -15,7 +15,9 @@ import {
   type SportModuleSupport,
 } from '@/lib/ai/analysis-quality-gate'
 import {
+  alignAnalystResearchBriefToCoupon,
   buildAnalystResearchMessage,
+  completePausedAnthropicTurn,
   containsAnalystPricingClaim,
   extractAnalystResearchSources,
   usedSuccessfulWebSearch,
@@ -170,55 +172,6 @@ function buildFallbackResearchBrief(
   }
 }
 
-function withResearchQuality(
-  legs: AnalysisLegQualityInput[] | undefined,
-  researchBrief: AnalystResearchBrief,
-  allowVerifiedCoverage: boolean,
-): AnalysisLegQualityInput[] {
-  const baseLegs: AnalysisLegQualityInput[] = legs?.length ? legs : researchBrief.legs.map(leg => ({
-    eventName: leg.eventName,
-    marketType: leg.marketType,
-    selection: leg.selection,
-  }))
-
-  return baseLegs.map((leg, index) => {
-    const researchLeg = researchBrief.legs[index]
-    return {
-      ...leg,
-      // Provider prose is not verification. Coverage can only be promoted
-      // when this request actually completed a cited web-search tool call.
-      fixtureStatus: allowVerifiedCoverage
-        ? researchLeg?.fixtureStatus ?? leg.fixtureStatus
-        : leg.fixtureStatus,
-      dataCoverage: allowVerifiedCoverage
-        ? researchLeg?.dataCoverage ?? leg.dataCoverage
-        : leg.dataCoverage,
-    }
-  })
-}
-
-function alignResearchBriefToCoupon(
-  input: z.infer<typeof requestSchema>,
-  researchBrief: AnalystResearchBrief,
-): AnalystResearchBrief {
-  const couponLegs = input.legs?.length ? input.legs : [{
-    eventName: input.event_name,
-    marketType: input.market_type,
-    selection: input.selection ?? null,
-  }]
-
-  return {
-    ...researchBrief,
-    legs: couponLegs.map((couponLeg, index) => ({
-      ...researchBrief.legs[index],
-      legNumber: index + 1,
-      eventName: couponLeg.eventName ?? input.event_name,
-      marketType: couponLeg.marketType ?? input.market_type,
-      selection: couponLeg.selection ?? null,
-    })),
-  }
-}
-
 const ANALYST_TIMEOUT_MS = 60_000
 
 async function callAnalystClaude(
@@ -228,14 +181,33 @@ async function callAnalystClaude(
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), ANALYST_TIMEOUT_MS)
   try {
-    return await anthropic.messages.create(params, { signal: controller.signal })
+    const continuationMessages = [...params.messages]
+    const initial = await anthropic.messages.create(params, { signal: controller.signal })
+    const collectedContent = [...initial.content]
+    const completed = await completePausedAnthropicTurn(initial, async pausedContent => {
+      continuationMessages.push({
+        role: 'assistant',
+        content: pausedContent as Anthropic.ContentBlockParam[],
+      })
+      const continuation = await anthropic.messages.create(
+        { ...params, messages: continuationMessages },
+        { signal: controller.signal },
+      )
+      collectedContent.push(...continuation.content)
+      return continuation
+    })
+    return { ...completed, content: collectedContent }
   } finally {
     clearTimeout(timer)
   }
 }
 
 function isWebSearchConfigurationError(error: unknown): boolean {
-  return error instanceof Anthropic.BadRequestError && /web[\s_-]?search|tool|organization|enable/i.test(error.message)
+  if (!(error instanceof Anthropic.BadRequestError)) return false
+  const body = (() => {
+    try { return JSON.stringify(error.error) } catch { return '' }
+  })()
+  return /web_search_20\d{6}|web[\s_-]+search(?:\s+tool)?/i.test(`${error.message} ${body}`)
 }
 
 function normalizeAnalystRaw(raw: unknown): unknown {
@@ -515,7 +487,7 @@ export async function POST(req: NextRequest) {
     const rawText = message.content
       .filter((b): b is Anthropic.TextBlock => b.type === 'text')
       .map(b => b.text)
-      .at(-1) ?? ''
+      .join('\n')
     const inputChars  = userMessage.length + systemPrompt.length
     const outputChars = rawText.length
 
@@ -546,14 +518,24 @@ export async function POST(req: NextRequest) {
     }
 
     const analysis = validated.data
-    const expectedLegCount = input.legs?.length || 1
-    const candidateResearchBrief = analysis.research_brief && analysis.research_brief.legs.length === expectedLegCount
+    const couponLegs = input.legs?.length ? input.legs.map(leg => ({
+      eventName: leg.eventName ?? input.event_name,
+      marketType: leg.marketType ?? input.market_type,
+      selection: leg.selection ?? null,
+      isLive: leg.isLive,
+    })) : [{
+      eventName: input.event_name,
+      marketType: input.market_type,
+      selection: input.selection ?? null,
+      isLive: false,
+    }]
+    const candidateResearchBrief = analysis.research_brief
       ? toResearchBrief(analysis.research_brief)
       : null
-    const parsedResearchBrief = candidateResearchBrief && !containsAnalystPricingClaim(candidateResearchBrief)
-      ? candidateResearchBrief
-      : buildFallbackResearchBrief(input)
-    const researchBrief = alignResearchBriefToCoupon(input, parsedResearchBrief)
+    const alignedResearchBrief = candidateResearchBrief && !containsAnalystPricingClaim(candidateResearchBrief)
+      ? alignAnalystResearchBriefToCoupon(candidateResearchBrief, couponLegs)
+      : null
+    const researchBrief = alignedResearchBrief ?? buildFallbackResearchBrief(input)
 
     // 8. Server owns pricing, but the quality gate can suppress it entirely.
     const qualityGate = evaluateAnalysisQuality({
@@ -562,17 +544,13 @@ export async function POST(req: NextRequest) {
       marketType:         input.market_type,
       selection:          input.selection ?? null,
       notes:              input.notes ?? null,
-      // Search is not equivalent to complete coverage. The pricing gate sees
-      // only explicit per-leg evidence flags from the structured response.
+      // Search is not equivalent to complete coverage. Until each claim is
+      // mapped to a citation, provider-declared coverage is never promoted.
       webSearchEnabled:    false,
       modelProbability:   analysis.model_probability,
       modelInputsPresent: false,
       sportModuleSupport: getAnalystSportSupport(input.sport),
-      legs:               withResearchQuality(
-        input.legs as AnalysisLegQualityInput[] | undefined,
-        researchBrief,
-        webSearchActuallyUsed,
-      ),
+      legs:               input.legs as AnalysisLegQualityInput[] | undefined,
     })
     const gatedPricing = buildAnalystPricingPayload({
       qualityGate,
