@@ -542,11 +542,25 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
   }) : false
 
   return (
-    <div className="max-w-2xl flex flex-col gap-6" onPaste={handlePaste}>
-      <div>
-        <h1 className="text-2xl font-bold text-white">AI Analyst</h1>
-        <p className="text-sm text-gray-500 mt-1">Enter match details or scan a coupon to get risk, coverage, and priced analysis when supported.</p>
-      </div>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6" onPaste={handlePaste}>
+      <section className="editorial-dark relative min-h-[340px] overflow-hidden border border-black p-5 md:p-8">
+        <div className="pointer-events-none absolute -right-4 top-2 select-none font-display text-[clamp(7rem,20vw,13rem)] font-black leading-none tracking-[-0.1em] text-white/[0.055]" aria-hidden>
+          SCAN
+        </div>
+        <div className="relative z-10 flex min-h-[290px] flex-col">
+          <div className="flex justify-between font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-white">
+            <span>AI / Scanner</span>
+            <span>Image to decision</span>
+          </div>
+          <div className="my-auto py-8">
+            <p className="font-mono text-[9px] font-black uppercase tracking-[0.2em] text-[#e8ff00]">Capture stage</p>
+            <h1 className="mt-4 max-w-3xl font-display text-[clamp(3rem,8vw,6.8rem)] font-black uppercase leading-[0.8] tracking-[-0.075em] text-white">
+              Analyze from<br />a screenshot
+            </h1>
+            <p className="mt-6 max-w-xl text-sm leading-6 text-white/60">Upload or paste a coupon, verify every extracted field, then run the supported analysis.</p>
+          </div>
+        </div>
+      </section>
 
       {/* ── Scout pre-fill indicator ───────────────────────── */}
       {scoutId && !analysis && (
@@ -558,23 +572,23 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
       {/* ── Scanner zone ────────────────────────────────────── */}
       <div
-        className={`border-2 border-dashed rounded-xl px-4 py-4 text-center cursor-pointer transition-colors ${
-          scanning ? 'border-indigo-500 bg-indigo-950/30' : 'border-gray-700 hover:border-indigo-600 hover:bg-gray-800/40'
+        className={`group cursor-pointer border border-black px-5 py-8 text-center transition-colors ${
+          scanning ? 'bg-[#e8ff00]' : 'bg-white hover:bg-[#e8ff00]'
         }`}
         onClick={() => !scanning && fileRef.current?.click()}
       >
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
         {scanning ? (
-          <div className="flex items-center justify-center gap-2 text-indigo-400 text-sm">
+          <div className="flex items-center justify-center gap-2 text-sm font-bold text-black">
             <Loader2 size={14} className="animate-spin" /> {scanMsg}
           </div>
         ) : scanMsg ? (
-          <div className="text-sm text-gray-300">{scanMsg}</div>
+          <div className="text-sm font-bold text-black">{scanMsg}</div>
         ) : (
           <div>
-            <div className="flex justify-center mb-1"><Camera size={24} strokeWidth={1.5} className="text-gray-500" /></div>
-            <p className="text-sm text-gray-400 font-medium">Paste screenshot (Ctrl+V) or click to upload</p>
-            <p className="text-xs text-gray-600 mt-0.5">Auto-fills event, market, odds, sport</p>
+            <div className="mb-3 flex justify-center"><Camera size={28} strokeWidth={1.5} /></div>
+            <p className="font-display text-xl font-black uppercase tracking-[-0.04em]">Choose screenshot</p>
+            <p className="mt-2 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-black/50">Paste, camera export or photo library</p>
           </div>
         )}
       </div>

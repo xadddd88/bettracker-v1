@@ -22,8 +22,8 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'BetTracker',
-  description: 'Intelligent betting analytics platform',
+  title: 'XADDD — BetTracker',
+  description: 'Decision intelligence for betting analysis and tracking.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

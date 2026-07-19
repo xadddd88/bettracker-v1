@@ -72,11 +72,11 @@ export default function FeedbackWidget() {
       {/* Floating trigger — clears mobile bottom nav on small screens */}
       <button
         onClick={openModal}
-        className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-40 bg-gray-900 border border-gray-700 hover:border-amber-600/60 text-slate-400 hover:text-amber-400 rounded-full px-3 py-1.5 text-xs font-medium shadow-lg transition-all flex items-center gap-1.5"
+        className="editorial-dark fixed bottom-20 right-0 z-40 flex min-h-11 items-center gap-2 border border-black bg-[#050505] px-4 font-mono text-[9px] font-black uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#e8ff00] hover:text-black md:bottom-6"
         aria-label="Open feedback form"
       >
-        <span>💬</span>
-        <span className="hidden sm:inline">Feedback</span>
+        <span aria-hidden>+</span>
+        <span>Feedback</span>
       </button>
 
       {/* Backdrop + dialog */}
@@ -85,13 +85,13 @@ export default function FeedbackWidget() {
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) closeModal() }}
         >
-          <div className="w-full max-w-sm bg-gray-900 rounded-xl border border-gray-700 shadow-2xl overflow-hidden">
+          <div className="w-full max-w-sm overflow-hidden border border-black bg-[#f5f5f0]">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
-              <h2 className="text-sm font-semibold text-white">Beta Feedback</h2>
+            <div className="flex items-center justify-between border-b border-black px-5 py-4">
+              <h2 className="font-display text-lg font-black uppercase tracking-[-0.04em]">Beta feedback</h2>
               <button
                 onClick={closeModal}
-                className="text-slate-500 hover:text-slate-300 text-xs transition-colors"
+                className="min-h-11 min-w-11 text-xs transition-colors hover:bg-black hover:text-white"
                 aria-label="Close"
               >
                 &#x2715;
@@ -101,7 +101,7 @@ export default function FeedbackWidget() {
             {done ? (
               <div className="px-5 py-10 text-center">
                 <div className="text-4xl mb-3">🙏</div>
-                <p className="text-sm font-semibold text-white">Thank you!</p>
+                <p className="text-sm font-semibold text-black">Thank you!</p>
                 <p className="text-xs text-slate-400 mt-1">Your feedback helps us build a better product.</p>
                 <button className="mt-5 btn-primary w-full text-sm" onClick={closeModal}>
                   Close
