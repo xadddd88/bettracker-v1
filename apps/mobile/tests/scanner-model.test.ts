@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { MAX_ANALYZE_JSON_BYTES, type PreparedImage } from '../src/ai/image-policy';
-import { parseScannerResponse, scannerRequestBody } from '../src/ai/scanner-model';
+import { MAX_SCANNER_REQUEST_BYTES, parseScannerResponse, scannerRequestBody } from '../src/ai/scanner-model';
 
 function image(base64: string): PreparedImage {
   return {
@@ -20,11 +20,17 @@ test('scanner request matches the existing server contract and stays below the l
   const body = scannerRequestBody(image('base64-coupon'));
 
   assert.deepEqual(body, { image: 'base64-coupon', media_type: 'image/jpeg' });
-  assert.ok(Buffer.byteLength(JSON.stringify(body), 'utf8') <= MAX_ANALYZE_JSON_BYTES);
+  assert.ok(Buffer.byteLength(JSON.stringify(body), 'utf8') < MAX_ANALYZE_JSON_BYTES);
 });
 
-test('scanner request fails closed when the complete serialized body is oversized', () => {
-  assert.equal(scannerRequestBody(image('a'.repeat(MAX_ANALYZE_JSON_BYTES))), null);
+test('scanner request accepts 4,399,999 bytes and rejects the exact 4,400,000-byte boundary', () => {
+  const emptyBodyBytes = Buffer.byteLength(JSON.stringify({ image: '', media_type: 'image/jpeg' }), 'utf8');
+  const bodyBelowLimit = scannerRequestBody(image('a'.repeat(MAX_SCANNER_REQUEST_BYTES - 1 - emptyBodyBytes)));
+  const bodyAtLimit = scannerRequestBody(image('a'.repeat(MAX_SCANNER_REQUEST_BYTES - emptyBodyBytes)));
+
+  assert.ok(bodyBelowLimit);
+  assert.equal(Buffer.byteLength(JSON.stringify(bodyBelowLimit), 'utf8'), 4_399_999);
+  assert.equal(bodyAtLimit, null);
 });
 
 test('scanner response preserves ordered legs and ignores provider diagnostics', () => {

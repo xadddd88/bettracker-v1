@@ -22,7 +22,7 @@ The exact mobile request body is:
 }
 ```
 
-The complete serialized body is measured again immediately before the request and must remain at or below 4,400,000 UTF-8 bytes.
+The complete serialized body is measured again immediately before the request and must remain strictly below 4,400,000 UTF-8 bytes. A body of exactly 4,400,000 bytes is rejected locally.
 
 The API origin defaults to `https://btdk.app`. Development may override it with `EXPO_PUBLIC_API_BASE_URL`; HTTPS is mandatory except for loopback. Credentials, query parameters, and fragments are rejected in the configured base URL.
 
@@ -34,10 +34,12 @@ The API origin defaults to `https://btdk.app`. Development may override it with 
 4. The result remains review-only. It does not invoke `create_tracked_bet`, save a bet, settle a bet, or perform any financial write.
 5. Event mode remains explicit and local-only; it does not send a coupon-shaped request.
 
+Generated JPEG files are limited to Expo's cache directory. Rejected compression-profile outputs are deleted immediately. The retained preview is deleted after successful replacement, Remove, successful Coupon analysis, or screen unmount; a cancelled or failed replacement keeps the current preview.
+
 ## Dependencies and deferred work
 
 - Depends on Decision #062 Phase 1A Bearer support for `/api/ai/scanner`.
-- Uses the native capture modules already included by Phase 1B; no dependency, permission, or native binary change is introduced.
+- Declares the SDK-compatible `expo-file-system` module already present transitively in the Expo dependency graph, using its current `File`/`Paths` API for cache-only deletion. No permission change is introduced.
 - Editable correction, conversion into the Tracker draft, idempotent secure saving, Event analysis, and provider-quality evaluation remain separate approved stages.
 
 Validation for this change uses injected fetch responses only. No production, Supabase, Vercel, AI, or provider call is part of the test run.

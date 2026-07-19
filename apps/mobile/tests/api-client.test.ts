@@ -173,6 +173,35 @@ test('rate limits, server timeouts and network failures are never retried', asyn
   assert.equal(networkRequests, 1);
 });
 
+test('generic 500, 502 and 503 server failures are never refreshed or retried', async () => {
+  for (const status of [500, 502, 503]) {
+    let requests = 0;
+    const refreshCalls: boolean[] = [];
+    const result = await authenticatedJsonRequest({
+      baseUrl: API_BASE,
+      body: { image: 'abc' },
+      fetchImpl: async () => {
+        requests += 1;
+        return new Response('RAW_SERVER_DETAIL', { status });
+      },
+      getAccessToken: async (refresh) => {
+        refreshCalls.push(refresh);
+        return 'token';
+      },
+      path: '/api/ai/scanner',
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      code: 'server',
+      message: 'Scanner is temporarily unavailable.',
+      status,
+    });
+    assert.equal(requests, 1);
+    assert.deepEqual(refreshCalls, [false]);
+  }
+});
+
 test('invalid JSON response is sanitized', async () => {
   const result = await authenticatedJsonRequest({
     baseUrl: API_BASE,

@@ -7,6 +7,7 @@ import ts from 'typescript';
 const root = process.cwd();
 
 const ALLOWED_CAPTURE_EXTERNAL_IMPORTS = new Set([
+  'expo-file-system',
   'expo-image-manipulator',
   'expo-image-picker',
 ]);
@@ -288,6 +289,8 @@ test('Mobile Phase 1B capture pipeline remains local-only', () => {
   const graph = collectImportGraph(entrypoint);
   const expectedTransitiveFiles = [
     entrypoint,
+    join(root, 'src/ai/image-cache-lifecycle.ts'),
+    join(root, 'src/ai/image-cache.ts'),
     join(root, 'src/ai/image-policy.ts'),
   ];
 
@@ -469,6 +472,7 @@ test('native capture adapter converts local images to JPEG without leaking raw d
   assert.match(source, /launchImageLibraryAsync/);
   assert.match(source, /ImageManipulator\.manipulate\(/);
   assert.match(source, /SaveFormat\.JPEG/);
+  assert.match(source, /cleanupUnretainedGeneratedImages/);
   assert.match(source, /mediaTypes:\s*\[\s*['"]images['"]\s*\]/);
   assert.match(source, /allowsMultipleSelection:\s*false/);
   assert.match(source, /base64:\s*false/);
@@ -486,6 +490,21 @@ test('native capture adapter converts local images to JPEG without leaking raw d
   assert.doesNotMatch(source, /manipulateAsync/);
   assert.doesNotMatch(source, /console\./);
   assert.doesNotMatch(source, /RAW_NATIVE_ERROR/);
+});
+
+test('generated JPEG cache cleanup is wired to replacement, removal, success and unmount', () => {
+  const screen = readFileSync(join(root, 'src/app/(app)/ai/index.tsx'), 'utf8');
+  const cache = readFileSync(join(root, 'src/ai/image-cache.ts'), 'utf8');
+
+  assert.match(screen, /new PreparedImageCacheLifecycle\(deleteGeneratedImage\)/);
+  assert.match(screen, /useEffect\(\(\) => \(\) => cacheLifecycleRef\.current\?\.clear\(\), \[\]\)/);
+  assert.match(screen, /case 'ready':[\s\S]*?replacePrepared\(outcome\.image\)/);
+  assert.match(screen, /function removeImage\(\)[\s\S]*?replacePrepared\(null\)/);
+  assert.match(screen, /if \(result\.ok\)[\s\S]*?replacePrepared\(null\)/);
+  assert.match(cache, /from ['"]expo-file-system['"]/);
+  assert.match(cache, /Paths\.cache\.uri/);
+  assert.match(cache, /file\.delete\(\)/);
+  assert.doesNotMatch(cache, /console\.|deleteAsync|documentDirectory/);
 });
 
 test('authenticated layout exposes three focused tabs and keeps Tracker detail in a Stack', () => {

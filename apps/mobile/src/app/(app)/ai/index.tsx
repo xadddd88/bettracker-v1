@@ -1,12 +1,14 @@
 import { Image } from 'expo-image';
 import { useNetworkState } from 'expo-network';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown, ReduceMotion } from 'react-native-reanimated';
 
 import { runWithCaptureLock } from '@/ai/capture-lock';
+import { PreparedImageCacheLifecycle } from '@/ai/image-cache-lifecycle';
+import { deleteGeneratedImage } from '@/ai/image-cache';
 import { captureFromCamera, captureFromLibrary, type CaptureOutcome, type CaptureSource, type PreparedCapture } from '@/ai/image-capture';
 import { analysisBodyByteLength, MAX_ANALYZE_JSON_BYTES, type CaptureMode } from '@/ai/image-policy';
 import { scanPreparedCoupon } from '@/ai/scanner-client';
@@ -38,6 +40,10 @@ export default function AiCaptureScreen() {
   const networkState = useNetworkState();
   const safeAreaInsets = useSafeAreaInsets();
   const operationLockRef = useRef(false);
+  const cacheLifecycleRef = useRef<PreparedImageCacheLifecycle | null>(null);
+  if (cacheLifecycleRef.current === null) {
+    cacheLifecycleRef.current = new PreparedImageCacheLifecycle(deleteGeneratedImage);
+  }
   const [mode, setMode] = useState<CaptureMode>('coupon');
   const [prepared, setPrepared] = useState<PreparedCapture | null>(null);
   const [operation, setOperation] = useState<'analyze' | 'capture' | null>(null);
@@ -46,6 +52,13 @@ export default function AiCaptureScreen() {
   const busy = operation !== null;
   const offline = networkState.isConnected === false || networkState.isInternetReachable === false;
   const androidTopInset = Platform.OS === 'android' ? { paddingTop: CONTENT_PADDING_TOP + safeAreaInsets.top } : undefined;
+
+  useEffect(() => () => cacheLifecycleRef.current?.clear(), []);
+
+  function replacePrepared(nextPrepared: PreparedCapture | null) {
+    cacheLifecycleRef.current?.replace(nextPrepared?.uri ?? null);
+    setPrepared(nextPrepared);
+  }
 
   async function handleCapture(source: CaptureSource) {
     if (busy) return;
@@ -66,7 +79,7 @@ export default function AiCaptureScreen() {
   function applyOutcome(outcome: CaptureOutcome) {
     switch (outcome.status) {
       case 'ready':
-        setPrepared(outcome.image);
+        replacePrepared(outcome.image);
         setAnalysis(null);
         setFeedback({ message: `${mode === 'coupon' ? 'Coupon' : 'Event'} image is ready.`, tone: 'success' });
         return;
@@ -83,8 +96,8 @@ export default function AiCaptureScreen() {
     if (busy || nextMode === mode) return;
     if (prepared) {
       const bodyBytes = analysisBodyByteLength(nextMode, prepared.base64);
-      if (bodyBytes > MAX_ANALYZE_JSON_BYTES) {
-        setPrepared(null);
+      if (bodyBytes >= MAX_ANALYZE_JSON_BYTES) {
+        replacePrepared(null);
         setFeedback({ message: MESSAGES.oversize, tone: 'error' });
       } else {
         setPrepared({ ...prepared, bodyBytes });
@@ -105,7 +118,7 @@ export default function AiCaptureScreen() {
   }
   function removeImage() {
     if (!busy) {
-      setPrepared(null);
+      replacePrepared(null);
       setAnalysis(null);
       setFeedback({ message: 'Image removed.', tone: 'info' });
     }
@@ -134,6 +147,7 @@ export default function AiCaptureScreen() {
 
     if (result.ok) {
       setAnalysis(result.analysis);
+      replacePrepared(null);
       setFeedback({ message: 'Coupon analysis is ready. Review every field before tracking.', tone: 'success' });
     } else {
       setFeedback({ message: result.message, tone: 'error' });

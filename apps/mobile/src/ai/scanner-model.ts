@@ -24,7 +24,7 @@ export type ScannerRequestBody = {
   media_type: 'image/jpeg';
 };
 
-const MAX_SCANNER_REQUEST_BYTES = 4_400_000;
+export const MAX_SCANNER_REQUEST_BYTES = 4_400_000;
 const MAX_SCANNER_LEGS = 20;
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -44,7 +44,7 @@ function number(value: unknown): number | null {
 
 export function scannerRequestBody(image: PreparedImage): ScannerRequestBody | null {
   const body: ScannerRequestBody = { image: image.base64, media_type: 'image/jpeg' };
-  return utf8ByteLength(JSON.stringify(body)) <= MAX_SCANNER_REQUEST_BYTES ? body : null;
+  return utf8ByteLength(JSON.stringify(body)) < MAX_SCANNER_REQUEST_BYTES ? body : null;
 }
 
 export function parseScannerResponse(value: unknown): ScannerAnalysis | null {

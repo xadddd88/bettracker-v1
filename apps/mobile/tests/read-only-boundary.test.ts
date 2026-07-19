@@ -19,7 +19,6 @@ test('Mobile client contains no financial writes, privileged secrets or unapprov
     /\.insert\s*\(/,
     /\.update\s*\(/,
     /\.upsert\s*\(/,
-    /\.delete\s*\(/,
     /\.rpc\s*\(/,
     /service[_-]?role/i,
     /SUPABASE_SERVICE/i,
@@ -28,6 +27,15 @@ test('Mobile client contains no financial writes, privileged secrets or unapprov
   ]) {
     assert.doesNotMatch(source, forbidden);
   }
+
+  const deleteCallers = sources.filter(({ source: contents }) => /\.delete\s*\(/.test(contents));
+  assert.deepEqual(
+    deleteCallers.map(({ path }) => path),
+    [join(process.cwd(), 'src/ai/image-cache.ts')],
+    'only the local generated-image cache cleaner may delete a file',
+  );
+  assert.match(deleteCallers[0].source, /new File\(uri\)/);
+  assert.match(deleteCallers[0].source, /Paths\.cache\.uri/);
 
   const scannerCallers = sources.filter(({ source: contents }) => /\/api\/ai\/scanner/.test(contents));
   assert.deepEqual(
