@@ -1108,6 +1108,32 @@ test('Analyst binds only verbatim claims to their exact citation URL', () => {
     text: 'Spain confirmed the squad on Friday.',
     sourceUrl: 'https://example.com/report',
   }]);
+
+  const prefix = 'x'.repeat(400);
+  const longCitationSources = extractAnalystResearchSources([{
+    type: 'text',
+    text: '{}',
+    citations: [{
+      type: 'web_search_result_location',
+      url: 'https://example.com/long-report',
+      title: 'Long report',
+      cited_text: `${prefix} MATERIAL QUALIFIER`,
+    }],
+  }]);
+  assert.deepEqual(longCitationSources, [{
+    title: 'Long report',
+    url: 'https://example.com/long-report',
+    citedText: null,
+  }]);
+
+  const prefixOnly = exactBuilderResearchBrief();
+  prefixOnly.sourcedClaims = [{ text: prefix, sourceUrl: 'https://example.com/long-report' }];
+  const rejectedPrefix = alignAnalystResearchBriefToCoupon(prefixOnly, [
+    { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5' },
+    { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5' },
+  ], longCitationSources);
+  assert.ok(rejectedPrefix);
+  assert.deepEqual(rejectedPrefix.sourcedClaims, []);
 });
 
 test('Analyst research source extraction keeps only cited public HTTPS sources', () => {

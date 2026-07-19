@@ -250,6 +250,12 @@ function cleanSourceText(value: unknown, max: number): string | null {
   return cleaned ? cleaned.slice(0, max) : null
 }
 
+function boundedCitationText(value: unknown, max: number): string | null {
+  if (typeof value !== 'string') return null
+  const cleaned = value.replace(/\s+/g, ' ').trim()
+  return cleaned && cleaned.length <= max ? cleaned : null
+}
+
 export function extractAnalystResearchSources(content: unknown): AnalystResearchSource[] {
   if (!Array.isArray(content)) return []
 
@@ -258,7 +264,9 @@ export function extractAnalystResearchSources(content: unknown): AnalystResearch
     const url = safeHttpUrl(urlValue)
     if (!url) return
     const title = cleanSourceText(titleValue, 240) ?? new URL(url).hostname
-    const citedText = cleanSourceText(citedTextValue, 400)
+    // Never truncate a citation before exact claim binding: a suffix can carry
+    // a material qualifier. Oversized excerpts fail closed instead.
+    const citedText = boundedCitationText(citedTextValue, 400)
     const existing = sources.get(url)
     sources.set(url, {
       title: existing?.title ?? title,
