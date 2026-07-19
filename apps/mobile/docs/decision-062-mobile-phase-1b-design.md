@@ -127,7 +127,7 @@ Profiles are attempted from the original local image in this order:
 | 1280 | 0.58 |
 | 1024 | 0.48 |
 
-The first result whose complete JSON body is at or below `4,400,000` bytes is
+The first result whose complete JSON body is strictly below `4,400,000` bytes is
 accepted. If every profile remains too large, the result is `oversize` and no
 prepared image is returned.
 
@@ -201,6 +201,12 @@ cache lifecycle ownership. Before a real AI upload is approved, a separate
 design must define cleanup for Replace, Remove, screen unmount, failed
 preprocessing attempts, and successful upload without risking deletion of
 picker-owned source assets.
+
+This follow-up is implemented by the reviewed Coupon Scanner wiring stage. It
+deletes only generated files inside Expo's cache directory, cleans rejected
+compression outputs, preserves the current preview after a failed replacement,
+and releases the retained preview on successful replacement, Remove, successful
+Coupon analysis, or screen unmount.
 
 ## Native Build Impact
 

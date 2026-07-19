@@ -10,25 +10,44 @@ function sourceFiles(directory: string): string[] {
   });
 }
 
-test('Mobile Phase 0 contains no financial writes, RPCs, Next APIs or privileged secrets', () => {
-  const source = sourceFiles(join(process.cwd(), 'src'))
-    .map((path) => readFileSync(path, 'utf8'))
-    .join('\n');
+test('Mobile client contains no financial writes, privileged secrets or unapproved Next APIs', () => {
+  const paths = sourceFiles(join(process.cwd(), 'src'));
+  const sources = paths.map((path) => ({ path, source: readFileSync(path, 'utf8') }));
+  const source = sources.map(({ source: contents }) => contents).join('\n');
 
   for (const forbidden of [
     /\.insert\s*\(/,
     /\.update\s*\(/,
     /\.upsert\s*\(/,
-    /\.delete\s*\(/,
     /\.rpc\s*\(/,
     /service[_-]?role/i,
     /SUPABASE_SERVICE/i,
     /ANTHROPIC_API_KEY/,
     /\/api\/bets/,
-    /\/api\/ai\/scanner/,
   ]) {
     assert.doesNotMatch(source, forbidden);
   }
+
+  const deleteCallers = sources.filter(({ source: contents }) => /\.delete\s*\(/.test(contents));
+  assert.deepEqual(
+    deleteCallers.map(({ path }) => path),
+    [join(process.cwd(), 'src/ai/image-cache.ts')],
+    'only the local generated-image cache cleaner may delete a file',
+  );
+  assert.match(deleteCallers[0].source, /new File\(uri\)/);
+  assert.match(deleteCallers[0].source, /Paths\.cache\.uri/);
+
+  const scannerCallers = sources.filter(({ source: contents }) => /\/api\/ai\/scanner/.test(contents));
+  assert.deepEqual(
+    scannerCallers.map(({ path }) => path),
+    [join(process.cwd(), 'src/ai/scanner-client.ts')],
+    'only the audited scanner client may name the scanner API route',
+  );
+  assert.equal(
+    scannerCallers[0].source.match(/\/api\/ai\/scanner/g)?.length,
+    1,
+    'the approved scanner route must appear exactly once',
+  );
 });
 
 test('read model uses explicit columns and orders nested legs', () => {

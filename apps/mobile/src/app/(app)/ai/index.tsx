@@ -1,14 +1,18 @@
 import { Image } from 'expo-image';
 import { useNetworkState } from 'expo-network';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown, ReduceMotion } from 'react-native-reanimated';
 
 import { runWithCaptureLock } from '@/ai/capture-lock';
+import { PreparedImageCacheLifecycle } from '@/ai/image-cache-lifecycle';
+import { deleteGeneratedImage } from '@/ai/image-cache';
 import { captureFromCamera, captureFromLibrary, type CaptureOutcome, type CaptureSource, type PreparedCapture } from '@/ai/image-capture';
 import { analysisBodyByteLength, MAX_ANALYZE_JSON_BYTES, type CaptureMode } from '@/ai/image-policy';
+import { scanPreparedCoupon } from '@/ai/scanner-client';
+import type { ScannerAnalysis } from '@/ai/scanner-model';
 import { MotionPressable } from '@/ui/motion';
 import { colors } from '@/ui/theme';
 import { EditorialBackdrop, EditorialRule, KineticType } from '@/ui/time-warp';
@@ -16,8 +20,8 @@ import { EditorialBackdrop, EditorialRule, KineticType } from '@/ui/time-warp';
 const MESSAGES = {
   cameraDenied: 'Camera access is off. Allow it in device settings to take a photo.',
   cancelled: 'Selection cancelled. Current image unchanged.',
-  connectionPending: 'Secure AI connection is being prepared',
   corrupt: 'This image could not be prepared. Choose another image.',
+  eventPending: 'Event analysis is not connected yet. Coupon scanning is available now.',
   offline: 'You are offline. Capture stays available, but Analyze waits for a connection.',
   oversize: 'This image is too large to prepare safely. Try a tighter crop or a lower-resolution image.',
   photosDenied: 'Photo access is off. Allow it in device settings to choose an image.',
@@ -35,25 +39,38 @@ type ActionButtonProps = { disabled?: boolean; icon: SymbolViewProps['name']; la
 export default function AiCaptureScreen() {
   const networkState = useNetworkState();
   const safeAreaInsets = useSafeAreaInsets();
-  const captureLockRef = useRef(false);
+  const operationLockRef = useRef(false);
+  const cacheLifecycleRef = useRef<PreparedImageCacheLifecycle | null>(null);
+  if (cacheLifecycleRef.current === null) {
+    cacheLifecycleRef.current = new PreparedImageCacheLifecycle(deleteGeneratedImage);
+  }
   const [mode, setMode] = useState<CaptureMode>('coupon');
   const [prepared, setPrepared] = useState<PreparedCapture | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<'analyze' | 'capture' | null>(null);
+  const [analysis, setAnalysis] = useState<ScannerAnalysis | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const busy = operation !== null;
   const offline = networkState.isConnected === false || networkState.isInternetReachable === false;
   const androidTopInset = Platform.OS === 'android' ? { paddingTop: CONTENT_PADDING_TOP + safeAreaInsets.top } : undefined;
 
+  useEffect(() => () => cacheLifecycleRef.current?.clear(), []);
+
+  function replacePrepared(nextPrepared: PreparedCapture | null) {
+    cacheLifecycleRef.current?.replace(nextPrepared?.uri ?? null);
+    setPrepared(nextPrepared);
+  }
+
   async function handleCapture(source: CaptureSource) {
     if (busy) return;
-    const outcome = await runWithCaptureLock(captureLockRef, async (): Promise<CaptureOutcome> => {
-      setBusy(true);
+    const outcome = await runWithCaptureLock(operationLockRef, async (): Promise<CaptureOutcome> => {
+      setOperation('capture');
       setFeedback(null);
       try {
         return source === 'camera' ? await captureFromCamera(mode) : await captureFromLibrary(mode);
       } catch {
         return { status: 'corrupt' };
       } finally {
-        setBusy(false);
+        setOperation(null);
       }
     });
     if (outcome) applyOutcome(outcome);
@@ -62,7 +79,8 @@ export default function AiCaptureScreen() {
   function applyOutcome(outcome: CaptureOutcome) {
     switch (outcome.status) {
       case 'ready':
-        setPrepared(outcome.image);
+        replacePrepared(outcome.image);
+        setAnalysis(null);
         setFeedback({ message: `${mode === 'coupon' ? 'Coupon' : 'Event'} image is ready.`, tone: 'success' });
         return;
       case 'cancelled': setFeedback({ message: MESSAGES.cancelled, tone: 'info' }); return;
@@ -78,14 +96,15 @@ export default function AiCaptureScreen() {
     if (busy || nextMode === mode) return;
     if (prepared) {
       const bodyBytes = analysisBodyByteLength(nextMode, prepared.base64);
-      if (bodyBytes > MAX_ANALYZE_JSON_BYTES) {
-        setPrepared(null);
+      if (bodyBytes >= MAX_ANALYZE_JSON_BYTES) {
+        replacePrepared(null);
         setFeedback({ message: MESSAGES.oversize, tone: 'error' });
       } else {
         setPrepared({ ...prepared, bodyBytes });
         setFeedback(null);
       }
     }
+    setAnalysis(null);
     setMode(nextMode);
   }
 
@@ -97,8 +116,43 @@ export default function AiCaptureScreen() {
       { style: 'cancel', text: 'Cancel' },
     ]);
   }
-  function removeImage() { if (!busy) { setPrepared(null); setFeedback({ message: 'Image removed.', tone: 'info' }); } }
-  function analyze() { if (prepared && !busy && !offline) setFeedback({ message: MESSAGES.connectionPending, tone: 'info' }); }
+  function removeImage() {
+    if (!busy) {
+      replacePrepared(null);
+      setAnalysis(null);
+      setFeedback({ message: 'Image removed.', tone: 'info' });
+    }
+  }
+  async function analyze() {
+    if (!prepared || busy || offline) return;
+    if (mode === 'event') {
+      setAnalysis(null);
+      setFeedback({ message: MESSAGES.eventPending, tone: 'info' });
+      return;
+    }
+
+    const result = await runWithCaptureLock(operationLockRef, async () => {
+      setOperation('analyze');
+      setAnalysis(null);
+      setFeedback({ message: 'Analyzing coupon securely…', tone: 'info' });
+      try {
+        return await scanPreparedCoupon(prepared);
+      } catch {
+        return { ok: false as const, message: 'Could not reach the scanner. Check your connection.' };
+      } finally {
+        setOperation(null);
+      }
+    });
+    if (!result) return;
+
+    if (result.ok) {
+      setAnalysis(result.analysis);
+      replacePrepared(null);
+      setFeedback({ message: 'Coupon analysis is ready. Review every field before tracking.', tone: 'success' });
+    } else {
+      setFeedback({ message: result.message, tone: 'error' });
+    }
+  }
   async function openSettings() {
     try { await Linking.openSettings(); }
     catch { setFeedback({ message: 'Settings could not be opened. Open device settings manually.', tone: 'error' }); }
@@ -169,7 +223,7 @@ export default function AiCaptureScreen() {
         )}
       </Animated.View>
 
-      {busy ? <View accessibilityLabel="Preparing image" style={styles.processing}><ActivityIndicator color={colors.text} /><Text style={styles.processingText}>PREPARING JPEG</Text></View> : null}
+      {busy ? <View accessibilityLabel={operation === 'analyze' ? 'Analyzing coupon' : 'Preparing image'} style={styles.processing}><ActivityIndicator color={colors.text} /><Text style={styles.processingText}>{operation === 'analyze' ? 'ANALYZING COUPON' : 'PREPARING JPEG'}</Text></View> : null}
       {feedback ? (
         <View accessibilityLiveRegion="polite" role={feedback.tone === 'error' ? 'alert' : undefined} style={[styles.feedback, feedback.tone === 'error' && styles.feedbackError, feedback.tone === 'success' && styles.feedbackSuccess]}>
           <Text style={styles.feedbackLabel}>{feedback.tone.toUpperCase()}</Text>
@@ -177,10 +231,45 @@ export default function AiCaptureScreen() {
           {feedback.canOpenSettings ? <ActionButton icon={{ android: 'settings', ios: 'gearshape', web: 'settings' }} label="Open settings" onPress={() => void openSettings()} /> : null}
         </View>
       ) : null}
+      {analysis ? <AnalysisResultPanel analysis={analysis} /> : null}
       <EditorialRule label="NO FINANCIAL RECORD IS SAVED AUTOMATICALLY" />
-      <ActionButton disabled={!prepared || busy || offline} icon={{ android: 'auto_awesome', ios: 'sparkles', web: 'auto_awesome' }} label="Analyze" onPress={analyze} tone="primary" />
+      <ActionButton disabled={!prepared || busy || offline} icon={{ android: 'auto_awesome', ios: 'sparkles', web: 'auto_awesome' }} label="Analyze" onPress={() => void analyze()} tone="primary" />
     </ScrollView>
   );
+}
+
+function AnalysisResultPanel({ analysis }: { analysis: ScannerAnalysis }) {
+  const legs = analysis.legs.length > 0
+    ? analysis.legs
+    : [{ eventName: analysis.eventName, marketType: analysis.marketType, odds: analysis.totalOdds, selection: analysis.selection, sport: analysis.sport }];
+
+  return (
+    <Animated.View accessibilityLabel="Coupon analysis result" entering={FadeInDown.duration(360).reduceMotion(ReduceMotion.System)} style={styles.analysisPanel}>
+      <View style={styles.analysisHeading}>
+        <Text style={styles.analysisEyebrow}>EXTRACTED / REVIEW REQUIRED</Text>
+        <Text style={styles.analysisCount}>{String(legs.length).padStart(2, '0')} LEG{legs.length === 1 ? '' : 'S'}</Text>
+      </View>
+      {legs.map((leg, index) => (
+        <View key={`${index}-${leg.eventName ?? 'unknown'}`} style={styles.analysisLeg}>
+          <Text style={styles.analysisLegIndex}>{String(index + 1).padStart(2, '0')}</Text>
+          <View style={styles.analysisLegCopy}>
+            <Text style={styles.analysisEvent}>{leg.eventName ?? 'UNRESOLVED EVENT'}</Text>
+            <Text style={styles.analysisSelection}>{leg.selection ?? leg.marketType ?? 'SELECTION NOT READ'}</Text>
+          </View>
+          <Text style={styles.analysisOdds}>{leg.odds != null ? leg.odds.toFixed(2) : '—'}</Text>
+        </View>
+      ))}
+      <View style={styles.analysisSummary}>
+        <AnalysisMetric label="TOTAL ODDS" value={analysis.totalOdds != null ? analysis.totalOdds.toFixed(2) : '—'} />
+        <AnalysisMetric label="STAKE" value={analysis.stake != null ? String(analysis.stake) : '—'} />
+        <AnalysisMetric label="BOOKMAKER" value={analysis.bookmaker ?? '—'} />
+      </View>
+    </Animated.View>
+  );
+}
+
+function AnalysisMetric({ label, value }: { label: string; value: string }) {
+  return <View style={styles.analysisMetric}><Text style={styles.analysisMetricLabel}>{label}</Text><Text numberOfLines={1} style={styles.analysisMetricValue}>{value}</Text></View>;
 }
 
 function ActionButton({ disabled = false, icon, label, onPress, tone = 'secondary' }: ActionButtonProps) {
@@ -244,4 +333,18 @@ const styles = StyleSheet.create({
   feedbackSuccess: { borderLeftColor: colors.success, borderLeftWidth: 5, paddingLeft: 10 },
   feedbackLabel: { color: colors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
   feedbackText: { color: colors.secondaryText, fontSize: 12, lineHeight: 18 },
+  analysisPanel: { backgroundColor: '#050505', marginHorizontal: -14 },
+  analysisHeading: { alignItems: 'center', borderBottomColor: '#3B3B38', borderBottomWidth: 1, flexDirection: 'row', minHeight: 56, paddingHorizontal: 14 },
+  analysisEyebrow: { color: '#FFFFFF', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  analysisCount: { color: colors.accentMuted, fontSize: 9, fontWeight: '900', marginLeft: 'auto' },
+  analysisLeg: { alignItems: 'center', borderBottomColor: '#292927', borderBottomWidth: 1, flexDirection: 'row', minHeight: 82, paddingHorizontal: 14, paddingVertical: 12 },
+  analysisLegIndex: { color: '#858580', fontSize: 9, width: 28 },
+  analysisLegCopy: { flex: 1, minWidth: 0, paddingRight: 12 },
+  analysisEvent: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', lineHeight: 17 },
+  analysisSelection: { color: '#A9A9A4', fontSize: 10, lineHeight: 15, marginTop: 5 },
+  analysisOdds: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
+  analysisSummary: { flexDirection: 'row', padding: 14 },
+  analysisMetric: { flex: 1, minWidth: 0 },
+  analysisMetricLabel: { color: '#777772', fontSize: 7, fontWeight: '800', letterSpacing: 0.7 },
+  analysisMetricValue: { color: '#FFFFFF', fontSize: 11, fontWeight: '800', marginTop: 5 },
 });

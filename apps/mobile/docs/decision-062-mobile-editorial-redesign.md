@@ -7,7 +7,7 @@ Replace the rejected neon/card dashboard with an original high-fashion editorial
 ## Product hierarchy
 
 1. **Home** opens as a full-bleed decision manifesto rather than a dashboard card stack. Real bankroll and tracker totals remain visible in the following portfolio section.
-2. **Scan** is a dedicated capture stage. Coupon/Event choice, camera, library, preview, replacement, removal, offline feedback, and the local-only Analyze holding state remain intact.
+2. **Scan** is a dedicated capture stage. Coupon/Event choice, camera, library, preview, replacement, removal, and offline feedback remain intact. The later Coupon Scanner wiring keeps this visual system while adding an authenticated review-only result.
 3. **Tracker** is an editorial archive. Bets are separated by rules instead of rounded cards; real odds, financial values, status, and detail navigation are unchanged.
 4. **Details and draft editor** use the same flat black/white language while preserving ordered Express legs, nullable fields, validation, and local-only behavior.
 
@@ -22,6 +22,6 @@ Replace the rejected neon/card dashboard with an original high-fashion editorial
 ## Boundaries
 
 - No new dependency or native module.
-- No new API, AI, provider, Supabase, RPC, or financial write.
-- AI Analyze remains local-only and displays `Secure AI connection is being prepared`.
+- The redesign itself introduced no API, AI, provider, Supabase, RPC, or financial write. Network behavior is owned by the later, separately reviewed Coupon Scanner stage.
+- Event Analyze remains explicitly deferred; Coupon Analyze never saves a financial record automatically.
 - Existing camera and library preparation/security policies are unchanged.

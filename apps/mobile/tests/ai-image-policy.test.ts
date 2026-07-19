@@ -24,7 +24,7 @@ test('measures the complete prospective JSON body in UTF-8 bytes', () => {
   assert.equal(utf8ByteLength('\u20b4'), 3);
 });
 
-test('keeps the complete local body below the 4.5 MB transport ceiling', () => {
+test('defines a strict local body ceiling below the 4.5 MB transport ceiling', () => {
   const emptyBodyBytes = analysisBodyByteLength('coupon', '');
   const exactLimitBase64 = 'A'.repeat(MAX_ANALYZE_JSON_BYTES - emptyBodyBytes);
 
@@ -33,6 +33,14 @@ test('keeps the complete local body below the 4.5 MB transport ceiling', () => {
     analysisBodyByteLength('coupon', exactLimitBase64),
     MAX_ANALYZE_JSON_BYTES,
   );
+});
+
+test('rejects a prepared body at the exact 4,400,000-byte boundary', async () => {
+  const emptyBodyBytes = analysisBodyByteLength('coupon', '');
+  const exactLimitBase64 = 'A'.repeat(MAX_ANALYZE_JSON_BYTES - emptyBodyBytes);
+  const result = await prepareWithProfiles('coupon', async () => rendered(exactLimitBase64));
+
+  assert.deepEqual(result, { status: 'oversize' });
 });
 
 test('resizes the longest side without upscaling', () => {
@@ -65,7 +73,7 @@ test('accepts the first profile whose complete body fits the local limit', async
   assert.deepEqual(attemptedDimensions, [2048, 1600]);
   assert.equal(result.image.profile.maxDimension, 1600);
   assert.equal(result.image.contentType, 'image/jpeg');
-  assert.ok(result.image.bodyBytes <= MAX_ANALYZE_JSON_BYTES);
+  assert.ok(result.image.bodyBytes < MAX_ANALYZE_JSON_BYTES);
 });
 
 test('fails closed after every approved profile remains oversized', async () => {

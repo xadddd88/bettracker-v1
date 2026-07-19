@@ -113,7 +113,7 @@ export async function prepareWithProfiles(
     }
 
     const bodyBytes = analysisBodyByteLength(mode, rendered.base64);
-    if (bodyBytes <= MAX_ANALYZE_JSON_BYTES) {
+    if (bodyBytes < MAX_ANALYZE_JSON_BYTES) {
       return {
         status: 'ready',
         image: {

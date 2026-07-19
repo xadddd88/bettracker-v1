@@ -7,6 +7,8 @@ import {
   type CaptureMode,
   type PreparedImage,
 } from './image-policy';
+import { cleanupUnretainedGeneratedImages } from './image-cache-lifecycle';
+import { deleteGeneratedImage } from './image-cache';
 
 export type CaptureSource = 'camera' | 'library';
 
@@ -80,6 +82,7 @@ async function preparePickerResult(
     return { status: 'corrupt' };
   }
 
+  const generatedUris: string[] = [];
   const prepared = await prepareWithProfiles(mode, async (profile) => {
     const context = ImageManipulator.manipulate(asset.uri);
     const resize = resizeWithin(asset.width, asset.height, profile.maxDimension);
@@ -91,6 +94,7 @@ async function preparePickerResult(
       compress: profile.compress,
       format: SaveFormat.JPEG,
     });
+    generatedUris.push(saved.uri);
 
     return {
       base64: saved.base64 ?? '',
@@ -99,6 +103,12 @@ async function preparePickerResult(
       width: saved.width,
     };
   });
+
+  cleanupUnretainedGeneratedImages(
+    generatedUris,
+    prepared.status === 'ready' ? prepared.image.uri : null,
+    deleteGeneratedImage,
+  );
 
   if (prepared.status !== 'ready') return prepared;
   return {
