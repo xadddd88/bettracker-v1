@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, ReduceMotion } from 'react-native-reanimated';
 
 import { useAuth } from '@/auth/auth-context';
 import { fetchBankroll, fetchBets } from '@/bets/data';
@@ -10,8 +11,13 @@ import { readErrorMessage } from '@/bets/errors';
 import { formatMoney, type BetDto } from '@/bets/models';
 import { summarizeBets } from '@/bets/summary';
 import { BetTicket } from '@/ui/bet-ticket';
+import { MotionPressable } from '@/ui/motion';
 import { colors } from '@/ui/theme';
 import { TimeWarpBackdrop, WarpRail } from '@/ui/time-warp';
+
+const ENTER_HEADER = FadeInDown.duration(380).reduceMotion(ReduceMotion.System);
+const ENTER_PANEL = FadeInDown.delay(80).duration(420).reduceMotion(ReduceMotion.System);
+const ENTER_ACTIONS = FadeInDown.delay(150).duration(420).reduceMotion(ReduceMotion.System);
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -50,17 +56,18 @@ export default function HomeScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <TimeWarpBackdrop />
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
+        <Animated.View entering={ENTER_HEADER} style={styles.header}>
           <View style={styles.headerCopy}>
             <WarpRail />
             <Text style={styles.brand}>XADDD</Text>
             <Text style={styles.title}>Overview</Text>
           </View>
-          <Pressable
+          <MotionPressable
             accessibilityLabel="Account and settings"
             accessibilityRole="button"
+            glow="magenta"
             onPress={() => router.push('/(app)/more')}
-            style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
+            style={styles.iconButton}
           >
             <SymbolView
               fallback={<Text style={styles.iconFallback}>ME</Text>}
@@ -68,8 +75,8 @@ export default function HomeScreen() {
               size={21}
               tintColor={colors.secondaryText}
             />
-          </Pressable>
-        </View>
+          </MotionPressable>
+        </Animated.View>
 
         {loading ? (
           <View style={styles.loadingRow}>
@@ -77,7 +84,7 @@ export default function HomeScreen() {
             <Text style={styles.muted}>Updating your dashboard…</Text>
           </View>
         ) : (
-          <View style={styles.bankrollCard}>
+          <Animated.View entering={ENTER_PANEL} style={styles.bankrollCard}>
             <WarpRail />
             <View style={styles.balanceRow}>
               <View>
@@ -98,7 +105,7 @@ export default function HomeScreen() {
               <SummaryMetric label="TRACKED" value={String(bets.length)} />
               <SummaryMetric label="SETTLED" value={String(summary.settledCount)} />
             </View>
-          </View>
+          </Animated.View>
         )}
 
         {error ? (
@@ -108,7 +115,7 @@ export default function HomeScreen() {
           </Pressable>
         ) : null}
 
-        <View style={styles.quickGrid}>
+        <Animated.View entering={ENTER_ACTIONS} style={styles.quickGrid}>
           <QuickAction
             icon={{ android: 'document_scanner', ios: 'viewfinder', web: 'document_scanner' }}
             label="Scan coupon"
@@ -120,7 +127,7 @@ export default function HomeScreen() {
             label="Add bet"
             onPress={() => router.push('/(app)/bets/new')}
           />
-        </View>
+        </Animated.View>
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent bets</Text>
@@ -137,6 +144,7 @@ export default function HomeScreen() {
             </View>
           ) : recent.map((bet, index) => (
             <BetTicket
+              animationDelay={index * 70}
               bet={bet}
               compact
               currency={currency}
@@ -172,18 +180,19 @@ function QuickAction({ icon, label, onPress, primary = false }: {
   primary?: boolean;
 }) {
   return (
-    <Pressable
+    <MotionPressable
       accessibilityLabel={label}
       accessibilityRole="button"
+      glow={primary ? 'cyan' : 'magenta'}
       onPress={onPress}
-      style={({ pressed }) => [styles.quickAction, primary && styles.quickActionPrimary, pressed && styles.pressed]}
+      style={[styles.quickAction, primary && styles.quickActionPrimary]}
     >
       <View style={[styles.quickIcon, primary && styles.quickIconPrimary]}>
         <SymbolView fallback={<Text>+</Text>} name={icon} size={20} tintColor={colors.accent} />
       </View>
       <Text style={[styles.quickLabel, primary && styles.quickLabelPrimary]}>{label}</Text>
       <Text style={[styles.chevron, primary && styles.quickLabelPrimary]}>›</Text>
-    </Pressable>
+    </MotionPressable>
   );
 }
 

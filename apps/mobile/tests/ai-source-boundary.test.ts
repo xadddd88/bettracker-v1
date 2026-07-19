@@ -14,6 +14,7 @@ const ALLOWED_AI_EXTERNAL_IMPORTS = new Set([
   'expo-symbols',
   'react',
   'react-native',
+  'react-native-reanimated',
   'react-native-safe-area-context',
 ]);
 

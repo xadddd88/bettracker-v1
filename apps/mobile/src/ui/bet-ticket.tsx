@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 import {
   betFinancialSummary,
@@ -7,16 +8,18 @@ import {
   type BetDto,
 } from '@/bets/models';
 import { STATUS_PRESENTATION } from '@/bets/presentation';
+import { MotionPressable } from '@/ui/motion';
 import { colors } from '@/ui/theme';
 
 type BetTicketProps = {
+  animationDelay?: number;
   bet: BetDto;
   compact?: boolean;
   currency: string;
   onPress: () => void;
 };
 
-export function BetTicket({ bet, compact = false, currency, onPress }: BetTicketProps) {
+export function BetTicket({ animationDelay = 0, bet, compact = false, currency, onPress }: BetTicketProps) {
   const coupon = couponPresentation(bet);
   const status = STATUS_PRESENTATION[bet.status];
   const financial = betFinancialSummary(bet, currency);
@@ -24,12 +27,17 @@ export function BetTicket({ bet, compact = false, currency, onPress }: BetTicket
   const previewLegs = coupon.legs.slice(0, compact ? 1 : 2);
 
   return (
-    <Pressable
-      accessibilityHint="Opens bet details"
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.ticket, pressed && styles.pressed]}
+    <Animated.View
+      entering={FadeInDown.delay(animationDelay).duration(420).reduceMotion(ReduceMotion.System)}
+      layout={LinearTransition.duration(240).reduceMotion(ReduceMotion.System)}
     >
+      <MotionPressable
+        accessibilityHint="Opens bet details"
+        accessibilityRole="button"
+        glow="none"
+        onPress={onPress}
+        style={styles.ticket}
+      >
       <View style={styles.topline}>
         <View style={styles.typeBadge}>
           <Text style={styles.typeText}>
@@ -70,7 +78,8 @@ export function BetTicket({ bet, compact = false, currency, onPress }: BetTicket
         <TicketMetric label={financial.label} value={financial.value} />
         {!compact ? <Text style={styles.date}>{new Date(bet.placedAt).toLocaleDateString()}</Text> : null}
       </View>
-    </Pressable>
+      </MotionPressable>
+    </Animated.View>
   );
 }
 
@@ -91,7 +100,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
-  pressed: { opacity: 0.72 },
   topline: {
     alignItems: 'center',
     flexDirection: 'row',

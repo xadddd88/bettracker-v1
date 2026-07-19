@@ -85,12 +85,23 @@ test('daily Home uses the read model and does not expose roadmap labels', () => 
 
 test('Time Warp visual system is shared by daily mobile surfaces', () => {
   const backdrop = source('src/ui/time-warp.tsx');
+  const motion = source('src/ui/motion.tsx');
   const ticket = source('src/ui/bet-ticket.tsx');
+  const tabs = source('src/app/(app)/_layout.tsx');
+  const trackerStack = source('src/app/(app)/bets/_layout.tsx');
 
   assert.match(backdrop, /TimeWarpBackdrop/);
   assert.match(backdrop, /WarpRail/);
   assert.match(backdrop, /colors\.magenta/);
   assert.match(backdrop, /colors\.ultraviolet/);
+  assert.match(backdrop, /withRepeat/);
+  assert.match(backdrop, /useReducedMotion/);
+  assert.match(backdrop, /cancelAnimation/);
+  assert.match(motion, /withSpring/);
+  assert.match(motion, /withRepeat/);
+  assert.match(motion, /useReducedMotion/);
+  assert.match(tabs, /animation:\s*['"]fade['"]/);
+  assert.match(trackerStack, /animation:\s*['"]slide_from_right['"]/);
   assert.match(ticket, /EXPRESS/);
   assert.match(ticket, /leg\.odds\.toFixed\(2\)/);
 

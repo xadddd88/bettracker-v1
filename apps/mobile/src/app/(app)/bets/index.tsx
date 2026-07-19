@@ -11,14 +11,18 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, ReduceMotion } from 'react-native-reanimated';
 
 import { useAuth } from '@/auth/auth-context';
 import { fetchBets, fetchCurrency } from '@/bets/data';
 import { readErrorMessage } from '@/bets/errors';
 import { type BetDto } from '@/bets/models';
 import { BetTicket } from '@/ui/bet-ticket';
+import { MotionPressable } from '@/ui/motion';
 import { colors } from '@/ui/theme';
 import { TimeWarpBackdrop, WarpRail } from '@/ui/time-warp';
+
+const ENTER_HEADER = FadeInDown.duration(360).reduceMotion(ReduceMotion.System);
 
 export default function BetsScreen() {
   const router = useRouter();
@@ -57,7 +61,7 @@ export default function BetsScreen() {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <TimeWarpBackdrop />
-      <View style={styles.header}>
+      <Animated.View entering={ENTER_HEADER} style={styles.header}>
         <View style={styles.headerCopy}>
           <WarpRail />
           <Text style={styles.eyebrow}>TRACKER</Text>
@@ -65,11 +69,12 @@ export default function BetsScreen() {
           <Text style={styles.subtitle}>{bets.length} tracked</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable
+          <MotionPressable
             accessibilityLabel="Scan coupon"
             accessibilityRole="button"
+            glow="magenta"
             onPress={() => router.push('/(app)/ai')}
-            style={({ pressed }) => [styles.headerButton, pressed && styles.cardPressed]}
+            style={styles.headerButton}
           >
             <SymbolView
               fallback={<Text style={styles.headerButtonText}>S</Text>}
@@ -77,12 +82,12 @@ export default function BetsScreen() {
               size={20}
               tintColor={colors.secondaryText}
             />
-          </Pressable>
-          <Pressable
+          </MotionPressable>
+          <MotionPressable
             accessibilityLabel="Add bet"
             accessibilityRole="button"
             onPress={() => router.push('/(app)/bets/new')}
-            style={({ pressed }) => [styles.headerButtonPrimary, pressed && styles.cardPressed]}
+            style={styles.headerButtonPrimary}
           >
             <SymbolView
               fallback={<Text style={styles.headerButtonPrimaryText}>+</Text>}
@@ -90,9 +95,9 @@ export default function BetsScreen() {
               size={22}
               tintColor={colors.background}
             />
-          </Pressable>
+          </MotionPressable>
         </View>
-      </View>
+      </Animated.View>
 
       {loading ? (
         <View style={styles.centered}>
@@ -133,9 +138,10 @@ export default function BetsScreen() {
               tintColor={colors.accent}
             />
           }
-          renderItem={({ item }) => {
+          renderItem={({ index, item }) => {
             return (
               <BetTicket
+                animationDelay={Math.min(index, 7) * 55}
                 bet={item}
                 currency={currency}
                 onPress={() => router.push({ pathname: '/(app)/bets/[id]', params: { id: item.id } })}

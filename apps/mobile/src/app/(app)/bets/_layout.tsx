@@ -6,7 +6,9 @@ export default function BetsLayout() {
   return (
     <Stack
       screenOptions={{
+        animation: 'slide_from_right',
         contentStyle: { backgroundColor: colors.background },
+        gestureEnabled: true,
         headerBackTitle: 'Tracker',
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.text,

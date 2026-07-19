@@ -3,7 +3,6 @@ import { useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,6 +22,7 @@ import {
   validateTrackerDraft,
 } from '@/bets/draft';
 import { colors } from '@/ui/theme';
+import { MotionPressable } from '@/ui/motion';
 import { TimeWarpBackdrop, WarpRail } from '@/ui/time-warp';
 
 type Feedback = { message: string; tone: 'error' | 'success' };
@@ -136,20 +136,20 @@ export default function NewBetScreen() {
               <Text style={styles.sectionTitle}>Coupon legs</Text>
               <Text style={styles.sectionHint}>{draft.legs.length} of {MAX_DRAFT_LEGS}</Text>
             </View>
-            <Pressable
+            <MotionPressable
               accessibilityLabel="Add another leg"
               accessibilityRole="button"
               accessibilityState={{ disabled: draft.legs.length >= MAX_DRAFT_LEGS }}
               disabled={draft.legs.length >= MAX_DRAFT_LEGS}
+              glow="magenta"
               onPress={addLeg}
-              style={({ pressed }) => [
+              style={[
                 styles.addButton,
                 draft.legs.length >= MAX_DRAFT_LEGS ? styles.disabled : null,
-                pressed ? styles.pressed : null,
               ]}
             >
               <Text style={styles.addButtonText}>+ Add leg</Text>
-            </Pressable>
+            </MotionPressable>
           </View>
 
           {draft.legs.map((leg, index) => (
@@ -160,14 +160,15 @@ export default function NewBetScreen() {
                 </View>
                 <Text style={styles.legTitle}>Leg {index + 1}</Text>
                 {draft.legs.length > 1 ? (
-                  <Pressable
+                  <MotionPressable
                     accessibilityLabel={`Remove leg ${index + 1}`}
                     accessibilityRole="button"
+                    glow="none"
                     onPress={() => removeLeg(leg.id)}
-                    style={({ pressed }) => [styles.removeButton, pressed ? styles.pressed : null]}
+                    style={styles.removeButton}
                   >
                     <Text style={styles.removeButtonText}>Remove</Text>
-                  </Pressable>
+                  </MotionPressable>
                 ) : null}
               </View>
 
@@ -178,21 +179,21 @@ export default function NewBetScreen() {
                 showsHorizontalScrollIndicator={false}
               >
                 {TRACKER_SPORTS.map((sport) => (
-                  <Pressable
+                  <MotionPressable
                     accessibilityRole="radio"
                     accessibilityState={{ selected: leg.sport === sport }}
+                    glow="none"
                     key={sport}
                     onPress={() => editLeg(leg.id, { sport })}
-                    style={({ pressed }) => [
+                    style={[
                       styles.sportChip,
                       leg.sport === sport ? styles.sportChipSelected : null,
-                      pressed ? styles.pressed : null,
                     ]}
                   >
                     <Text style={[styles.sportText, leg.sport === sport ? styles.sportTextSelected : null]}>
                       {SPORT_LABELS[sport]}
                     </Text>
-                  </Pressable>
+                  </MotionPressable>
                 ))}
               </ScrollView>
 
@@ -283,20 +284,21 @@ export default function NewBetScreen() {
           ) : null}
 
           <View style={styles.actions}>
-            <Pressable
+            <MotionPressable
               accessibilityRole="button"
+              glow="none"
               onPress={() => router.back()}
-              style={({ pressed }) => [styles.secondaryButton, pressed ? styles.pressed : null]}
+              style={styles.secondaryButton}
             >
               <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </Pressable>
-            <Pressable
+            </MotionPressable>
+            <MotionPressable
               accessibilityRole="button"
               onPress={reviewBet}
-              style={({ pressed }) => [styles.primaryButton, pressed ? styles.pressed : null]}
+              style={styles.primaryButton}
             >
               <Text style={styles.primaryButtonText}>Review bet</Text>
-            </Pressable>
+            </MotionPressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -343,18 +345,18 @@ function DraftInput({
 
 function SegmentButton({ label, onPress, selected }: { label: string; onPress: () => void; selected: boolean }) {
   return (
-    <Pressable
+    <MotionPressable
       accessibilityRole="radio"
       accessibilityState={{ selected }}
+      glow={selected ? 'cyan' : 'none'}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.segmentButton,
         selected ? styles.segmentButtonSelected : null,
-        pressed ? styles.pressed : null,
       ]}
     >
       <Text style={[styles.segmentText, selected ? styles.segmentTextSelected : null]}>{label}</Text>
-    </Pressable>
+    </MotionPressable>
   );
 }
 

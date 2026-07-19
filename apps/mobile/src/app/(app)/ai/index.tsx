@@ -7,13 +7,13 @@ import {
   Alert,
   Linking,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeIn, FadeInDown, ReduceMotion } from 'react-native-reanimated';
 
 import {
   captureFromCamera,
@@ -29,6 +29,7 @@ import {
   type CaptureMode,
 } from '@/ai/image-policy';
 import { colors } from '@/ui/theme';
+import { MotionPressable } from '@/ui/motion';
 import { TimeWarpBackdrop, WarpRail } from '@/ui/time-warp';
 
 const MESSAGES = {
@@ -47,6 +48,8 @@ const MODE_OPTIONS: readonly { label: string; value: CaptureMode }[] = [
 ];
 
 const CONTENT_PADDING_TOP = 16;
+const ENTER_HEADER = FadeInDown.duration(360).reduceMotion(ReduceMotion.System);
+const ENTER_CAPTURE = FadeIn.delay(100).duration(420).reduceMotion(ReduceMotion.System);
 
 type Feedback = {
   canOpenSettings?: boolean;
@@ -186,27 +189,27 @@ export default function AiCaptureScreen() {
       style={styles.screen}
     >
       <TimeWarpBackdrop />
-      <View style={styles.header}>
+      <Animated.View entering={ENTER_HEADER} style={styles.header}>
         <WarpRail />
         <Text style={styles.eyebrow}>AI ANALYZER</Text>
         <Text style={styles.title}>Scan screenshot</Text>
         <Text style={styles.subtitle}>
           {mode === 'coupon' ? 'Extract selections and odds from a coupon.' : 'Prepare an event for AI analysis.'}
         </Text>
-      </View>
+      </Animated.View>
 
       <View accessibilityLabel="Capture type" style={styles.modeControl}>
         {MODE_OPTIONS.map((option) => (
-          <Pressable
+          <MotionPressable
             accessibilityRole="radio"
             accessibilityState={{ selected: mode === option.value }}
             disabled={busy}
+            glow={mode === option.value ? 'cyan' : 'none'}
             key={option.value}
             onPress={() => selectMode(option.value)}
-            style={({ pressed }) => [
+            style={[
               styles.modeOption,
               mode === option.value ? styles.modeOptionSelected : null,
-              pressed ? styles.pressed : null,
             ]}
           >
             <Text
@@ -217,7 +220,7 @@ export default function AiCaptureScreen() {
             >
               {option.label}
             </Text>
-          </Pressable>
+          </MotionPressable>
         ))}
       </View>
 
@@ -233,7 +236,7 @@ export default function AiCaptureScreen() {
         </View>
       ) : null}
 
-      <View style={styles.captureTool}>
+      <Animated.View entering={ENTER_CAPTURE} style={styles.captureTool}>
         {prepared ? (
           <>
             <View style={styles.previewFrame}>
@@ -311,7 +314,7 @@ export default function AiCaptureScreen() {
             </View>
           </View>
         )}
-      </View>
+      </Animated.View>
 
       {busy ? (
         <View accessibilityLabel="Preparing image" style={styles.processing}>
@@ -368,18 +371,18 @@ function ActionButton({
   tone = 'secondary',
 }: ActionButtonProps) {
   return (
-    <Pressable
+    <MotionPressable
       accessibilityLabel={label}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
+      glow={tone === 'primary' ? 'cyan' : tone === 'danger' ? 'magenta' : 'none'}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.actionButton,
         tone === 'primary' ? styles.actionButtonPrimary : null,
         tone === 'danger' ? styles.actionButtonDanger : null,
         disabled ? styles.actionButtonDisabled : null,
-        pressed ? styles.pressed : null,
       ]}
     >
       <SymbolView
@@ -397,7 +400,7 @@ function ActionButton({
       >
         {label}
       </Text>
-    </Pressable>
+    </MotionPressable>
   );
 }
 
