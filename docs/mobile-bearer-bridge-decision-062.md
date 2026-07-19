@@ -1,6 +1,6 @@
 # Decision #062 — Mobile Phase 1A Bearer Bridge
 
-Status: IMPLEMENTED IN DRAFT REVIEW; no production runtime or smoke authorized by this implementation.
+Status: RESTACKED ON CURRENT MAIN; DRAFT REVIEW; no production runtime or smoke authorized by this implementation.
 
 ## Purpose
 
