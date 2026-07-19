@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/auth/auth-context';
 import { fetchBet, fetchCurrency } from '@/bets/data';
 import { readErrorMessage } from '@/bets/errors';
-import { betTitle, type BetDto, formatMoney } from '@/bets/models';
+import { betFinancialSummary, couponPresentation, type BetDto, formatMoney } from '@/bets/models';
 import { STATUS_PRESENTATION } from '@/bets/presentation';
 import { colors } from '@/ui/theme';
 
@@ -73,53 +73,66 @@ export default function BetDetailScreen() {
 
   const status = STATUS_PRESENTATION[bet.status];
   const firstLeg = bet.legs[0];
-  const express = bet.legs.length > 1;
+  const coupon = couponPresentation(bet);
+  const financialSummary = betFinancialSummary(bet, currency);
+  const totalOdds = bet.totalOdds?.toFixed(2) ?? firstLeg?.odds.toFixed(2) ?? '—';
 
   return (
     <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.headingRow}>
-          <Text style={styles.title}>{betTitle(bet)}</Text>
+          <View style={styles.headingCopy}>
+            <Text style={styles.eyebrow}>TRACKED BET</Text>
+            <Text style={styles.title}>{coupon.label}</Text>
+          </View>
           <View style={[styles.badge, { borderColor: status.color }]}>
             <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
           </View>
         </View>
 
-        {!express && firstLeg ? (
-          <View style={styles.card}>
-            <DetailRow label="Event" value={firstLeg.eventName} />
-            {firstLeg.marketType ? <DetailRow label="Market" value={firstLeg.marketType} /> : null}
-            {firstLeg.selection ? <DetailRow label="Selection" value={firstLeg.selection} /> : null}
-          </View>
-        ) : null}
-
-        <View style={styles.card}>
-          <DetailRow label="Stake" value={formatMoney(bet.stake, currency)} />
-          <DetailRow label="Odds" value={bet.totalOdds?.toFixed(2) ?? firstLeg?.odds.toFixed(2) ?? '—'} />
-          {bet.potentialPayout !== null ? (
-            <DetailRow label="Potential payout" value={formatMoney(bet.potentialPayout, currency)} />
-          ) : null}
-          {bet.pnl !== null ? <DetailRow label="P&L" value={formatMoney(bet.pnl, currency)} /> : null}
-          {bet.bookmaker ? <DetailRow label="Bookmaker" value={bet.bookmaker} /> : null}
-          <DetailRow label="Placed" value={new Date(bet.placedAt).toLocaleString()} />
+        <View style={[styles.card, styles.summaryCard]}>
+          <SummaryMetric label="Stake" value={formatMoney(bet.stake, currency)} />
+          <View style={styles.summaryDivider} />
+          <SummaryMetric label="Total odds" value={totalOdds} />
+          <View style={styles.summaryDivider} />
+          <SummaryMetric
+            label={financialSummary.label}
+            value={financialSummary.value}
+          />
         </View>
 
-        {express ? (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Ordered legs</Text>
-            {bet.legs.map((leg, index) => (
-              <View key={leg.id} style={[styles.leg, index > 0 && styles.legBorder]}>
-                <Text style={styles.legIndex}>{leg.legIndex ?? index + 1}</Text>
-                <View style={styles.legCopy}>
-                  <Text style={styles.legEvent}>{leg.eventName}</Text>
-                  {leg.marketType ? <Text style={styles.legMeta}>{leg.marketType}</Text> : null}
-                  {leg.selection ? <Text style={styles.legMeta}>Selection: {leg.selection}</Text> : null}
-                </View>
-                <Text style={styles.legOdds}>@{leg.odds.toFixed(2)}</Text>
-              </View>
-            ))}
+        <View style={[styles.card, styles.couponCard]}>
+          <View style={styles.sectionHeading}>
+            <Text style={styles.sectionTitle}>{coupon.isExpress ? 'Coupon legs' : 'Selection'}</Text>
+            <Text style={styles.sectionCount}>{coupon.legs.length}</Text>
           </View>
-        ) : null}
+          {coupon.legs.map((leg, index) => (
+            <View key={leg.id} style={[styles.leg, index > 0 && styles.legBorder]}>
+              <View style={styles.legIndexBadge}>
+                <Text style={styles.legIndex}>{leg.index}</Text>
+              </View>
+              <View style={styles.legCopy}>
+                <Text style={styles.legEvent}>{leg.eventName}</Text>
+                {leg.selection ? <Text style={styles.legSelection}>{leg.selection}</Text> : null}
+                {leg.marketType ? <Text style={styles.legMeta}>{leg.marketType}</Text> : null}
+              </View>
+              {leg.odds !== null ? <Text style={styles.legOdds}>{leg.odds.toFixed(2)}</Text> : null}
+            </View>
+          ))}
+          {coupon.isLegacy ? (
+            <View style={styles.legacyNotice}>
+              <Text style={styles.legacyText}>
+                Legacy record · individual leg odds were not saved
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.card}>
+          {bet.bookmaker ? <DetailRow label="Bookmaker" value={bet.bookmaker} /> : null}
+          <DetailRow label="Placed" value={new Date(bet.placedAt).toLocaleString()} />
+          {bet.settledAt ? <DetailRow label="Settled" value={new Date(bet.settledAt).toLocaleString()} /> : null}
+        </View>
 
         {bet.notes ? (
           <View style={styles.card}>
@@ -131,6 +144,15 @@ export default function BetDetailScreen() {
         <Text style={styles.readOnly}>Read-only mobile view</Text>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function SummaryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.summaryMetric}>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text adjustsFontSizeToFit numberOfLines={1} style={styles.summaryValue}>{value}</Text>
+    </View>
   );
 }
 
@@ -150,22 +172,36 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, fontSize: 15, lineHeight: 22, textAlign: 'center' },
   retryButton: { backgroundColor: colors.accent, borderRadius: 10, justifyContent: 'center', minHeight: 44, paddingHorizontal: 20 },
   retryText: { color: colors.background, fontWeight: '800' },
-  headingRow: { alignItems: 'flex-start', flexDirection: 'row', gap: 12 },
-  title: { color: colors.text, flex: 1, fontSize: 23, fontWeight: '800', lineHeight: 30, minWidth: 0 },
+  headingRow: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  headingCopy: { flex: 1, gap: 3, minWidth: 0 },
+  eyebrow: { color: colors.placeholder, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
+  title: { color: colors.text, fontSize: 22, fontWeight: '800', lineHeight: 28 },
   badge: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
   badgeText: { fontSize: 11, fontWeight: '800' },
   card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, gap: 13, padding: 16 },
+  summaryCard: { alignItems: 'stretch', flexDirection: 'row', gap: 8, paddingHorizontal: 12 },
+  summaryMetric: { alignItems: 'center', flex: 1, gap: 5, justifyContent: 'center', minWidth: 0 },
+  summaryLabel: { color: colors.muted, fontSize: 11 },
+  summaryValue: { color: colors.text, fontSize: 16, fontWeight: '800', maxWidth: '100%' },
+  summaryDivider: { alignSelf: 'stretch', backgroundColor: colors.border, width: 1 },
+  couponCard: { gap: 0, paddingBottom: 12 },
+  sectionHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  sectionTitle: { color: colors.secondaryText, fontSize: 12, fontWeight: '800', letterSpacing: 0.7, textTransform: 'uppercase' },
+  sectionCount: { color: colors.placeholder, fontSize: 12, fontWeight: '700' },
+  leg: { alignItems: 'flex-start', flexDirection: 'row', gap: 11, paddingVertical: 11 },
+  legBorder: { borderTopColor: colors.border, borderTopWidth: 1 },
+  legIndexBadge: { alignItems: 'center', backgroundColor: colors.background, borderColor: colors.border, borderRadius: 14, borderWidth: 1, height: 28, justifyContent: 'center', width: 28 },
+  legIndex: { color: colors.secondaryText, fontSize: 12, fontWeight: '800' },
+  legCopy: { flex: 1, gap: 5, minWidth: 0 },
+  legEvent: { color: colors.text, fontSize: 14, fontWeight: '700', lineHeight: 20 },
+  legSelection: { color: colors.accent, fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  legMeta: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+  legOdds: { color: colors.secondaryText, fontSize: 14, fontWeight: '800', paddingTop: 4 },
+  legacyNotice: { backgroundColor: colors.background, borderRadius: 9, marginTop: 5, paddingHorizontal: 10, paddingVertical: 8 },
+  legacyText: { color: colors.placeholder, fontSize: 11, lineHeight: 16, textAlign: 'center' },
   row: { alignItems: 'flex-start', flexDirection: 'row', gap: 16, justifyContent: 'space-between' },
   rowLabel: { color: colors.muted, fontSize: 13 },
   rowValue: { color: colors.text, flex: 1, fontSize: 14, fontWeight: '600', textAlign: 'right' },
-  sectionTitle: { color: colors.secondaryText, fontSize: 13, fontWeight: '800', textTransform: 'uppercase' },
-  leg: { alignItems: 'flex-start', flexDirection: 'row', gap: 10, paddingVertical: 4 },
-  legBorder: { borderTopColor: colors.border, borderTopWidth: 1, paddingTop: 13 },
-  legIndex: { color: colors.placeholder, fontSize: 12, width: 20 },
-  legCopy: { flex: 1, gap: 3, minWidth: 0 },
-  legEvent: { color: colors.text, fontSize: 14, fontWeight: '600', lineHeight: 20 },
-  legMeta: { color: colors.muted, fontSize: 12, lineHeight: 17 },
-  legOdds: { color: colors.secondaryText, fontSize: 13, fontWeight: '700' },
   notes: { color: colors.secondaryText, fontSize: 14, lineHeight: 21 },
   readOnly: { color: colors.placeholder, fontSize: 11, textAlign: 'center' },
 });

@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { currencySymbol, mapBetRow, resolveBetStatus } from '../src/bets/models';
+import {
+  betFinancialSummary,
+  couponPresentation,
+  currencySymbol,
+  mapBetRow,
+  resolveBetStatus,
+} from '../src/bets/models';
 import { sanitizeAuthError, shouldRefreshForAppState } from '../src/auth/policy';
 import { readErrorMessage, sanitizeReadError } from '../src/bets/errors';
 
@@ -31,10 +37,80 @@ test('unknown statuses do not masquerade as a settlement outcome', () => {
   assert.equal(resolveBetStatus('won'), 'won');
 });
 
+test('presents ordered relational Express legs without changing their odds', () => {
+  const bet = mapBetRow({
+    bet_type: 'parlay', id: 'bet-express', placed_at: '2026-07-17T00:00:00Z',
+    stake: 10, status: 'pending', total_odds: 3,
+    legs: [
+      { event_name: 'Second event', id: '2', leg_index: 2, odds: 1.5, selection: 'Away' },
+      { event_name: 'First event', id: '1', leg_index: 1, odds: 2, selection: 'Home' },
+    ],
+  });
+
+  const coupon = couponPresentation(bet);
+  assert.equal(coupon.label, 'Express · 2 legs');
+  assert.equal(coupon.isLegacy, false);
+  assert.deepEqual(coupon.legs.map((leg) => [leg.index, leg.eventName, leg.odds]), [
+    [1, 'First event', 2], [2, 'Second event', 1.5],
+  ]);
+});
+
+test('splits a legacy Express only when count, events and selections agree', () => {
+  const bet = mapBetRow({
+    bet_type: 'single', id: 'legacy', placed_at: '2026-06-29T00:00:00Z',
+    stake: 1000, status: 'pending', total_odds: 4.11,
+    legs: [{
+      event_name: 'Event A + Event B + Event C + Event D', id: 'legacy-leg', odds: 4.11,
+      market_type: 'Експрес (4 ноги)', selection: 'Pick A + Pick B + Pick C + Pick D',
+    }],
+  });
+
+  const coupon = couponPresentation(bet);
+  assert.equal(coupon.label, 'Express · 4 legs');
+  assert.equal(coupon.isLegacy, true);
+  assert.deepEqual(coupon.legs.map((leg) => [leg.eventName, leg.selection, leg.odds]), [
+    ['Event A', 'Pick A', null], ['Event B', 'Pick B', null],
+    ['Event C', 'Pick C', null], ['Event D', 'Pick D', null],
+  ]);
+});
+
+test('fails closed when a legacy Express cannot be split unambiguously', () => {
+  const bet = mapBetRow({
+    bet_type: 'single', id: 'ambiguous', placed_at: '2026-06-29T00:00:00Z',
+    stake: 10, status: 'pending', total_odds: 2,
+    legs: [{
+      event_name: 'Event A + Event B + Event C + Event D', id: 'legacy-leg', odds: 2,
+      market_type: 'Експрес (4 ноги)', selection: 'Combined selection',
+    }],
+  });
+
+  const coupon = couponPresentation(bet);
+  assert.equal(coupon.label, 'Legacy Express');
+  assert.equal(coupon.isLegacy, true);
+  assert.equal(coupon.legs.length, 1);
+  assert.equal(coupon.legs[0].eventName, 'Event A + Event B + Event C + Event D');
+  assert.equal(coupon.legs[0].odds, null);
+});
+
 test('formats supported and fallback currencies', () => {
   assert.equal(currencySymbol('UAH'), '₴');
   assert.equal(currencySymbol('GBP'), '£');
   assert.equal(currencySymbol('JPY'), 'JPY ');
+});
+
+test('financial summary never invents a zero payout', () => {
+  assert.deepEqual(
+    betFinancialSummary({ pnl: null, potentialPayout: null }, 'USD'),
+    { label: 'Payout', value: '—' },
+  );
+  assert.deepEqual(
+    betFinancialSummary({ pnl: null, potentialPayout: 25 }, 'EUR'),
+    { label: 'Payout', value: '€25.00' },
+  );
+  assert.deepEqual(
+    betFinancialSummary({ pnl: -4, potentialPayout: 25 }, 'USD'),
+    { label: 'P&L', value: '-$4.00' },
+  );
 });
 
 test('auth and read errors are sanitized', () => {
