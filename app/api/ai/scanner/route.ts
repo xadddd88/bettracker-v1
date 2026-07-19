@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { authenticateRequest } from '@/lib/supabase/request-auth'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 import {
@@ -14,6 +14,10 @@ import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 // ─── Constants ───────────────────────────────────────────────
 const ALLOWED_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const
 const MAX_BASE64_CHARS = 10 * 1024 * 1024 // ~7.5 MB original image
+const SCANNER_UPSTREAM_TIMEOUT_MS = (() => {
+  const configured = Number(process.env.SCANNER_UPSTREAM_TIMEOUT_MS)
+  return Number.isFinite(configured) && configured > 0 ? configured : 60_000
+})()
 
 const SCAN_PROMPT = `You are a betting slip OCR expert. Analyze this screenshot of a betting coupon or slip.
 
@@ -145,6 +149,20 @@ function shouldRetryScannerParse(err: unknown) {
   return stage === 'normalization' && missingFields.includes('legs')
 }
 
+function isUpstreamTimeout(err: unknown) {
+  return err instanceof Error && (
+    err.name === 'TimeoutError' ||
+    (err.name === 'AbortError' && /timeout/i.test(err.message))
+  )
+}
+
+function scannerTimeoutResponse() {
+  return NextResponse.json(
+    { error: 'Scanner timed out — please try again' },
+    { status: 504 }
+  )
+}
+
 async function callAnthropicScanner(
   apiKey: string,
   image: string,
@@ -170,6 +188,7 @@ async function callAnthropicScanner(
         ],
       }],
     }),
+    signal: AbortSignal.timeout(SCANNER_UPSTREAM_TIMEOUT_MS),
   })
 
   if (!response.ok) {
@@ -225,11 +244,11 @@ const scanOutputSchema = z.object({
 // ─── Handler ─────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   // Auth check
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const auth = await authenticateRequest(req)
+  if (!auth.authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  const { user } = auth
 
   const rateCheck = await enforceRateLimit(`scanner:${user.id}`, RATE_LIMITS.scanner())
   if (rateCheck.unavailable) {
@@ -275,6 +294,10 @@ export async function POST(req: NextRequest) {
   try {
     raw = await callAnthropicScanner(apiKey, image, media_type, SCAN_PROMPT)
   } catch (err) {
+    if (isUpstreamTimeout(err)) {
+      await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'timeout' })
+      return scannerTimeoutResponse()
+    }
     console.error('[scanner] fetch error:', err)
     await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'api_error' })
     return NextResponse.json({ error: 'Scanner API error' }, { status: 502 })
@@ -290,6 +313,10 @@ export async function POST(req: NextRequest) {
         const fallbackRaw = await callAnthropicScanner(apiKey, image, media_type, FALLBACK_SCAN_PROMPT)
         normalizedData = normalizeLooseCouponExtraction(parseScannerVisionResult(fallbackRaw))
       } catch (fallbackErr) {
+        if (isUpstreamTimeout(fallbackErr)) {
+          await trackServerEvent(user.id, EVENTS.SCANNER_FAILED, { error_type: 'timeout' })
+          return scannerTimeoutResponse()
+        }
         const stage = (fallbackErr as { scannerParseStage?: ScannerParseStage }).scannerParseStage ?? 'normalization'
         const missingFields = (fallbackErr as { missingFields?: string[] }).missingFields ?? []
         console.error('[scanner] fallback parse/normalization failed:', { stage, missingFields })

@@ -1,7 +1,7 @@
 # Decision Ledger / Numbering Governance
 
-Status: CURRENT — Decision #062 ACTIVE (Mobile Phase 0 implementation in review); Decision #061 ACTIVE (Phase A1 merged via PR #162 as `a6d4ebb`, deployed READY; Phase A2 browser E2E remains outside main); Decision #060 EXECUTED / VERIFIED / CLOSED 2026-07-16; Decision #056 implementation merged/deployed, runtime provider call not approved / not run
-Last updated: 2026-07-17
+Status: CURRENT — Decision #062 ACTIVE (mobile Phases 0/1B/1C merged; Phase 1A Bearer bridge in Draft review); Decision #061 ACTIVE (Phase A1 merged via PR #162 as `a6d4ebb`, deployed READY; Phase A2 browser E2E remains outside main); Decision #060 EXECUTED / VERIFIED / CLOSED 2026-07-16; Decision #056 implementation merged/deployed, runtime provider call not approved / not run
+Last updated: 2026-07-19
 
 ## Purpose
 
@@ -16,7 +16,7 @@ Retired reservation / do not reuse: #032
 Highest-numbered closed: #060 — Founder-First Coupon-to-Tracker (Phase A + Phase B production API smoke verified)
 Active approved: #061 — Founder Daily Flow Acceptance (Phase A1 fail-closed tracker input lifecycle;
                  Playwright/Supabase-stub harness deferred)
-                 #062 — Mobile Phase 0 (password auth/session + read-only bets)
+                 #062 — Mobile Founder client (0/1B/1C merged; 1A Bearer bridge in Draft review)
                  #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run
                  (implementation merged/deployed; runtime provider call not approved / not run)
 Next unreserved: #063
@@ -44,7 +44,7 @@ Next unreserved: #063
 | #059 | Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY; eligibility BLOCKED |
 | #060 | Founder-First Coupon-to-Tracker — EXECUTED / VERIFIED / CLOSED 2026-07-16; Phase A + Phase B production API smoke verified |
 | #061 | Founder Daily Flow Acceptance — ACTIVE; Phase A read-only assessment delivered; Phase A1 merged via PR #162 as `a6d4ebb`, deployed READY; Phase A2 browser E2E deferred / not approved |
-| #062 | Mobile Phase 0 — ACTIVE; native password auth/session + read-only bet list/detail implementation in review; replacement native build not yet approved |
+| #062 | Mobile Founder client — ACTIVE; Phases 0/1B/1C merged; replacement Android+iOS development builds installed; Phase 1A Bearer bridge in Draft review with no production runtime |
 
 ## Retired / Superseded Tracks
 

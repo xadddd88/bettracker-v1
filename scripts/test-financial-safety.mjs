@@ -92,7 +92,7 @@ function makeStubClient(cfg = {}) {
   const client = {
     calls,
     auth: {
-      getUser: async () => ({ data: { user: cfg.user === null ? null : { id: 'user-1' } } }),
+      getUser: async () => ({ data: { user: cfg.user === null ? null : (cfg.user ?? { id: 'user-1' }) } }),
     },
     rpc: async (name, args) => {
       calls.rpc.push({ name, args });
@@ -959,6 +959,173 @@ test('intent: fingerprintPayload is stable for equal payloads and distinct for d
   assert.notEqual(a1, b, 'different payloads must not collide');
 });
 
+// ── Decision #062 Phase 1A: native Bearer authentication bridge ─────
+// Exercises the compiled request-scoped adapter directly. A request carrying
+// Authorization is token-only and can never fall back to a browser cookie.
+
+console.log('\nDecision #062 Phase 1A — authenticated Bearer bridge:');
+
+const REQUEST_AUTH_MODULE = 'lib/supabase/request-auth.js';
+
+function jwtWithRole(role) {
+  const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ role })}.signature`;
+}
+
+function makeAuthOnlyClient({ user = { id: 'verified-user' }, error = null } = {}) {
+  const calls = { getUser: [] };
+  return {
+    calls,
+    auth: {
+      async getUser(token) {
+        calls.getUser.push(token);
+        return { data: { user }, error };
+      },
+    },
+  };
+}
+
+function clearRequestAuthModules() {
+  for (const rel of [REQUEST_AUTH_MODULE, 'lib/supabase/server.js']) {
+    try { delete require.cache[require.resolve(path.join(buildDir, rel))]; } catch { /* not loaded */ }
+  }
+}
+
+async function withRequestAuthHarness({ cookieClient, bearerClient }, fn) {
+  return withCompiledAlias(async () => {
+    clearRequestAuthModules();
+
+    const serverPath = path.join(buildDir, 'lib/supabase/server.js');
+    let cookieCreates = 0;
+    require.cache[require.resolve(serverPath)] = {
+      id: serverPath,
+      filename: serverPath,
+      loaded: true,
+      exports: {
+        createClient: async () => {
+          cookieCreates++;
+          return cookieClient;
+        },
+      },
+    };
+
+    const packagePath = require.resolve('@supabase/supabase-js');
+    const originalPackageModule = require.cache[packagePath];
+    const bearerCreates = [];
+    require.cache[packagePath] = {
+      id: packagePath,
+      filename: packagePath,
+      loaded: true,
+      exports: {
+        createClient: (url, key, options) => {
+          bearerCreates.push({ url, key, options });
+          return bearerClient;
+        },
+      },
+    };
+
+    const previousEnv = {
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      anon: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      service: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    };
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://local-auth.test';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'fake-anon-key';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-key';
+
+    try {
+      const adapter = require(path.join(buildDir, REQUEST_AUTH_MODULE));
+      return await fn(adapter, {
+        bearerCreates,
+        cookieCreates: () => cookieCreates,
+      });
+    } finally {
+      clearRequestAuthModules();
+      if (originalPackageModule) require.cache[packagePath] = originalPackageModule;
+      else delete require.cache[packagePath];
+      if (previousEnv.url === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      else process.env.NEXT_PUBLIC_SUPABASE_URL = previousEnv.url;
+      if (previousEnv.anon === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      else process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = previousEnv.anon;
+      if (previousEnv.service === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+      else process.env.SUPABASE_SERVICE_ROLE_KEY = previousEnv.service;
+    }
+  });
+}
+
+await testAsync('request-auth: missing Authorization preserves the verified cookie-session flow', async () => {
+  const cookieClient = makeAuthOnlyClient({ user: { id: 'cookie-user' } });
+  const bearerClient = makeAuthOnlyClient();
+  await withRequestAuthHarness({ cookieClient, bearerClient }, async ({ authenticateRequest }, calls) => {
+    const result = await authenticateRequest(new Request('https://example.test/api/bets/tracked'));
+    assert.equal(result.authorized, true);
+    assert.equal(result.user.id, 'cookie-user');
+    assert.equal(result.supabase, cookieClient);
+    assert.equal(calls.cookieCreates(), 1);
+    assert.equal(calls.bearerCreates.length, 0);
+    assert.deepEqual(cookieClient.calls.getUser, [undefined]);
+  });
+});
+
+await testAsync('request-auth: valid Bearer uses a request-scoped anon client and verified JWT identity', async () => {
+  const token = jwtWithRole('authenticated');
+  const cookieClient = makeAuthOnlyClient({ user: { id: 'cookie-user' } });
+  const bearerClient = makeAuthOnlyClient({ user: { id: 'mobile-user' } });
+  await withRequestAuthHarness({ cookieClient, bearerClient }, async ({ authenticateRequest }, calls) => {
+    const result = await authenticateRequest(new Request('https://example.test/api/bets/tracked', {
+      headers: { Authorization: `Bearer ${token}` },
+    }));
+    assert.equal(result.authorized, true);
+    assert.equal(result.user.id, 'mobile-user', 'identity must come only from getUser(token)');
+    assert.equal(result.supabase, bearerClient);
+    assert.equal(calls.cookieCreates(), 0);
+    assert.equal(calls.bearerCreates.length, 1);
+    assert.equal(calls.bearerCreates[0].url, 'https://local-auth.test');
+    assert.equal(calls.bearerCreates[0].key, 'fake-anon-key');
+    assert.equal(calls.bearerCreates[0].options.global.headers.Authorization, `Bearer ${token}`);
+    assert.equal(calls.bearerCreates[0].options.auth.persistSession, false);
+    assert.equal(calls.bearerCreates[0].options.auth.autoRefreshToken, false);
+    assert.deepEqual(bearerClient.calls.getUser, [token]);
+  });
+});
+
+await testAsync('request-auth: malformed or invalid Bearer fails closed without cookie fallback', async () => {
+  for (const [authorization, bearerUser, expectedCreates] of [
+    ['', { id: 'mobile-user' }, 0],
+    ['Basic abc', { id: 'mobile-user' }, 0],
+    ['Bearer', { id: 'mobile-user' }, 0],
+    ['Bearer one two', { id: 'mobile-user' }, 0],
+    ['Bearer invalid-token', null, 1],
+  ]) {
+    const cookieClient = makeAuthOnlyClient({ user: { id: 'cookie-user' } });
+    const bearerClient = makeAuthOnlyClient({ user: bearerUser });
+    await withRequestAuthHarness({ cookieClient, bearerClient }, async ({ authenticateRequest }, calls) => {
+      const result = await authenticateRequest(new Request('https://example.test/api/ai/scanner', {
+        headers: { Authorization: authorization },
+      }));
+      assert.equal(result.authorized, false);
+      assert.equal(calls.cookieCreates(), 0, `${authorization}: cookie fallback is forbidden`);
+      assert.equal(calls.bearerCreates.length, expectedCreates);
+    });
+  }
+});
+
+await testAsync('request-auth: service credentials are rejected before client creation or network validation', async () => {
+  for (const token of ['fake-service-key', jwtWithRole('service_role')]) {
+    const cookieClient = makeAuthOnlyClient({ user: { id: 'cookie-user' } });
+    const bearerClient = makeAuthOnlyClient({ user: { id: 'service-user' } });
+    await withRequestAuthHarness({ cookieClient, bearerClient }, async ({ authenticateRequest }, calls) => {
+      const result = await authenticateRequest(new Request('https://example.test/api/bets/tracked', {
+        headers: { Authorization: `Bearer ${token}` },
+      }));
+      assert.equal(result.authorized, false);
+      assert.equal(calls.cookieCreates(), 0);
+      assert.equal(calls.bearerCreates.length, 0, 'service credentials must be rejected pre-network');
+      assert.equal(bearerClient.calls.getUser.length, 0);
+    });
+  }
+});
+
 // ── Decision #060 Phase B: /api/bets/tracked write path ──────────────
 // The unified Single/Express form writes ONLY through POST
 // /api/bets/tracked → create_tracked_bet() as the authenticated user.
@@ -980,23 +1147,47 @@ function stubRateLimitModule() {
         rateState.calls.push({ key, windows });
         return rateState.result;
       },
-      RATE_LIMITS: { trackedBet: () => [{ limit: 10, seconds: 60 }] },
+      RATE_LIMITS: {
+        trackedBet: () => [{ limit: 10, seconds: 60 }],
+        scanner: () => [{ limit: 5, seconds: 60 }],
+      },
+    },
+  };
+}
+
+let routeAuthState = null;
+
+function stubRequestAuthModule() {
+  const p = path.join(buildDir, REQUEST_AUTH_MODULE);
+  require.cache[require.resolve(p)] = {
+    id: p, filename: p, loaded: true,
+    exports: {
+      authenticateRequest: async (req) => {
+        routeAuthState.calls.push(req.headers.get('authorization'));
+        if (routeAuthState.override) return routeAuthState.override;
+        const { data: { user } } = await currentStub.auth.getUser();
+        return user
+          ? { authorized: true, supabase: currentStub, user }
+          : { authorized: false };
+      },
     },
   };
 }
 
 function clearTrackedBetModules() {
-  for (const rel of [TRACKED_ROUTE, 'lib/supabase/server.js', 'lib/analytics/server.js', 'lib/rate-limit.js', 'lib/bets/tracked-bet.js']) {
+  for (const rel of [TRACKED_ROUTE, REQUEST_AUTH_MODULE, 'lib/supabase/server.js', 'lib/analytics/server.js', 'lib/rate-limit.js', 'lib/bets/tracked-bet.js']) {
     try { delete require.cache[require.resolve(path.join(buildDir, rel))]; } catch { /* not loaded */ }
   }
 }
 
-async function withTrackedBetRoute(stub, rate, fn) {
+async function withTrackedBetRoute(stub, rate, fn, authOverride = null) {
   return withCompiledAlias(async () => {
     clearTrackedBetModules();
     currentStub = stub;
     rateState = { result: rate ?? { allowed: true, retryAfter: 0, unavailable: false }, calls: [] };
+    routeAuthState = { override: authOverride, calls: [] };
     stubServerModules();
+    stubRequestAuthModule();
     stubRateLimitModule();
     const route = require(path.join(buildDir, TRACKED_ROUTE));
     try {
@@ -1005,6 +1196,7 @@ async function withTrackedBetRoute(stub, rate, fn) {
       clearTrackedBetModules();
       currentStub = null;
       rateState = null;
+      routeAuthState = null;
     }
   });
 }
@@ -1055,6 +1247,24 @@ await testAsync('tracked-bet: rate-limited → 429 + Retry-After, keyed per user
     assert.equal(rate.calls[0].key, 'tracked-bet:user-1', 'limiter must be keyed per user');
     assert.equal(stub.calls.rpc.length, 0);
   });
+});
+
+await testAsync('tracked-bet: verified native identity keys the limiter and authenticated RPC client', async () => {
+  const stub = makeStubClient({ user: null, rpcResults: trackedRpcOk() });
+  const mobileUser = { id: 'mobile-user' };
+  await withTrackedBetRoute(stub, null, async ({ POST }, rate) => {
+    const response = await POST(new Request(TRACKED_URL, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        Authorization: `Bearer ${jwtWithRole('authenticated')}`,
+      },
+      body: JSON.stringify(singleLegBody()),
+    }));
+    assert.equal(response.status, 200);
+    assert.equal(rate.calls[0].key, 'tracked-bet:mobile-user');
+    assert.equal(stub.calls.rpc.length, 1, 'verified request client must execute the authenticated RPC');
+  }, { authorized: true, supabase: stub, user: mobileUser });
 });
 
 await testAsync('tracked-bet: limiter unavailable → 503 fail-closed, RPC not called', async () => {
@@ -1206,6 +1416,105 @@ await testAsync('tracked-bet: exact replay passes through — 200, same bet id, 
   });
 });
 
+const SCANNER_ROUTE = 'app/api/ai/scanner/route.js';
+
+function clearScannerModules() {
+  for (const rel of [
+    SCANNER_ROUTE,
+    REQUEST_AUTH_MODULE,
+    'lib/analytics/server.js',
+    'lib/rate-limit.js',
+    'lib/ai/coupon-scanner.js',
+  ]) {
+    try { delete require.cache[require.resolve(path.join(buildDir, rel))]; } catch { /* not loaded */ }
+  }
+}
+
+async function withScannerRoute(stub, rate, fn, authOverride = null) {
+  return withCompiledAlias(async () => {
+    clearScannerModules();
+    currentStub = stub;
+    rateState = { result: rate ?? { allowed: true, retryAfter: 0, unavailable: false }, calls: [] };
+    routeAuthState = { override: authOverride, calls: [] };
+    stubServerModules();
+    stubRequestAuthModule();
+    stubRateLimitModule();
+    const route = require(path.join(buildDir, SCANNER_ROUTE));
+    try {
+      return await fn(route, rateState);
+    } finally {
+      clearScannerModules();
+      currentStub = null;
+      rateState = null;
+      routeAuthState = null;
+    }
+  });
+}
+
+await testAsync('scanner: timeout returns sanitized 504 and never performs an automatic provider retry', async () => {
+  const stub = makeStubClient({ user: null });
+  const previousApiKey = process.env.ANTHROPIC_API_KEY;
+  const originalFetch = globalThis.fetch;
+  let providerCalls = 0;
+  process.env.ANTHROPIC_API_KEY = 'fake-provider-key';
+  globalThis.fetch = async () => {
+    providerCalls++;
+    const error = new Error('The operation was aborted due to timeout');
+    error.name = 'TimeoutError';
+    throw error;
+  };
+
+  try {
+    await withScannerRoute(stub, null, async ({ POST }, rate) => {
+      const response = await POST(new Request('https://example.test/api/ai/scanner', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          Authorization: `Bearer ${jwtWithRole('authenticated')}`,
+        },
+        body: JSON.stringify({ image: 'jpeg-base64', media_type: 'image/jpeg' }),
+      }));
+      const result = await readJsonResponse(response);
+      assert.equal(result.status, 504);
+      assert.equal(result.body.error, 'Scanner timed out — please try again');
+      assert.equal(providerCalls, 1, 'ambiguous timeout must never auto-retry paid provider work');
+      assert.equal(rate.calls[0].key, 'scanner:mobile-user');
+    }, { authorized: true, supabase: stub, user: { id: 'mobile-user' } });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousApiKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = previousApiKey;
+  }
+});
+
+await testAsync('scanner: cookie user rate limit remains fail-closed before provider work', async () => {
+  const stub = makeStubClient({ user: { id: 'cookie-user' } });
+  const originalFetch = globalThis.fetch;
+  let providerCalls = 0;
+  globalThis.fetch = async () => {
+    providerCalls++;
+    throw new Error('provider must not be reached');
+  };
+
+  try {
+    await withScannerRoute(
+      stub,
+      { allowed: false, retryAfter: 17, unavailable: false },
+      async ({ POST }, rate) => {
+        const response = await POST(jsonRequest('https://example.test/api/ai/scanner', {
+          image: 'jpeg-base64', media_type: 'image/jpeg',
+        }));
+        assert.equal(response.status, 429);
+        assert.equal(response.headers.get('Retry-After'), '17');
+        assert.equal(rate.calls[0].key, 'scanner:cookie-user');
+        assert.equal(providerCalls, 0);
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('tracked-bet: form and route sources — API-only path, idempotency lifecycle, no service_role', () => {
   // The route exists ONLY at the agreed path.
   assert.ok(existsSync(path.join(repoRoot, 'app/api/bets/tracked/route.ts')), 'route must live at app/api/bets/tracked/route.ts');
@@ -1245,11 +1554,18 @@ test('tracked-bet: form and route sources — API-only path, idempotency lifecyc
 
   const route = readFileSync(path.join(repoRoot, 'app/api/bets/tracked/route.ts'), 'utf8');
   const routeCode = route.split('\n').filter((l) => !l.trimStart().startsWith('//')).join('\n');
-  assert.ok(route.includes("from '@/lib/supabase/server'"), 'route must use the cookie-session client');
+  assert.ok(route.includes("from '@/lib/supabase/request-auth'"), 'route must use the shared request-scoped auth bridge');
   assert.ok(!/createAdminClient|service_role|SERVICE_ROLE/.test(routeCode), 'service_role must never appear in the user flow');
   assert.ok(route.includes('trackedBetRequestSchema'), 'route must validate with the shared strict schema');
   assert.ok(route.includes("rpc('create_tracked_bet'"), 'route must write through create_tracked_bet');
   assert.ok(!/\.from\('/.test(route), 'route must not touch financial tables directly');
+
+  const scannerRoute = readFileSync(path.join(repoRoot, 'app/api/ai/scanner/route.ts'), 'utf8');
+  assert.ok(scannerRoute.includes("from '@/lib/supabase/request-auth'"), 'scanner must use the shared request-scoped auth bridge');
+  assert.ok(scannerRoute.includes('AbortSignal.timeout(SCANNER_UPSTREAM_TIMEOUT_MS)'), 'scanner provider calls need an upstream timeout');
+  const scannerHandler = scannerRoute.slice(scannerRoute.indexOf('// Call Claude Vision'));
+  assert.ok(scannerHandler.indexOf('if (isUpstreamTimeout(err))') < scannerHandler.indexOf('shouldRetryScannerParse(err)'),
+    'timeout handling must precede parse retry decisions');
 
   const shared = readFileSync(path.join(repoRoot, 'lib/bets/tracked-bet.ts'), 'utf8');
   const sharedCode = shared.split('\n').filter((l) => !l.trimStart().startsWith('//')).join('\n');
