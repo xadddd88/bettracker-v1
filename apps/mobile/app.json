@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/images/android-icon-monochrome.png",
-      "bundleIdentifier": "com.dmitriykhodakivskyi.xaddd"
+      "bundleIdentifier": "com.dmitriykhodakivskyi.xaddd",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.dmitriykhodakivskyi.xaddd",
