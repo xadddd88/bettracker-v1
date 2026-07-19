@@ -2189,17 +2189,19 @@ Reference: `docs/daily-flow-acceptance-decision-061.md`
 **Date:** 2026-07-17
 **Proposed by:** CPO + Founder
 **Approved by:** Founder (`APPROVE #062 MOBILE PHASE 0`)
-**Status:** ACTIVE — implementation in review. No production mobile auth/readback acceptance and no replacement native build has been authorized or executed by this implementation.
+**Status:** ACTIVE — Phase 0, Phase 1B capture shell, and Phase 1C product shell are merged. Founder replacement Android and iOS development builds have been installed. Phase 1A Bearer bridge is implemented in Draft review; no production runtime/smoke is authorized by that implementation.
 
 **Decision:** Establish the first native Founder product slice in `apps/mobile`: password authentication, encrypted persisted session, protected navigation, and read-only owner-scoped bet list/detail. Single and Express legs are rendered in `leg_index` order with nullable selection and currency-aware amounts.
 
-**Boundary:** Public Supabase URL/publishable key only; existing RLS remains the authorization boundary. No mobile financial write, RPC, Next API, scanner, settlement, deposit, provider call, analytics SDK, migration, policy, or server change. The existing Android development build predates SecureStore and must be replaced only after separate build approval; iOS waits for active Apple Developer membership and device registration.
+**Boundary:** Public Supabase URL/publishable key only in the native bundle; existing RLS remains the authorization boundary. Phase 0 remains read-only. Phase 1B added offline-safe camera/gallery JPEG preparation with no real AI request. Phase 1C added the Home/AI/Tracker/Stats/More shell and local-only tracker draft editor. The separately reviewed Phase 1A server bridge accepts a verified user Bearer for Scanner/Tracker routes without exposing service-role credentials and preserves browser cookies when Authorization is absent. Native route wiring, real AI calls, mobile financial writes, settlement, deposit, analytics, migrations, and policy changes remain deferred.
 
-**Validation:** mobile TypeScript + test TypeScript clean; 10/10 unit/boundary tests; Expo lint clean; Expo public config resolves; Android JS export succeeds with synthetic public env. Production/Supabase/provider calls and writes 0; EAS builds and EAS Updates 0.
+**Validation:** merged mobile phases passed their unit/boundary, TypeScript, lint, Expo config/export, GitHub, and Vercel checks. Founder completed and installed replacement development builds on registered Android and iOS devices. Phase 1A financial-safety is 72/72 on local stubs; production/Supabase/provider calls and writes 0, and no EAS build/update is part of Phase 1A.
 
 **Numbering:** Decision #062 occupied and ACTIVE; next unreserved decision #063.
 
 Reference: `docs/mobile-phase-0-decision-062.md`
+
+Phase 1A reference: `docs/mobile-bearer-bridge-decision-062.md`
 
 ---
 

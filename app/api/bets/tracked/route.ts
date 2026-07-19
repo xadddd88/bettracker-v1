@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { authenticateRequest } from '@/lib/supabase/request-auth'
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { trackedBetRequestSchema } from '@/lib/bets/tracked-bet'
 
@@ -8,7 +8,7 @@ import { trackedBetRequestSchema } from '@/lib/bets/tracked-bet'
 // bankroll_transactions directly: one create_tracked_bet() RPC does
 // leg validation, the bankroll row lock, the no-overdraft guard, and
 // the atomic bet + legs + balance + stake-transaction write. The RPC
-// runs as the AUTHENTICATED user (cookie-session client) — never
+// runs as the AUTHENTICATED user (cookie session or verified native Bearer) — never
 // service_role — so auth.uid() inside the function is the caller.
 
 // Sanitized mapping for the RPC's deterministic validation RAISEs.
@@ -18,9 +18,9 @@ const RPC_VALIDATION_PATTERN =
   /legs must|leg \d+ |total_odds|stake must|stake exceeds|bookmaker too long|notes too long|unsupported source|invalid idempotency key/i
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req)
+  if (!auth.authorized) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { supabase, user } = auth
 
   const rateCheck = await enforceRateLimit(`tracked-bet:${user.id}`, RATE_LIMITS.trackedBet())
   if (rateCheck.unavailable) {
