@@ -20,7 +20,6 @@ import {
   completePausedAnthropicTurn,
   containsAnalystPricingClaim,
   extractAnalystResearchSources,
-  usedSuccessfulWebSearch,
   type AnalystResearchBrief,
 } from '@/lib/ai/analyst-research'
 
@@ -82,6 +81,10 @@ const researchBriefSchema = z.object({
   builder_risk: z.string().max(1_500).nullable(),
   verdict: z.string().min(10).max(1_500),
   data_gaps: z.array(z.string().min(2).max(300)).max(12),
+  sourced_claims: z.array(z.object({
+    claim: z.string().min(2).max(400),
+    source_url: z.string().min(1).max(2_000),
+  })).max(12),
   legs: z.array(z.object({
     leg_number: z.number().int().min(1).max(20),
     event_name: z.string().min(1).max(500),
@@ -117,6 +120,10 @@ function toResearchBrief(value: ResearchBriefOutput): AnalystResearchBrief {
     builderRisk: value.builder_risk,
     verdict: value.verdict,
     dataGaps: value.data_gaps,
+    sourcedClaims: value.sourced_claims.map(claim => ({
+      text: claim.claim,
+      sourceUrl: claim.source_url,
+    })),
     legs: value.legs.map(leg => ({
       legNumber: leg.leg_number,
       eventName: leg.event_name,
@@ -153,6 +160,7 @@ function buildFallbackResearchBrief(
       : null,
     verdict: 'Use this as a qualitative review only until the fixture and current evidence are verified.',
     dataGaps: ['Exact fixture status', 'Current team news and availability', 'Recent form and market movement'],
+    sourcedClaims: [],
     legs: suppliedLegs.map((leg, index) => ({
       legNumber: index + 1,
       eventName: leg.eventName ?? input.event_name,
@@ -346,19 +354,25 @@ Return ONLY a valid JSON object matching this exact schema (no markdown, no expl
   ],
   "research_brief": {
     "headline": <concise conclusion in user's language>,
-    "summary": <useful qualitative analysis; distinguish sourced facts from conditional reasoning>,
+    "summary": <conditional market logic only; do not put current facts here>,
     "builder_risk": <for Bet Builder, explain dependence/correlation and shared match-script risk; otherwise null>,
-    "verdict": <what the bettor should conclude or verify next, without inventing an edge>,
+    "verdict": <conditional conclusion or next verification step; do not put current facts here>,
     "data_gaps": [<specific unresolved checks>],
+    "sourced_claims": [
+      {
+        "claim": <copy the citation's cited_text verbatim; no paraphrase>,
+        "source_url": <the exact HTTPS URL from that same citation>
+      }
+    ],
     "legs": [
       {
         "leg_number": <1-based integer>,
         "event_name": <exact event for this leg>,
         "market_type": <exact market>,
         "selection": <exact selection or null>,
-        "assessment": <what must happen and how robust/fragile this leg is>,
-        "evidence": [<only verified or explicitly conditional evidence>],
-        "risks": [<specific failure modes>],
+        "assessment": <conditional market mechanics only; no current facts>,
+        "evidence": [<conditional logic only; current facts belong exclusively in sourced_claims>],
+        "risks": [<conditional failure modes only; no current facts>],
         "fixture_status": <"scheduled" | "unknown" | "live" | "finished" | "cancelled" | "abandoned" | "postponed" | "retired" | "walkover" | "not_bettable">,
         "coverage": {
           "live_injuries": <true only if actually verified>,
@@ -481,8 +495,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const webSearchActuallyUsed = !searchFallbackUsed && webSearchEnabled && usedSuccessfulWebSearch(message.content)
-    const researchSources = extractAnalystResearchSources(message.content)
+    const extractedResearchSources = extractAnalystResearchSources(message.content)
 
     const rawText = message.content
       .filter((b): b is Anthropic.TextBlock => b.type === 'text')
@@ -533,9 +546,14 @@ export async function POST(req: NextRequest) {
       ? toResearchBrief(analysis.research_brief)
       : null
     const alignedResearchBrief = candidateResearchBrief && !containsAnalystPricingClaim(candidateResearchBrief)
-      ? alignAnalystResearchBriefToCoupon(candidateResearchBrief, couponLegs)
+      ? alignAnalystResearchBriefToCoupon(candidateResearchBrief, couponLegs, extractedResearchSources)
       : null
     const researchBrief = alignedResearchBrief ?? buildFallbackResearchBrief(input)
+    const boundSourceUrls = new Set(researchBrief.sourcedClaims.map(claim => claim.sourceUrl))
+    const researchSources = extractedResearchSources.filter(source => boundSourceUrls.has(source.url))
+    const webSearchActuallyUsed =
+      !searchFallbackUsed && webSearchEnabled &&
+      researchBrief.sourcedClaims.length > 0 && researchSources.length > 0
 
     // 8. Server owns pricing, but the quality gate can suppress it entirely.
     const qualityGate = evaluateAnalysisQuality({
@@ -574,8 +592,8 @@ export async function POST(req: NextRequest) {
     // 9. Keep sourced qualitative research distinct from pricing/model proof.
     const honestDisclaimer = webSearchActuallyUsed
       ? (input.output_language === 'uk'
-          ? 'Поточні факти наведені лише там, де знайдено джерела. Імовірність, перевага та EV не розраховуються без перевірених модельних входів.'
-          : 'Current facts are included only where sources were found. Probability, edge, and EV are not calculated without verified model inputs.')
+          ? 'Поточними фактами вважаються лише дослівні уривки в блоці «Цитовані твердження», кожен із яких прив’язаний до конкретного джерела. Решта тексту — умовна логіка ринку. Імовірність, перевага та EV не розраховуються.'
+          : 'Only verbatim excerpts in Sourced claims are treated as current facts, each bound to a specific citation. All other prose is conditional market logic. Probability, edge, and EV are not calculated.')
       : (input.output_language === 'uk'
           ? 'Цей аналіз базується на купоні та наданому контексті; актуальні дані, які не вдалося перевірити, позначені як прогалини.'
           : 'This analysis uses the coupon and supplied context; current data that could not be verified is listed as a gap.')

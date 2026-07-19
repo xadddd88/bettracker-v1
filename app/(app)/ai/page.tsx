@@ -104,7 +104,9 @@ function localizedRiskLabel(risk: RiskLevel, fallback: string, trustView: Analys
 }
 
 function renderResearchBriefText(brief: AnalystResearchBrief, sources: AnalystResearchSource[] = []): string {
+  const sourceByUrl = new Map(sources.map(source => [source.url, source]))
   const lines = [
+    'CONDITIONAL MARKET REVIEW — not a verified current-fact report',
     brief.headline,
     brief.summary,
     brief.builderRisk ? `\nBet Builder: ${brief.builderRisk}` : '',
@@ -116,7 +118,10 @@ function renderResearchBriefText(brief: AnalystResearchBrief, sources: AnalystRe
     ]),
     `\nVerdict: ${brief.verdict}`,
     ...brief.dataGaps.map(item => `Unverified: ${item}`),
-    ...sources.map(source => `Source: ${source.title} — ${source.url}`),
+    ...brief.sourcedClaims.flatMap(claim => {
+      const source = sourceByUrl.get(claim.sourceUrl)
+      return source ? [`Cited claim: “${claim.text}” — ${source.title} — ${claim.sourceUrl}`] : []
+    }),
   ]
   return lines.filter(Boolean).join('\n')
 }
@@ -444,19 +449,20 @@ export default function AIAnalystPage() {
       }</ul></li>`
     ).join('') ?? ''
     const researchHtml = a.research_brief ? `<section class="research">
-  <div class="research-kicker">${a.web_search_used ? 'CURRENT-SOURCE RESEARCH' : 'COUPON INTELLIGENCE'}</div>
+  <div class="research-kicker">CONDITIONAL MARKET REVIEW</div>
   <h2>${escapeHtml(a.research_brief.headline)}</h2>
   <p>${escapeHtml(a.research_brief.summary)}</p>
+  <p><strong>Trust boundary:</strong> Narrative analysis is conditional. Only verbatim excerpts under Cited claims are bound to current sources.</p>
   ${a.research_brief.builderRisk ? `<div class="builder"><strong>Bet Builder correlation</strong><br>${escapeHtml(a.research_brief.builderRisk)}</div>` : ''}
   ${a.research_brief.legs.map(leg => `<div class="research-leg">
     <strong>${leg.legNumber}. ${escapeHtml(leg.eventName)}</strong>
     <div>${escapeHtml(leg.marketType)}${leg.selection ? ` · ${escapeHtml(leg.selection)}` : ''}</div>
     <p>${escapeHtml(leg.assessment)}</p>
-    ${leg.evidence.length ? `<ul>${leg.evidence.map(item => `<li>+ ${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+    ${leg.evidence.length ? `<ul>${leg.evidence.map(item => `<li>+ Conditional: ${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
     ${leg.risks.length ? `<ul>${leg.risks.map(item => `<li>− ${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
   </div>`).join('')}
   <div class="verdict"><strong>Verdict</strong><br>${escapeHtml(a.research_brief.verdict)}</div>
-  ${a.research_sources?.length ? `<div class="sources"><strong>Sources</strong><ul>${a.research_sources.map(source => `<li>${escapeHtml(source.title)} — ${escapeHtml(source.url)}</li>`).join('')}</ul></div>` : ''}
+  ${a.research_brief.sourcedClaims.length ? `<div class="sources"><strong>Cited claims</strong><ul>${a.research_brief.sourcedClaims.map(claim => `<li>“${escapeHtml(claim.text)}” — ${escapeHtml(claim.sourceUrl)}</li>`).join('')}</ul></div>` : ''}
 </section>` : ''
     const pricingHtml = showPricing
       ? `<div class="grid">
@@ -816,7 +822,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               <div className="border-b border-black bg-black px-5 py-4 text-white">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="font-mono text-[9px] font-black uppercase tracking-[0.18em] text-[#e8ff00]">
-                    {a.web_search_used ? 'Current-source research' : 'Coupon intelligence'}
+                    Conditional market review
                   </p>
                   <span className="border border-white/40 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-white">
                     {a.research_brief.legs.length} {a.research_brief.legs.length === 1 ? 'leg' : 'legs'}
@@ -826,6 +832,9 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                   {a.research_brief.headline}
                 </h2>
                 <p className="mt-4 max-w-3xl text-sm leading-6 text-white/75">{a.research_brief.summary}</p>
+                <p className="mt-3 max-w-3xl border-l-2 border-[#e8ff00] pl-3 font-mono text-[9px] font-bold uppercase leading-4 tracking-[0.08em] text-white/70">
+                  Narrative analysis is conditional. Only verbatim excerpts under Cited claims are bound to current sources.
+                </p>
               </div>
 
               {a.research_brief.builderRisk && (
@@ -855,11 +864,11 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
                       <div className="mt-4 grid gap-4 md:grid-cols-2">
                         <div>
-                          <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/50">Evidence / logic</p>
+                          <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/50">Conditional logic</p>
                           <ul className="mt-2 space-y-1.5 text-sm leading-5 text-black/75">
                             {leg.evidence.length > 0
                               ? leg.evidence.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>+ {item}</li>)
-                              : <li>+ No verified current evidence returned.</li>}
+                              : <li>+ No additional conditional note.</li>}
                           </ul>
                         </div>
                         <div>
@@ -887,24 +896,29 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 )}
               </div>
 
-              {a.research_sources && a.research_sources.length > 0 && (
+              {a.research_brief.sourcedClaims.length > 0 && a.research_sources && a.research_sources.length > 0 && (
                 <div className="border-t border-black bg-[#f4f3ed] px-5 py-5">
-                  <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em] text-black/50">Sources consulted</p>
+                  <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em] text-black/50">Cited claims — verbatim source excerpts</p>
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
-                    {a.research_sources.map(source => (
+                    {a.research_brief.sourcedClaims.map((claim, claimIndex) => {
+                      const source = a.research_sources?.find(item => item.url === claim.sourceUrl)
+                      if (!source) return null
+                      return (
                       <a
-                        key={source.url}
+                        key={`${claimIndex}-${source.url}-${claim.text}`}
                         href={source.url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="border border-black bg-white px-3 py-3 text-sm font-bold text-black underline decoration-1 underline-offset-4 hover:bg-[#e8ff00]"
                       >
-                        <span className="block">{source.title}</span>
+                        <span className="block no-underline">“{claim.text}”</span>
+                        <span className="mt-2 block">{source.title}</span>
                         <span className="mt-1 block font-mono text-[9px] font-black uppercase tracking-[0.08em] no-underline opacity-50">
                           {new URL(source.url).hostname}
                         </span>
                       </a>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}

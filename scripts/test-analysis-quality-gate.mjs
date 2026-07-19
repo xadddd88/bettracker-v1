@@ -1029,6 +1029,7 @@ function exactBuilderResearchBrief() {
     builderRisk: 'An early goal can change both attacking pressure and corner volume.',
     verdict: 'Verify the fixture and current inputs before kickoff.',
     dataGaps: ['Exact competition'],
+    sourcedClaims: [],
     legs: [
       {
         legNumber: 2,
@@ -1086,6 +1087,29 @@ test('Analyst rejects duplicate numbers and mismatched leg identity instead of s
   assert.equal(alignAnalystResearchBriefToCoupon(mismatched, couponLegs), null);
 });
 
+test('Analyst binds only verbatim claims to their exact citation URL', () => {
+  const brief = exactBuilderResearchBrief();
+  brief.sourcedClaims = [
+    { text: 'Spain confirmed the squad on Friday.', sourceUrl: 'https://example.com/report' },
+    { text: 'Paraphrased claim not present in the citation.', sourceUrl: 'https://example.com/report' },
+    { text: 'Unrelated source.', sourceUrl: 'https://example.org/uncited' },
+  ];
+  const aligned = alignAnalystResearchBriefToCoupon(brief, [
+    { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5' },
+    { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5' },
+  ], [{
+    title: 'Squad report',
+    url: 'https://example.com/report',
+    citedText: 'Spain confirmed the squad on Friday.',
+  }]);
+
+  assert.ok(aligned);
+  assert.deepEqual(aligned.sourcedClaims, [{
+    text: 'Spain confirmed the squad on Friday.',
+    sourceUrl: 'https://example.com/report',
+  }]);
+});
+
 test('Analyst research source extraction keeps only cited public HTTPS sources', () => {
   const content = [
     {
@@ -1098,6 +1122,9 @@ test('Analyst research source extraction keeps only cited public HTTPS sources',
         { type: 'web_search_result_location', url: 'https://user:pass@example.com/private', title: 'Credentials', cited_text: 'nope' },
         { type: 'web_search_result_location', url: 'https://127.0.0.1/internal', title: 'Loopback', cited_text: 'nope' },
         { type: 'web_search_result_location', url: 'https://192.168.1.5/internal', title: 'Private', cited_text: 'nope' },
+        { type: 'web_search_result_location', url: 'https://192.0.2.1/test', title: 'TEST-NET-1', cited_text: 'nope' },
+        { type: 'web_search_result_location', url: 'https://198.51.100.1/test', title: 'TEST-NET-2', cited_text: 'nope' },
+        { type: 'web_search_result_location', url: 'https://203.0.113.1/test', title: 'TEST-NET-3', cited_text: 'nope' },
       ],
     },
     {
@@ -1124,6 +1151,7 @@ test('Analyst research rejects probability and edge claims but permits ordinary 
     builderRisk: 'An early goal may reduce later attacking pressure and corner volume.',
     verdict: 'Verify the competition and squads before kickoff.',
     dataGaps: ['Exact competition'],
+    sourcedClaims: [],
     legs: [{
       legNumber: 1,
       eventName: 'Spain - Argentina',
@@ -1153,6 +1181,7 @@ test('saved research parser rejects partial nested JSON and unsafe stored source
   assert.ok(parseStoredAnalystResearchBrief(valid));
   assert.equal(parseStoredAnalystResearchBrief({ ...valid, legs: [{ legNumber: 1 }] }), null);
   assert.equal(parseStoredAnalystResearchBrief({ ...valid, legs: [{ ...valid.legs[0], risks: 'not-an-array' }] }), null);
+  assert.equal(parseStoredAnalystResearchBrief({ ...valid, sourcedClaims: [{ text: 'Claim', sourceUrl: 'https://192.0.2.1/test' }] }), null);
   assert.deepEqual(parseStoredAnalystResearchSources([
     { title: 'Report', url: 'https://example.com/report', citedText: null },
     { title: 'Internal', url: 'https://127.0.0.1/admin', citedText: null },
@@ -1203,6 +1232,9 @@ test('web Analyst transports coupon legs and time into the research pipeline', (
   assert.match(routeSource, /research_brief:\s*researchBrief/);
   assert.match(routeSource, /research_sources:\s*researchSources/);
   assert.match(routeSource, /offered_odds:\s*input\.offered_odds/);
+  assert.match(routeSource, /researchBrief\.sourcedClaims\.length\s*>\s*0/);
+  assert.doesNotMatch(pageSource, /Current-source research/);
+  assert.doesNotMatch(decisionDetailSource, /Current-source research/);
   assert.match(pageSource, /coupon_event_time:\s*form\.event_time/);
   assert.match(pageSource, /client_timezone:\s*Intl\.DateTimeFormat/);
   assert.match(pageSource, /a\.research_brief\.legs\.map/);

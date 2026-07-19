@@ -6,6 +6,11 @@ export type AnalystResearchSource = {
   citedText: string | null
 }
 
+export type AnalystSourcedClaim = {
+  text: string
+  sourceUrl: string
+}
+
 export type AnalystResearchLeg = {
   legNumber: number
   eventName: string
@@ -24,6 +29,7 @@ export type AnalystResearchBrief = {
   builderRisk: string | null
   verdict: string
   dataGaps: string[]
+  sourcedClaims: AnalystSourcedClaim[]
   legs: AnalystResearchLeg[]
 }
 
@@ -81,6 +87,28 @@ const EMPTY_COVERAGE: AnalysisDataCoverage = {
   lineMovement: false,
 }
 
+export function bindAnalystSourcedClaims(
+  claims: AnalystSourcedClaim[],
+  citedSources: AnalystResearchSource[],
+): AnalystSourcedClaim[] {
+  const citedByUrl = new Map(citedSources.map(source => [source.url, source]))
+  const sourcedClaims: AnalystSourcedClaim[] = []
+  const seenClaims = new Set<string>()
+  for (const claim of claims) {
+    const source = citedByUrl.get(claim.sourceUrl)
+    if (!source?.citedText) continue
+    const claimText = claim.text.replace(/\s+/g, ' ').trim()
+    const citedText = source.citedText.replace(/\s+/g, ' ').trim()
+    if (!claimText || claimText !== citedText) continue
+    const key = `${source.url}\n${claimText}`
+    if (seenClaims.has(key)) continue
+    seenClaims.add(key)
+    sourcedClaims.push({ text: claimText, sourceUrl: source.url })
+    if (sourcedClaims.length === 12) break
+  }
+  return sourcedClaims
+}
+
 /**
  * Bind provider commentary to coupon legs by the explicit 1-based leg number.
  * Identity must still match the corresponding coupon leg, so a reordered or
@@ -91,6 +119,7 @@ const EMPTY_COVERAGE: AnalysisDataCoverage = {
 export function alignAnalystResearchBriefToCoupon(
   brief: AnalystResearchBrief,
   couponLegs: AnalystCouponLegIdentity[],
+  citedSources: AnalystResearchSource[] = [],
 ): AnalystResearchBrief | null {
   if (brief.legs.length !== couponLegs.length || couponLegs.length === 0) return null
 
@@ -123,7 +152,11 @@ export function alignAnalystResearchBriefToCoupon(
     })
   }
 
-  return { ...brief, legs: aligned }
+  return {
+    ...brief,
+    sourcedClaims: bindAnalystSourcedClaims(brief.sourcedClaims, citedSources),
+    legs: aligned,
+  }
 }
 
 export function formatCouponLegsForResearch(legs: AnalystPromptLeg[] | null | undefined): string {
@@ -194,8 +227,12 @@ function safeHttpUrl(value: unknown): string | null {
         (a === 100 && b >= 64 && b <= 127) ||
         (a === 169 && b === 254) ||
         (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 0 && (octets[2] === 0 || octets[2] === 2)) ||
+        (a === 192 && b === 88 && octets[2] === 99) ||
         (a === 192 && b === 168) ||
-        (a === 198 && (b === 18 || b === 19))
+        (a === 198 && (b === 18 || b === 19)) ||
+        (a === 198 && b === 51 && octets[2] === 100) ||
+        (a === 203 && b === 0 && octets[2] === 113)
       if (nonPublic) return null
     } else if (!hostname.includes('.')) {
       return null
@@ -260,6 +297,7 @@ export function containsAnalystPricingClaim(brief: AnalystResearchBrief): boolea
     brief.builderRisk,
     brief.verdict,
     ...brief.dataGaps,
+    ...brief.sourcedClaims.map(claim => claim.text),
     ...brief.legs.flatMap(leg => [leg.assessment, ...leg.evidence, ...leg.risks]),
   ].filter(Boolean).join('\n')
 
@@ -307,11 +345,21 @@ export function parseStoredAnalystResearchBrief(value: unknown): AnalystResearch
   const verdict = boundedString(value.verdict, 10, 1_500)
   const builderRisk = value.builderRisk === null ? null : boundedString(value.builderRisk, 1, 1_500)
   const dataGaps = boundedStrings(value.dataGaps, 12, 300)
+  const rawSourcedClaims = value.sourcedClaims ?? []
   if (
     !headline || !summary || !verdict ||
     (builderRisk === null && value.builderRisk !== null) ||
     !dataGaps
   ) return null
+  if (!Array.isArray(rawSourcedClaims) || rawSourcedClaims.length > 12) return null
+  const sourcedClaims: AnalystSourcedClaim[] = []
+  for (const item of rawSourcedClaims) {
+    if (!isRecord(item)) return null
+    const text = boundedString(item.text, 2, 400)
+    const sourceUrl = safeHttpUrl(item.sourceUrl)
+    if (!text || !sourceUrl) return null
+    sourcedClaims.push({ text, sourceUrl })
+  }
   if (!Array.isArray(value.legs) || value.legs.length < 1 || value.legs.length > 20) return null
 
   const legs: AnalystResearchLeg[] = []
@@ -353,7 +401,7 @@ export function parseStoredAnalystResearchBrief(value: unknown): AnalystResearch
     })
   }
 
-  return { headline, summary, builderRisk, verdict, dataGaps, legs }
+  return { headline, summary, builderRisk, verdict, dataGaps, sourcedClaims, legs }
 }
 
 export function parseStoredAnalystResearchSources(value: unknown): AnalystResearchSource[] {

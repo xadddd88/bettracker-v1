@@ -14,6 +14,7 @@ import {
 import { currencySymbol } from '@/lib/money'
 import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
 import {
+  bindAnalystSourcedClaims,
   parseStoredAnalystResearchBrief,
   parseStoredAnalystResearchSources,
 } from '@/lib/ai/analyst-research'
@@ -179,8 +180,12 @@ export default async function DecisionDetailPage({
   const action = ACTION_CONFIG[d.final_action] ?? ACTION_CONFIG.pending
   const linkedBet = d.bet_legs?.[0]?.bets ?? null
   const analysisOutput = d.ai_analysis_runs?.[0]?.output_json ?? null
-  const researchBrief = parseStoredAnalystResearchBrief(analysisOutput?.research_brief)
   const researchSources = parseStoredAnalystResearchSources(analysisOutput?.research_sources)
+  const parsedResearchBrief = parseStoredAnalystResearchBrief(analysisOutput?.research_brief)
+  const researchBrief = parsedResearchBrief ? {
+    ...parsedResearchBrief,
+    sourcedClaims: bindAnalystSourcedClaims(parsedResearchBrief.sourcedClaims, researchSources),
+  } : null
   const qualityGate = analysisOutput?.quality_gate ?? null
   const storedTrustView = getDecisionTrustView(d, qualityGate)
   const showPricing = shouldShowPricingStats({
@@ -250,12 +255,15 @@ export default async function DecisionDetailPage({
         <section className="border border-black bg-white text-black" aria-labelledby="saved-research-heading">
           <div className="border-b border-black bg-black px-5 py-5 text-white">
             <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em] text-[#e8ff00]">
-              {analysisOutput?.web_search_used ? 'Current-source research' : 'Coupon intelligence'}
+              Conditional market review
             </p>
             <h2 id="saved-research-heading" className="mt-3 font-display text-3xl font-black leading-none tracking-[-0.04em] text-white">
               {researchBrief.headline}
             </h2>
             <p className="mt-3 text-sm leading-6 text-white/75">{researchBrief.summary}</p>
+            <p className="mt-3 border-l-2 border-[#e8ff00] pl-3 font-mono text-[9px] font-bold uppercase leading-4 tracking-[0.08em] text-white/70">
+              Narrative analysis is conditional. Only verbatim excerpts under Cited claims are bound to current sources.
+            </p>
           </div>
 
           {researchBrief.builderRisk && (
@@ -280,12 +288,18 @@ export default async function DecisionDetailPage({
                 </div>
                 <p className="mt-3 text-sm font-semibold leading-6">{leg.assessment}</p>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <ul className="space-y-1 text-sm text-black/70">
+                  <div>
+                    <p className="mb-2 font-mono text-[9px] font-black uppercase tracking-[0.12em] text-black/45">Conditional logic</p>
+                    <ul className="space-y-1 text-sm text-black/70">
                     {leg.evidence.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>+ {item}</li>)}
-                  </ul>
-                  <ul className="space-y-1 text-sm text-black/70">
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="mb-2 font-mono text-[9px] font-black uppercase tracking-[0.12em] text-black/45">Failure modes</p>
+                    <ul className="space-y-1 text-sm text-black/70">
                     {leg.risks.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>− {item}</li>)}
-                  </ul>
+                    </ul>
+                  </div>
                 </div>
               </article>
             ))}
@@ -296,18 +310,23 @@ export default async function DecisionDetailPage({
             <p className="mt-2 text-base font-bold leading-6">{researchBrief.verdict}</p>
           </div>
 
-          {researchSources.length > 0 && (
+          {researchBrief.sourcedClaims.length > 0 && researchSources.length > 0 && (
             <div className="border-t border-black bg-[#f4f3ed] px-5 py-4">
-              <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/45">Sources consulted</p>
+              <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/45">Cited claims — verbatim source excerpts</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {researchSources.map(source => (
-                  <a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer" className="border border-black bg-white px-3 py-3 text-sm font-bold text-black underline underline-offset-4 hover:bg-[#e8ff00]">
-                    <span className="block">{source.title}</span>
+                {researchBrief.sourcedClaims.map((claim, claimIndex) => {
+                  const source = researchSources.find(item => item.url === claim.sourceUrl)
+                  if (!source) return null
+                  return (
+                  <a key={`${claimIndex}-${source.url}-${claim.text}`} href={source.url} target="_blank" rel="noopener noreferrer" className="border border-black bg-white px-3 py-3 text-sm font-bold text-black underline underline-offset-4 hover:bg-[#e8ff00]">
+                    <span className="block no-underline">“{claim.text}”</span>
+                    <span className="mt-2 block">{source.title}</span>
                     <span className="mt-1 block font-mono text-[9px] font-black uppercase tracking-[0.08em] no-underline opacity-50">
                       {new URL(source.url).hostname}
                     </span>
                   </a>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
