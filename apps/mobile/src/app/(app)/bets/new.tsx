@@ -118,11 +118,9 @@ export default function NewBetScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.intro}>
-            <Text style={styles.eyebrow}>TRACKER DRAFT</Text>
-            <Text style={styles.title}>Build the coupon leg by leg</Text>
-            <Text style={styles.subtitle}>
-              Review everything locally. This form does not create a financial record yet.
-            </Text>
+            <Text style={styles.eyebrow}>TRACKER</Text>
+            <Text style={styles.title}>Add bet</Text>
+            <Text style={styles.subtitle}>Enter the coupon exactly as it appears.</Text>
           </View>
 
           <View accessibilityLabel="Bet type" style={styles.segmented}>
@@ -356,31 +354,29 @@ function SegmentButton({ label, onPress, selected }: { label: string; onPress: (
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   safeArea: { backgroundColor: colors.background, flex: 1 },
-  content: { gap: 16, padding: 16, paddingBottom: 36 },
+  content: { gap: 14, padding: 16, paddingBottom: 36 },
   intro: { gap: 5 },
   eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
-  title: { color: colors.text, fontSize: 23, fontWeight: '800', lineHeight: 29 },
+  title: { color: colors.text, fontSize: 25, fontWeight: '900', lineHeight: 30 },
   subtitle: { color: colors.muted, fontSize: 13, lineHeight: 19 },
   segmented: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 10,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: 4,
     padding: 4,
   },
   segmentButton: { alignItems: 'center', borderRadius: 8, flex: 1, justifyContent: 'center', minHeight: 44 },
-  segmentButtonSelected: { backgroundColor: colors.surfaceRaised },
+  segmentButtonSelected: { backgroundColor: colors.accent },
   segmentText: { color: colors.muted, fontSize: 14, fontWeight: '800' },
-  segmentTextSelected: { color: colors.accent },
+  segmentTextSelected: { color: colors.background },
   legsHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   sectionTitle: { color: colors.secondaryText, fontSize: 13, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
   sectionHint: { color: colors.placeholder, fontSize: 11, marginTop: 2 },
   addButton: { alignItems: 'center', borderColor: colors.accent, borderRadius: 9, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
   addButtonText: { color: colors.accent, fontSize: 13, fontWeight: '800' },
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, gap: 14, padding: 15 },
-  legCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, gap: 13, padding: 15 },
+  card: { backgroundColor: colors.surface, borderRadius: 16, gap: 14, padding: 15 },
+  legCard: { backgroundColor: colors.surface, borderRadius: 16, gap: 13, padding: 15 },
   legHeading: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   legNumber: { alignItems: 'center', backgroundColor: colors.surfaceRaised, borderRadius: 999, height: 32, justifyContent: 'center', width: 32 },
   legNumberText: { color: colors.accent, fontSize: 12, fontWeight: '900' },
@@ -394,7 +390,7 @@ const styles = StyleSheet.create({
   sportTextSelected: { color: colors.accent },
   field: { gap: 6 },
   fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '700' },
-  input: { backgroundColor: colors.background, borderColor: colors.border, borderRadius: 10, borderWidth: 1, color: colors.text, fontSize: 14, minHeight: 46, paddingHorizontal: 12, paddingVertical: 10 },
+  input: { backgroundColor: colors.surfaceMuted, borderColor: colors.border, borderRadius: 10, borderWidth: 1, color: colors.text, fontSize: 14, minHeight: 46, paddingHorizontal: 12, paddingVertical: 10 },
   multilineInput: { minHeight: 92, textAlignVertical: 'top' },
   expressCard: { backgroundColor: colors.surface, borderColor: colors.accent, borderRadius: 16, borderWidth: 1, gap: 12, padding: 15 },
   previewRow: { alignItems: 'baseline', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },

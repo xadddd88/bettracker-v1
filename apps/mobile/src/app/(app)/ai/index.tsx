@@ -185,9 +185,11 @@ export default function AiCaptureScreen() {
       style={styles.screen}
     >
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>FOUNDER ANALYZER</Text>
-        <Text style={styles.title}>AI capture</Text>
-        <Text style={styles.subtitle}>Prepare a coupon or event screenshot on this device.</Text>
+        <Text style={styles.eyebrow}>AI ANALYZER</Text>
+        <Text style={styles.title}>Scan screenshot</Text>
+        <Text style={styles.subtitle}>
+          {mode === 'coupon' ? 'Extract selections and odds from a coupon.' : 'Prepare an event for AI analysis.'}
+        </Text>
       </View>
 
       <View accessibilityLabel="Capture type" style={styles.modeControl}>
@@ -282,8 +284,8 @@ export default function AiCaptureScreen() {
               tintColor={colors.accent}
             />
             <View style={styles.emptyCopy}>
-              <Text style={styles.emptyTitle}>Add a {mode} screenshot</Text>
-              <Text style={styles.emptyText}>The image is prepared locally as a JPEG.</Text>
+              <Text style={styles.emptyTitle}>Add {mode === 'coupon' ? 'coupon' : 'event'} screenshot</Text>
+              <Text style={styles.emptyText}>Take a clear photo or choose one from your library.</Text>
             </View>
             <View style={styles.sourceActions}>
               <ActionButton
@@ -402,13 +404,13 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    gap: 18,
+    gap: 14,
     paddingBottom: 28,
     paddingHorizontal: 16,
     paddingTop: CONTENT_PADDING_TOP,
   },
   header: {
-    gap: 4,
+    gap: 3,
   },
   eyebrow: {
     color: colors.accent,
@@ -418,8 +420,8 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 27,
+    fontWeight: '900',
   },
   subtitle: {
     color: colors.muted,
@@ -427,11 +429,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   modeControl: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
     borderCurve: 'continuous',
     borderRadius: 8,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: 4,
     padding: 4,
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   modeOptionSelected: {
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: colors.accent,
   },
   modeLabel: {
     color: colors.muted,
@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   modeLabelSelected: {
-    color: colors.accent,
+    color: colors.background,
   },
   offlineNotice: {
     alignItems: 'center',
@@ -479,19 +479,19 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   captureTool: {
-    gap: 14,
+    gap: 12,
   },
   emptyState: {
     alignItems: 'center',
+    backgroundColor: colors.surface,
     borderColor: colors.border,
     borderCurve: 'continuous',
     borderRadius: 8,
-    borderStyle: 'dashed',
     borderWidth: 1,
-    gap: 14,
+    gap: 12,
     justifyContent: 'center',
-    minHeight: 280,
-    padding: 18,
+    minHeight: 218,
+    padding: 16,
   },
   emptyFallback: {
     color: colors.accent,
@@ -526,8 +526,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderCurve: 'continuous',
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 14,
     maxHeight: 480,
     minHeight: 260,
     overflow: 'hidden',
@@ -558,7 +557,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderCurve: 'continuous',
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     flexBasis: 132,
     flexDirection: 'row',
@@ -612,7 +611,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderCurve: 'continuous',
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     gap: 10,
     padding: 12,

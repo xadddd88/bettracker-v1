@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/auth/auth-context';
 import { fetchBets, fetchCurrency } from '@/bets/data';
 import { readErrorMessage } from '@/bets/errors';
-import { betTitle, type BetDto, formatMoney } from '@/bets/models';
+import { betFinancialSummary, couponPresentation, type BetDto, formatMoney } from '@/bets/models';
 import { STATUS_PRESENTATION } from '@/bets/presentation';
 import { colors } from '@/ui/theme';
 
@@ -56,9 +56,9 @@ export default function BetsScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>FOUNDER TRACKER</Text>
-          <Text style={styles.title}>Your bets</Text>
-          <Text style={styles.subtitle}>{bets.length} tracked · ordered coupon view</Text>
+          <Text style={styles.eyebrow}>TRACKER</Text>
+          <Text style={styles.title}>My bets</Text>
+          <Text style={styles.subtitle}>{bets.length} tracked</Text>
         </View>
         <View style={styles.headerActions}>
           <Pressable
@@ -122,6 +122,9 @@ export default function BetsScreen() {
           renderItem={({ item }) => {
             const status = STATUS_PRESENTATION[item.status];
             const firstLeg = item.legs[0];
+            const coupon = couponPresentation(item);
+            const financial = betFinancialSummary(item, currency);
+            const totalOdds = item.totalOdds ?? firstLeg?.odds ?? null;
             return (
               <Pressable
                 accessibilityHint="Opens bet details"
@@ -130,24 +133,27 @@ export default function BetsScreen() {
                 style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
               >
                 <View style={styles.cardHeader}>
-                  <Text numberOfLines={2} style={styles.cardTitle}>{betTitle(item)}</Text>
-                  <View style={[styles.badge, { borderColor: status.color }]}>
+                  <View style={styles.cardHeading}>
+                    <Text style={styles.couponType}>{coupon.label.toUpperCase()}</Text>
+                    <Text numberOfLines={2} style={styles.cardTitle}>
+                      {firstLeg?.eventName ?? 'Tracked bet'}
+                    </Text>
+                  </View>
+                  <View style={[styles.badge, { backgroundColor: `${status.color}18` }]}>
                     <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
                   </View>
                 </View>
-                {item.legs.length > 1 ? (
-                  <Text numberOfLines={2} style={styles.eventPreview}>
-                    {item.legs.map((leg) => leg.eventName).join(' · ')}
-                  </Text>
-                ) : firstLeg?.selection ? (
-                  <Text numberOfLines={1} style={styles.eventPreview}>{firstLeg.selection}</Text>
-                ) : null}
+                <Text numberOfLines={1} style={styles.selection}>
+                  {coupon.isExpress
+                    ? `${coupon.legs.length} selections · ${coupon.legs.slice(0, 2).map((leg) => leg.selection ?? leg.eventName).join(' + ')}`
+                    : firstLeg?.selection ?? firstLeg?.marketType ?? 'Selection not recorded'}
+                </Text>
                 <View style={styles.metrics}>
                   <Metric label="Stake" value={formatMoney(item.stake, currency)} />
-                  <Metric label="Odds" value={item.totalOdds?.toFixed(2) ?? firstLeg?.odds.toFixed(2) ?? '—'} />
-                  {item.pnl !== null ? <Metric label="P&L" value={formatMoney(item.pnl, currency)} /> : null}
+                  <Metric label="Odds" value={totalOdds?.toFixed(2) ?? '—'} />
+                  <Metric label={financial.label} value={financial.value} />
+                  <Text style={styles.date}>{new Date(item.placedAt).toLocaleDateString()}</Text>
                 </View>
-                <Text style={styles.date}>{new Date(item.placedAt).toLocaleDateString()}</Text>
               </Pressable>
             );
           }}
@@ -168,17 +174,17 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: colors.background, flex: 1 },
-  header: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 18, paddingVertical: 16 },
+  header: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingBottom: 14, paddingTop: 8 },
   headerCopy: { flex: 1, minWidth: 0 },
-  eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1.8 },
-  title: { color: colors.text, fontSize: 28, fontWeight: '800', marginTop: 4 },
-  subtitle: { color: colors.muted, fontSize: 13, marginTop: 3 },
+  eyebrow: { color: colors.accent, fontSize: 9, fontWeight: '900', letterSpacing: 1.6 },
+  title: { color: colors.text, fontSize: 27, fontWeight: '900', marginTop: 2 },
+  subtitle: { color: colors.muted, fontSize: 11, marginTop: 2 },
   headerActions: { flexDirection: 'row', gap: 8 },
   headerButton: { alignItems: 'center', borderColor: colors.border, borderRadius: 9, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 12 },
   headerButtonText: { color: colors.secondaryText, fontSize: 12, fontWeight: '800' },
   headerButtonPrimary: { alignItems: 'center', backgroundColor: colors.accent, borderRadius: 9, justifyContent: 'center', minHeight: 44, paddingHorizontal: 12 },
   headerButtonPrimaryText: { color: colors.background, fontSize: 12, fontWeight: '900' },
-  list: { gap: 12, paddingBottom: 28, paddingHorizontal: 16 },
+  list: { gap: 10, paddingBottom: 28, paddingHorizontal: 16 },
   emptyList: { flexGrow: 1 },
   centered: { alignItems: 'center', flex: 1, gap: 14, justifyContent: 'center', padding: 28 },
   muted: { color: colors.muted, fontSize: 14, lineHeight: 21, textAlign: 'center' },
@@ -189,16 +195,18 @@ const styles = StyleSheet.create({
   emptyButtonText: { color: colors.background, fontSize: 13, fontWeight: '900' },
   retryButton: { backgroundColor: colors.accent, borderRadius: 10, justifyContent: 'center', minHeight: 44, paddingHorizontal: 20 },
   retryText: { color: colors.background, fontWeight: '800' },
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, gap: 12, padding: 16 },
+  card: { backgroundColor: colors.surface, borderRadius: 16, gap: 10, overflow: 'hidden', padding: 14 },
   cardPressed: { backgroundColor: colors.surfaceRaised, opacity: 0.9 },
   cardHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 10 },
-  cardTitle: { color: colors.text, flex: 1, fontSize: 16, fontWeight: '700', lineHeight: 22, minWidth: 0 },
-  badge: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 4 },
+  cardHeading: { flex: 1, gap: 4, minWidth: 0 },
+  couponType: { color: colors.accent, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  cardTitle: { color: colors.text, fontSize: 15, fontWeight: '800', lineHeight: 20 },
+  badge: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
   badgeText: { fontSize: 11, fontWeight: '800' },
-  eventPreview: { color: colors.muted, fontSize: 13, lineHeight: 19 },
-  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
-  metric: { gap: 2, minWidth: 62 },
-  metricLabel: { color: colors.placeholder, fontSize: 10, textTransform: 'uppercase' },
-  metricValue: { color: colors.secondaryText, fontSize: 14, fontWeight: '700' },
-  date: { color: colors.placeholder, fontSize: 11 },
+  selection: { color: colors.muted, fontSize: 12, lineHeight: 17 },
+  metrics: { alignItems: 'flex-end', borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 16, paddingTop: 10 },
+  metric: { gap: 2 },
+  metricLabel: { color: colors.placeholder, fontSize: 8, fontWeight: '700', textTransform: 'uppercase' },
+  metricValue: { color: colors.secondaryText, fontSize: 13, fontWeight: '800' },
+  date: { color: colors.placeholder, fontSize: 9, marginLeft: 'auto' },
 });

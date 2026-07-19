@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { type ColorValue, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '@/ui/theme';
 
@@ -22,6 +23,8 @@ function TabIcon({ color, fallback, name }: TabIconProps) {
 }
 
 export default function AppLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       backBehavior="history"
@@ -31,13 +34,14 @@ export default function AppLayout() {
         tabBarActiveTintColor: colors.accent,
         tabBarHideOnKeyboard: true,
         tabBarInactiveTintColor: colors.muted,
-        tabBarItemStyle: { minHeight: 52, paddingVertical: 4 },
+        tabBarItemStyle: { minHeight: 50, paddingTop: 6 },
         tabBarLabelPosition: 'below-icon',
         tabBarLabelStyle: { fontSize: 10, fontWeight: '700' },
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          minHeight: 58,
+          height: 58 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 6),
         },
       }}
     >
@@ -58,7 +62,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="ai"
         options={{
-          tabBarAccessibilityLabel: 'AI Analyzer',
+          tabBarAccessibilityLabel: 'Scan',
           tabBarIcon: ({ color }) => (
             <TabIcon
               color={color}
@@ -66,7 +70,7 @@ export default function AppLayout() {
               name={{ android: 'auto_awesome', ios: 'sparkles', web: 'auto_awesome' }}
             />
           ),
-          title: 'AI',
+          title: 'Scan',
         }}
       />
       <Tabs.Screen
@@ -85,31 +89,11 @@ export default function AppLayout() {
       />
       <Tabs.Screen
         name="stats"
-        options={{
-          tabBarAccessibilityLabel: 'Stats',
-          tabBarIcon: ({ color }) => (
-            <TabIcon
-              color={color}
-              fallback="S"
-              name={{ android: 'bar_chart', ios: 'chart.bar.fill', web: 'bar_chart' }}
-            />
-          ),
-          title: 'Stats',
-        }}
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="more"
-        options={{
-          tabBarAccessibilityLabel: 'More',
-          tabBarIcon: ({ color }) => (
-            <TabIcon
-              color={color}
-              fallback="•••"
-              name={{ android: 'more_horiz', ios: 'ellipsis', web: 'more_horiz' }}
-            />
-          ),
-          title: 'More',
-        }}
+        options={{ href: null }}
       />
       <Tabs.Screen name="index" options={{ href: null }} />
     </Tabs>

@@ -16,9 +16,9 @@ export default function MoreScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenHeader
-          eyebrow="ACCOUNT & APP"
-          subtitle="Mobile preferences and account access."
-          title="More"
+          eyebrow="XADDD"
+          subtitle="Profile, preferences and secure access."
+          title="Account"
         />
 
         <View style={styles.profileCard}>
@@ -31,11 +31,11 @@ export default function MoreScreen() {
             />
           </View>
           <View style={styles.profileCopy}>
-            <Text style={styles.profileTitle}>Founder</Text>
+            <Text style={styles.profileTitle}>Signed in</Text>
             <Text numberOfLines={1} style={styles.profileEmail}>{email}</Text>
           </View>
           <View style={styles.secureBadge}>
-            <Text style={styles.secureBadgeText}>SECURE</Text>
+            <Text style={styles.secureBadgeText}>ACTIVE</Text>
           </View>
         </View>
 
@@ -68,7 +68,7 @@ export default function MoreScreen() {
           </View>
         ) : null}
 
-        <Text style={styles.version}>xaddd Founder development build</Text>
+        <Text style={styles.version}>xaddd mobile</Text>
       </ScrollView>
     </SafeAreaView>
   );

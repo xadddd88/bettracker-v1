@@ -9,18 +9,23 @@ function source(path: string): string {
   return readFileSync(join(root, path), 'utf8');
 }
 
-test('product shell exposes five persistent sections with Tracker as a nested Stack', () => {
+test('product shell exposes three focused sections with Tracker as a nested Stack', () => {
   const tabs = source('src/app/(app)/_layout.tsx');
   const tracker = source('src/app/(app)/bets/_layout.tsx');
 
   assert.match(tabs, /import \{ Tabs \} from 'expo-router'/);
-  for (const route of ['home', 'ai', 'bets', 'stats', 'more']) {
+  for (const route of ['home', 'ai', 'bets']) {
     assert.match(tabs, new RegExp(`name=["']${route}["']`));
   }
-  for (const label of ['Home', 'AI', 'Tracker', 'Stats', 'More']) {
+  for (const label of ['Home', 'Scan', 'Tracker']) {
     assert.match(tabs, new RegExp(`title:\\s*["']${label}["']`));
   }
+  for (const route of ['stats', 'more']) {
+    assert.match(tabs, new RegExp(`name=["']${route}["'][\\s\\S]*?href:\\s*null`));
+  }
   assert.match(tabs, /tabBarHideOnKeyboard:\s*true/);
+  assert.match(tabs, /useSafeAreaInsets\(\)/);
+  assert.match(tabs, /paddingBottom:\s*Math\.max\(insets\.bottom,\s*6\)/);
   assert.match(tracker, /import \{ Stack \} from 'expo-router'/);
   assert.match(tracker, /name="\[id\]"/);
   assert.match(tracker, /name="new"/);
@@ -53,7 +58,7 @@ test('local tracker editor cannot perform network or financial writes', () => {
   assert.match(editor, /Review bet/);
 });
 
-test('all Phase 1C routes and the product shell component exist', () => {
+test('support routes remain available outside the focused tab bar', () => {
   for (const path of [
     'src/app/(app)/home.tsx',
     'src/app/(app)/stats.tsx',
@@ -63,4 +68,17 @@ test('all Phase 1C routes and the product shell component exist', () => {
   ]) {
     assert.equal(existsSync(join(root, path)), true, `${path} should exist`);
   }
+});
+
+test('daily Home uses the read model and does not expose roadmap labels', () => {
+  const home = source('src/app/(app)/home.tsx');
+  const data = source('src/bets/data.ts');
+
+  assert.match(home, /fetchBets\(userId\)/);
+  assert.match(home, /fetchBankroll\(userId\)/);
+  assert.match(home, /Dashboard/);
+  assert.match(home, /Recent bets/);
+  assert.doesNotMatch(home, /Founder build|CORE WORKFLOW|LOCAL REVIEW|READY|NEXT|LATER/);
+  assert.match(data, /select\(['"]balance, currency['"]\)/);
+  assert.doesNotMatch(data, /select\s*\(\s*['"`]\s*\*/);
 });

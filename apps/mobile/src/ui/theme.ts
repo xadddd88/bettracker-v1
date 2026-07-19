@@ -1,5 +1,6 @@
 export const colors = {
   accent: '#38bdf8',
+  accentMuted: '#0f3550',
   background: '#07111f',
   border: '#243244',
   danger: '#fb7185',
@@ -8,6 +9,7 @@ export const colors = {
   secondaryText: '#cbd5e1',
   success: '#4ade80',
   surface: '#111c2c',
+  surfaceMuted: '#0c1726',
   surfaceRaised: '#172438',
   text: '#f8fafc',
   warning: '#facc15',
