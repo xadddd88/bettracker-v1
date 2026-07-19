@@ -276,6 +276,24 @@
   color: #050505 !important;
 }
 
+/* The broad legacy text remap above keeps old dark pages readable on paper,
+   but selected controls are intentionally black surfaces. Pin their foreground
+   explicitly so a `.text-white` utility can never become black-on-black. */
+.web-editorial .btn-primary,
+.web-editorial .btn-primary.text-white,
+.web-editorial .btn-primary .text-white,
+.web-editorial .bg-black,
+.web-editorial .bg-black.text-white,
+.web-editorial .bg-black .text-white,
+.web-editorial .bg-indigo-600.text-white {
+  color: #ffffff !important;
+}
+
+.web-editorial .btn-primary:hover,
+.web-editorial .btn-primary:hover .text-white {
+  color: #050505 !important;
+}
+
 .web-editorial .border-gray-600,
 .web-editorial .border-gray-700,
 .web-editorial .border-gray-800,

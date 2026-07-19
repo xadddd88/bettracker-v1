@@ -32,6 +32,7 @@ Prefer this loose extraction contract. The server will normalize it deterministi
   "rawText": "all visible coupon text preserving line order",
   "couponType": "single|express|parlay|unknown",
   "totalOdds": 7.253,
+  "eventStartText": "exact visible date/time line, e.g. Сьогодні, 22:10, or null",
   "warnings": [],
   "legs": [
     {
@@ -86,6 +87,7 @@ Rules:
 - For express/parlay: use the total combined coefficient, not individual leg odds
 - stake is usually not printed on coupons — return null unless clearly visible
 - Return null for any field not clearly visible
+- Preserve the exact visible event date/time line in eventStartText. Do not resolve words such as Today/Tomorrow to a date.
 - sport should reflect the dominant sport on the coupon
 - For express/parlay coupons, preserve every leg in legs[] instead of only flattening the event and selection
 - Infer sport per leg; do not blindly apply the dominant sport to every leg
@@ -108,6 +110,7 @@ Use this exact shape:
   "rawText": "all visible text in line order",
   "couponType": "express",
   "totalOdds": 7.253,
+  "eventStartText": "exact visible date/time line, or null",
   "warnings": [],
   "legs": [
     {
@@ -217,6 +220,7 @@ const scanOutputSchema = z.object({
   odds:        z.number().nullable().optional(),
   stake:       z.number().nullable().optional(),
   bookmaker:   z.string().nullable().optional(),
+  event_start_text: z.string().max(120).nullable().optional(),
   // Accept both legacy and canonical sport values — mapped to canonical in the handler
   sport: z.enum([
     'soccer', 'tennis', 'cs2', 'basketball', 'ice_hockey', 'mma', 'other',

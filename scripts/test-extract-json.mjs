@@ -170,12 +170,11 @@ test('Analyst UK fixture — full Analyst JSON with Ukrainian prose surrounding 
   assert.ok(Array.isArray(result.factors) && result.factors.length >= 6);
 });
 
-// ── 14. Analyst multi-block: valid JSON is in the LAST text block ─────────────
-test('Analyst multi-block — last-block selection matches updated route logic (.at(-1))', () => {
+// ── 14. Analyst multi-block: preserve every text block ────────────────────────
+test('Analyst multi-block — joined text preserves provider JSON across blocks', () => {
   // Simulates the Anthropic SDK content array when the model produces
-  // multiple text blocks (e.g. reasoning prose followed by the JSON block).
-  // The updated analyst route takes .filter(text).at(-1) — this test confirms
-  // that approach extracts the JSON from the right block.
+  // multiple text blocks (e.g. reasoning prose followed by the JSON block),
+  // including content collected across a pause_turn continuation.
   const contentBlocks = [
     { type: 'text', text: 'Дозвольте проаналізувати цю ставку детально...' },
     {
@@ -184,11 +183,12 @@ test('Analyst multi-block — last-block selection matches updated route logic (
     },
   ];
 
-  // Mirrors exactly what app/api/ai/analyst/route.ts now does
+  // Mirrors exactly what app/api/ai/analyst/route.ts now does. Reading only
+  // `.at(-1)` would discard earlier text/citations from a continued turn.
   const rawText = contentBlocks
     .filter(b => b.type === 'text')
     .map(b => b.text)
-    .at(-1) ?? '';
+    .join('\n');
 
   const result = JSON.parse(extractJsonObject(rawText));
   assert.strictEqual(result.recommendation, 'watch');

@@ -18,6 +18,7 @@ import {
   type AnalysisQualityGateResult,
   type AnalystTrustView,
 } from '@/lib/ai/analysis-quality-gate'
+import type { AnalystResearchBrief, AnalystResearchSource } from '@/lib/ai/analyst-research'
 
 // ─── Image helper ─────────────────────────────────────────────
 function fileToBase64(file: File): Promise<{ data: string; media_type: string }> {
@@ -56,6 +57,9 @@ interface Analysis {
   disclaimer:          string
   quality_gate?:       AnalysisQualityGateResult | null
   trust_view?:         AnalystTrustView | null
+  research_brief?:     AnalystResearchBrief | null
+  research_sources?:   AnalystResearchSource[]
+  web_search_used?:    boolean
   // Input echoed back from server
   sport:           string
   event_name:      string
@@ -64,6 +68,7 @@ interface Analysis {
   line:            number | null
   offered_odds:    number
   bookmaker:       string | null
+  coupon_event_time?: string | null
   output_language: string
 }
 
@@ -96,6 +101,29 @@ function localizedRiskLabel(risk: RiskLevel, fallback: string, trustView: Analys
   if (risk === 'high') return 'Високий ризик'
   if (risk === 'medium') return 'Середній ризик'
   return 'Низький ризик'
+}
+
+function renderResearchBriefText(brief: AnalystResearchBrief, sources: AnalystResearchSource[] = []): string {
+  const sourceByUrl = new Map(sources.map(source => [source.url, source]))
+  const lines = [
+    'CONDITIONAL MARKET REVIEW — not a verified current-fact report',
+    brief.headline,
+    brief.summary,
+    brief.builderRisk ? `\nBet Builder: ${brief.builderRisk}` : '',
+    ...brief.legs.flatMap(leg => [
+      `\n${leg.legNumber}. ${leg.eventName} — ${leg.marketType}${leg.selection ? ` / ${leg.selection}` : ''}`,
+      leg.assessment,
+      ...leg.evidence.map(item => `+ ${item}`),
+      ...leg.risks.map(item => `− ${item}`),
+    ]),
+    `\nVerdict: ${brief.verdict}`,
+    ...brief.dataGaps.map(item => `Unverified: ${item}`),
+    ...brief.sourcedClaims.flatMap(claim => {
+      const source = sourceByUrl.get(claim.sourceUrl)
+      return source ? [`Cited claim: “${claim.text}” — ${source.title} — ${claim.sourceUrl}`] : []
+    }),
+  ]
+  return lines.filter(Boolean).join('\n')
 }
 
 // ─── Constants ────────────────────────────────────────────────
@@ -186,7 +214,7 @@ export default function AIAnalystPage() {
   const [scoutId,    setScoutId]    = useState<string | null>(null)
   const [sport,      setSport]      = useState<Sport>('soccer')
   const [locale,     setLocale]     = useState<Locale>('auto')
-  const [form,       setForm]       = useState({ event_name: '', market_type: '', selection: '', line: '', odds: '', bookmaker: '', notes: '' })
+  const [form,       setForm]       = useState({ event_name: '', market_type: '', selection: '', line: '', odds: '', bookmaker: '', event_time: '', notes: '' })
   const [errors,     setErrors]     = useState<Record<string, string>>({})
   const [analysis,   setAnalysis]   = useState<Analysis | null>(null)
   const [analyzing,  setAnalyzing]  = useState(false)
@@ -227,6 +255,7 @@ export default function AIAnalystPage() {
         selection:   d.selection   ?? prev.selection,
         odds:        d.odds != null ? String(d.odds) : prev.odds,
         bookmaker:   d.bookmaker   ?? prev.bookmaker,
+        event_time:  d.event_start_text ?? prev.event_time,
       }))
       setCouponLegs(Array.isArray(d.legs) && d.legs.length > 0 ? d.legs : null)
       if (SPORTS_LIST.includes(d.sport)) setSport(d.sport as Sport)
@@ -276,6 +305,8 @@ export default function AIAnalystPage() {
           line:            form.line ? parseFloat(form.line) : undefined,
           offered_odds:    odds,
           bookmaker:       form.bookmaker.trim() || undefined,
+          coupon_event_time: form.event_time.trim() || undefined,
+          client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           notes:           form.notes.trim() || undefined,
           output_language: locale,
           legs:            couponLegs ?? undefined,
@@ -417,6 +448,22 @@ export default function AIAnalystPage() {
         ].filter(Boolean).map(item => `<li>${escapeHtml(item)}</li>`).join('')
       }</ul></li>`
     ).join('') ?? ''
+    const researchHtml = a.research_brief ? `<section class="research">
+  <div class="research-kicker">CONDITIONAL MARKET REVIEW</div>
+  <h2>${escapeHtml(a.research_brief.headline)}</h2>
+  <p>${escapeHtml(a.research_brief.summary)}</p>
+  <p><strong>Trust boundary:</strong> Narrative analysis is conditional. Only verbatim excerpts under Cited claims are bound to current sources.</p>
+  ${a.research_brief.builderRisk ? `<div class="builder"><strong>Bet Builder correlation</strong><br>${escapeHtml(a.research_brief.builderRisk)}</div>` : ''}
+  ${a.research_brief.legs.map(leg => `<div class="research-leg">
+    <strong>${leg.legNumber}. ${escapeHtml(leg.eventName)}</strong>
+    <div>${escapeHtml(leg.marketType)}${leg.selection ? ` · ${escapeHtml(leg.selection)}` : ''}</div>
+    <p>${escapeHtml(leg.assessment)}</p>
+    ${leg.evidence.length ? `<ul>${leg.evidence.map(item => `<li>+ Conditional: ${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+    ${leg.risks.length ? `<ul>${leg.risks.map(item => `<li>− ${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+  </div>`).join('')}
+  <div class="verdict"><strong>Verdict</strong><br>${escapeHtml(a.research_brief.verdict)}</div>
+  ${a.research_brief.sourcedClaims.length ? `<div class="sources"><strong>Cited claims</strong><ul>${a.research_brief.sourcedClaims.map(claim => `<li>“${escapeHtml(claim.text)}” — ${escapeHtml(claim.sourceUrl)}</li>`).join('')}</ul></div>` : ''}
+</section>` : ''
     const pricingHtml = showPricing
       ? `<div class="grid">
   <div class="stat"><div class="stat-label">Model probability</div><div class="stat-value">${a.model_probability?.toFixed(1)}%</div></div>
@@ -455,6 +502,13 @@ export default function AIAnalystPage() {
   .stat-label{font-size:11px;color:#888;margin-bottom:4px}
   .stat-value{font-size:22px;font-weight:700}
   .quality-gate{background:#fff7ed;border:1px solid #fed7aa;padding:14px;border-radius:8px;margin:16px 0}
+  .research{border:1px solid #111;padding:16px;margin:16px 0}
+  .research h2{font-size:20px;margin:8px 0}
+  .research-kicker{font-size:10px;font-weight:800;letter-spacing:.08em}
+  .builder{background:#e8ff00;border:1px solid #111;padding:10px;margin:12px 0}
+  .research-leg{border-top:1px solid #111;padding:12px 0}
+  .research-leg p,.research-leg li,.sources li{font-size:12px;line-height:1.5}
+  .verdict{border-top:1px solid #111;padding-top:12px}
   .gate-kicker{font-size:11px;color:#9a3412;text-transform:uppercase;font-weight:700;letter-spacing:.04em}
   .gate-label{font-size:18px;font-weight:800;color:#9a3412;margin-top:4px}
   .gate-support,.gate-score{font-size:12px;color:#7c2d12;margin-top:4px}
@@ -472,6 +526,7 @@ export default function AIAnalystPage() {
 <h1>${escapeHtml(a.event_name)}</h1>
 <div class="meta">${escapeHtml(metaSport)} \u00B7 ${escapeHtml(a.market_type)}${a.selection?' \u00B7 '+escapeHtml(a.selection):''} \u00B7 @${a.offered_odds}${a.bookmaker?' \u00B7 '+escapeHtml(a.bookmaker):''}</div>
 <div class="rec">${escapeHtml(showPricing ? recLabels[a.recommendation]??a.recommendation : trustView?.label ?? recLabels[a.recommendation]??a.recommendation)}</div>
+${researchHtml}
 ${pricingHtml}
 <div class="reasoning">${escapeHtml(trustView && !showPricing ? trustView.displayReasoning : a.reasoning)}</div>
 ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:''}
@@ -500,7 +555,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
       impliedProbability: a.implied_probability,
       edgePercent:        a.edge_percent,
     })
-    const text = trustView && !showPricing
+    const trustText = trustView && !showPricing
       ? renderAnalystTrustShareText(trustView, {
         eventName:   a.event_name,
         sport:       a.sport,
@@ -527,6 +582,9 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
         ``,
         `via BetTracker AI`,
       ].filter(Boolean).join('\n')
+    const text = a.research_brief
+      ? `${renderResearchBriefText(a.research_brief, a.research_sources)}\n\n${trustText}`
+      : trustText
     await navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -687,6 +745,17 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           </div>
 
           <div className="sm:col-span-2">
+            <label className="label">Coupon date / time</label>
+            <input
+              className="input"
+              placeholder="Today, 22:10 / 19.07.2026, 22:10"
+              value={form.event_time}
+              onChange={e => setField('event_time', e.target.value)}
+            />
+            <p className="mt-1 text-[10px] text-gray-500">Keep the exact text from the coupon so the Analyst can identify the fixture.</p>
+          </div>
+
+          <div className="sm:col-span-2">
             <label className="label">Context / Notes</label>
             <textarea
               className="input resize-none" rows={2}
@@ -696,6 +765,35 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
             />
           </div>
         </div>
+
+        {couponLegs && couponLegs.length > 0 && (
+          <section className="border border-black bg-[#f4f3ed]" aria-labelledby="coupon-legs-heading">
+            <div className="flex items-center justify-between border-b border-black px-4 py-3">
+              <h2 id="coupon-legs-heading" className="font-mono text-[10px] font-black uppercase tracking-[0.16em] text-black">
+                Extracted coupon legs
+              </h2>
+              <span className="bg-black px-2 py-1 font-mono text-[9px] font-black text-white">{couponLegs.length}</span>
+            </div>
+            <div className="divide-y divide-black/25">
+              {couponLegs.map((leg, index) => (
+                <article key={`${leg.eventName ?? 'leg'}-${index}`} className="grid gap-2 px-4 py-4 sm:grid-cols-[44px_1fr_auto]">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full border border-black font-mono text-xs font-black text-black">
+                    {String(index + 1).padStart(2, '0')}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-display text-base font-black text-black">{leg.eventName || form.event_name}</p>
+                    <p className="mt-1 text-sm text-black/65">
+                      {leg.marketType || form.market_type}{leg.selection ? ` · ${leg.selection}` : ''}
+                    </p>
+                  </div>
+                  <div className="font-mono text-sm font-black text-black">
+                    {leg.odds != null ? Number(leg.odds).toFixed(2) : '—'}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
 
         {rootErr && !analysis && (
           <div className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
@@ -719,6 +817,114 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
       {/* ── Analysis result ─────────────────────────────────── */}
       {a && (
         <div className="flex flex-col gap-4">
+          {a.research_brief && (
+            <section className="border border-black bg-white text-black" aria-labelledby="research-brief-heading">
+              <div className="border-b border-black bg-black px-5 py-4 text-white">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="font-mono text-[9px] font-black uppercase tracking-[0.18em] text-[#e8ff00]">
+                    Conditional market review
+                  </p>
+                  <span className="border border-white/40 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-white">
+                    {a.research_brief.legs.length} {a.research_brief.legs.length === 1 ? 'leg' : 'legs'}
+                  </span>
+                </div>
+                <h2 id="research-brief-heading" className="mt-4 max-w-3xl font-display text-3xl font-black leading-[0.95] tracking-[-0.045em] text-white md:text-5xl">
+                  {a.research_brief.headline}
+                </h2>
+                <p className="mt-4 max-w-3xl text-sm leading-6 text-white/75">{a.research_brief.summary}</p>
+                <p className="mt-3 max-w-3xl border-l-2 border-[#e8ff00] pl-3 font-mono text-[9px] font-bold uppercase leading-4 tracking-[0.08em] text-white/70">
+                  Narrative analysis is conditional. Only verbatim excerpts under Cited claims are bound to current sources.
+                </p>
+              </div>
+
+              {a.research_brief.builderRisk && (
+                <div className="border-b border-black bg-[#e8ff00] px-5 py-4">
+                  <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em] text-black">Bet Builder correlation</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-black">{a.research_brief.builderRisk}</p>
+                </div>
+              )}
+
+              <div className="divide-y divide-black">
+                {a.research_brief.legs.map(leg => (
+                  <article key={`${leg.legNumber}-${leg.eventName}-${leg.marketType}`} className="grid gap-4 px-5 py-5 md:grid-cols-[54px_1fr]">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full border border-black font-mono text-xs font-black">
+                      {String(leg.legNumber).padStart(2, '0')}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h3 className="font-display text-xl font-black tracking-[-0.025em]">{leg.eventName}</h3>
+                          <p className="mt-1 text-sm text-black/60">{leg.marketType}{leg.selection ? ` · ${leg.selection}` : ''}</p>
+                        </div>
+                        <span className="border border-black px-2 py-1 font-mono text-[9px] font-black uppercase tracking-[0.1em]">
+                          {leg.fixtureStatus.replaceAll('_', ' ')}
+                        </span>
+                      </div>
+                      <p className="mt-4 text-sm font-semibold leading-6">{leg.assessment}</p>
+
+                      <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <div>
+                          <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/50">Conditional logic</p>
+                          <ul className="mt-2 space-y-1.5 text-sm leading-5 text-black/75">
+                            {leg.evidence.length > 0
+                              ? leg.evidence.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>+ {item}</li>)
+                              : <li>+ No additional conditional note.</li>}
+                          </ul>
+                        </div>
+                        <div>
+                          <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/50">Failure modes</p>
+                          <ul className="mt-2 space-y-1.5 text-sm leading-5 text-black/75">
+                            {leg.risks.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>− {item}</li>)}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="border-t border-black px-5 py-5">
+                <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em] text-black/50">Analyst verdict</p>
+                <p className="mt-2 text-base font-bold leading-6">{a.research_brief.verdict}</p>
+                {a.research_brief.dataGaps.length > 0 && (
+                  <div className="mt-4 border-l-4 border-black pl-4">
+                    <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/50">Still unverified</p>
+                    <ul className="mt-2 space-y-1 text-sm text-black/70">
+                      {a.research_brief.dataGaps.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>— {item}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {a.research_brief.sourcedClaims.length > 0 && a.research_sources && a.research_sources.length > 0 && (
+                <div className="border-t border-black bg-[#f4f3ed] px-5 py-5">
+                  <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em] text-black/50">Cited claims — verbatim source excerpts</p>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    {a.research_brief.sourcedClaims.map((claim, claimIndex) => {
+                      const source = a.research_sources?.find(item => item.url === claim.sourceUrl)
+                      if (!source) return null
+                      return (
+                      <a
+                        key={`${claimIndex}-${source.url}-${claim.text}`}
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="border border-black bg-white px-3 py-3 text-sm font-bold text-black underline decoration-1 underline-offset-4 hover:bg-[#e8ff00]"
+                      >
+                        <span className="block no-underline">“{claim.text}”</span>
+                        <span className="mt-2 block">{source.title}</span>
+                        <span className="mt-1 block font-mono text-[9px] font-black uppercase tracking-[0.08em] no-underline opacity-50">
+                          {new URL(source.url).hostname}
+                        </span>
+                      </a>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
           {/* Recommendation header */}
           {(() => {
             const rec = REC_CONFIG[a.recommendation]
@@ -738,15 +944,19 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               no_value: 'AI does not recommend this market.',
             }
             const disclaimerText = trust && !showPricing ? trust.uiDisclaimer : a.disclaimer
+            const researchedNoPriceLabel = trust?.locale === 'uk' ? 'ЦІНУ НЕ ПІДТВЕРДЖЕНО' : 'PRICE NOT VERIFIED'
+            const researchedNoPriceSupport = trust?.locale === 'uk'
+              ? 'Якісний розбір наведено вище; точну ймовірність та EV приховано.'
+              : 'Qualitative research is shown above; probability and EV remain withheld.'
             return (
               <div className={`card border ${rec.bg} flex flex-col gap-3`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <span className={`text-lg font-bold ${showPricing ? rec.color : 'text-amber-300'}`}>
-                      {showPricing ? rec.label : trust?.label ?? gate?.label ?? 'INSUFFICIENT DATA'}
+                      {showPricing ? rec.label : a.research_brief ? researchedNoPriceLabel : trust?.label ?? gate?.label ?? 'INSUFFICIENT DATA'}
                     </span>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {showPricing ? recDetail[a.recommendation] : trust?.supportLabel ?? gate?.supportLabel ?? 'Unsupported / partially supported bet'}
+                      {showPricing ? recDetail[a.recommendation] : a.research_brief ? researchedNoPriceSupport : trust?.supportLabel ?? gate?.supportLabel ?? 'Unsupported / partially supported bet'}
                     </p>
                   </div>
                   {showPricing ? (
@@ -860,7 +1070,11 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
           {/* Factors */}
           <div className="card flex flex-col gap-2">
-            <h3 className="text-sm font-semibold text-gray-300 mb-1">{trustView?.factorAnalysisLabel ?? 'Factor Analysis'}</h3>
+            <h3 className="text-sm font-semibold text-gray-300 mb-1">
+              {a.research_brief && !pricingVisible
+                ? (trustView?.locale === 'uk' ? 'Перевірка ціни' : 'Pricing verification')
+                : trustView?.factorAnalysisLabel ?? 'Factor Analysis'}
+            </h3>
             {(trustView && !pricingVisible ? trustView.displayFactors : a.factors).map((f, i) => (
               <div key={i} className="py-1.5 border-b border-gray-800 last:border-0">
                 <div className="flex items-center justify-between">

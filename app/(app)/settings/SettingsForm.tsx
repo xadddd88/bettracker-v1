@@ -148,9 +148,9 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
         </div>
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
-            <label className="label">Web search in Scout</label>
+            <label className="label">Web search in Scout & Analyst</label>
             <p className="text-[11px] text-gray-600 mt-0.5">
-              Allows Scout to search current web sources when discovering opportunities. Requires server-side activation.
+              Allows Scout and Analyst to consult current sources. Exact pricing still requires verified model inputs. Requires server-side activation.
             </p>
           </div>
           <button

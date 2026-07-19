@@ -54,6 +54,8 @@ export type LooseCouponExtraction = {
   stake?: number | string | null
   bookmaker?: string | null
   sport?: ScannerSport | null
+  eventStartText?: string | null
+  event_start_text?: string | null
   legs?: LooseScannerLeg[] | null
   warnings?: string[] | null
 }
@@ -81,6 +83,7 @@ export type NormalizedScannerCoupon = {
   stake: number | null
   bookmaker: string | null
   sport: Exclude<ScannerSport, 'football' | 'hockey'> | null
+  event_start_text: string | null
   legs: NormalizedScannerLeg[]
 }
 
@@ -159,6 +162,8 @@ export function normalizeLooseCouponExtraction(input: LooseCouponExtraction): No
     stake: toNumber(input.stake),
     bookmaker: cleanString(input.bookmaker),
     sport,
+    event_start_text: cleanString(input.eventStartText ?? input.event_start_text)
+      ?? extractEventStartText(rawText ?? ''),
     legs,
   }
 }
@@ -352,6 +357,14 @@ function extractTotalOdds(rawText: string): number | null {
   }
   const values = lines.map(toNumber).filter((value): value is number => value != null)
   return values.length ? values[values.length - 1] : null
+}
+
+function extractEventStartText(rawText: string): string | null {
+  const lines = rawText.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+  return lines.find(line =>
+    /(?:сьогодні|сегодня|today|завтра|tomorrow)|(?:\b\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?\b)/i.test(line) &&
+    /\b\d{1,2}:\d{2}\b/.test(line)
+  ) ?? null
 }
 
 function toNumber(value: unknown): number | null {

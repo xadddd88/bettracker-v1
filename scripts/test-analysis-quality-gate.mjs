@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,6 +41,17 @@ const {
   normalizeLooseCouponExtraction,
   buildScannerFailureResponse,
 } = scannerModule;
+const researchModule = require(path.join(buildDir, 'lib/ai/analyst-research.js'));
+const {
+  alignAnalystResearchBriefToCoupon,
+  buildAnalystResearchMessage,
+  completePausedAnthropicTurn,
+  containsAnalystPricingClaim,
+  extractAnalystResearchSources,
+  parseStoredAnalystResearchBrief,
+  parseStoredAnalystResearchSources,
+  usedSuccessfulWebSearch,
+} = researchModule;
 
 let passed = 0;
 let failed = 0;
@@ -47,6 +59,18 @@ let failed = 0;
 function test(name, fn) {
   try {
     fn();
+    console.log(`  ok  ${name}`);
+    passed++;
+  } catch (err) {
+    console.error(`  fail ${name}`);
+    console.error(`       ${err.message}`);
+    failed++;
+  }
+}
+
+async function asyncTest(name, fn) {
+  try {
+    await fn();
     console.log(`  ok  ${name}`);
     passed++;
   } catch (err) {
@@ -341,6 +365,33 @@ test('legacy flattened scanner response reconstructs express legs without raw le
   assert.deepEqual(normalized.legs.map(leg => leg.periodOrPhase), ['3-й сет', 'Перерва', '1-й сет']);
   assert.deepEqual(normalized.legs.map(leg => leg.statusSource), ['coupon', 'coupon', 'coupon']);
   assert.deepEqual(normalized.legs.map(leg => leg.statusText), ['Лайв', 'Лайв', 'Лайв']);
+});
+
+test('scanner preserves the exact coupon date and time for fixture research', () => {
+  const explicit = normalizeLooseCouponExtraction({
+    eventStartText: 'Сьогодні, 22:10',
+    event_name: 'Іспанія - Аргентина',
+    market_type: 'Bet Builder',
+    selection: 'Більше 2.5 + Більше 6.5',
+    totalOdds: 2.91,
+    sport: 'soccer',
+    legs: [
+      { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5', sport: 'soccer' },
+      { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5', sport: 'soccer' },
+    ],
+  });
+  assert.equal(explicit.event_start_text, 'Сьогодні, 22:10');
+
+  const fromRawText = normalizeLooseCouponExtraction({
+    rawText: 'Сьогодні, 22:10\nІспанія - Аргентина',
+    event_name: 'Іспанія - Аргентина',
+    market_type: 'Тотал',
+    selection: 'Більше 2.5',
+    odds: 1.8,
+    sport: 'soccer',
+    legs: [{ eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5', sport: 'soccer' }],
+  });
+  assert.equal(fromRawText.event_start_text, 'Сьогодні, 22:10');
 });
 
 test('invalid scanner response returns localized actionable error metadata', () => {
@@ -945,6 +996,278 @@ test('saved unpriced Analyst decision detail share and PDF strings use trust vie
   assert.ok(combined.includes('Покриття даних'), combined);
   assert.ok(combined.includes('Перелік відсутніх даних'), combined);
   assertNoDecisionSurfaceLeaks(combined);
+});
+
+test('Analyst research message preserves Bet Builder legs and coupon time context', () => {
+  const message = buildAnalystResearchMessage({
+    sport: 'soccer',
+    eventName: 'Іспанія - Аргентина',
+    marketType: 'Bet Builder',
+    selection: 'Більше 2.5 + Більше 6.5',
+    offeredOdds: 2.91,
+    couponEventTime: 'Сьогодні, 22:10',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: '2026-07-19T19:00:00.000Z',
+    legs: [
+      { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5', sport: 'soccer' },
+      { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5', sport: 'soccer' },
+    ],
+  });
+
+  assert.ok(message.includes('Exact date/time text visible on coupon: Сьогодні, 22:10'), message);
+  assert.ok(message.includes('User timezone: Europe/Kyiv'), message);
+  assert.ok(message.includes('Offered total odds: 2.91'), message);
+  assert.ok(message.includes('Leg 1: event=Іспанія - Аргентина | market=Тотал | selection=Більше 2.5'), message);
+  assert.ok(message.includes('Leg 2: event=Іспанія - Аргентина | market=Кутові. Тотал | selection=Більше 6.5'), message);
+  assert.ok(message.includes('correlation'), message);
+});
+
+function exactBuilderResearchBrief() {
+  return {
+    headline: 'Conditional Bet Builder review',
+    summary: 'The two legs depend on the same match script and need separate verification.',
+    builderRisk: 'An early goal can change both attacking pressure and corner volume.',
+    verdict: 'Verify the fixture and current inputs before kickoff.',
+    dataGaps: ['Exact competition'],
+    sourcedClaims: [],
+    legs: [
+      {
+        legNumber: 2,
+        eventName: 'Іспанія - Аргентина',
+        marketType: 'Кутові. Тотал',
+        selection: 'Більше 6.5',
+        assessment: 'Seven corners are required.',
+        evidence: ['Conditional match logic only'],
+        risks: ['Low attacking width'],
+        fixtureStatus: 'scheduled',
+        dataCoverage: { liveInjuries: true, teamNews: true, recentForm: true, lineMovement: true },
+      },
+      {
+        legNumber: 1,
+        eventName: 'Іспанія - Аргентина',
+        marketType: 'Тотал',
+        selection: 'Більше 2.5',
+        assessment: 'Three goals are required.',
+        evidence: ['Conditional scoring logic only'],
+        risks: ['Low-tempo opening'],
+        fixtureStatus: 'scheduled',
+        dataCoverage: { liveInjuries: true, teamNews: true, recentForm: true, lineMovement: true },
+      },
+    ],
+  };
+}
+
+test('Analyst aligns reordered model legs by leg number and discards unbound coverage', () => {
+  const aligned = alignAnalystResearchBriefToCoupon(exactBuilderResearchBrief(), [
+    { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5' },
+    { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5' },
+  ]);
+
+  assert.ok(aligned);
+  assert.equal(aligned.legs[0].assessment, 'Three goals are required.');
+  assert.equal(aligned.legs[1].assessment, 'Seven corners are required.');
+  assert.deepEqual(aligned.legs.map(leg => leg.dataCoverage), [
+    { liveInjuries: false, teamNews: false, recentForm: false, lineMovement: false },
+    { liveInjuries: false, teamNews: false, recentForm: false, lineMovement: false },
+  ]);
+  assert.deepEqual(aligned.legs.map(leg => leg.fixtureStatus), ['unknown', 'unknown']);
+});
+
+test('Analyst rejects duplicate numbers and mismatched leg identity instead of swapping commentary', () => {
+  const couponLegs = [
+    { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5' },
+    { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5' },
+  ];
+  const duplicate = exactBuilderResearchBrief();
+  duplicate.legs[0].legNumber = 1;
+  assert.equal(alignAnalystResearchBriefToCoupon(duplicate, couponLegs), null);
+
+  const mismatched = exactBuilderResearchBrief();
+  mismatched.legs[0].selection = 'Більше 2.5';
+  assert.equal(alignAnalystResearchBriefToCoupon(mismatched, couponLegs), null);
+});
+
+test('Analyst binds only verbatim claims to their exact citation URL', () => {
+  const brief = exactBuilderResearchBrief();
+  brief.sourcedClaims = [
+    { text: 'Spain confirmed the squad on Friday.', sourceUrl: 'https://example.com/report' },
+    { text: 'Paraphrased claim not present in the citation.', sourceUrl: 'https://example.com/report' },
+    { text: 'Unrelated source.', sourceUrl: 'https://example.org/uncited' },
+  ];
+  const aligned = alignAnalystResearchBriefToCoupon(brief, [
+    { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5' },
+    { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5' },
+  ], [{
+    title: 'Squad report',
+    url: 'https://example.com/report',
+    citedText: 'Spain confirmed the squad on Friday.',
+  }]);
+
+  assert.ok(aligned);
+  assert.deepEqual(aligned.sourcedClaims, [{
+    text: 'Spain confirmed the squad on Friday.',
+    sourceUrl: 'https://example.com/report',
+  }]);
+
+  const prefix = 'x'.repeat(400);
+  const longCitationSources = extractAnalystResearchSources([{
+    type: 'text',
+    text: '{}',
+    citations: [{
+      type: 'web_search_result_location',
+      url: 'https://example.com/long-report',
+      title: 'Long report',
+      cited_text: `${prefix} MATERIAL QUALIFIER`,
+    }],
+  }]);
+  assert.deepEqual(longCitationSources, [{
+    title: 'Long report',
+    url: 'https://example.com/long-report',
+    citedText: null,
+  }]);
+
+  const prefixOnly = exactBuilderResearchBrief();
+  prefixOnly.sourcedClaims = [{ text: prefix, sourceUrl: 'https://example.com/long-report' }];
+  const rejectedPrefix = alignAnalystResearchBriefToCoupon(prefixOnly, [
+    { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5' },
+    { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5' },
+  ], longCitationSources);
+  assert.ok(rejectedPrefix);
+  assert.deepEqual(rejectedPrefix.sourcedClaims, []);
+});
+
+test('Analyst research source extraction keeps only cited public HTTPS sources', () => {
+  const content = [
+    {
+      type: 'text',
+      text: '{}',
+      citations: [
+        { type: 'web_search_result_location', url: 'https://example.com/report', title: ' Match report ', cited_text: '  Current team news. ' },
+        { type: 'web_search_result_location', url: 'javascript:alert(1)', title: 'Unsafe', cited_text: 'nope' },
+        { type: 'web_search_result_location', url: 'http://example.com/plain', title: 'Plain HTTP', cited_text: 'nope' },
+        { type: 'web_search_result_location', url: 'https://user:pass@example.com/private', title: 'Credentials', cited_text: 'nope' },
+        { type: 'web_search_result_location', url: 'https://127.0.0.1/internal', title: 'Loopback', cited_text: 'nope' },
+        { type: 'web_search_result_location', url: 'https://192.168.1.5/internal', title: 'Private', cited_text: 'nope' },
+        { type: 'web_search_result_location', url: 'https://192.0.2.1/test', title: 'TEST-NET-1', cited_text: 'nope' },
+        { type: 'web_search_result_location', url: 'https://198.51.100.1/test', title: 'TEST-NET-2', cited_text: 'nope' },
+        { type: 'web_search_result_location', url: 'https://203.0.113.1/test', title: 'TEST-NET-3', cited_text: 'nope' },
+      ],
+    },
+    {
+      type: 'web_search_tool_result',
+      content: [
+        { type: 'web_search_result', url: 'https://example.com/report', title: 'Duplicate title' },
+        { type: 'web_search_result', url: 'https://example.org/schedule', title: 'Schedule' },
+      ],
+    },
+  ];
+
+  assert.equal(usedSuccessfulWebSearch(content), true);
+  assert.deepEqual(extractAnalystResearchSources(content), [
+    { title: 'Match report', url: 'https://example.com/report', citedText: 'Current team news.' },
+  ]);
+  assert.equal(usedSuccessfulWebSearch([{ type: 'web_search_tool_result', content: [{ type: 'web_search_result', url: 'https://example.org/uncited' }] }]), false);
+  assert.equal(usedSuccessfulWebSearch([{ type: 'web_search_tool_result', content: { type: 'web_search_tool_result_error' } }]), false);
+});
+
+test('Analyst research rejects probability and edge claims but permits ordinary match statistics', () => {
+  const brief = {
+    headline: 'Conditional Bet Builder review',
+    summary: 'Spain recorded 58% possession in a sourced match, but the exact fixture still needs verification.',
+    builderRisk: 'An early goal may reduce later attacking pressure and corner volume.',
+    verdict: 'Verify the competition and squads before kickoff.',
+    dataGaps: ['Exact competition'],
+    sourcedClaims: [],
+    legs: [{
+      legNumber: 1,
+      eventName: 'Spain - Argentina',
+      marketType: 'Total',
+      selection: 'Over 2.5',
+      assessment: 'This leg needs three goals and is sensitive to game state.',
+      evidence: [],
+      risks: ['Low-tempo opening'],
+      fixtureStatus: 'unknown',
+      dataCoverage: {},
+    }],
+  };
+
+  assert.equal(containsAnalystPricingClaim(brief), false);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'Model probability is 42% and the edge is -5%.' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, summary: 'Реальна ймовірність 41,5% дає негативну перевагу.' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'probability 0.42' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'EV +0.12 units' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'edge -0.05' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'probabilidad 42%' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'вероятность 42%' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'Wahrscheinlichkeit 0,42' }), true);
+});
+
+test('saved research parser rejects partial nested JSON and unsafe stored sources', () => {
+  const valid = exactBuilderResearchBrief();
+  assert.ok(parseStoredAnalystResearchBrief(valid));
+  assert.equal(parseStoredAnalystResearchBrief({ ...valid, legs: [{ legNumber: 1 }] }), null);
+  assert.equal(parseStoredAnalystResearchBrief({ ...valid, legs: [{ ...valid.legs[0], risks: 'not-an-array' }] }), null);
+  assert.equal(parseStoredAnalystResearchBrief({ ...valid, sourcedClaims: [{ text: 'Claim', sourceUrl: 'https://192.0.2.1/test' }] }), null);
+  assert.deepEqual(parseStoredAnalystResearchSources([
+    { title: 'Report', url: 'https://example.com/report', citedText: null },
+    { title: 'Internal', url: 'https://127.0.0.1/admin', citedText: null },
+    { title: 'Plain', url: 'http://example.com/report', citedText: null },
+  ]), [{ title: 'Report', url: 'https://example.com/report', citedText: null }]);
+});
+
+await asyncTest('Anthropic pause_turn continuation preserves protocol state and is bounded', async () => {
+  const seen = [];
+  const completed = await completePausedAnthropicTurn(
+    { stop_reason: 'pause_turn', content: ['first'] },
+    async (content, continuation) => {
+      seen.push({ content, continuation });
+      return continuation === 1
+        ? { stop_reason: 'pause_turn', content: ['second'] }
+        : { stop_reason: 'end_turn', content: ['done'] };
+    },
+  );
+  assert.deepEqual(seen, [
+    { content: ['first'], continuation: 1 },
+    { content: ['second'], continuation: 2 },
+  ]);
+  assert.deepEqual(completed, { stop_reason: 'end_turn', content: ['done'] });
+  await assert.rejects(
+    completePausedAnthropicTurn(
+      { stop_reason: 'pause_turn', content: ['first'] },
+      async content => ({ stop_reason: 'pause_turn', content }),
+      1,
+    ),
+    /continuation limit/,
+  );
+});
+
+test('editorial black action surfaces explicitly retain readable foreground text', () => {
+  const css = readFileSync(path.join(repoRoot, 'app/globals.css'), 'utf8');
+  assert.match(css, /\.web-editorial \.btn-primary[\s\S]*?color:\s*#ffffff\s*!important/);
+  assert.match(css, /\.web-editorial \.bg-black[\s\S]*?color:\s*#ffffff\s*!important/);
+  assert.match(css, /\.web-editorial \.bg-indigo-600\.text-white[\s\S]*?color:\s*#ffffff\s*!important/);
+});
+
+test('web Analyst transports coupon legs and time into the research pipeline', () => {
+  const routeSource = readFileSync(path.join(repoRoot, 'app/api/ai/analyst/route.ts'), 'utf8');
+  const pageSource = readFileSync(path.join(repoRoot, 'app/(app)/ai/page.tsx'), 'utf8');
+  const decisionDetailSource = readFileSync(path.join(repoRoot, 'app/(app)/decisions/[id]/page.tsx'), 'utf8');
+
+  assert.match(routeSource, /buildAnalystResearchMessage\(\{[\s\S]*?couponEventTime:\s*input\.coupon_event_time[\s\S]*?legs:\s*input\.legs/);
+  assert.match(routeSource, /type:\s*'web_search_20250305'/);
+  assert.match(routeSource, /research_brief:\s*researchBrief/);
+  assert.match(routeSource, /research_sources:\s*researchSources/);
+  assert.match(routeSource, /offered_odds:\s*input\.offered_odds/);
+  assert.match(routeSource, /researchBrief\.sourcedClaims\.length\s*>\s*0/);
+  assert.doesNotMatch(pageSource, /Current-source research/);
+  assert.doesNotMatch(decisionDetailSource, /Current-source research/);
+  assert.match(pageSource, /coupon_event_time:\s*form\.event_time/);
+  assert.match(pageSource, /client_timezone:\s*Intl\.DateTimeFormat/);
+  assert.match(pageSource, /a\.research_brief\.legs\.map/);
+  assert.match(pageSource, /ЦІНУ НЕ ПІДТВЕРДЖЕНО/);
+  assert.match(decisionDetailSource, /researchBrief\.legs\.map/);
+  assert.match(decisionDetailSource, /parseStoredAnalystResearchBrief/);
+  assert.match(decisionDetailSource, /parseStoredAnalystResearchSources/);
 });
 
 if (failed > 0) {
