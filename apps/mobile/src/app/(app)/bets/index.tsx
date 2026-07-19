@@ -1,4 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,9 +15,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/auth/auth-context';
 import { fetchBets, fetchCurrency } from '@/bets/data';
 import { readErrorMessage } from '@/bets/errors';
-import { betFinancialSummary, couponPresentation, type BetDto, formatMoney } from '@/bets/models';
-import { STATUS_PRESENTATION } from '@/bets/presentation';
+import { type BetDto } from '@/bets/models';
+import { BetTicket } from '@/ui/bet-ticket';
 import { colors } from '@/ui/theme';
+import { TimeWarpBackdrop, WarpRail } from '@/ui/time-warp';
 
 export default function BetsScreen() {
   const router = useRouter();
@@ -54,8 +56,10 @@ export default function BetsScreen() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+      <TimeWarpBackdrop />
       <View style={styles.header}>
         <View style={styles.headerCopy}>
+          <WarpRail />
           <Text style={styles.eyebrow}>TRACKER</Text>
           <Text style={styles.title}>My bets</Text>
           <Text style={styles.subtitle}>{bets.length} tracked</Text>
@@ -67,7 +71,12 @@ export default function BetsScreen() {
             onPress={() => router.push('/(app)/ai')}
             style={({ pressed }) => [styles.headerButton, pressed && styles.cardPressed]}
           >
-            <Text style={styles.headerButtonText}>Scan</Text>
+            <SymbolView
+              fallback={<Text style={styles.headerButtonText}>S</Text>}
+              name={{ android: 'document_scanner', ios: 'viewfinder', web: 'document_scanner' }}
+              size={20}
+              tintColor={colors.secondaryText}
+            />
           </Pressable>
           <Pressable
             accessibilityLabel="Add bet"
@@ -75,7 +84,12 @@ export default function BetsScreen() {
             onPress={() => router.push('/(app)/bets/new')}
             style={({ pressed }) => [styles.headerButtonPrimary, pressed && styles.cardPressed]}
           >
-            <Text style={styles.headerButtonPrimaryText}>+ Add</Text>
+            <SymbolView
+              fallback={<Text style={styles.headerButtonPrimaryText}>+</Text>}
+              name={{ android: 'add', ios: 'plus', web: 'add' }}
+              size={22}
+              tintColor={colors.background}
+            />
           </Pressable>
         </View>
       </View>
@@ -120,41 +134,12 @@ export default function BetsScreen() {
             />
           }
           renderItem={({ item }) => {
-            const status = STATUS_PRESENTATION[item.status];
-            const firstLeg = item.legs[0];
-            const coupon = couponPresentation(item);
-            const financial = betFinancialSummary(item, currency);
-            const totalOdds = item.totalOdds ?? firstLeg?.odds ?? null;
             return (
-              <Pressable
-                accessibilityHint="Opens bet details"
-                accessibilityRole="button"
+              <BetTicket
+                bet={item}
+                currency={currency}
                 onPress={() => router.push({ pathname: '/(app)/bets/[id]', params: { id: item.id } })}
-                style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-              >
-                <View style={styles.cardHeader}>
-                  <View style={styles.cardHeading}>
-                    <Text style={styles.couponType}>{coupon.label.toUpperCase()}</Text>
-                    <Text numberOfLines={2} style={styles.cardTitle}>
-                      {firstLeg?.eventName ?? 'Tracked bet'}
-                    </Text>
-                  </View>
-                  <View style={[styles.badge, { backgroundColor: `${status.color}18` }]}>
-                    <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
-                  </View>
-                </View>
-                <Text numberOfLines={1} style={styles.selection}>
-                  {coupon.isExpress
-                    ? `${coupon.legs.length} selections · ${coupon.legs.slice(0, 2).map((leg) => leg.selection ?? leg.eventName).join(' + ')}`
-                    : firstLeg?.selection ?? firstLeg?.marketType ?? 'Selection not recorded'}
-                </Text>
-                <View style={styles.metrics}>
-                  <Metric label="Stake" value={formatMoney(item.stake, currency)} />
-                  <Metric label="Odds" value={totalOdds?.toFixed(2) ?? '—'} />
-                  <Metric label={financial.label} value={financial.value} />
-                  <Text style={styles.date}>{new Date(item.placedAt).toLocaleDateString()}</Text>
-                </View>
-              </Pressable>
+              />
             );
           }}
         />
@@ -163,26 +148,17 @@ export default function BetsScreen() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.metric}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: colors.background, flex: 1 },
-  header: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingBottom: 14, paddingTop: 8 },
-  headerCopy: { flex: 1, minWidth: 0 },
-  eyebrow: { color: colors.accent, fontSize: 9, fontWeight: '900', letterSpacing: 1.6 },
-  title: { color: colors.text, fontSize: 27, fontWeight: '900', marginTop: 2 },
+  header: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingHorizontal: 14, paddingBottom: 12, paddingTop: 6 },
+  headerCopy: { flex: 1, gap: 3, minWidth: 0 },
+  eyebrow: { color: colors.accent, fontFamily: 'monospace', fontSize: 9, fontWeight: '700', letterSpacing: 1.6 },
+  title: { color: colors.text, fontSize: 25, fontWeight: '800', letterSpacing: -0.3, marginTop: 2 },
   subtitle: { color: colors.muted, fontSize: 11, marginTop: 2 },
   headerActions: { flexDirection: 'row', gap: 8 },
-  headerButton: { alignItems: 'center', borderColor: colors.border, borderRadius: 9, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 12 },
+  headerButton: { alignItems: 'center', borderColor: colors.border, borderRadius: 21, borderWidth: StyleSheet.hairlineWidth, height: 42, justifyContent: 'center', width: 42 },
   headerButtonText: { color: colors.secondaryText, fontSize: 12, fontWeight: '800' },
-  headerButtonPrimary: { alignItems: 'center', backgroundColor: colors.accent, borderRadius: 9, justifyContent: 'center', minHeight: 44, paddingHorizontal: 12 },
+  headerButtonPrimary: { alignItems: 'center', backgroundColor: colors.accent, borderRadius: 21, height: 42, justifyContent: 'center', width: 42 },
   headerButtonPrimaryText: { color: colors.background, fontSize: 12, fontWeight: '900' },
   list: { gap: 10, paddingBottom: 28, paddingHorizontal: 16 },
   emptyList: { flexGrow: 1 },
@@ -195,18 +171,5 @@ const styles = StyleSheet.create({
   emptyButtonText: { color: colors.background, fontSize: 13, fontWeight: '900' },
   retryButton: { backgroundColor: colors.accent, borderRadius: 10, justifyContent: 'center', minHeight: 44, paddingHorizontal: 20 },
   retryText: { color: colors.background, fontWeight: '800' },
-  card: { backgroundColor: colors.surface, borderRadius: 16, gap: 10, overflow: 'hidden', padding: 14 },
   cardPressed: { backgroundColor: colors.surfaceRaised, opacity: 0.9 },
-  cardHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 10 },
-  cardHeading: { flex: 1, gap: 4, minWidth: 0 },
-  couponType: { color: colors.accent, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
-  cardTitle: { color: colors.text, fontSize: 15, fontWeight: '800', lineHeight: 20 },
-  badge: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
-  badgeText: { fontSize: 11, fontWeight: '800' },
-  selection: { color: colors.muted, fontSize: 12, lineHeight: 17 },
-  metrics: { alignItems: 'flex-end', borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 16, paddingTop: 10 },
-  metric: { gap: 2 },
-  metricLabel: { color: colors.placeholder, fontSize: 8, fontWeight: '700', textTransform: 'uppercase' },
-  metricValue: { color: colors.secondaryText, fontSize: 13, fontWeight: '800' },
-  date: { color: colors.placeholder, fontSize: 9, marginLeft: 'auto' },
 });

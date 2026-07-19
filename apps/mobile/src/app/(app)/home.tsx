@@ -7,10 +7,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/auth/auth-context';
 import { fetchBankroll, fetchBets } from '@/bets/data';
 import { readErrorMessage } from '@/bets/errors';
-import { betTitle, formatMoney, type BetDto } from '@/bets/models';
-import { STATUS_PRESENTATION } from '@/bets/presentation';
+import { formatMoney, type BetDto } from '@/bets/models';
 import { summarizeBets } from '@/bets/summary';
+import { BetTicket } from '@/ui/bet-ticket';
 import { colors } from '@/ui/theme';
+import { TimeWarpBackdrop, WarpRail } from '@/ui/time-warp';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -47,11 +48,13 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+      <TimeWarpBackdrop />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View style={styles.headerCopy}>
+            <WarpRail />
             <Text style={styles.brand}>XADDD</Text>
-            <Text style={styles.title}>Dashboard</Text>
+            <Text style={styles.title}>Overview</Text>
           </View>
           <Pressable
             accessibilityLabel="Account and settings"
@@ -75,6 +78,7 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View style={styles.bankrollCard}>
+            <WarpRail />
             <View style={styles.balanceRow}>
               <View>
                 <Text style={styles.metricLabel}>BANKROLL</Text>
@@ -132,11 +136,11 @@ export default function HomeScreen() {
               <Text style={styles.muted}>Scan a coupon or prepare your first bet.</Text>
             </View>
           ) : recent.map((bet, index) => (
-            <RecentBet
+            <BetTicket
               bet={bet}
+              compact
               currency={currency}
               key={bet.id}
-              last={index === recent.length - 1}
               onPress={() => router.push({ pathname: '/(app)/bets/[id]', params: { id: bet.id } })}
             />
           ))}
@@ -175,7 +179,7 @@ function QuickAction({ icon, label, onPress, primary = false }: {
       style={({ pressed }) => [styles.quickAction, primary && styles.quickActionPrimary, pressed && styles.pressed]}
     >
       <View style={[styles.quickIcon, primary && styles.quickIconPrimary]}>
-        <SymbolView fallback={<Text>+</Text>} name={icon} size={22} tintColor={primary ? colors.background : colors.accent} />
+        <SymbolView fallback={<Text>+</Text>} name={icon} size={20} tintColor={colors.accent} />
       </View>
       <Text style={[styles.quickLabel, primary && styles.quickLabelPrimary]}>{label}</Text>
       <Text style={[styles.chevron, primary && styles.quickLabelPrimary]}>›</Text>
@@ -183,77 +187,44 @@ function QuickAction({ icon, label, onPress, primary = false }: {
   );
 }
 
-function RecentBet({ bet, currency, last, onPress }: {
-  bet: BetDto;
-  currency: string;
-  last: boolean;
-  onPress: () => void;
-}) {
-  const status = STATUS_PRESENTATION[bet.status];
-  const odds = bet.totalOdds ?? bet.legs[0]?.odds ?? null;
-  return (
-    <Pressable
-      accessibilityHint="Opens bet details"
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.recentRow, !last && styles.recentDivider, pressed && styles.recentPressed]}
-    >
-      <View style={styles.recentCopy}>
-        <Text numberOfLines={1} style={styles.recentTitle}>{betTitle(bet)}</Text>
-        <Text style={styles.recentMeta}>{formatMoney(bet.stake, currency)} · {odds?.toFixed(2) ?? '—'}</Text>
-      </View>
-      <View style={[styles.statusDot, { backgroundColor: status.color }]} />
-      <Text style={[styles.statusLabel, { color: status.color }]}>{status.label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: colors.background, flex: 1 },
-  content: { gap: 18, paddingBottom: 28, paddingHorizontal: 16, paddingTop: 8 },
+  content: { gap: 14, paddingBottom: 24, paddingHorizontal: 14, paddingTop: 6 },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  headerCopy: { gap: 2 },
-  brand: { color: colors.accent, fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  title: { color: colors.text, fontSize: 27, fontWeight: '900' },
-  iconButton: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: 14, height: 46, justifyContent: 'center', width: 46 },
+  headerCopy: { gap: 4 },
+  brand: { color: colors.accent, fontFamily: 'monospace', fontSize: 9, fontWeight: '800', letterSpacing: 2.2 },
+  title: { color: colors.text, fontSize: 25, fontWeight: '800', letterSpacing: -0.3 },
+  iconButton: { alignItems: 'center', borderColor: colors.border, borderRadius: 21, borderWidth: StyleSheet.hairlineWidth, height: 42, justifyContent: 'center', width: 42 },
   iconFallback: { color: colors.secondaryText, fontSize: 10, fontWeight: '900' },
-  loadingRow: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: 18, flexDirection: 'row', gap: 12, minHeight: 108, padding: 18 },
-  bankrollCard: { backgroundColor: colors.surface, borderRadius: 20, gap: 18, padding: 18 },
+  loadingRow: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: 12, flexDirection: 'row', gap: 12, minHeight: 102, padding: 16 },
+  bankrollCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, gap: 16, padding: 16 },
   balanceRow: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
-  metricLabel: { color: colors.placeholder, fontSize: 9, fontWeight: '800', letterSpacing: 1 },
-  balance: { color: colors.text, fontSize: 30, fontWeight: '900', letterSpacing: -0.8, marginTop: 4 },
-  openBadge: { alignItems: 'center', backgroundColor: colors.accentMuted, borderRadius: 12, minWidth: 54, paddingHorizontal: 10, paddingVertical: 7 },
-  openBadgeValue: { color: colors.accent, fontSize: 17, fontWeight: '900' },
-  openBadgeLabel: { color: colors.accent, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
+  metricLabel: { color: colors.placeholder, fontFamily: 'monospace', fontSize: 9, fontWeight: '700', letterSpacing: 1 },
+  balance: { color: colors.text, fontSize: 29, fontVariant: ['tabular-nums'], fontWeight: '800', letterSpacing: -0.8, marginTop: 3 },
+  openBadge: { alignItems: 'baseline', backgroundColor: colors.accentMuted, borderRadius: 6, flexDirection: 'row', gap: 4, paddingHorizontal: 8, paddingVertical: 5 },
+  openBadgeValue: { color: colors.accent, fontSize: 13, fontWeight: '800' },
+  openBadgeLabel: { color: colors.accent, fontSize: 8, fontWeight: '700', letterSpacing: 0.7 },
   summaryRow: { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', paddingTop: 14 },
   summaryMetric: { flex: 1, gap: 4 },
-  summaryValue: { color: colors.secondaryText, fontSize: 14, fontWeight: '800' },
+  summaryValue: { color: colors.secondaryText, fontSize: 13, fontVariant: ['tabular-nums'], fontWeight: '700' },
   positive: { color: colors.success },
   negative: { color: colors.danger },
   errorCard: { backgroundColor: colors.surface, borderLeftColor: colors.danger, borderLeftWidth: 3, borderRadius: 10, gap: 4, padding: 12 },
   errorText: { color: colors.secondaryText, fontSize: 12 },
   retry: { color: colors.accent, fontSize: 11, fontWeight: '800' },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  quickAction: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: 16, flex: 1, flexBasis: 138, flexDirection: 'row', gap: 10, minHeight: 66, paddingHorizontal: 12 },
-  quickActionPrimary: { backgroundColor: colors.accent },
-  quickIcon: { alignItems: 'center', backgroundColor: colors.accentMuted, borderRadius: 10, height: 40, justifyContent: 'center', width: 40 },
-  quickIconPrimary: { backgroundColor: 'rgba(7,17,31,0.14)' },
-  quickLabel: { color: colors.text, flex: 1, fontSize: 14, fontWeight: '800' },
-  quickLabelPrimary: { color: colors.background },
+  quickAction: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, flex: 1, flexBasis: 138, flexDirection: 'row', gap: 9, minHeight: 58, paddingHorizontal: 10 },
+  quickActionPrimary: { borderColor: colors.accent },
+  quickIcon: { alignItems: 'center', backgroundColor: colors.surfaceMuted, borderRadius: 8, height: 36, justifyContent: 'center', width: 36 },
+  quickIconPrimary: { backgroundColor: colors.accentMuted },
+  quickLabel: { color: colors.text, flex: 1, fontSize: 13, fontWeight: '700' },
+  quickLabelPrimary: { color: colors.text },
   chevron: { color: colors.muted, fontSize: 24 },
   sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
+  sectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   textButton: { justifyContent: 'center', minHeight: 44, paddingHorizontal: 4 },
   textButtonLabel: { color: colors.accent, fontSize: 12, fontWeight: '800' },
-  recentCard: { backgroundColor: colors.surface, borderRadius: 16, overflow: 'hidden' },
-  recentRow: { alignItems: 'center', flexDirection: 'row', minHeight: 68, paddingHorizontal: 14 },
-  recentDivider: { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  recentPressed: { backgroundColor: colors.surfaceRaised },
-  recentCopy: { flex: 1, gap: 4, minWidth: 0 },
-  recentTitle: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  recentMeta: { color: colors.muted, fontSize: 11 },
-  statusDot: { borderRadius: 99, height: 7, marginRight: 6, width: 7 },
-  statusLabel: { fontSize: 11, fontWeight: '800' },
+  recentCard: { gap: 8 },
   emptyRecent: { alignItems: 'center', gap: 6, padding: 28 },
   emptyTitle: { color: colors.text, fontSize: 15, fontWeight: '800' },
   muted: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' },

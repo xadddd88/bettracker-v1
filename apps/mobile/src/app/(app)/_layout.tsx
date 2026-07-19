@@ -36,9 +36,9 @@ export default function AppLayout() {
         tabBarInactiveTintColor: colors.muted,
         tabBarItemStyle: { minHeight: 50, paddingTop: 6 },
         tabBarLabelPosition: 'below-icon',
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '700' },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
         tabBarStyle: {
-          backgroundColor: colors.surface,
+          backgroundColor: colors.surfaceMuted,
           borderTopColor: colors.border,
           height: 58 + insets.bottom,
           paddingBottom: Math.max(insets.bottom, 6),

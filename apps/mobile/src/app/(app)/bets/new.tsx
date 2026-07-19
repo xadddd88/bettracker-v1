@@ -23,6 +23,7 @@ import {
   validateTrackerDraft,
 } from '@/bets/draft';
 import { colors } from '@/ui/theme';
+import { TimeWarpBackdrop, WarpRail } from '@/ui/time-warp';
 
 type Feedback = { message: string; tone: 'error' | 'success' };
 
@@ -108,6 +109,7 @@ export default function NewBetScreen() {
 
   return (
     <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
+      <TimeWarpBackdrop />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={88}
@@ -118,6 +120,7 @@ export default function NewBetScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.intro}>
+            <WarpRail />
             <Text style={styles.eyebrow}>TRACKER</Text>
             <Text style={styles.title}>Add bet</Text>
             <Text style={styles.subtitle}>Enter the coupon exactly as it appears.</Text>
@@ -169,7 +172,11 @@ export default function NewBetScreen() {
               </View>
 
               <Text style={styles.fieldLabel}>Sport</Text>
-              <View style={styles.sports}>
+              <ScrollView
+                contentContainerStyle={styles.sports}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              >
                 {TRACKER_SPORTS.map((sport) => (
                   <Pressable
                     accessibilityRole="radio"
@@ -187,7 +194,7 @@ export default function NewBetScreen() {
                     </Text>
                   </Pressable>
                 ))}
-              </View>
+              </ScrollView>
 
               <DraftInput
                 label="Event"
@@ -354,10 +361,10 @@ function SegmentButton({ label, onPress, selected }: { label: string; onPress: (
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   safeArea: { backgroundColor: colors.background, flex: 1 },
-  content: { gap: 14, padding: 16, paddingBottom: 36 },
+  content: { gap: 13, padding: 14, paddingBottom: 32 },
   intro: { gap: 5 },
-  eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
-  title: { color: colors.text, fontSize: 25, fontWeight: '900', lineHeight: 30 },
+  eyebrow: { color: colors.accent, fontFamily: 'monospace', fontSize: 9, fontWeight: '700', letterSpacing: 1.5 },
+  title: { color: colors.text, fontSize: 24, fontWeight: '800', lineHeight: 29 },
   subtitle: { color: colors.muted, fontSize: 13, lineHeight: 19 },
   segmented: {
     backgroundColor: colors.surfaceMuted,
@@ -371,7 +378,7 @@ const styles = StyleSheet.create({
   segmentText: { color: colors.muted, fontSize: 14, fontWeight: '800' },
   segmentTextSelected: { color: colors.background },
   legsHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
-  sectionTitle: { color: colors.secondaryText, fontSize: 13, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
+  sectionTitle: { color: colors.secondaryText, fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   sectionHint: { color: colors.placeholder, fontSize: 11, marginTop: 2 },
   addButton: { alignItems: 'center', borderColor: colors.accent, borderRadius: 9, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
   addButtonText: { color: colors.accent, fontSize: 13, fontWeight: '800' },
@@ -383,7 +390,7 @@ const styles = StyleSheet.create({
   legTitle: { color: colors.text, flex: 1, fontSize: 16, fontWeight: '800' },
   removeButton: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 5 },
   removeButtonText: { color: colors.danger, fontSize: 12, fontWeight: '800' },
-  sports: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  sports: { gap: 7, paddingRight: 4 },
   sportChip: { borderColor: colors.border, borderRadius: 999, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 10 },
   sportChipSelected: { backgroundColor: colors.surfaceRaised, borderColor: colors.accent },
   sportText: { color: colors.muted, fontSize: 11, fontWeight: '700' },

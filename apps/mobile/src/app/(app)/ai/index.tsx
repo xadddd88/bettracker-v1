@@ -29,6 +29,7 @@ import {
   type CaptureMode,
 } from '@/ai/image-policy';
 import { colors } from '@/ui/theme';
+import { TimeWarpBackdrop, WarpRail } from '@/ui/time-warp';
 
 const MESSAGES = {
   cameraDenied: 'Camera access is off. Allow it in device settings to take a photo.',
@@ -184,7 +185,9 @@ export default function AiCaptureScreen() {
       contentInsetAdjustmentBehavior="automatic"
       style={styles.screen}
     >
+      <TimeWarpBackdrop />
       <View style={styles.header}>
+        <WarpRail />
         <Text style={styles.eyebrow}>AI ANALYZER</Text>
         <Text style={styles.title}>Scan screenshot</Text>
         <Text style={styles.subtitle}>
@@ -404,24 +407,26 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    gap: 14,
-    paddingBottom: 28,
-    paddingHorizontal: 16,
-    paddingTop: CONTENT_PADDING_TOP,
+    gap: 13,
+    paddingBottom: 24,
+    paddingHorizontal: 14,
+    paddingTop: 10,
   },
   header: {
     gap: 3,
   },
   eyebrow: {
     color: colors.accent,
+    fontFamily: 'monospace',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 1.8,
   },
   title: {
     color: colors.text,
-    fontSize: 27,
-    fontWeight: '900',
+    fontSize: 25,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   subtitle: {
     color: colors.muted,
@@ -445,7 +450,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   modeOptionSelected: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.surfaceRaised,
   },
   modeLabel: {
     color: colors.muted,
@@ -453,15 +458,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   modeLabelSelected: {
-    color: colors.background,
+    color: colors.accent,
   },
   offlineNotice: {
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderColor: colors.warning,
     borderCurve: 'continuous',
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     gap: 10,
     padding: 12,
@@ -490,8 +495,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 12,
     justifyContent: 'center',
-    minHeight: 218,
-    padding: 16,
+    minHeight: 196,
+    padding: 14,
   },
   emptyFallback: {
     color: colors.accent,
@@ -558,7 +563,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderCurve: 'continuous',
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     flexBasis: 132,
     flexDirection: 'row',
     flexGrow: 1,
