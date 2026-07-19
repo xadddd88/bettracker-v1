@@ -14,6 +14,13 @@ import {
   type AnalysisLegQualityInput,
   type SportModuleSupport,
 } from '@/lib/ai/analysis-quality-gate'
+import {
+  buildAnalystResearchMessage,
+  containsAnalystPricingClaim,
+  extractAnalystResearchSources,
+  usedSuccessfulWebSearch,
+  type AnalystResearchBrief,
+} from '@/lib/ai/analyst-research'
 
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
@@ -30,6 +37,8 @@ const requestSchema = z.object({
   offered_odds:    z.number().min(1.01).max(1000),
   bookmaker:       z.string().max(100).optional(),
   notes:           z.string().max(1000).optional(),
+  coupon_event_time: z.string().max(120).optional(),
+  client_timezone: z.string().max(80).optional(),
   output_language: z.enum(LOCALES).default('auto'),
   legs: z.array(z.object({
     rawText:          z.string().max(500).nullable().optional(),
@@ -53,17 +62,181 @@ const factorSchema = z.object({
   detail: z.string(),
 })
 
+const fixtureStatusSchema = z.enum([
+  'scheduled', 'unknown', 'live', 'finished', 'cancelled', 'abandoned',
+  'postponed', 'retired', 'walkover', 'not_bettable',
+])
+
+const researchCoverageSchema = z.object({
+  live_injuries: z.boolean(),
+  team_news: z.boolean(),
+  recent_form: z.boolean(),
+  line_movement: z.boolean(),
+})
+
+const researchBriefSchema = z.object({
+  headline: z.string().min(5).max(180),
+  summary: z.string().min(20).max(2_500),
+  builder_risk: z.string().max(1_500).nullable(),
+  verdict: z.string().min(10).max(1_500),
+  data_gaps: z.array(z.string().min(2).max(300)).max(12),
+  legs: z.array(z.object({
+    leg_number: z.number().int().min(1).max(20),
+    event_name: z.string().min(1).max(500),
+    market_type: z.string().min(1).max(500),
+    selection: z.string().max(200).nullable(),
+    assessment: z.string().min(10).max(1_500),
+    evidence: z.array(z.string().min(2).max(500)).max(8),
+    risks: z.array(z.string().min(2).max(500)).max(8),
+    fixture_status: fixtureStatusSchema,
+    coverage: researchCoverageSchema,
+  })).min(1).max(20),
+}).optional()
+
 const analysisSchema = z.object({
-  model_probability:    z.number().min(0).max(100),
-  implied_probability:  z.number().min(0).max(100),
-  edge_percent:         z.number().min(-100).max(100),
+  model_probability:    z.number().min(0).max(100).nullable(),
+  implied_probability:  z.number().min(0).max(100).nullable(),
+  edge_percent:         z.number().min(-100).max(100).nullable(),
   confidence_score:     z.number().min(0).max(100),
   risk_level:           z.enum(['low', 'medium', 'high']),
   recommendation:       z.enum(['bet', 'skip', 'watch', 'no_value']),
   reasoning:            z.string().min(10),
   factors:              z.array(factorSchema).min(4).max(12),
-  disclaimer:           z.string().optional(),
+  research_brief:       researchBriefSchema,
+  disclaimer:           z.string().nullable().optional(),
 })
+
+type ResearchBriefOutput = NonNullable<z.infer<typeof researchBriefSchema>>
+
+function toResearchBrief(value: ResearchBriefOutput): AnalystResearchBrief {
+  return {
+    headline: value.headline,
+    summary: value.summary,
+    builderRisk: value.builder_risk,
+    verdict: value.verdict,
+    dataGaps: value.data_gaps,
+    legs: value.legs.map(leg => ({
+      legNumber: leg.leg_number,
+      eventName: leg.event_name,
+      marketType: leg.market_type,
+      selection: leg.selection,
+      assessment: leg.assessment,
+      evidence: leg.evidence,
+      risks: leg.risks,
+      fixtureStatus: leg.fixture_status,
+      dataCoverage: {
+        liveInjuries: leg.coverage.live_injuries,
+        teamNews: leg.coverage.team_news,
+        recentForm: leg.coverage.recent_form,
+        lineMovement: leg.coverage.line_movement,
+      },
+    })),
+  }
+}
+
+function buildFallbackResearchBrief(
+  input: z.infer<typeof requestSchema>,
+): AnalystResearchBrief {
+  const suppliedLegs = input.legs?.length ? input.legs : [{
+    eventName: input.event_name,
+    marketType: input.market_type,
+    selection: input.selection ?? null,
+    sport: input.sport,
+  }]
+  return {
+    headline: input.legs && input.legs.length > 1 ? 'Bet Builder requires leg-by-leg verification' : 'Market review requires verification',
+    summary: 'The coupon structure was preserved, but the provider did not return the complete leg-by-leg research contract. No probability or edge is inferred from this fallback.',
+    builderRisk: input.legs && input.legs.length > 1
+      ? 'The legs share one match script and must not be treated as independent outcomes.'
+      : null,
+    verdict: 'Use this as a qualitative review only until the fixture and current evidence are verified.',
+    dataGaps: ['Exact fixture status', 'Current team news and availability', 'Recent form and market movement'],
+    legs: suppliedLegs.map((leg, index) => ({
+      legNumber: index + 1,
+      eventName: leg.eventName ?? input.event_name,
+      marketType: leg.marketType ?? input.market_type,
+      selection: leg.selection ?? null,
+      assessment: 'This leg was preserved from the coupon, but the response did not contain enough sourced current evidence for a stronger conclusion.',
+      evidence: [],
+      risks: ['Fixture identity or status is not verified', 'Current market-specific inputs are incomplete'],
+      fixtureStatus: leg.isLive ? 'live' : 'unknown',
+      dataCoverage: {
+        liveInjuries: false,
+        teamNews: false,
+        recentForm: false,
+        lineMovement: false,
+      },
+    })),
+  }
+}
+
+function withResearchQuality(
+  legs: AnalysisLegQualityInput[] | undefined,
+  researchBrief: AnalystResearchBrief,
+  allowVerifiedCoverage: boolean,
+): AnalysisLegQualityInput[] {
+  const baseLegs: AnalysisLegQualityInput[] = legs?.length ? legs : researchBrief.legs.map(leg => ({
+    eventName: leg.eventName,
+    marketType: leg.marketType,
+    selection: leg.selection,
+  }))
+
+  return baseLegs.map((leg, index) => {
+    const researchLeg = researchBrief.legs[index]
+    return {
+      ...leg,
+      // Provider prose is not verification. Coverage can only be promoted
+      // when this request actually completed a cited web-search tool call.
+      fixtureStatus: allowVerifiedCoverage
+        ? researchLeg?.fixtureStatus ?? leg.fixtureStatus
+        : leg.fixtureStatus,
+      dataCoverage: allowVerifiedCoverage
+        ? researchLeg?.dataCoverage ?? leg.dataCoverage
+        : leg.dataCoverage,
+    }
+  })
+}
+
+function alignResearchBriefToCoupon(
+  input: z.infer<typeof requestSchema>,
+  researchBrief: AnalystResearchBrief,
+): AnalystResearchBrief {
+  const couponLegs = input.legs?.length ? input.legs : [{
+    eventName: input.event_name,
+    marketType: input.market_type,
+    selection: input.selection ?? null,
+  }]
+
+  return {
+    ...researchBrief,
+    legs: couponLegs.map((couponLeg, index) => ({
+      ...researchBrief.legs[index],
+      legNumber: index + 1,
+      eventName: couponLeg.eventName ?? input.event_name,
+      marketType: couponLeg.marketType ?? input.market_type,
+      selection: couponLeg.selection ?? null,
+    })),
+  }
+}
+
+const ANALYST_TIMEOUT_MS = 60_000
+
+async function callAnalystClaude(
+  anthropic: Anthropic,
+  params: Anthropic.MessageCreateParamsNonStreaming,
+): Promise<Anthropic.Message> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ANALYST_TIMEOUT_MS)
+  try {
+    return await anthropic.messages.create(params, { signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function isWebSearchConfigurationError(error: unknown): boolean {
+  return error instanceof Anthropic.BadRequestError && /web[\s_-]?search|tool|organization|enable/i.test(error.message)
+}
 
 function normalizeAnalystRaw(raw: unknown): unknown {
   if (raw && typeof raw === 'object') {
@@ -149,7 +322,11 @@ function buildSystemPrompt(sport: string, outputLanguage: string, webSearchEnabl
     : `Respond in this language for all user-facing text: ${outputLanguage}. Reasoning and factors must be in ${outputLanguage}.`
 
   const disclaimer = webSearchEnabled
-    ? ''
+    ? `
+CURRENT-EVIDENCE REQUIREMENT:
+- Use web search to identify the exact fixture and verify current facts.
+- Cite only facts supported by returned sources. If the fixture is ambiguous, set fixture_status to "unknown".
+- A successful search is not permission to invent model probabilities or line movement.`
     : `
 HONESTY REQUIREMENT:
 You do not have access to live data for this analysis.
@@ -161,7 +338,7 @@ Your role is to evaluate betting decisions with structured, honest analysis.
 
 LANGUAGE: ${langInstruction}
 Structured JSON field values (risk_level, recommendation, etc.) must always be in English canonical form.
-Only reasoning, factors.detail, and disclaimer should be in the user's language.
+All user-facing strings — reasoning, factors, research_brief, and disclaimer — must be in the user's language.
 
 ${sportModule}
 
@@ -173,14 +350,20 @@ RESPONSIBLE BETTING RULES (non-negotiable):
 - If edge is negative or marginal, use recommendation = "no_value" or "skip"
 - Do not encourage increasing stake aggressively
 - Confidence score must honestly reflect your certainty — do not inflate it
+
+PRICING BOUNDARY:
+- This route does not provide a calibrated probability model.
+- Always return null for model_probability, implied_probability, and edge_percent.
+- Do not state probability, edge, EV, or value as a number anywhere else in the response.
+- Offered odds may be discussed only as the bookmaker's price, not proof of value.
 ${disclaimer}
 
 OUTPUT FORMAT:
 Return ONLY a valid JSON object matching this exact schema (no markdown, no explanation outside JSON):
 {
-  "model_probability": <number 0-100, your estimated win probability>,
-  "implied_probability": <number 0-100, calculated from offered_odds as (1/odds)*100>,
-  "edge_percent": <model_probability minus implied_probability>,
+  "model_probability": null,
+  "implied_probability": null,
+  "edge_percent": null,
   "confidence_score": <number 0-100, your confidence in this analysis>,
   "risk_level": <"low" | "medium" | "high">,
   "recommendation": <"bet" | "skip" | "watch" | "no_value">,
@@ -189,8 +372,36 @@ Return ONLY a valid JSON object matching this exact schema (no markdown, no expl
     { "name": <factor name in user's language>, "score": <-3 to +3>, "detail": <1-2 sentences> },
     ... (minimum 6 factors, maximum 10)
   ],
+  "research_brief": {
+    "headline": <concise conclusion in user's language>,
+    "summary": <useful qualitative analysis; distinguish sourced facts from conditional reasoning>,
+    "builder_risk": <for Bet Builder, explain dependence/correlation and shared match-script risk; otherwise null>,
+    "verdict": <what the bettor should conclude or verify next, without inventing an edge>,
+    "data_gaps": [<specific unresolved checks>],
+    "legs": [
+      {
+        "leg_number": <1-based integer>,
+        "event_name": <exact event for this leg>,
+        "market_type": <exact market>,
+        "selection": <exact selection or null>,
+        "assessment": <what must happen and how robust/fragile this leg is>,
+        "evidence": [<only verified or explicitly conditional evidence>],
+        "risks": [<specific failure modes>],
+        "fixture_status": <"scheduled" | "unknown" | "live" | "finished" | "cancelled" | "abandoned" | "postponed" | "retired" | "walkover" | "not_bettable">,
+        "coverage": {
+          "live_injuries": <true only if actually verified>,
+          "team_news": <true only if actually verified>,
+          "recent_form": <true only if actually verified>,
+          "line_movement": <true only if actually verified>
+        }
+      }
+    ]
+  },
   "disclaimer": <string or null — required if no live data>
-}`
+}
+
+Every supplied coupon leg must appear exactly once in research_brief.legs, in the original order.
+Do not collapse a Bet Builder into a single generic market. Analyze its legs separately, then their correlation.`
 }
 
 // ─── Route handler ────────────────────────────────────────────
@@ -229,8 +440,18 @@ export async function POST(req: NextRequest) {
     }
     const input = parsed.data
 
-    // 4. Sprint 2: real web search not implemented — always false
-    const webSearchEnabled = false
+    // 4. Use the same explicit global + per-user search gate as Scout. A
+    // failed profile read disables search; it never widens access.
+    const globalWebSearchEnabled = process.env.ANTHROPIC_WEB_SEARCH_ENABLED === 'true'
+    let webSearchEnabled = false
+    if (globalWebSearchEnabled) {
+      const profileRes = await supabase
+        .from('profiles')
+        .select('web_search_enabled')
+        .eq('id', user.id)
+        .single()
+      webSearchEnabled = !profileRes.error && (profileRes.data?.web_search_enabled ?? false)
+    }
 
     await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_STARTED, {
       sport:          input.sport,
@@ -238,31 +459,58 @@ export async function POST(req: NextRequest) {
       has_bookmaker:  !!input.bookmaker,
       has_notes:      !!input.notes,
       language:       input.output_language,
+      web_search_enabled: webSearchEnabled,
     })
 
     // 5. Build prompt
     const systemPrompt = buildSystemPrompt(input.sport, input.output_language, webSearchEnabled)
-    const implied = parseFloat(((1 / input.offered_odds) * 100).toFixed(2))
-
-    const userMessage = `Analyze this betting opportunity:
-
-Sport: ${input.sport}
-Event: ${input.event_name}
-Market: ${input.market_type}${input.selection ? `\nSelection: ${input.selection}` : ''}${input.line != null ? `\nLine: ${input.line}` : ''}
-Offered odds: ${input.offered_odds} (implied probability: ${implied}%)${input.bookmaker ? `\nBookmaker: ${input.bookmaker}` : ''}${input.notes ? `\nAdditional context: ${input.notes}` : ''}
-
-Return structured JSON analysis only.`
+    const userMessage = buildAnalystResearchMessage({
+      sport: input.sport,
+      eventName: input.event_name,
+      marketType: input.market_type,
+      selection: input.selection ?? null,
+      line: input.line ?? null,
+      offeredOdds: input.offered_odds,
+      bookmaker: input.bookmaker ?? null,
+      notes: input.notes ?? null,
+      couponEventTime: input.coupon_event_time ?? null,
+      clientTimezone: input.client_timezone ?? null,
+      currentUtcIso: new Date().toISOString(),
+      legs: input.legs,
+    })
 
     // 6. Claude call
     const model = process.env.ANTHROPIC_MODEL_ANALYST ?? 'claude-sonnet-4-6'
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-    const message = await anthropic.messages.create({
+    const buildCallParams = (withWebSearch: boolean): Anthropic.MessageCreateParamsNonStreaming => ({
       model,
-      max_tokens: 1500,
+      max_tokens: 5_000,
       messages: [{ role: 'user', content: userMessage }],
-      system: systemPrompt,
+      system: buildSystemPrompt(input.sport, input.output_language, withWebSearch),
+      ...(withWebSearch && {
+        tools: ([{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }] as unknown as Anthropic.Tool[]),
+      }),
     })
+
+    let message: Anthropic.Message
+    let searchFallbackUsed = false
+    try {
+      message = await callAnalystClaude(anthropic, buildCallParams(webSearchEnabled))
+    } catch (error) {
+      // Only a request/configuration rejection is known to precede execution
+      // and can be retried safely. Ambiguous timeout/network/5xx failures are
+      // never automatically retried.
+      if (webSearchEnabled && isWebSearchConfigurationError(error)) {
+        searchFallbackUsed = true
+        message = await callAnalystClaude(anthropic, buildCallParams(false))
+      } else {
+        throw error
+      }
+    }
+
+    const webSearchActuallyUsed = !searchFallbackUsed && webSearchEnabled && usedSuccessfulWebSearch(message.content)
+    const researchSources = extractAnalystResearchSources(message.content)
 
     const rawText = message.content
       .filter((b): b is Anthropic.TextBlock => b.type === 'text')
@@ -298,6 +546,14 @@ Return structured JSON analysis only.`
     }
 
     const analysis = validated.data
+    const expectedLegCount = input.legs?.length || 1
+    const candidateResearchBrief = analysis.research_brief && analysis.research_brief.legs.length === expectedLegCount
+      ? toResearchBrief(analysis.research_brief)
+      : null
+    const parsedResearchBrief = candidateResearchBrief && !containsAnalystPricingClaim(candidateResearchBrief)
+      ? candidateResearchBrief
+      : buildFallbackResearchBrief(input)
+    const researchBrief = alignResearchBriefToCoupon(input, parsedResearchBrief)
 
     // 8. Server owns pricing, but the quality gate can suppress it entirely.
     const qualityGate = evaluateAnalysisQuality({
@@ -306,15 +562,23 @@ Return structured JSON analysis only.`
       marketType:         input.market_type,
       selection:          input.selection ?? null,
       notes:              input.notes ?? null,
-      webSearchEnabled,
+      // Search is not equivalent to complete coverage. The pricing gate sees
+      // only explicit per-leg evidence flags from the structured response.
+      webSearchEnabled:    false,
       modelProbability:   analysis.model_probability,
       modelInputsPresent: false,
       sportModuleSupport: getAnalystSportSupport(input.sport),
-      legs:               input.legs as AnalysisLegQualityInput[] | undefined,
+      legs:               withResearchQuality(
+        input.legs as AnalysisLegQualityInput[] | undefined,
+        researchBrief,
+        webSearchActuallyUsed,
+      ),
     })
     const gatedPricing = buildAnalystPricingPayload({
       qualityGate,
-      modelProbability: analysis.model_probability,
+      // This route has no calibrated probability model. The placeholder is
+      // suppressed by the quality gate and never reaches persistence or UI.
+      modelProbability: analysis.model_probability ?? 0,
       offeredOdds:      input.offered_odds,
       recommendation:   analysis.recommendation,
       riskLevel:        analysis.risk_level,
@@ -329,13 +593,19 @@ Return structured JSON analysis only.`
       rawFactors:   analysis.factors,
     })
 
-    // 9. Sprint 2: always include honesty disclaimer
-    const honestDisclaimer = input.output_language === 'uk'
-      ? 'Цей аналіз базується лише на наданій інформації та не включає актуальні травми, новини команд, оновлення поточної форми або поточний рух лінії.'
-      : 'This analysis is based only on the information provided and does not include live injuries, team news, recent form updates, or current line movement.'
+    // 9. Keep sourced qualitative research distinct from pricing/model proof.
+    const honestDisclaimer = webSearchActuallyUsed
+      ? (input.output_language === 'uk'
+          ? 'Поточні факти наведені лише там, де знайдено джерела. Імовірність, перевага та EV не розраховуються без перевірених модельних входів.'
+          : 'Current facts are included only where sources were found. Probability, edge, and EV are not calculated without verified model inputs.')
+      : (input.output_language === 'uk'
+          ? 'Цей аналіз базується на купоні та наданому контексті; актуальні дані, які не вдалося перевірити, позначені як прогалини.'
+          : 'This analysis uses the coupon and supplied context; current data that could not be verified is listed as a gap.')
     const safeDisclaimer = qualityGate.pricingAllowed
       ? analysis.disclaimer || honestDisclaimer
-      : trustPayload.trust_view.uiDisclaimer
+      : webSearchActuallyUsed
+        ? honestDisclaimer
+        : trustPayload.trust_view.uiDisclaimer
     analysis.disclaimer = safeDisclaimer
 
     // 10. Persist decision immediately — every Analyst call creates a decision + ai_analysis_run
@@ -348,6 +618,8 @@ Return structured JSON analysis only.`
       offered_odds: input.offered_odds,
       bookmaker:    input.bookmaker ?? null,
       legs:         input.legs ?? null,
+      coupon_event_time: input.coupon_event_time ?? null,
+      client_timezone: input.client_timezone ?? null,
     }
     const outputJson = {
       model_probability:   gatedPricing.model_probability,
@@ -361,6 +633,9 @@ Return structured JSON analysis only.`
       disclaimer:          safeDisclaimer,
       quality_gate:        qualityGate,
       trust_view:          trustPayload.trust_view,
+      research_brief:      researchBrief,
+      research_sources:    researchSources,
+      web_search_used:     webSearchActuallyUsed,
     }
 
     // Decision #048: persistence is server-only. The user client above
@@ -391,7 +666,7 @@ Return structured JSON analysis only.`
       p_model_name:          model,
       p_input_snapshot:      inputSnapshot,
       p_output_json:         outputJson,
-      p_web_search_used:     false,
+      p_web_search_used:     webSearchActuallyUsed,
       p_input_chars:         inputChars,
       p_output_chars:        outputChars,
     })
@@ -425,6 +700,7 @@ Return structured JSON analysis only.`
         confidence_bucket: bucketConfidence(analysis.confidence_score),
         odds_bucket:       bucketOdds(input.offered_odds),
         decision_id:       decisionId,
+        web_search_used:   webSearchActuallyUsed,
       }),
       trackServerEvent(user.id, EVENTS.DECISION_CREATED, {
         decision_id:    decisionId,
@@ -451,6 +727,9 @@ Return structured JSON analysis only.`
         disclaimer:          safeDisclaimer,
         quality_gate:        qualityGate,
         trust_view:          trustPayload.trust_view,
+        research_brief:      researchBrief,
+        research_sources:    researchSources,
+        web_search_used:     webSearchActuallyUsed,
         // Input context echoed back (for UI display, PDF, share)
         sport:           input.sport,
         event_name:      input.event_name,
@@ -459,14 +738,30 @@ Return structured JSON analysis only.`
         line:            input.line ?? null,
         offered_odds:    input.offered_odds,
         bookmaker:       input.bookmaker ?? null,
+        coupon_event_time: input.coupon_event_time ?? null,
         output_language: input.output_language,
       },
     })
 
   } catch (err: unknown) {
-    console.error('[analyst]', err)
-    const msg = err instanceof Error ? err.message : 'Internal error'
-    return NextResponse.json({ success: false, error: msg }, { status: 500 })
+    const errorType = err instanceof Anthropic.RateLimitError
+      ? 'anthropic_rate_limited'
+      : err instanceof Anthropic.APIConnectionTimeoutError || (err instanceof Error && err.name === 'AbortError')
+        ? 'anthropic_timeout'
+        : err instanceof Anthropic.APIConnectionError
+          ? 'anthropic_network'
+          : 'internal'
+    console.error('[analyst]', { errorType })
+    const status = errorType === 'anthropic_rate_limited'
+      ? 429
+      : errorType === 'anthropic_timeout'
+        ? 504
+        : errorType === 'anthropic_network'
+          ? 503
+          : 500
+    return NextResponse.json(
+      { success: false, error: 'Analysis is temporarily unavailable. Please try again.' },
+      { status },
+    )
   }
 }
-

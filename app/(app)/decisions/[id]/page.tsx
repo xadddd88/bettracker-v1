@@ -13,6 +13,7 @@ import {
 } from '@/lib/ai/analysis-quality-gate'
 import { currencySymbol } from '@/lib/money'
 import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
+import type { AnalystResearchBrief, AnalystResearchSource } from '@/lib/ai/analyst-research'
 
 // Canonical resolver keys (Decision #058): explicit color for every status —
 // unknown values render as 'Unknown', never as raw text or a settled look.
@@ -34,6 +35,9 @@ interface AnalysisRunRow {
     quality_gate?: AnalysisQualityGateResult | null
     trust_view?: AnalystTrustView | null
     edge_bucket?: string | null
+    research_brief?: AnalystResearchBrief | null
+    research_sources?: AnalystResearchSource[]
+    web_search_used?: boolean
   } | null
 }
 
@@ -107,6 +111,18 @@ function localizedRiskLabel(risk: string | null, fallback: string | null, trustV
   return fallback
 }
 
+function safeResearchSources(sources: AnalystResearchSource[] | undefined): AnalystResearchSource[] {
+  if (!Array.isArray(sources)) return []
+  return sources.filter(source => {
+    try {
+      const url = new URL(source.url)
+      return url.protocol === 'https:' || url.protocol === 'http:'
+    } catch {
+      return false
+    }
+  }).slice(0, 8)
+}
+
 function ScoreBar({ score }: { score: number }) {
   const color = score > 0 ? 'bg-green-500' : score < 0 ? 'bg-red-500' : 'bg-gray-500'
   return (
@@ -172,6 +188,8 @@ export default async function DecisionDetailPage({
   const action = ACTION_CONFIG[d.final_action] ?? ACTION_CONFIG.pending
   const linkedBet = d.bet_legs?.[0]?.bets ?? null
   const analysisOutput = d.ai_analysis_runs?.[0]?.output_json ?? null
+  const researchBrief = analysisOutput?.research_brief ?? null
+  const researchSources = safeResearchSources(analysisOutput?.research_sources)
   const qualityGate = analysisOutput?.quality_gate ?? null
   const storedTrustView = getDecisionTrustView(d, qualityGate)
   const showPricing = shouldShowPricingStats({
@@ -236,6 +254,71 @@ export default async function DecisionDetailPage({
           </div>
         </div>
       </div>
+
+      {researchBrief && Array.isArray(researchBrief.legs) && researchBrief.legs.length > 0 && (
+        <section className="border border-black bg-white text-black" aria-labelledby="saved-research-heading">
+          <div className="border-b border-black bg-black px-5 py-5 text-white">
+            <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em] text-[#e8ff00]">
+              {analysisOutput?.web_search_used ? 'Current-source research' : 'Coupon intelligence'}
+            </p>
+            <h2 id="saved-research-heading" className="mt-3 font-display text-3xl font-black leading-none tracking-[-0.04em] text-white">
+              {researchBrief.headline}
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-white/75">{researchBrief.summary}</p>
+          </div>
+
+          {researchBrief.builderRisk && (
+            <div className="border-b border-black bg-[#e8ff00] px-5 py-4 text-sm font-semibold leading-6">
+              <span className="font-mono text-[9px] font-black uppercase tracking-[0.14em]">Bet Builder correlation</span>
+              <p className="mt-1">{researchBrief.builderRisk}</p>
+            </div>
+          )}
+
+          <div className="divide-y divide-black">
+            {researchBrief.legs.map(leg => (
+              <article key={`${leg.legNumber}-${leg.eventName}-${leg.marketType}`} className="px-5 py-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/45">Leg {leg.legNumber}</p>
+                    <h3 className="mt-1 font-display text-xl font-black">{leg.eventName}</h3>
+                    <p className="mt-1 text-sm text-black/60">{leg.marketType}{leg.selection ? ` · ${leg.selection}` : ''}</p>
+                  </div>
+                  <span className="border border-black px-2 py-1 font-mono text-[9px] font-black uppercase tracking-[0.1em]">
+                    {leg.fixtureStatus.replaceAll('_', ' ')}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm font-semibold leading-6">{leg.assessment}</p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <ul className="space-y-1 text-sm text-black/70">
+                    {leg.evidence.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>+ {item}</li>)}
+                  </ul>
+                  <ul className="space-y-1 text-sm text-black/70">
+                    {leg.risks.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>− {item}</li>)}
+                  </ul>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="border-t border-black px-5 py-5">
+            <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/45">Analyst verdict</p>
+            <p className="mt-2 text-base font-bold leading-6">{researchBrief.verdict}</p>
+          </div>
+
+          {researchSources.length > 0 && (
+            <div className="border-t border-black bg-[#f4f3ed] px-5 py-4">
+              <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/45">Sources consulted</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {researchSources.map(source => (
+                  <a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer" className="border border-black bg-white px-3 py-3 text-sm font-bold text-black underline underline-offset-4 hover:bg-[#e8ff00]">
+                    {source.title}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* AI Analysis card */}
       {(showPricing || surface.isTrustBlocked || d.reasoning) && (

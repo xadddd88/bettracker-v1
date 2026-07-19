@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,6 +41,13 @@ const {
   normalizeLooseCouponExtraction,
   buildScannerFailureResponse,
 } = scannerModule;
+const researchModule = require(path.join(buildDir, 'lib/ai/analyst-research.js'));
+const {
+  buildAnalystResearchMessage,
+  containsAnalystPricingClaim,
+  extractAnalystResearchSources,
+  usedSuccessfulWebSearch,
+} = researchModule;
 
 let passed = 0;
 let failed = 0;
@@ -341,6 +349,33 @@ test('legacy flattened scanner response reconstructs express legs without raw le
   assert.deepEqual(normalized.legs.map(leg => leg.periodOrPhase), ['3-й сет', 'Перерва', '1-й сет']);
   assert.deepEqual(normalized.legs.map(leg => leg.statusSource), ['coupon', 'coupon', 'coupon']);
   assert.deepEqual(normalized.legs.map(leg => leg.statusText), ['Лайв', 'Лайв', 'Лайв']);
+});
+
+test('scanner preserves the exact coupon date and time for fixture research', () => {
+  const explicit = normalizeLooseCouponExtraction({
+    eventStartText: 'Сьогодні, 22:10',
+    event_name: 'Іспанія - Аргентина',
+    market_type: 'Bet Builder',
+    selection: 'Більше 2.5 + Більше 6.5',
+    totalOdds: 2.91,
+    sport: 'soccer',
+    legs: [
+      { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5', sport: 'soccer' },
+      { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5', sport: 'soccer' },
+    ],
+  });
+  assert.equal(explicit.event_start_text, 'Сьогодні, 22:10');
+
+  const fromRawText = normalizeLooseCouponExtraction({
+    rawText: 'Сьогодні, 22:10\nІспанія - Аргентина',
+    event_name: 'Іспанія - Аргентина',
+    market_type: 'Тотал',
+    selection: 'Більше 2.5',
+    odds: 1.8,
+    sport: 'soccer',
+    legs: [{ eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5', sport: 'soccer' }],
+  });
+  assert.equal(fromRawText.event_start_text, 'Сьогодні, 22:10');
 });
 
 test('invalid scanner response returns localized actionable error metadata', () => {
@@ -945,6 +980,104 @@ test('saved unpriced Analyst decision detail share and PDF strings use trust vie
   assert.ok(combined.includes('Покриття даних'), combined);
   assert.ok(combined.includes('Перелік відсутніх даних'), combined);
   assertNoDecisionSurfaceLeaks(combined);
+});
+
+test('Analyst research message preserves Bet Builder legs and coupon time context', () => {
+  const message = buildAnalystResearchMessage({
+    sport: 'soccer',
+    eventName: 'Іспанія - Аргентина',
+    marketType: 'Bet Builder',
+    selection: 'Більше 2.5 + Більше 6.5',
+    offeredOdds: 2.91,
+    couponEventTime: 'Сьогодні, 22:10',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: '2026-07-19T19:00:00.000Z',
+    legs: [
+      { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5', sport: 'soccer' },
+      { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5', sport: 'soccer' },
+    ],
+  });
+
+  assert.ok(message.includes('Exact date/time text visible on coupon: Сьогодні, 22:10'), message);
+  assert.ok(message.includes('User timezone: Europe/Kyiv'), message);
+  assert.ok(message.includes('Leg 1: event=Іспанія - Аргентина | market=Тотал | selection=Більше 2.5'), message);
+  assert.ok(message.includes('Leg 2: event=Іспанія - Аргентина | market=Кутові. Тотал | selection=Більше 6.5'), message);
+  assert.ok(message.includes('correlation'), message);
+});
+
+test('Analyst research source extraction keeps cited HTTP sources and drops unsafe URLs', () => {
+  const content = [
+    {
+      type: 'text',
+      text: '{}',
+      citations: [
+        { type: 'web_search_result_location', url: 'https://example.com/report', title: ' Match report ', cited_text: '  Current team news. ' },
+        { type: 'web_search_result_location', url: 'javascript:alert(1)', title: 'Unsafe', cited_text: 'nope' },
+      ],
+    },
+    {
+      type: 'web_search_tool_result',
+      content: [
+        { type: 'web_search_result', url: 'https://example.com/report', title: 'Duplicate title' },
+        { type: 'web_search_result', url: 'https://example.org/schedule', title: 'Schedule' },
+      ],
+    },
+  ];
+
+  assert.equal(usedSuccessfulWebSearch(content), true);
+  assert.deepEqual(extractAnalystResearchSources(content), [
+    { title: 'Match report', url: 'https://example.com/report', citedText: 'Current team news.' },
+    { title: 'Schedule', url: 'https://example.org/schedule', citedText: null },
+  ]);
+  assert.equal(usedSuccessfulWebSearch([{ type: 'web_search_tool_result', content: { type: 'web_search_tool_result_error' } }]), false);
+});
+
+test('Analyst research rejects probability and edge claims but permits ordinary match statistics', () => {
+  const brief = {
+    headline: 'Conditional Bet Builder review',
+    summary: 'Spain recorded 58% possession in a sourced match, but the exact fixture still needs verification.',
+    builderRisk: 'An early goal may reduce later attacking pressure and corner volume.',
+    verdict: 'Verify the competition and squads before kickoff.',
+    dataGaps: ['Exact competition'],
+    legs: [{
+      legNumber: 1,
+      eventName: 'Spain - Argentina',
+      marketType: 'Total',
+      selection: 'Over 2.5',
+      assessment: 'This leg needs three goals and is sensitive to game state.',
+      evidence: [],
+      risks: ['Low-tempo opening'],
+      fixtureStatus: 'unknown',
+      dataCoverage: {},
+    }],
+  };
+
+  assert.equal(containsAnalystPricingClaim(brief), false);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'Model probability is 42% and the edge is -5%.' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, summary: 'Реальна ймовірність 41,5% дає негативну перевагу.' }), true);
+});
+
+test('editorial black action surfaces explicitly retain readable foreground text', () => {
+  const css = readFileSync(path.join(repoRoot, 'app/globals.css'), 'utf8');
+  assert.match(css, /\.web-editorial \.btn-primary[\s\S]*?color:\s*#ffffff\s*!important/);
+  assert.match(css, /\.web-editorial \.bg-black[\s\S]*?color:\s*#ffffff\s*!important/);
+  assert.match(css, /\.web-editorial \.bg-indigo-600\.text-white[\s\S]*?color:\s*#ffffff\s*!important/);
+});
+
+test('web Analyst transports coupon legs and time into the research pipeline', () => {
+  const routeSource = readFileSync(path.join(repoRoot, 'app/api/ai/analyst/route.ts'), 'utf8');
+  const pageSource = readFileSync(path.join(repoRoot, 'app/(app)/ai/page.tsx'), 'utf8');
+  const decisionDetailSource = readFileSync(path.join(repoRoot, 'app/(app)/decisions/[id]/page.tsx'), 'utf8');
+
+  assert.match(routeSource, /buildAnalystResearchMessage\(\{[\s\S]*?couponEventTime:\s*input\.coupon_event_time[\s\S]*?legs:\s*input\.legs/);
+  assert.match(routeSource, /type:\s*'web_search_20250305'/);
+  assert.match(routeSource, /research_brief:\s*researchBrief/);
+  assert.match(pageSource, /coupon_event_time:\s*form\.event_time/);
+  assert.match(pageSource, /client_timezone:\s*Intl\.DateTimeFormat/);
+  assert.match(pageSource, /a\.research_brief\.legs\.map/);
+  assert.match(pageSource, /ЦІНУ НЕ ПІДТВЕРДЖЕНО/);
+  assert.match(decisionDetailSource, /researchBrief\.legs\.map/);
+  assert.match(decisionDetailSource, /safeResearchSources/);
 });
 
 if (failed > 0) {
