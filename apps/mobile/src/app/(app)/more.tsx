@@ -27,7 +27,7 @@ export default function MoreScreen() {
               fallback={<Text style={styles.avatarFallback}>F</Text>}
               name={{ android: 'person', ios: 'person.fill', web: 'person' }}
               size={25}
-              tintColor={colors.accent}
+              tintColor="#FFFFFF"
             />
           </View>
           <View style={styles.profileCopy}>
@@ -85,12 +85,11 @@ function SettingRow({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: colors.background, flex: 1 },
-  content: { gap: 20, padding: 16, paddingBottom: 32 },
+  content: { gap: 18, padding: 14, paddingBottom: 32 },
   profileCard: {
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
@@ -99,18 +98,19 @@ const styles = StyleSheet.create({
   avatar: {
     alignItems: 'center',
     backgroundColor: colors.surfaceRaised,
-    borderRadius: 999,
+    borderColor: colors.border,
+    borderWidth: 1,
     height: 48,
     justifyContent: 'center',
     width: 48,
   },
-  avatarFallback: { color: colors.accent, fontSize: 18, fontWeight: '900' },
+  avatarFallback: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
   profileCopy: { flex: 1, gap: 3, minWidth: 0 },
   profileTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
   profileEmail: { color: colors.muted, fontSize: 12 },
-  secureBadge: { backgroundColor: colors.surfaceRaised, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5 },
+  secureBadge: { backgroundColor: colors.accentMuted, paddingHorizontal: 8, paddingVertical: 5 },
   secureBadgeText: { color: colors.success, fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
-  rows: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1 },
+  rows: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
   settingRow: {
     alignItems: 'center',
     borderBottomColor: colors.border,
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   settingLabel: { color: colors.secondaryText, fontSize: 14, fontWeight: '700' },
   settingValue: { color: colors.muted, fontSize: 12, textAlign: 'right' },
   actions: { gap: 10 },
-  notice: { backgroundColor: colors.surfaceRaised, borderRadius: 10, padding: 12 },
-  noticeText: { color: colors.secondaryText, fontSize: 12, lineHeight: 18 },
+  notice: { backgroundColor: colors.accentMuted, borderColor: colors.border, borderWidth: 1, padding: 12 },
+  noticeText: { color: colors.text, fontSize: 12, lineHeight: 18 },
   version: { color: colors.placeholder, fontSize: 11, textAlign: 'center' },
 });

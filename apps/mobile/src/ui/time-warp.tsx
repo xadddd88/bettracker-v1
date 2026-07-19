@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -12,130 +12,112 @@ import Animated, {
 
 import { colors } from '@/ui/theme';
 
-const HORIZONTAL_LINES = [0, 1, 2, 3, 4] as const;
-const VERTICAL_LINES = [0, 1, 2, 3] as const;
+type KineticTypeProps = {
+  dark?: boolean;
+  label: string;
+  reverse?: boolean;
+};
 
-export function TimeWarpBackdrop() {
-  const phase = useSharedValue(0);
+export function EditorialBackdrop({ dark = false }: { dark?: boolean }) {
+  const progress = useSharedValue(0);
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
-    cancelAnimation(phase);
+    cancelAnimation(progress);
+    progress.value = reduceMotion
+      ? 0.35
+      : withRepeat(withTiming(1, { duration: 12000, easing: Easing.linear }), -1, true);
+    return () => cancelAnimation(progress);
+  }, [progress, reduceMotion]);
 
-    if (reduceMotion) {
-      phase.value = 0.5;
-      return;
-    }
-
-    phase.value = withRepeat(
-      withTiming(1, { duration: 7200, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true,
-    );
-    return () => cancelAnimation(phase);
-  }, [phase, reduceMotion]);
-
-  const cyanMotion = useAnimatedStyle(() => ({
-    opacity: 0.08 + phase.value * 0.08,
+  const slashStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: phase.value * 42 },
-      { translateY: phase.value * 26 },
-      { scale: 0.92 + phase.value * 0.12 },
+      { translateX: -70 + progress.value * 110 },
+      { rotate: '-18deg' },
     ],
-  }));
-  const magentaMotion = useAnimatedStyle(() => ({
-    opacity: 0.04 + (1 - phase.value) * 0.08,
-    transform: [
-      { translateX: phase.value * -34 },
-      { translateY: phase.value * -22 },
-      { scale: 1.04 - phase.value * 0.1 },
-    ],
-  }));
-  const horizonMotion = useAnimatedStyle(() => ({
-    opacity: 0.08 + phase.value * 0.12,
-    transform: [{ scaleX: 0.8 + phase.value * 0.32 }],
   }));
 
   return (
-    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <Animated.View style={[styles.cyanGlow, cyanMotion]} />
-      <Animated.View style={[styles.magentaGlow, magentaMotion]} />
-      <View style={styles.cyanOrbit} />
-      <View style={styles.magentaOrbit} />
-      <View style={styles.grid}>
-        {HORIZONTAL_LINES.map((line) => <View key={`h-${line}`} style={[styles.horizontal, { top: `${line * 25}%` }]} />)}
-        {VERTICAL_LINES.map((line) => <View key={`v-${line}`} style={[styles.vertical, { left: `${line * 33.333}%` }]} />)}
-      </View>
-      <Animated.View style={[styles.horizon, horizonMotion]} />
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, dark ? styles.backdropDark : styles.backdropLight]}
+    >
+      <Animated.View style={[styles.slash, dark ? styles.slashDark : styles.slashLight, slashStyle]} />
+      <View style={[styles.corner, dark ? styles.cornerDark : styles.cornerLight]} />
+      <View style={[styles.fineRule, dark ? styles.ruleDark : styles.ruleLight]} />
     </View>
   );
 }
 
-export function WarpRail() {
+export function KineticType({ dark = true, label, reverse = false }: KineticTypeProps) {
+  const progress = useSharedValue(reverse ? 1 : 0);
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    cancelAnimation(progress);
+    progress.value = reduceMotion
+      ? 0.4
+      : withRepeat(
+          withTiming(reverse ? 0 : 1, { duration: 9000, easing: Easing.linear }),
+          -1,
+          true,
+        );
+    return () => cancelAnimation(progress);
+  }, [progress, reduceMotion, reverse]);
+
+  const motion = useAnimatedStyle(() => ({
+    transform: [{ translateX: -90 + progress.value * 60 }],
+  }));
+
   return (
-    <View accessibilityElementsHidden pointerEvents="none" style={styles.rail}>
-      <View style={styles.railCyan} />
-      <View style={styles.railMagenta} />
+    <View accessibilityElementsHidden pointerEvents="none" style={styles.kineticClip}>
+      <Animated.Text
+        numberOfLines={1}
+        style={[styles.kineticText, dark ? styles.kineticOnDark : styles.kineticOnLight, motion]}
+      >
+        {`${label}  ${label}  ${label}`}
+      </Animated.Text>
     </View>
   );
+}
+
+export function EditorialRule({ inverted = false, label }: { inverted?: boolean; label?: string }) {
+  return (
+    <View style={styles.ruleRow}>
+      <View style={[styles.ruleLine, inverted && styles.ruleLineInverted]} />
+      {label ? <Text style={[styles.ruleLabel, inverted && styles.ruleLabelInverted]}>{label}</Text> : null}
+    </View>
+  );
+}
+
+// Transitional aliases keep older secondary screens source-compatible while the
+// product moves from the discarded neon system to the editorial system.
+export const TimeWarpBackdrop = EditorialBackdrop;
+export function WarpRail() {
+  return <EditorialRule />;
 }
 
 const styles = StyleSheet.create({
-  cyanGlow: {
-    backgroundColor: colors.accent,
-    borderRadius: 180,
-    height: 310,
-    position: 'absolute',
-    right: -205,
-    top: -115,
-    width: 310,
-  },
-  magentaGlow: {
-    backgroundColor: colors.magenta,
-    borderRadius: 150,
-    height: 250,
-    left: -190,
-    position: 'absolute',
-    top: 260,
-    width: 250,
-  },
-  cyanOrbit: {
-    borderColor: colors.accent,
-    borderRadius: 260,
-    borderWidth: StyleSheet.hairlineWidth,
-    height: 340,
-    opacity: 0.12,
-    position: 'absolute',
-    right: -230,
-    top: -140,
-    transform: [{ rotate: '-18deg' }],
-    width: 340,
-  },
-  magentaOrbit: {
-    borderColor: colors.magenta,
-    borderRadius: 210,
-    borderWidth: StyleSheet.hairlineWidth,
-    height: 270,
-    left: -205,
-    opacity: 0.09,
-    position: 'absolute',
-    top: 260,
-    transform: [{ rotate: '14deg' }],
-    width: 270,
-  },
-  grid: {
-    bottom: 0,
-    height: 180,
-    left: 0,
-    opacity: 0.055,
-    position: 'absolute',
-    right: 0,
-    transform: [{ perspective: 240 }, { rotateX: '58deg' }, { scale: 1.35 }],
-  },
-  horizontal: { backgroundColor: colors.accent, height: StyleSheet.hairlineWidth, left: 0, position: 'absolute', right: 0 },
-  vertical: { backgroundColor: colors.ultraviolet, bottom: 0, position: 'absolute', top: 0, width: StyleSheet.hairlineWidth },
-  horizon: { backgroundColor: colors.magenta, bottom: 156, height: StyleSheet.hairlineWidth, left: '28%', opacity: 0.14, position: 'absolute', right: '28%' },
-  rail: { flexDirection: 'row', gap: 4, height: 2, overflow: 'hidden', width: 54 },
-  railCyan: { backgroundColor: colors.accent, flex: 3 },
-  railMagenta: { backgroundColor: colors.magenta, flex: 1 },
+  backdropLight: { backgroundColor: colors.background },
+  backdropDark: { backgroundColor: '#050505' },
+  slash: { height: 760, position: 'absolute', right: -330, top: -260, width: 260 },
+  slashLight: { backgroundColor: '#ECECE7' },
+  slashDark: { backgroundColor: '#111111' },
+  corner: { height: 118, position: 'absolute', right: 0, top: 0, width: 76 },
+  cornerLight: { backgroundColor: '#E8FF00' },
+  cornerDark: { backgroundColor: '#E8FF00' },
+  fineRule: { bottom: 92, height: StyleSheet.hairlineWidth, left: 0, position: 'absolute', right: 0 },
+  ruleLight: { backgroundColor: '#C2C2BC' },
+  ruleDark: { backgroundColor: '#333333' },
+  kineticClip: { left: 0, overflow: 'hidden', position: 'absolute', right: 0, top: '24%' },
+  kineticText: { fontSize: 74, fontWeight: '900', letterSpacing: -4, lineHeight: 78 },
+  kineticOnDark: { color: '#1A1A1A' },
+  kineticOnLight: { color: '#E4E4DE' },
+  ruleRow: { alignItems: 'center', flexDirection: 'row', gap: 8, minHeight: 12 },
+  ruleLine: { backgroundColor: colors.text, flex: 1, height: 1 },
+  ruleLineInverted: { backgroundColor: '#FFFFFF' },
+  ruleLabel: { color: colors.text, fontSize: 8, fontWeight: '700', letterSpacing: 1.4 },
+  ruleLabelInverted: { color: '#FFFFFF' },
 });

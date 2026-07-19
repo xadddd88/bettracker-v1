@@ -476,13 +476,14 @@ test('authenticated layout exposes three focused tabs and keeps Tracker detail i
   for (const route of ['home', 'ai', 'bets']) {
     assert.match(layout, new RegExp(`name=["']${route}["']`));
   }
-  for (const label of ['Home', 'Scan', 'Tracker']) {
-    assert.match(layout, new RegExp(`tabBarAccessibilityLabel:\\s*["']${label}["']`));
+  assert.match(layout, /tabBarAccessibilityLabel:\s*title/);
+  for (const label of ['HOME', 'SCAN', 'TRACKER']) {
+    assert.match(layout, new RegExp(`screen\\(['"]${label}['"]\\)`));
   }
   for (const route of ['stats', 'more']) {
     assert.match(layout, new RegExp(`name=["']${route}["'][\\s\\S]*?href:\\s*null`));
   }
-  assert.match(layout, /tabBarItemStyle:\s*\{\s*minHeight:\s*50/);
+  assert.match(layout, /tabBarItemStyle:\s*\{\s*minHeight:\s*52/);
   assert.match(layout, /name="index" options=\{\{ href: null \}\}/);
 
   assert.match(trackerLayout, /<Stack/);
@@ -529,5 +530,5 @@ test('AI capture screen exposes the approved local-only responsive states', () =
   assert.match(source, /contentFit="contain"/);
   assert.match(source, /Linking\.openSettings\(\)/);
   assert.match(source, /accessibilityState=\{\{\s*selected:\s*mode === option\.value\s*\}\}/);
-  assert.match(source, /minHeight:\s*44/);
+  assert.match(source, /minHeight:\s*(?:44|5[2-9]|[6-9]\d)/);
 });

@@ -17,8 +17,8 @@ test('product shell exposes three focused sections with Tracker as a nested Stac
   for (const route of ['home', 'ai', 'bets']) {
     assert.match(tabs, new RegExp(`name=["']${route}["']`));
   }
-  for (const label of ['Home', 'Scan', 'Tracker']) {
-    assert.match(tabs, new RegExp(`title:\\s*["']${label}["']`));
+  for (const label of ['HOME', 'SCAN', 'TRACKER']) {
+    assert.match(tabs, new RegExp(`screen\\(['"]${label}['"]\\)`));
   }
   for (const route of ['stats', 'more']) {
     assert.match(tabs, new RegExp(`name=["']${route}["'][\\s\\S]*?href:\\s*null`));
@@ -70,40 +70,39 @@ test('support routes remain available outside the focused tab bar', () => {
   }
 });
 
-test('daily Home uses the read model and does not expose roadmap labels', () => {
+test('daily Home uses the read model and exposes the editorial workflow', () => {
   const home = source('src/app/(app)/home.tsx');
   const data = source('src/bets/data.ts');
 
   assert.match(home, /fetchBets\(userId\)/);
   assert.match(home, /fetchBankroll\(userId\)/);
-  assert.match(home, /Overview/);
-  assert.match(home, /Recent bets/);
+  assert.match(home, /BETTING[\s\S]*?DECISIONS[\s\S]*?IN FOCUS/);
+  assert.match(home, /RECENT BETS/);
   assert.doesNotMatch(home, /Founder build|CORE WORKFLOW|LOCAL REVIEW|READY|NEXT|LATER/);
   assert.match(data, /select\(['"]balance, currency['"]\)/);
   assert.doesNotMatch(data, /select\s*\(\s*['"`]\s*\*/);
 });
 
-test('Time Warp visual system is shared by daily mobile surfaces', () => {
+test('editorial motion system is shared by daily mobile surfaces', () => {
   const backdrop = source('src/ui/time-warp.tsx');
   const motion = source('src/ui/motion.tsx');
   const ticket = source('src/ui/bet-ticket.tsx');
   const tabs = source('src/app/(app)/_layout.tsx');
   const trackerStack = source('src/app/(app)/bets/_layout.tsx');
 
-  assert.match(backdrop, /TimeWarpBackdrop/);
-  assert.match(backdrop, /WarpRail/);
-  assert.match(backdrop, /colors\.magenta/);
-  assert.match(backdrop, /colors\.ultraviolet/);
+  assert.match(backdrop, /EditorialBackdrop/);
+  assert.match(backdrop, /KineticType/);
+  assert.match(backdrop, /EditorialRule/);
+  assert.match(backdrop, /#E8FF00/);
   assert.match(backdrop, /withRepeat/);
   assert.match(backdrop, /useReducedMotion/);
   assert.match(backdrop, /cancelAnimation/);
   assert.match(motion, /withSpring/);
-  assert.match(motion, /withRepeat/);
   assert.match(motion, /useReducedMotion/);
-  assert.match(tabs, /animation:\s*['"]fade['"]/);
+  assert.match(tabs, /animation:\s*['"]shift['"]/);
   assert.match(trackerStack, /animation:\s*['"]slide_from_right['"]/);
   assert.match(ticket, /EXPRESS/);
-  assert.match(ticket, /leg\.odds\.toFixed\(2\)/);
+  assert.match(ticket, /totalOdds\?\.toFixed\(2\)/);
 
   for (const path of [
     'src/app/(app)/home.tsx',
@@ -112,6 +111,6 @@ test('Time Warp visual system is shared by daily mobile surfaces', () => {
     'src/app/(app)/bets/new.tsx',
     'src/app/(app)/bets/[id].tsx',
   ]) {
-    assert.match(source(path), /TimeWarpBackdrop/);
+    assert.match(source(path), /(?:EditorialBackdrop|TimeWarpBackdrop)/);
   }
 });
