@@ -14,6 +14,7 @@ const ALLOWED_AI_EXTERNAL_IMPORTS = new Set([
   'expo-symbols',
   'react',
   'react-native',
+  'react-native-reanimated',
   'react-native-safe-area-context',
 ]);
 
@@ -427,6 +428,9 @@ test('Expo Tabs owns the bottom safe area without an overlaid custom bar', () =>
 
   assert.match(source, /import \{ Tabs \} from 'expo-router'/);
   assert.match(source, /tabBarStyle/);
+  assert.match(source, /useSafeAreaInsets\(\)/);
+  assert.match(source, /height:\s*58\s*\+\s*insets\.bottom/);
+  assert.match(source, /paddingBottom:\s*Math\.max\(insets\.bottom,\s*6\)/);
   assert.doesNotMatch(source, /position:\s*['"]absolute['"]/);
   assert.equal(existsSync(join(root, 'src/ui/bottom-navigation.tsx')), false);
 });
@@ -462,18 +466,22 @@ test('native capture adapter converts local images to JPEG without leaking raw d
   assert.doesNotMatch(source, /RAW_NATIVE_ERROR/);
 });
 
-test('authenticated layout exposes five accessible tabs and keeps Tracker detail in a Stack', () => {
+test('authenticated layout exposes three focused tabs and keeps Tracker detail in a Stack', () => {
   const layoutPath = join(root, 'src/app/(app)/_layout.tsx');
   const trackerLayoutPath = join(root, 'src/app/(app)/bets/_layout.tsx');
   const layout = readFileSync(layoutPath, 'utf8');
   const trackerLayout = readFileSync(trackerLayoutPath, 'utf8');
 
   assert.match(layout, /<Tabs/);
-  for (const route of ['home', 'ai', 'bets', 'stats', 'more']) {
+  for (const route of ['home', 'ai', 'bets']) {
     assert.match(layout, new RegExp(`name=["']${route}["']`));
   }
-  for (const label of ['Home', 'AI Analyzer', 'Tracker', 'Stats', 'More']) {
-    assert.match(layout, new RegExp(`tabBarAccessibilityLabel:\\s*["']${label}["']`));
+  assert.match(layout, /tabBarAccessibilityLabel:\s*title/);
+  for (const label of ['HOME', 'SCAN', 'TRACKER']) {
+    assert.match(layout, new RegExp(`screen\\(['"]${label}['"]\\)`));
+  }
+  for (const route of ['stats', 'more']) {
+    assert.match(layout, new RegExp(`name=["']${route}["'][\\s\\S]*?href:\\s*null`));
   }
   assert.match(layout, /tabBarItemStyle:\s*\{\s*minHeight:\s*52/);
   assert.match(layout, /name="index" options=\{\{ href: null \}\}/);
@@ -491,7 +499,7 @@ test('AI capture screen exposes the approved local-only responsive states', () =
   const source = readFileSync(path, 'utf8');
 
   for (const label of [
-    'AI capture',
+    'Scan screenshot',
     'Coupon',
     'Event',
     'Take photo',
@@ -522,5 +530,5 @@ test('AI capture screen exposes the approved local-only responsive states', () =
   assert.match(source, /contentFit="contain"/);
   assert.match(source, /Linking\.openSettings\(\)/);
   assert.match(source, /accessibilityState=\{\{\s*selected:\s*mode === option\.value\s*\}\}/);
-  assert.match(source, /minHeight:\s*44/);
+  assert.match(source, /minHeight:\s*(?:44|5[2-9]|[6-9]\d)/);
 });

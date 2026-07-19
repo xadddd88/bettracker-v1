@@ -9,6 +9,7 @@ import { readErrorMessage } from '@/bets/errors';
 import { betFinancialSummary, couponPresentation, type BetDto, formatMoney } from '@/bets/models';
 import { STATUS_PRESENTATION } from '@/bets/presentation';
 import { colors } from '@/ui/theme';
+import { TimeWarpBackdrop, WarpRail } from '@/ui/time-warp';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -79,9 +80,11 @@ export default function BetDetailScreen() {
 
   return (
     <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
+      <TimeWarpBackdrop />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.headingRow}>
           <View style={styles.headingCopy}>
+            <WarpRail />
             <Text style={styles.eyebrow}>TRACKED BET</Text>
             <Text style={styles.title}>{coupon.label}</Text>
           </View>
@@ -141,7 +144,6 @@ export default function BetDetailScreen() {
           </View>
         ) : null}
 
-        <Text style={styles.readOnly}>Read-only mobile view</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -167,41 +169,40 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: colors.background, flex: 1 },
-  content: { gap: 14, padding: 16, paddingBottom: 32 },
+  content: { gap: 0, paddingBottom: 28 },
   centered: { alignItems: 'center', flex: 1, gap: 14, justifyContent: 'center', padding: 28 },
   error: { color: colors.danger, fontSize: 15, lineHeight: 22, textAlign: 'center' },
-  retryButton: { backgroundColor: colors.accent, borderRadius: 10, justifyContent: 'center', minHeight: 44, paddingHorizontal: 20 },
-  retryText: { color: colors.background, fontWeight: '800' },
-  headingRow: { alignItems: 'center', flexDirection: 'row', gap: 12 },
-  headingCopy: { flex: 1, gap: 3, minWidth: 0 },
-  eyebrow: { color: colors.placeholder, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
-  title: { color: colors.text, fontSize: 22, fontWeight: '800', lineHeight: 28 },
-  badge: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
-  badgeText: { fontSize: 11, fontWeight: '800' },
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, gap: 13, padding: 16 },
-  summaryCard: { alignItems: 'stretch', flexDirection: 'row', gap: 8, paddingHorizontal: 12 },
+  retryButton: { backgroundColor: colors.accent, justifyContent: 'center', minHeight: 48, paddingHorizontal: 20 },
+  retryText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  headingRow: { alignItems: 'flex-end', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', gap: 12, minHeight: 190, padding: 14 },
+  headingCopy: { flex: 1, gap: 8, minWidth: 0 },
+  eyebrow: { color: colors.muted, fontSize: 8, fontWeight: '800', letterSpacing: 1.4 },
+  title: { color: colors.text, fontSize: 39, fontWeight: '900', letterSpacing: -1.8, lineHeight: 40 },
+  badge: { borderColor: colors.border, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 7 },
+  badgeText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  card: { backgroundColor: colors.surface, borderBottomColor: colors.border, borderBottomWidth: 1, gap: 13, padding: 14 },
+  summaryCard: { alignItems: 'stretch', flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingVertical: 18 },
   summaryMetric: { alignItems: 'center', flex: 1, gap: 5, justifyContent: 'center', minWidth: 0 },
-  summaryLabel: { color: colors.muted, fontSize: 11 },
-  summaryValue: { color: colors.text, fontSize: 16, fontWeight: '800', maxWidth: '100%' },
+  summaryLabel: { color: colors.muted, fontSize: 8, fontWeight: '700', letterSpacing: 0.7 },
+  summaryValue: { color: colors.text, fontSize: 17, fontVariant: ['tabular-nums'], fontWeight: '900', maxWidth: '100%' },
   summaryDivider: { alignSelf: 'stretch', backgroundColor: colors.border, width: 1 },
   couponCard: { gap: 0, paddingBottom: 12 },
   sectionHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  sectionTitle: { color: colors.secondaryText, fontSize: 12, fontWeight: '800', letterSpacing: 0.7, textTransform: 'uppercase' },
+  sectionTitle: { color: colors.secondaryText, fontSize: 9, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' },
   sectionCount: { color: colors.placeholder, fontSize: 12, fontWeight: '700' },
   leg: { alignItems: 'flex-start', flexDirection: 'row', gap: 11, paddingVertical: 11 },
   legBorder: { borderTopColor: colors.border, borderTopWidth: 1 },
-  legIndexBadge: { alignItems: 'center', backgroundColor: colors.background, borderColor: colors.border, borderRadius: 14, borderWidth: 1, height: 28, justifyContent: 'center', width: 28 },
-  legIndex: { color: colors.secondaryText, fontSize: 12, fontWeight: '800' },
+  legIndexBadge: { alignItems: 'center', backgroundColor: colors.accentMuted, borderColor: colors.border, borderWidth: 1, height: 28, justifyContent: 'center', width: 28 },
+  legIndex: { color: colors.text, fontSize: 10, fontWeight: '900' },
   legCopy: { flex: 1, gap: 5, minWidth: 0 },
   legEvent: { color: colors.text, fontSize: 14, fontWeight: '700', lineHeight: 20 },
-  legSelection: { color: colors.accent, fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  legSelection: { color: colors.text, fontSize: 13, fontWeight: '900', lineHeight: 18 },
   legMeta: { color: colors.muted, fontSize: 11, lineHeight: 16 },
-  legOdds: { color: colors.secondaryText, fontSize: 14, fontWeight: '800', paddingTop: 4 },
-  legacyNotice: { backgroundColor: colors.background, borderRadius: 9, marginTop: 5, paddingHorizontal: 10, paddingVertical: 8 },
+  legOdds: { borderBottomColor: colors.border, borderBottomWidth: 2, color: colors.text, fontSize: 17, fontWeight: '900', minWidth: 46, paddingHorizontal: 7, paddingVertical: 5, textAlign: 'center' },
+  legacyNotice: { backgroundColor: colors.surfaceMuted, marginTop: 5, paddingHorizontal: 10, paddingVertical: 8 },
   legacyText: { color: colors.placeholder, fontSize: 11, lineHeight: 16, textAlign: 'center' },
   row: { alignItems: 'flex-start', flexDirection: 'row', gap: 16, justifyContent: 'space-between' },
   rowLabel: { color: colors.muted, fontSize: 13 },
   rowValue: { color: colors.text, flex: 1, fontSize: 14, fontWeight: '600', textAlign: 'right' },
   notes: { color: colors.secondaryText, fontSize: 14, lineHeight: 21 },
-  readOnly: { color: colors.placeholder, fontSize: 11, textAlign: 'center' },
 });

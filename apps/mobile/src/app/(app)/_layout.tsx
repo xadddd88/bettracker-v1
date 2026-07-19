@@ -1,117 +1,63 @@
 import { Tabs } from 'expo-router';
-import { SymbolView, type SymbolViewProps } from 'expo-symbols';
-import { type ColorValue, Text } from 'react-native';
+import { useEffect } from 'react';
+import { StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { colors } from '@/ui/theme';
 
-type TabIconProps = {
-  color: ColorValue;
-  fallback: string;
-  name: SymbolViewProps['name'];
-};
-
-function TabIcon({ color, fallback, name }: TabIconProps) {
-  return (
-    <SymbolView
-      fallback={<Text style={{ color, fontSize: 13, fontWeight: '900' }}>{fallback}</Text>}
-      name={name}
-      size={21}
-      tintColor={color}
-    />
-  );
+function TabMarker({ focused }: { focused: boolean }) {
+  const progress = useSharedValue(focused ? 1 : 0);
+  const reduceMotion = useReducedMotion();
+  useEffect(() => {
+    progress.value = reduceMotion ? (focused ? 1 : 0) : withSpring(focused ? 1 : 0, { damping: 16, stiffness: 230 });
+  }, [focused, progress, reduceMotion]);
+  const style = useAnimatedStyle(() => ({
+    opacity: 0.25 + progress.value * 0.75,
+    transform: [{ scaleX: 0.28 + progress.value * 0.72 }],
+  }));
+  return <Animated.View style={[styles.marker, style]} />;
 }
 
 export default function AppLayout() {
+  const insets = useSafeAreaInsets();
+  const screen = (title: string) => ({
+    tabBarAccessibilityLabel: title,
+    tabBarIcon: ({ focused }: { focused: boolean }) => <TabMarker focused={focused} />,
+    title,
+  });
+
   return (
     <Tabs
       backBehavior="history"
       screenOptions={{
+        animation: 'shift',
         headerShown: false,
         sceneStyle: { backgroundColor: colors.background },
-        tabBarActiveTintColor: colors.accent,
+        tabBarActiveTintColor: '#FFFFFF',
         tabBarHideOnKeyboard: true,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarItemStyle: { minHeight: 52, paddingVertical: 4 },
+        tabBarInactiveTintColor: '#91918B',
+        tabBarItemStyle: { minHeight: 52, paddingTop: 6 },
         tabBarLabelPosition: 'below-icon',
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '700' },
+        tabBarLabelStyle: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
         tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          minHeight: 58,
+          backgroundColor: '#050505',
+          borderTopColor: '#050505',
+          height: 58 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 6),
         },
       }}
     >
-      <Tabs.Screen
-        name="home"
-        options={{
-          tabBarAccessibilityLabel: 'Home',
-          tabBarIcon: ({ color }) => (
-            <TabIcon
-              color={color}
-              fallback="H"
-              name={{ android: 'home', ios: 'house.fill', web: 'home' }}
-            />
-          ),
-          title: 'Home',
-        }}
-      />
-      <Tabs.Screen
-        name="ai"
-        options={{
-          tabBarAccessibilityLabel: 'AI Analyzer',
-          tabBarIcon: ({ color }) => (
-            <TabIcon
-              color={color}
-              fallback="AI"
-              name={{ android: 'auto_awesome', ios: 'sparkles', web: 'auto_awesome' }}
-            />
-          ),
-          title: 'AI',
-        }}
-      />
-      <Tabs.Screen
-        name="bets"
-        options={{
-          tabBarAccessibilityLabel: 'Tracker',
-          tabBarIcon: ({ color }) => (
-            <TabIcon
-              color={color}
-              fallback="T"
-              name={{ android: 'confirmation_number', ios: 'ticket.fill', web: 'confirmation_number' }}
-            />
-          ),
-          title: 'Tracker',
-        }}
-      />
-      <Tabs.Screen
-        name="stats"
-        options={{
-          tabBarAccessibilityLabel: 'Stats',
-          tabBarIcon: ({ color }) => (
-            <TabIcon
-              color={color}
-              fallback="S"
-              name={{ android: 'bar_chart', ios: 'chart.bar.fill', web: 'bar_chart' }}
-            />
-          ),
-          title: 'Stats',
-        }}
-      />
-      <Tabs.Screen
-        name="more"
-        options={{
-          tabBarAccessibilityLabel: 'More',
-          tabBarIcon: ({ color }) => (
-            <TabIcon
-              color={color}
-              fallback="•••"
-              name={{ android: 'more_horiz', ios: 'ellipsis', web: 'more_horiz' }}
-            />
-          ),
-          title: 'More',
-        }}
-      />
+      <Tabs.Screen name="home" options={screen('HOME')} />
+      <Tabs.Screen name="ai" options={screen('SCAN')} />
+      <Tabs.Screen name="bets" options={screen('TRACKER')} />
+      <Tabs.Screen name="stats" options={{ href: null }} />
+      <Tabs.Screen name="more" options={{ href: null }} />
       <Tabs.Screen name="index" options={{ href: null }} />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  marker: { backgroundColor: '#FFFFFF', height: 2, width: 28 },
+});

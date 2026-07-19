@@ -27,15 +27,31 @@ const BET_COLUMNS = `
   )
 `;
 
-export async function fetchCurrency(userId: string): Promise<string> {
+export interface BankrollDto {
+  balance: number | null;
+  currency: string;
+}
+
+export async function fetchBankroll(userId: string): Promise<BankrollDto> {
   const { data, error } = await getSupabase()
     .from('bankrolls')
-    .select('currency')
+    .select('balance, currency')
     .eq('user_id', userId)
     .eq('is_default', true)
     .maybeSingle();
   if (error) throw sanitizeReadError(error.message, error.code);
-  return typeof data?.currency === 'string' ? data.currency : 'USD';
+
+  const parsedBalance = Number(data?.balance);
+  return {
+    balance: data?.balance === null || data?.balance === undefined || !Number.isFinite(parsedBalance)
+      ? null
+      : parsedBalance,
+    currency: typeof data?.currency === 'string' ? data.currency : 'USD',
+  };
+}
+
+export async function fetchCurrency(userId: string): Promise<string> {
+  return (await fetchBankroll(userId)).currency;
 }
 
 export async function fetchBets(userId: string): Promise<BetDto[]> {

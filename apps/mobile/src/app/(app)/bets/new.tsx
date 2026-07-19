@@ -3,7 +3,6 @@ import { useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,6 +22,8 @@ import {
   validateTrackerDraft,
 } from '@/bets/draft';
 import { colors } from '@/ui/theme';
+import { MotionPressable } from '@/ui/motion';
+import { TimeWarpBackdrop, WarpRail } from '@/ui/time-warp';
 
 type Feedback = { message: string; tone: 'error' | 'success' };
 
@@ -108,6 +109,7 @@ export default function NewBetScreen() {
 
   return (
     <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
+      <TimeWarpBackdrop />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={88}
@@ -118,11 +120,10 @@ export default function NewBetScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.intro}>
-            <Text style={styles.eyebrow}>TRACKER DRAFT</Text>
-            <Text style={styles.title}>Build the coupon leg by leg</Text>
-            <Text style={styles.subtitle}>
-              Review everything locally. This form does not create a financial record yet.
-            </Text>
+            <WarpRail />
+            <Text style={styles.eyebrow}>TRACKER</Text>
+            <Text style={styles.title}>Add bet</Text>
+            <Text style={styles.subtitle}>Enter the coupon exactly as it appears.</Text>
           </View>
 
           <View accessibilityLabel="Bet type" style={styles.segmented}>
@@ -135,20 +136,20 @@ export default function NewBetScreen() {
               <Text style={styles.sectionTitle}>Coupon legs</Text>
               <Text style={styles.sectionHint}>{draft.legs.length} of {MAX_DRAFT_LEGS}</Text>
             </View>
-            <Pressable
+            <MotionPressable
               accessibilityLabel="Add another leg"
               accessibilityRole="button"
               accessibilityState={{ disabled: draft.legs.length >= MAX_DRAFT_LEGS }}
               disabled={draft.legs.length >= MAX_DRAFT_LEGS}
+              glow="magenta"
               onPress={addLeg}
-              style={({ pressed }) => [
+              style={[
                 styles.addButton,
                 draft.legs.length >= MAX_DRAFT_LEGS ? styles.disabled : null,
-                pressed ? styles.pressed : null,
               ]}
             >
               <Text style={styles.addButtonText}>+ Add leg</Text>
-            </Pressable>
+            </MotionPressable>
           </View>
 
           {draft.legs.map((leg, index) => (
@@ -159,37 +160,42 @@ export default function NewBetScreen() {
                 </View>
                 <Text style={styles.legTitle}>Leg {index + 1}</Text>
                 {draft.legs.length > 1 ? (
-                  <Pressable
+                  <MotionPressable
                     accessibilityLabel={`Remove leg ${index + 1}`}
                     accessibilityRole="button"
+                    glow="none"
                     onPress={() => removeLeg(leg.id)}
-                    style={({ pressed }) => [styles.removeButton, pressed ? styles.pressed : null]}
+                    style={styles.removeButton}
                   >
                     <Text style={styles.removeButtonText}>Remove</Text>
-                  </Pressable>
+                  </MotionPressable>
                 ) : null}
               </View>
 
               <Text style={styles.fieldLabel}>Sport</Text>
-              <View style={styles.sports}>
+              <ScrollView
+                contentContainerStyle={styles.sports}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              >
                 {TRACKER_SPORTS.map((sport) => (
-                  <Pressable
+                  <MotionPressable
                     accessibilityRole="radio"
                     accessibilityState={{ selected: leg.sport === sport }}
+                    glow="none"
                     key={sport}
                     onPress={() => editLeg(leg.id, { sport })}
-                    style={({ pressed }) => [
+                    style={[
                       styles.sportChip,
                       leg.sport === sport ? styles.sportChipSelected : null,
-                      pressed ? styles.pressed : null,
                     ]}
                   >
                     <Text style={[styles.sportText, leg.sport === sport ? styles.sportTextSelected : null]}>
                       {SPORT_LABELS[sport]}
                     </Text>
-                  </Pressable>
+                  </MotionPressable>
                 ))}
-              </View>
+              </ScrollView>
 
               <DraftInput
                 label="Event"
@@ -278,20 +284,21 @@ export default function NewBetScreen() {
           ) : null}
 
           <View style={styles.actions}>
-            <Pressable
+            <MotionPressable
               accessibilityRole="button"
+              glow="none"
               onPress={() => router.back()}
-              style={({ pressed }) => [styles.secondaryButton, pressed ? styles.pressed : null]}
+              style={styles.secondaryButton}
             >
               <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </Pressable>
-            <Pressable
+            </MotionPressable>
+            <MotionPressable
               accessibilityRole="button"
               onPress={reviewBet}
-              style={({ pressed }) => [styles.primaryButton, pressed ? styles.pressed : null]}
+              style={styles.primaryButton}
             >
               <Text style={styles.primaryButtonText}>Review bet</Text>
-            </Pressable>
+            </MotionPressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -338,78 +345,76 @@ function DraftInput({
 
 function SegmentButton({ label, onPress, selected }: { label: string; onPress: () => void; selected: boolean }) {
   return (
-    <Pressable
+    <MotionPressable
       accessibilityRole="radio"
       accessibilityState={{ selected }}
+      glow={selected ? 'cyan' : 'none'}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.segmentButton,
         selected ? styles.segmentButtonSelected : null,
-        pressed ? styles.pressed : null,
       ]}
     >
       <Text style={[styles.segmentText, selected ? styles.segmentTextSelected : null]}>{label}</Text>
-    </Pressable>
+    </MotionPressable>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   safeArea: { backgroundColor: colors.background, flex: 1 },
-  content: { gap: 16, padding: 16, paddingBottom: 36 },
-  intro: { gap: 5 },
-  eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
-  title: { color: colors.text, fontSize: 23, fontWeight: '800', lineHeight: 29 },
+  content: { gap: 0, paddingBottom: 32 },
+  intro: { borderBottomColor: colors.border, borderBottomWidth: 1, gap: 7, minHeight: 175, padding: 14, paddingTop: 24 },
+  eyebrow: { color: colors.muted, fontSize: 8, fontWeight: '800', letterSpacing: 1.5 },
+  title: { color: colors.text, fontSize: 45, fontWeight: '900', letterSpacing: -2.3, lineHeight: 47 },
   subtitle: { color: colors.muted, fontSize: 13, lineHeight: 19 },
   segmented: {
     backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 10,
-    borderWidth: 1,
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
     flexDirection: 'row',
-    gap: 4,
-    padding: 4,
+    gap: 0,
   },
-  segmentButton: { alignItems: 'center', borderRadius: 8, flex: 1, justifyContent: 'center', minHeight: 44 },
-  segmentButtonSelected: { backgroundColor: colors.surfaceRaised },
+  segmentButton: { alignItems: 'center', borderRightColor: colors.border, borderRightWidth: 1, flex: 1, justifyContent: 'center', minHeight: 58 },
+  segmentButtonSelected: { backgroundColor: colors.accentMuted },
   segmentText: { color: colors.muted, fontSize: 14, fontWeight: '800' },
-  segmentTextSelected: { color: colors.accent },
-  legsHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
-  sectionTitle: { color: colors.secondaryText, fontSize: 13, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
+  segmentTextSelected: { color: colors.text },
+  legsHeader: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', padding: 14 },
+  sectionTitle: { color: colors.secondaryText, fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   sectionHint: { color: colors.placeholder, fontSize: 11, marginTop: 2 },
-  addButton: { alignItems: 'center', borderColor: colors.accent, borderRadius: 9, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
-  addButtonText: { color: colors.accent, fontSize: 13, fontWeight: '800' },
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, gap: 14, padding: 15 },
-  legCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, gap: 13, padding: 15 },
+  addButton: { alignItems: 'center', backgroundColor: colors.text, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
+  addButtonText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', letterSpacing: 0.7 },
+  card: { backgroundColor: colors.surface, borderBottomColor: colors.border, borderBottomWidth: 1, gap: 14, padding: 15 },
+  legCard: { backgroundColor: colors.surface, borderBottomColor: colors.border, borderBottomWidth: 1, gap: 13, padding: 15 },
   legHeading: { alignItems: 'center', flexDirection: 'row', gap: 10 },
-  legNumber: { alignItems: 'center', backgroundColor: colors.surfaceRaised, borderRadius: 999, height: 32, justifyContent: 'center', width: 32 },
-  legNumberText: { color: colors.accent, fontSize: 12, fontWeight: '900' },
+  legNumber: { alignItems: 'center', backgroundColor: colors.accentMuted, borderColor: colors.border, borderWidth: 1, height: 32, justifyContent: 'center', width: 32 },
+  legNumberText: { color: colors.text, fontSize: 11, fontWeight: '900' },
   legTitle: { color: colors.text, flex: 1, fontSize: 16, fontWeight: '800' },
   removeButton: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 5 },
   removeButtonText: { color: colors.danger, fontSize: 12, fontWeight: '800' },
-  sports: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  sportChip: { borderColor: colors.border, borderRadius: 999, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 10 },
-  sportChipSelected: { backgroundColor: colors.surfaceRaised, borderColor: colors.accent },
+  sports: { gap: 7, paddingRight: 4 },
+  sportChip: { borderColor: colors.border, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 10 },
+  sportChipSelected: { backgroundColor: colors.accentMuted, borderColor: colors.border },
   sportText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
-  sportTextSelected: { color: colors.accent },
+  sportTextSelected: { color: colors.text },
   field: { gap: 6 },
   fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '700' },
-  input: { backgroundColor: colors.background, borderColor: colors.border, borderRadius: 10, borderWidth: 1, color: colors.text, fontSize: 14, minHeight: 46, paddingHorizontal: 12, paddingVertical: 10 },
+  input: { backgroundColor: colors.background, borderBottomColor: colors.border, borderBottomWidth: 1, color: colors.text, fontSize: 14, minHeight: 46, paddingHorizontal: 0, paddingVertical: 10 },
   multilineInput: { minHeight: 92, textAlignVertical: 'top' },
-  expressCard: { backgroundColor: colors.surface, borderColor: colors.accent, borderRadius: 16, borderWidth: 1, gap: 12, padding: 15 },
+  expressCard: { backgroundColor: colors.accentMuted, borderBottomColor: colors.border, borderBottomWidth: 1, gap: 12, padding: 15 },
   previewRow: { alignItems: 'baseline', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
   previewLabel: { color: colors.muted, fontSize: 12 },
-  previewValue: { color: colors.accent, fontSize: 18, fontWeight: '900' },
+  previewValue: { color: colors.text, fontSize: 20, fontWeight: '900' },
   previewHint: { color: colors.placeholder, fontSize: 10, lineHeight: 15 },
-  feedback: { borderRadius: 10, borderWidth: 1, padding: 13 },
+  feedback: { borderBottomWidth: 1, borderTopWidth: 1, marginTop: 12, padding: 13 },
   feedbackError: { backgroundColor: colors.surface, borderColor: colors.danger },
   feedbackSuccess: { backgroundColor: colors.surface, borderColor: colors.success },
   feedbackErrorText: { color: colors.danger, fontSize: 13, lineHeight: 19 },
   feedbackSuccessText: { color: colors.success, fontSize: 13, lineHeight: 19 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  primaryButton: { alignItems: 'center', backgroundColor: colors.accent, borderColor: colors.accent, borderRadius: 10, borderWidth: 1, flexBasis: 140, flexGrow: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 16 },
-  primaryButtonText: { color: colors.background, fontSize: 14, fontWeight: '900' },
-  secondaryButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 10, borderWidth: 1, flexBasis: 110, flexGrow: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 16 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap' },
+  primaryButton: { alignItems: 'center', backgroundColor: colors.accent, borderColor: colors.accent, borderWidth: 1, flexBasis: 140, flexGrow: 1, justifyContent: 'center', minHeight: 56, paddingHorizontal: 16 },
+  primaryButtonText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  secondaryButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, flexBasis: 110, flexGrow: 1, justifyContent: 'center', minHeight: 56, paddingHorizontal: 16 },
   secondaryButtonText: { color: colors.secondaryText, fontSize: 14, fontWeight: '800' },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.7 },
