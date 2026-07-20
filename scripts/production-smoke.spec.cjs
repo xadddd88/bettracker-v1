@@ -41,14 +41,31 @@ test('authenticated Analyst production smoke stays outside financial writes', as
   })
 
   await page.goto('/login', { waitUntil: 'domcontentloaded' })
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-  await page.locator('input[type="email"]').fill(qaEmail)
-  await page.locator('input[type="password"]').fill(qaPassword)
+  await page.getByLabel('Email', { exact: true }).fill(qaEmail)
+  await page.getByLabel('Password', { exact: true }).fill(qaPassword)
 
-  await Promise.all([
-    page.waitForURL(url => url.origin === baseUrl && url.pathname === '/dashboard', { timeout: 30_000 }),
-    page.getByRole('button', { name: 'Enter workspace', exact: true }).click(),
-  ])
+  const passwordAuthResponsePromise = page.waitForResponse(
+    response => {
+      const url = new URL(response.url())
+      return (
+        response.request().method() === 'POST' &&
+        url.pathname.endsWith('/auth/v1/token') &&
+        url.searchParams.get('grant_type') === 'password'
+      )
+    },
+    { timeout: 30_000 },
+  )
+
+  await page.getByRole('button', { name: 'Enter workspace', exact: true }).click()
+  const passwordAuthResponse = await passwordAuthResponsePromise
+
+  expect(
+    passwordAuthResponse.status(),
+    `Supabase password sign-in returned HTTP ${passwordAuthResponse.status()}`,
+  ).toBe(200)
+
+  await page.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+  await expect(page).toHaveURL(`${baseUrl}/dashboard`)
 
   await page.goto('/ai', { waitUntil: 'domcontentloaded' })
   await expect(page).toHaveURL(`${baseUrl}/ai`)
