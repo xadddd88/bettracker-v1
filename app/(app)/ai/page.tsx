@@ -18,7 +18,12 @@ import {
   type AnalysisQualityGateResult,
   type AnalystTrustView,
 } from '@/lib/ai/analysis-quality-gate'
-import type { AnalystResearchBrief, AnalystResearchSource } from '@/lib/ai/analyst-research'
+import {
+  hasUnsupportedLiveAnalystInput,
+  type AnalystResearchBrief,
+  type AnalystResearchSource,
+  type AnalystWebSearchFailureReason,
+} from '@/lib/ai/analyst-research'
 
 // ─── Image helper ─────────────────────────────────────────────
 function fileToBase64(file: File): Promise<{ data: string; media_type: string }> {
@@ -59,7 +64,10 @@ interface Analysis {
   trust_view?:         AnalystTrustView | null
   research_brief?:     AnalystResearchBrief | null
   research_sources?:   AnalystResearchSource[]
-  web_search_used?:    boolean
+  web_search_enabled?: boolean
+  web_search_attempted?: boolean
+  web_search_used?:     boolean
+  web_search_failure_reason?: AnalystWebSearchFailureReason | null
   // Input echoed back from server
   sport:           string
   event_name:      string
@@ -226,6 +234,7 @@ export default function AIAnalystPage() {
   const [showStake,  setShowStake]  = useState(false)
   const [showRisk,   setShowRisk]   = useState(false)
   const [couponLegs, setCouponLegs] = useState<AnalysisLegQualityInput[] | null>(null)
+  const liveCouponBlocked = hasUnsupportedLiveAnalystInput(couponLegs)
 
   function setField(k: string, v: string) {
     setForm(f => ({ ...f, [k]: v }))
@@ -288,6 +297,12 @@ export default function AIAnalystPage() {
     const odds = parseFloat(form.odds)
     if (!form.odds || isNaN(odds) || odds <= 1) newErrors.odds = 'Must be > 1.00'
     if (Object.keys(newErrors).length) { setErrors(newErrors); return }
+    if (liveCouponBlocked) {
+      setRootErr(locale === 'uk'
+        ? 'Live-аналіз недоступний без поточного рахунку, фази матчу, ігрового часу та актуальної live-лінії. Використайте pre-match купон.'
+        : 'Live analysis requires the current score, match phase, game clock, and current live odds. Use a pre-match coupon.')
+      return
+    }
 
     setAnalyzing(true)
     setShowStake(false)
@@ -334,7 +349,7 @@ export default function AIAnalystPage() {
     } finally {
       setAnalyzing(false)
     }
-  }, [sport, locale, form, scoutId, couponLegs])
+  }, [sport, locale, form, scoutId, couponLegs, liveCouponBlocked])
 
   // ── Act on already-persisted decision ─────────────────────
   // Decision is created immediately by /api/ai/analyst.
@@ -795,8 +810,16 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           </section>
         )}
 
+        {liveCouponBlocked && (
+          <div className="border border-black bg-[#e8ff00] px-4 py-3 text-sm font-bold leading-5 text-black" role="alert">
+            {locale === 'uk'
+              ? 'LIVE ЗАБЛОКОВАНО: для чесного аналізу потрібні поточний рахунок, фаза, ігровий час та актуальна live-лінія. Цей модуль працює лише з pre-match купонами.'
+              : 'LIVE BLOCKED: a trustworthy analysis needs the current score, phase, game clock, and current live odds. This module supports pre-match coupons only.'}
+          </div>
+        )}
+
         {rootErr && !analysis && (
-          <div className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
+          <div className="border border-black bg-white px-4 py-3 text-sm font-bold text-red-700" role="alert">
             {rootErr}
           </div>
         )}
@@ -804,10 +827,12 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
         <button
           className="btn-primary flex items-center justify-center gap-2"
           onClick={handleAnalyze}
-          disabled={analyzing}
+          disabled={analyzing || liveCouponBlocked}
         >
           {analyzing ? (
             <><Loader2 size={14} className="animate-spin" /> Analyzing…</>
+          ) : liveCouponBlocked ? (
+            <>Live analysis unavailable</>
           ) : (
             <><Search size={14} strokeWidth={2} /> Analyze</>
           )}
@@ -817,6 +842,28 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
       {/* ── Analysis result ─────────────────────────────────── */}
       {a && (
         <div className="flex flex-col gap-4">
+          <section className={`border border-black px-5 py-4 text-black ${a.web_search_used ? 'bg-[#e8ff00]' : 'bg-white'}`} aria-label="Web research status">
+            <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em]">
+              {a.web_search_used
+                ? 'Current research verified'
+                : a.web_search_attempted
+                  ? 'Current research unavailable'
+                  : 'Web research disabled'}
+            </p>
+            <p className="mt-2 text-sm font-bold leading-5">
+              {a.web_search_used
+                ? `${a.research_sources?.length ?? 0} cited source${a.research_sources?.length === 1 ? '' : 's'} bound to exact claims.`
+                : a.web_search_attempted
+                  ? 'No current claim was accepted without an exact citation. Pricing remains hidden.'
+                  : 'This run contains conditional market logic only; no current fact is presented as verified.'}
+            </p>
+            {a.web_search_failure_reason && (
+              <p className="mt-2 font-mono text-[9px] font-bold uppercase tracking-[0.08em] opacity-60">
+                {a.web_search_failure_reason.replaceAll('_', ' ')}
+              </p>
+            )}
+          </section>
+
           {a.research_brief && (
             <section className="border border-black bg-white text-black" aria-labelledby="research-brief-heading">
               <div className="border-b border-black bg-black px-5 py-4 text-white">

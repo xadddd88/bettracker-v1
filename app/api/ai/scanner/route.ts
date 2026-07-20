@@ -90,6 +90,7 @@ Rules:
 - Preserve the exact visible event date/time line in eventStartText. Do not resolve words such as Today/Tomorrow to a date.
 - sport should reflect the dominant sport on the coupon
 - For express/parlay coupons, preserve every leg in legs[] instead of only flattening the event and selection
+- For a Bet Builder on one event, every visible component row is a separate leg in the original top-to-bottom order. Keep the displayed combined coefficient only in totalOdds/odds; never replace it with a component coefficient or collapse the component rows.
 - Infer sport per leg; do not blindly apply the dominant sport to every leg
 - If a leg visibly says Лайв, Live, In-play, 1-й сет, 2-й сет, 3-й сет, Перерва, or Halftime, set isLive=true and statusSource="coupon"
 - Return ONLY the JSON object, nothing else`
