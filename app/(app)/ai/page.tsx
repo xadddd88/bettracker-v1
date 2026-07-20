@@ -80,6 +80,11 @@ interface Analysis {
   output_language: string
 }
 
+type ScannedLiveEnvelope = {
+  isLive: boolean
+  statusText: string | null
+}
+
 function escapeHtml(value: string | number | null | undefined): string {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&': '&amp;',
@@ -234,7 +239,12 @@ export default function AIAnalystPage() {
   const [showStake,  setShowStake]  = useState(false)
   const [showRisk,   setShowRisk]   = useState(false)
   const [couponLegs, setCouponLegs] = useState<AnalysisLegQualityInput[] | null>(null)
-  const liveCouponBlocked = hasUnsupportedLiveAnalystInput(couponLegs)
+  const [scannedLiveEnvelope, setScannedLiveEnvelope] = useState<ScannedLiveEnvelope | null>(null)
+  const liveCouponBlocked = hasUnsupportedLiveAnalystInput({
+    couponIsLive: scannedLiveEnvelope?.isLive,
+    couponStatusText: scannedLiveEnvelope?.statusText,
+    legs: couponLegs,
+  })
 
   function setField(k: string, v: string) {
     setForm(f => ({ ...f, [k]: v }))
@@ -266,7 +276,15 @@ export default function AIAnalystPage() {
         bookmaker:   d.bookmaker   ?? prev.bookmaker,
         event_time:  d.event_start_text ?? prev.event_time,
       }))
-      setCouponLegs(Array.isArray(d.legs) && d.legs.length > 0 ? d.legs : null)
+      const scannedLegs = Array.isArray(d.legs) && d.legs.length > 0 ? d.legs : null
+      setCouponLegs(scannedLegs)
+      const liveLeg = scannedLegs?.find((leg: AnalysisLegQualityInput) =>
+        leg.isLive === true || /(?:^|\s)(?:live|in[- ]?play|en vivo|лайв)(?:\s|$)/iu.test(leg.statusText ?? ''),
+      )
+      setScannedLiveEnvelope({
+        isLive: Boolean(liveLeg),
+        statusText: liveLeg?.statusText ?? null,
+      })
       if (SPORTS_LIST.includes(d.sport)) setSport(d.sport as Sport)
       setScanMsg('\u2705 Coupon scanned \u2014 review and analyze')
     } catch {
@@ -321,6 +339,8 @@ export default function AIAnalystPage() {
           offered_odds:    odds,
           bookmaker:       form.bookmaker.trim() || undefined,
           coupon_event_time: form.event_time.trim() || undefined,
+          coupon_is_live: scannedLiveEnvelope?.isLive ?? false,
+          coupon_status_text: scannedLiveEnvelope?.statusText ?? undefined,
           client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           notes:           form.notes.trim() || undefined,
           output_language: locale,
@@ -349,7 +369,7 @@ export default function AIAnalystPage() {
     } finally {
       setAnalyzing(false)
     }
-  }, [sport, locale, form, scoutId, couponLegs, liveCouponBlocked])
+  }, [sport, locale, form, scoutId, couponLegs, scannedLiveEnvelope, liveCouponBlocked])
 
   // ── Act on already-persisted decision ─────────────────────
   // Decision is created immediately by /api/ai/analyst.

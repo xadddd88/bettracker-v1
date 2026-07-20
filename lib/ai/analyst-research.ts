@@ -225,15 +225,23 @@ RESEARCH INSTRUCTIONS
 6. Return structured JSON only.`
 }
 
-export function hasUnsupportedLiveAnalystInput(
-  legs: Pick<AnalystPromptLeg, 'isLive' | 'statusText'>[] | null | undefined,
-): boolean {
-  if (!legs?.length) return false
-  return legs.some(leg => {
+export type AnalystLiveEnvelope = {
+  couponIsLive?: boolean | null
+  couponStatusText?: string | null
+  legs?: Pick<AnalystPromptLeg, 'isLive' | 'statusText'>[] | null
+}
+
+export function hasUnsupportedLiveAnalystInput(input: AnalystLiveEnvelope): boolean {
+  if (input.couponIsLive === true) return true
+
+  const couponStatus = cleanPromptValue(input.couponStatusText)?.toLocaleLowerCase('en-US') ?? ''
+  if (/(?:^|\s)(?:live|in[- ]?play|en vivo|лайв)(?:\s|$)/iu.test(couponStatus)) return true
+
+  return input.legs?.some(leg => {
     if (leg.isLive === true) return true
     const status = cleanPromptValue(leg.statusText)?.toLocaleLowerCase('en-US') ?? ''
     return /(?:^|\s)(?:live|in[- ]?play|en vivo|лайв)(?:\s|$)/iu.test(status)
-  })
+  }) ?? false
 }
 
 export function resolveAnalystWebSearchTelemetry(input: {

@@ -41,6 +41,8 @@ const requestSchema = z.object({
   bookmaker:       z.string().max(100).optional(),
   notes:           z.string().max(1000).optional(),
   coupon_event_time: z.string().max(120).optional(),
+  coupon_is_live:  z.boolean().optional(),
+  coupon_status_text: z.string().max(120).nullable().optional(),
   client_timezone: z.string().max(80).optional(),
   output_language: z.enum(LOCALES).default('auto'),
   legs: z.array(z.object({
@@ -431,7 +433,11 @@ export async function POST(req: NextRequest) {
     // Live markets need current score, phase, clock and live-price inputs.
     // This route is intentionally pre-match only, so reject before profile
     // reads, provider calls, persistence, or any generated narrative.
-    if (hasUnsupportedLiveAnalystInput(input.legs)) {
+    if (hasUnsupportedLiveAnalystInput({
+      couponIsLive: input.coupon_is_live,
+      couponStatusText: input.coupon_status_text,
+      legs: input.legs,
+    })) {
       await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, {
         sport: input.sport,
         error_type: 'live_analysis_not_supported',

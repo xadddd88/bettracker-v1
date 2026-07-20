@@ -414,11 +414,14 @@ test('invalid scanner response returns localized actionable error metadata', () 
 console.log('\nAnalysis Quality Gate checks\n');
 
 test('live Analyst preflight recognizes explicit and visible live status only', () => {
-  assert.equal(hasUnsupportedLiveAnalystInput([{ isLive: true, statusText: null }]), true);
-  assert.equal(hasUnsupportedLiveAnalystInput([{ isLive: false, statusText: 'Live' }]), true);
-  assert.equal(hasUnsupportedLiveAnalystInput([{ isLive: false, statusText: 'Лайв' }]), true);
-  assert.equal(hasUnsupportedLiveAnalystInput([{ isLive: false, statusText: 'Scheduled' }]), false);
-  assert.equal(hasUnsupportedLiveAnalystInput(null), false);
+  assert.equal(hasUnsupportedLiveAnalystInput({ legs: [{ isLive: true, statusText: null }] }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ legs: [{ isLive: false, statusText: 'Live' }] }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ legs: [{ isLive: false, statusText: 'Лайв' }] }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ legs: [{ isLive: false, statusText: 'Scheduled' }] }), false);
+  assert.equal(hasUnsupportedLiveAnalystInput({ couponIsLive: true, legs: null }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ couponStatusText: 'In-play', legs: null }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ couponStatusText: 'Scheduled', legs: null }), false);
+  assert.equal(hasUnsupportedLiveAnalystInput({}), false);
 });
 
 test('exact live coupon is parsed per leg and blocked as unsupported live analysis', () => {
@@ -1314,9 +1317,10 @@ test('web Analyst transports coupon legs and time into the research pipeline', (
   assert.match(routeSource, /research_sources:\s*researchSources/);
   assert.match(routeSource, /offered_odds:\s*input\.offered_odds/);
   assert.match(routeSource, /boundClaimCount:\s*researchBrief\.sourcedClaims\.length/);
-  assert.match(routeSource, /if \(hasUnsupportedLiveAnalystInput\(input\.legs\)\)/);
+  assert.match(routeSource, /couponIsLive:\s*input\.coupon_is_live/);
+  assert.match(routeSource, /couponStatusText:\s*input\.coupon_status_text/);
   assert.ok(
-    routeSource.indexOf('if (hasUnsupportedLiveAnalystInput(input.legs))') < routeSource.indexOf('new Anthropic('),
+    routeSource.indexOf('if (hasUnsupportedLiveAnalystInput({') < routeSource.indexOf('new Anthropic('),
     'live guard must run before the provider client/call',
   );
   assert.match(routeSource, /code:\s*'live_analysis_not_supported'/);
@@ -1333,6 +1337,10 @@ test('web Analyst transports coupon legs and time into the research pipeline', (
   assert.match(pageSource, /a\.research_brief\.legs\.map/);
   assert.match(pageSource, /ЦІНУ НЕ ПІДТВЕРДЖЕНО/);
   assert.match(pageSource, /disabled=\{analyzing \|\| liveCouponBlocked\}/);
+  assert.match(pageSource, /coupon_is_live:\s*scannedLiveEnvelope\?\.isLive \?\? false/);
+  assert.match(pageSource, /coupon_status_text:\s*scannedLiveEnvelope\?\.statusText \?\? undefined/);
+  assert.match(pageSource, /if \(\['event_name', 'market_type', 'selection', 'odds'\]\.includes\(k\)\) setCouponLegs\(null\)/);
+  assert.doesNotMatch(pageSource, /setField[\s\S]{0,500}setScannedLiveEnvelope\(null\)/);
   assert.match(pageSource, /Current research verified/);
   assert.match(decisionDetailSource, /researchBrief\.legs\.map/);
   assert.match(decisionDetailSource, /parseStoredAnalystResearchBrief/);
