@@ -26,6 +26,11 @@ export const EVENTS = {
   BET_SETTLE_FAILED:             'bet_settle_failed',
   BET_SETTLE_DUPLICATE_REJECTED: 'bet_settle_duplicate_rejected',
 
+  // Pending bet cancellation (soft delete + atomic stake refund)
+  BET_CANCEL_CLICKED:   'bet_cancel_clicked',
+  BET_CANCEL_SUCCEEDED: 'bet_cancel_succeeded',
+  BET_CANCEL_FAILED:    'bet_cancel_failed',
+
   // Scanner
   SCANNER_STARTED:          'scanner_started',
   SCANNER_COMPLETED:        'scanner_completed',

@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
       .from('bets')
       .select('stake')
       .eq('user_id', user.id)
+      .is('archived_at', null)
       .eq('status', 'pending')
     const pendingExposure = (pendingBets ?? []).reduce((s, b) => s + Number(b.stake), 0)
 

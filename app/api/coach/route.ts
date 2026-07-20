@@ -444,6 +444,7 @@ export async function POST(req: NextRequest) {
       .from('bets')
       .select('id, bet_type, stake, total_odds, status, pnl, source, placed_at, settled_at, legs:bet_legs(sport, market_type, decisions(confidence_score, edge_percent))')
       .eq('user_id', user.id)
+      .is('archived_at', null)
       .order('placed_at', { ascending: false })
 
     let decisionsQuery = supabase

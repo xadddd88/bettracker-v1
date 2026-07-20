@@ -22,6 +22,7 @@ export default async function BetDetailPage({
     .select('*, legs:bet_legs(*)')
     .eq('id', id)
     .eq('user_id', user!.id)
+    .is('archived_at', null)
     // Express legs display in coupon order (Decision #060 Phase B).
     .order('leg_index', { referencedTable: 'bet_legs', ascending: true })
     .single()

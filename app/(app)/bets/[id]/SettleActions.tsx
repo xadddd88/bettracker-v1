@@ -91,6 +91,34 @@ export default function SettleActions({ betId, status, pnl, settledAt, sym }: Pr
     }
   }
 
+  async function cancelBet() {
+    if (settlingRef.current) return
+    if (!window.confirm('Delete this pending bet? The stake will be returned to your bankroll. This cannot be undone.')) return
+
+    settlingRef.current = true
+    trackClientEvent(EVENTS.BET_CANCEL_CLICKED, { bet_id: betId, from_page: 'bet_detail' })
+    setLoading('delete')
+    setError('')
+    try {
+      const res = await fetch(`/api/bets/${betId}/cancel`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        setError(json.error ?? 'Bet could not be deleted')
+        return
+      }
+      router.replace('/bets')
+      router.refresh()
+    } catch {
+      setError('Network error — try again')
+    } finally {
+      settlingRef.current = false
+      setLoading(null)
+    }
+  }
+
   return (
     <div className="card">
       <div className="stat-label mb-3">Settle bet</div>
@@ -116,6 +144,18 @@ export default function SettleActions({ betId, status, pnl, settledAt, sym }: Pr
         >
           {loading === 'void' ? '…' : 'Void'}
         </button>
+      </div>
+      <div className="mt-4 border-t border-gray-800 pt-4">
+        <button
+          className="min-h-11 w-full border border-red-900 bg-red-950/40 px-4 py-2 text-sm font-medium text-red-300 transition-colors hover:bg-red-950 disabled:opacity-40"
+          disabled={loading !== null}
+          onClick={cancelBet}
+        >
+          {loading === 'delete' ? 'Deleting…' : 'Delete bet and return stake'}
+        </button>
+        <p className="mt-2 text-[11px] text-gray-600">
+          Available only while pending. The financial audit record is retained.
+        </p>
       </div>
       {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
     </div>

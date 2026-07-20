@@ -20,6 +20,7 @@ export default async function DashboardPage() {
     .from('bets')
     .select('*, legs:bet_legs(*)')
     .eq('user_id', user!.id)
+    .is('archived_at', null)
     .order('placed_at', { ascending: false })
 
   const { data: bankroll } = await supabase
