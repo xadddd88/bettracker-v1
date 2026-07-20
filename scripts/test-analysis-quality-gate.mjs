@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
+import Module, { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,9 +44,12 @@ const {
 const researchModule = require(path.join(buildDir, 'lib/ai/analyst-research.js'));
 const {
   alignAnalystResearchBriefToCoupon,
+  buildAnalystScannerSnapshot,
   buildAnalystResearchMessage,
   completePausedAnthropicTurn,
   containsAnalystPricingClaim,
+  clearAnalystScannerLegsAfterManualEdit,
+  createAnalystScanGenerationGate,
   extractAnalystResearchSources,
   hasUnsupportedLiveAnalystInput,
   parseStoredAnalystResearchBrief,
@@ -88,6 +91,125 @@ function assertMissing(result, needle) {
     allMissing.some(item => item.toLowerCase().includes(needle.toLowerCase())),
     `expected missing checklist to include ${needle}; got ${JSON.stringify(allMissing)}`
   );
+}
+
+async function withAnalystRouteHarness(run) {
+  const routePath = path.join(buildDir, 'app/api/ai/analyst/route.js');
+  const serverPath = path.join(buildDir, 'lib/supabase/server.js');
+  const adminPath = path.join(buildDir, 'lib/supabase/admin.js');
+  const analyticsPath = path.join(buildDir, 'lib/analytics/server.js');
+  const rateLimitPath = path.join(buildDir, 'lib/rate-limit.js');
+  const originalResolveFilename = Module._resolveFilename;
+  const originalLoad = Module._load;
+  const previousSearchFlag = process.env.ANTHROPIC_WEB_SEARCH_ENABLED;
+  const calls = { profile: 0, provider: 0, admin: 0, rpc: 0, analytics: 0 };
+
+  class FakeAnthropicError extends Error {}
+  class FakeAnthropic {
+    static BadRequestError = FakeAnthropicError;
+    static RateLimitError = FakeAnthropicError;
+    static APIConnectionTimeoutError = FakeAnthropicError;
+    static APIConnectionError = FakeAnthropicError;
+
+    constructor() {
+      calls.provider += 1;
+      this.messages = {
+        create: async () => { throw new Error('provider_sentinel'); },
+      };
+    }
+  }
+
+  const clear = () => {
+    for (const compiledPath of [routePath, serverPath, adminPath, analyticsPath, rateLimitPath]) {
+      try { delete require.cache[require.resolve(compiledPath)]; } catch { /* not loaded */ }
+    }
+  };
+
+  Module._resolveFilename = function resolveAlias(request, parent, isMain, options) {
+    if (request.startsWith('@/')) {
+      return originalResolveFilename.call(this, path.join(buildDir, request.slice(2)), parent, isMain, options);
+    }
+    return originalResolveFilename.call(this, request, parent, isMain, options);
+  };
+  Module._load = function loadWithAnthropicStub(request, parent, isMain) {
+    if (request === '@anthropic-ai/sdk') return FakeAnthropic;
+    return originalLoad.call(this, request, parent, isMain);
+  };
+
+  clear();
+  require.cache[serverPath] = {
+    id: serverPath,
+    filename: serverPath,
+    loaded: true,
+    exports: {
+      createClient: async () => ({
+        auth: { getUser: async () => ({ data: { user: { id: 'user-live-test' } } }) },
+        from() {
+          calls.profile += 1;
+          const builder = {
+            select() { return builder; },
+            eq() { return builder; },
+            async single() { return { data: { web_search_enabled: false }, error: null }; },
+          };
+          return builder;
+        },
+      }),
+    },
+  };
+  require.cache[adminPath] = {
+    id: adminPath,
+    filename: adminPath,
+    loaded: true,
+    exports: {
+      createAdminClient: () => {
+        calls.admin += 1;
+        return { rpc: async () => { calls.rpc += 1; return { data: null, error: null }; } };
+      },
+    },
+  };
+  require.cache[analyticsPath] = {
+    id: analyticsPath,
+    filename: analyticsPath,
+    loaded: true,
+    exports: { trackServerEvent: async () => { calls.analytics += 1; } },
+  };
+  require.cache[rateLimitPath] = {
+    id: rateLimitPath,
+    filename: rateLimitPath,
+    loaded: true,
+    exports: {
+      RATE_LIMITS: { analyst: () => [{ limit: 1, seconds: 60 }] },
+      enforceRateLimit: async () => ({ allowed: true, unavailable: false, retryAfter: 0 }),
+    },
+  };
+
+  process.env.ANTHROPIC_WEB_SEARCH_ENABLED = 'false';
+  try {
+    const route = require(routePath);
+    return await run({ ...route, calls });
+  } finally {
+    clear();
+    Module._resolveFilename = originalResolveFilename;
+    Module._load = originalLoad;
+    if (previousSearchFlag === undefined) delete process.env.ANTHROPIC_WEB_SEARCH_ENABLED;
+    else process.env.ANTHROPIC_WEB_SEARCH_ENABLED = previousSearchFlag;
+  }
+}
+
+function analystRequest(overrides = {}) {
+  return new Request('https://example.test/api/ai/analyst', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      sport: 'soccer',
+      event_name: 'Spain - Argentina',
+      market_type: 'Match result',
+      selection: 'Draw',
+      offered_odds: 2.08,
+      output_language: 'en',
+      ...overrides,
+    }),
+  });
 }
 
 function assertNoForbiddenPricingText(text) {
@@ -414,11 +536,108 @@ test('invalid scanner response returns localized actionable error metadata', () 
 console.log('\nAnalysis Quality Gate checks\n');
 
 test('live Analyst preflight recognizes explicit and visible live status only', () => {
-  assert.equal(hasUnsupportedLiveAnalystInput([{ isLive: true, statusText: null }]), true);
-  assert.equal(hasUnsupportedLiveAnalystInput([{ isLive: false, statusText: 'Live' }]), true);
-  assert.equal(hasUnsupportedLiveAnalystInput([{ isLive: false, statusText: 'Лайв' }]), true);
-  assert.equal(hasUnsupportedLiveAnalystInput([{ isLive: false, statusText: 'Scheduled' }]), false);
-  assert.equal(hasUnsupportedLiveAnalystInput(null), false);
+  assert.equal(hasUnsupportedLiveAnalystInput({ legs: [{ isLive: true, statusText: null }] }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ legs: [{ isLive: false, statusText: 'Live' }] }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ legs: [{ isLive: false, statusText: 'Лайв' }] }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ legs: [{ isLive: false, statusText: 'Scheduled' }] }), false);
+  assert.equal(hasUnsupportedLiveAnalystInput({ couponIsLive: true, legs: null }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ couponStatusText: 'In-play', legs: null }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ couponStatusText: 'LIVE:', legs: null }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ couponStatusText: 'In-play, 2H', legs: null }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ couponStatusText: 'Halftime', legs: null }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ legs: [{ isLive: false, statusText: 'Перерва' }] }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ legs: [{ isLive: false, periodOrPhase: '3-й сет' }] }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ legs: [{ isLive: false, scoreText: '1-0' }] }), true);
+  assert.equal(hasUnsupportedLiveAnalystInput({ couponStatusText: 'Scheduled', legs: null }), false);
+  assert.equal(hasUnsupportedLiveAnalystInput({}), false);
+});
+
+test('scanner snapshot replaces sparse fields and resets a prior live envelope', () => {
+  const live = buildAnalystScannerSnapshot({
+    event_name: 'Spain - Argentina',
+    market_type: 'Extra time result',
+    selection: 'Draw',
+    odds: 2.08,
+    legs: [{ isLive: false, periodOrPhase: 'Halftime', statusText: null, scoreText: '1-1' }],
+  });
+  assert.equal(live.liveEnvelope.isLive, true);
+
+  const scheduled = buildAnalystScannerSnapshot({
+    selection: 'New selection',
+    legs: [{ isLive: false, periodOrPhase: null, statusText: 'Scheduled', scoreText: null }],
+  });
+  assert.deepEqual(scheduled.form, {
+    eventName: '',
+    marketType: '',
+    selection: 'New selection',
+    odds: '',
+    bookmaker: '',
+    eventTime: '',
+  });
+  assert.equal(scheduled.liveEnvelope.isLive, false);
+  assert.equal(scheduled.liveEnvelope.statusText, 'Scheduled');
+});
+
+test('manual coupon edits clear detailed legs but preserve the scanned live envelope', () => {
+  const liveEnvelope = {
+    isLive: true,
+    statusText: 'LIVE:',
+    periodOrPhase: '2H',
+    scoreText: '1-0',
+  };
+  const edited = clearAnalystScannerLegsAfterManualEdit({
+    legs: [{ eventName: 'Spain - Argentina', isLive: true }],
+    liveEnvelope,
+  });
+  assert.deepEqual(edited, { legs: null, liveEnvelope });
+  assert.equal(clearAnalystScannerLegsAfterManualEdit(null), null);
+});
+
+test('scanner generation gate ignores stale responses and only the latest request can finish', () => {
+  const gate = createAnalystScanGenerationGate();
+  const first = gate.begin();
+  const second = gate.begin();
+  assert.equal(gate.isCurrent(first), false);
+  assert.equal(gate.finish(first), false);
+  assert.equal(gate.isActive(), true);
+  assert.equal(gate.isCurrent(second), true);
+  assert.equal(gate.finish(second), true);
+  assert.equal(gate.isActive(), false);
+});
+
+await asyncTest('Analyst route rejects every positive live signal before profile, provider or persistence', async () => {
+  await withAnalystRouteHarness(async ({ POST, calls }) => {
+    const liveInputs = [
+      { coupon_status_text: 'LIVE:' },
+      { coupon_status_text: 'In-play, 2H' },
+      { coupon_status_text: 'Halftime' },
+      { legs: [{ isLive: false, statusText: 'Перерва' }] },
+      { legs: [{ isLive: false, periodOrPhase: '3-й сет' }] },
+      { legs: [{ isLive: false, scoreText: '1-0' }] },
+    ];
+
+    for (const input of liveInputs) {
+      const response = await POST(analystRequest(input));
+      const body = await response.json();
+      assert.equal(response.status, 422, JSON.stringify(input));
+      assert.equal(body.code, 'live_analysis_not_supported');
+    }
+
+    assert.equal(calls.profile, 0);
+    assert.equal(calls.provider, 0);
+    assert.equal(calls.admin, 0);
+    assert.equal(calls.rpc, 0);
+
+    const scheduledResponse = await POST(analystRequest({
+      coupon_status_text: 'Scheduled',
+      legs: [{ isLive: false, periodOrPhase: null, statusText: 'Scheduled', scoreText: null }],
+    }));
+    assert.notEqual(scheduledResponse.status, 422, 'a scheduled coupon must pass the live preflight');
+    assert.equal(calls.profile, 0);
+    assert.equal(calls.provider, 1, 'scheduled input should reach the next provider stage');
+    assert.equal(calls.admin, 0);
+    assert.equal(calls.rpc, 0);
+  });
 });
 
 test('exact live coupon is parsed per leg and blocked as unsupported live analysis', () => {
@@ -1314,9 +1533,11 @@ test('web Analyst transports coupon legs and time into the research pipeline', (
   assert.match(routeSource, /research_sources:\s*researchSources/);
   assert.match(routeSource, /offered_odds:\s*input\.offered_odds/);
   assert.match(routeSource, /boundClaimCount:\s*researchBrief\.sourcedClaims\.length/);
-  assert.match(routeSource, /if \(hasUnsupportedLiveAnalystInput\(input\.legs\)\)/);
+  assert.match(routeSource, /couponIsLive:\s*input\.coupon_is_live/);
+  assert.match(routeSource, /couponStatusText:\s*input\.coupon_status_text/);
+  assert.doesNotMatch(routeSource, /if \(false\s*&&\s*hasUnsupportedLiveAnalystInput/);
   assert.ok(
-    routeSource.indexOf('if (hasUnsupportedLiveAnalystInput(input.legs))') < routeSource.indexOf('new Anthropic('),
+    routeSource.indexOf('if (hasUnsupportedLiveAnalystInput({') < routeSource.indexOf('new Anthropic('),
     'live guard must run before the provider client/call',
   );
   assert.match(routeSource, /code:\s*'live_analysis_not_supported'/);
@@ -1332,7 +1553,15 @@ test('web Analyst transports coupon legs and time into the research pipeline', (
   assert.match(pageSource, /client_timezone:\s*Intl\.DateTimeFormat/);
   assert.match(pageSource, /a\.research_brief\.legs\.map/);
   assert.match(pageSource, /ЦІНУ НЕ ПІДТВЕРДЖЕНО/);
-  assert.match(pageSource, /disabled=\{analyzing \|\| liveCouponBlocked\}/);
+  assert.match(pageSource, /disabled=\{analyzing \|\| scanning \|\| liveCouponBlocked\}/);
+  assert.match(pageSource, /coupon_is_live:\s*scannedLiveEnvelope\?\.isLive \?\? false/);
+  assert.match(pageSource, /coupon_status_text:\s*scannedLiveEnvelope\?\.statusText \?\? undefined/);
+  assert.match(pageSource, /setScannedCoupon\(clearAnalystScannerLegsAfterManualEdit\)/);
+  assert.match(pageSource, /buildAnalystScannerSnapshot<AnalysisLegQualityInput>\(d\)/);
+  assert.doesNotMatch(pageSource, /event_name:\s+d\.event_name\s+\?\?\s+prev\.event_name/);
+  assert.match(pageSource, /scanGenerationGateRef\.current\.begin\(\)/);
+  assert.match(pageSource, /scanGenerationGateRef\.current\.isCurrent\(scanGeneration\)/);
+  assert.match(pageSource, /scanGenerationGateRef\.current\.finish\(scanGeneration\)/);
   assert.match(pageSource, /Current research verified/);
   assert.match(decisionDetailSource, /researchBrief\.legs\.map/);
   assert.match(decisionDetailSource, /parseStoredAnalystResearchBrief/);

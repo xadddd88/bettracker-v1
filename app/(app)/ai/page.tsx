@@ -19,6 +19,9 @@ import {
   type AnalystTrustView,
 } from '@/lib/ai/analysis-quality-gate'
 import {
+  buildAnalystScannerSnapshot,
+  clearAnalystScannerLegsAfterManualEdit,
+  createAnalystScanGenerationGate,
   hasUnsupportedLiveAnalystInput,
   type AnalystResearchBrief,
   type AnalystResearchSource,
@@ -78,6 +81,18 @@ interface Analysis {
   bookmaker:       string | null
   coupon_event_time?: string | null
   output_language: string
+}
+
+type ScannedLiveEnvelope = {
+  isLive: boolean
+  statusText: string | null
+  periodOrPhase: string | null
+  scoreText: string | null
+}
+
+type ScannedCouponState = {
+  legs: AnalysisLegQualityInput[] | null
+  liveEnvelope: ScannedLiveEnvelope
 }
 
 function escapeHtml(value: string | number | null | undefined): string {
@@ -194,6 +209,7 @@ export default function AIAnalystPage() {
   const supabase = createClient()
 
   const fileRef = useRef<HTMLInputElement>(null)
+  const scanGenerationGateRef = useRef(createAnalystScanGenerationGate())
 
   useEffect(() => { trackClientEvent(EVENTS.AI_PAGE_VIEWED) }, [])
 
@@ -233,46 +249,64 @@ export default function AIAnalystPage() {
   const [stakeStr,   setStakeStr]   = useState('')
   const [showStake,  setShowStake]  = useState(false)
   const [showRisk,   setShowRisk]   = useState(false)
-  const [couponLegs, setCouponLegs] = useState<AnalysisLegQualityInput[] | null>(null)
-  const liveCouponBlocked = hasUnsupportedLiveAnalystInput(couponLegs)
+  const [scannedCoupon, setScannedCoupon] = useState<ScannedCouponState | null>(null)
+  const couponLegs = scannedCoupon?.legs ?? null
+  const scannedLiveEnvelope = scannedCoupon?.liveEnvelope ?? null
+  const liveCouponBlocked = hasUnsupportedLiveAnalystInput({
+    couponIsLive: scannedLiveEnvelope?.isLive,
+    couponStatusText: scannedLiveEnvelope?.statusText,
+    legs: couponLegs,
+  })
 
   function setField(k: string, v: string) {
     setForm(f => ({ ...f, [k]: v }))
     setErrors(e => ({ ...e, [k]: '' }))
-    if (['event_name', 'market_type', 'selection', 'odds'].includes(k)) setCouponLegs(null)
+    if (['event_name', 'market_type', 'selection', 'odds'].includes(k)) {
+      setScannedCoupon(clearAnalystScannerLegsAfterManualEdit)
+    }
   }
 
   // ── Scanner ────────────────────────────────────────────────
   const runScanner = useCallback(async (file: File) => {
+    const scanGeneration = scanGenerationGateRef.current.begin()
     setScanning(true)
     setScanMsg('Scanning coupon...')
     try {
       const { data, media_type } = await fileToBase64(file)
+      if (!scanGenerationGateRef.current.isCurrent(scanGeneration)) return
       const res = await fetch('/api/ai/scanner', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: data, media_type }),
       })
       const json = await res.json()
+      if (!scanGenerationGateRef.current.isCurrent(scanGeneration)) return
       if (!res.ok || !json.success) { setScanMsg(json.error ?? 'Scan failed'); return }
       const d = json.data
       const SPORTS_LIST: Sport[] = ['tennis', 'soccer', 'cs2', 'basketball', 'ice_hockey', 'mma', 'other']
+      const snapshot = buildAnalystScannerSnapshot<AnalysisLegQualityInput>(d)
       setForm(prev => ({
         ...prev,
-        event_name:  d.event_name  ?? prev.event_name,
-        market_type: d.market_type ?? prev.market_type,
-        selection:   d.selection   ?? prev.selection,
-        odds:        d.odds != null ? String(d.odds) : prev.odds,
-        bookmaker:   d.bookmaker   ?? prev.bookmaker,
-        event_time:  d.event_start_text ?? prev.event_time,
+        event_name:  snapshot.form.eventName,
+        market_type: snapshot.form.marketType,
+        selection:   snapshot.form.selection,
+        line:        '',
+        odds:        snapshot.form.odds,
+        bookmaker:   snapshot.form.bookmaker,
+        event_time:  snapshot.form.eventTime,
       }))
-      setCouponLegs(Array.isArray(d.legs) && d.legs.length > 0 ? d.legs : null)
-      if (SPORTS_LIST.includes(d.sport)) setSport(d.sport as Sport)
+      setScannedCoupon({
+        legs: snapshot.legs,
+        liveEnvelope: snapshot.liveEnvelope,
+      })
+      setSport(SPORTS_LIST.includes(d.sport) ? d.sport as Sport : 'other')
       setScanMsg('\u2705 Coupon scanned \u2014 review and analyze')
     } catch {
-      setScanMsg('Scan error \u2014 try again')
+      if (scanGenerationGateRef.current.isCurrent(scanGeneration)) {
+        setScanMsg('Scan error \u2014 try again')
+      }
     } finally {
-      setScanning(false)
+      if (scanGenerationGateRef.current.finish(scanGeneration)) setScanning(false)
     }
   }, [])
 
@@ -290,6 +324,11 @@ export default function AIAnalystPage() {
     setErrors({})
     setRootErr('')
     setAnalysis(null)
+
+    if (scanGenerationGateRef.current.isActive()) {
+      setRootErr(locale === 'uk' ? 'Дочекайтеся завершення сканування купона.' : 'Wait for coupon scanning to finish.')
+      return
+    }
 
     const newErrors: Record<string, string> = {}
     if (!form.event_name.trim()) newErrors.event_name = 'Required'
@@ -321,6 +360,8 @@ export default function AIAnalystPage() {
           offered_odds:    odds,
           bookmaker:       form.bookmaker.trim() || undefined,
           coupon_event_time: form.event_time.trim() || undefined,
+          coupon_is_live: scannedLiveEnvelope?.isLive ?? false,
+          coupon_status_text: scannedLiveEnvelope?.statusText ?? undefined,
           client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           notes:           form.notes.trim() || undefined,
           output_language: locale,
@@ -349,7 +390,7 @@ export default function AIAnalystPage() {
     } finally {
       setAnalyzing(false)
     }
-  }, [sport, locale, form, scoutId, couponLegs, liveCouponBlocked])
+  }, [sport, locale, form, scoutId, couponLegs, scannedLiveEnvelope, liveCouponBlocked])
 
   // ── Act on already-persisted decision ─────────────────────
   // Decision is created immediately by /api/ai/analyst.
@@ -827,10 +868,12 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
         <button
           className="btn-primary flex items-center justify-center gap-2"
           onClick={handleAnalyze}
-          disabled={analyzing || liveCouponBlocked}
+          disabled={analyzing || scanning || liveCouponBlocked}
         >
           {analyzing ? (
             <><Loader2 size={14} className="animate-spin" /> Analyzing…</>
+          ) : scanning ? (
+            <><Loader2 size={14} className="animate-spin" /> Scanning…</>
           ) : liveCouponBlocked ? (
             <>Live analysis unavailable</>
           ) : (
