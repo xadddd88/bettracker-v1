@@ -1650,6 +1650,35 @@ test('scanner: single-leg coupon never gets a total odds value; legacy flattened
   assert.equal(legacy.legs[0].event_name, 'A vs B');
 });
 
+test('editor: Single / Express mode switch is behavioural and preserves the first draft', () => {
+  const { emptyLegDraft, switchLegDraftMode } = loadTrackedBetLib();
+  const first = { ...emptyLegDraft('soccer'), event_name: 'A vs B', odds: '1.80' };
+  const express = switchLegDraftMode([first], 'express');
+  assert.equal(express.length, 2, 'Express must create a second editable leg');
+  assert.deepEqual(express[0], first, 'Express must preserve the existing first leg');
+  assert.equal(express[1].sport, 'soccer', 'the new leg inherits the first leg sport');
+  const single = switchLegDraftMode(express, 'single');
+  assert.deepEqual(single, [first], 'Single keeps the first leg and removes Express-only legs');
+});
+
+test('page: Single / Express controls are real accessible buttons, not passive indicators', () => {
+  const page = readFileSync(path.join(repoRoot, 'app/(app)/bets/new/page.tsx'), 'utf8');
+  assert.ok(page.includes('onClick={() => selectBetMode(\'single\')}'), 'Single must invoke the mode transition');
+  assert.ok(page.includes('onClick={() => selectBetMode(\'express\')}'), 'Express must invoke the mode transition');
+  assert.ok(page.includes('aria-pressed={!isExpress}') && page.includes('aria-pressed={isExpress}'),
+    'both mode buttons must expose their selected state');
+  assert.ok(page.includes("window.confirm('Switch to Single and remove the additional Express legs?')"),
+    'dropping additional legs requires explicit confirmation');
+});
+
+test('dashboard: an Express summary renders every event, market, selection and individual odds', () => {
+  const dashboard = readFileSync(path.join(repoRoot, 'app/(app)/dashboard/page.tsx'), 'utf8');
+  assert.ok(dashboard.includes('bet.legs!.map((item, legIndex) => ('), 'dashboard must map all Express legs');
+  assert.ok(dashboard.includes('{item.event_name}'), 'each Express event must be visible');
+  assert.ok(dashboard.includes('[item.market_type, item.selection]'), 'each leg market and selection must be visible');
+  assert.ok(dashboard.includes('Number(item.odds).toFixed(2)'), 'each leg coefficient must be visible');
+});
+
 test('page: overflow branch runs BEFORE any state write, with the fixed non-echoing message', () => {
   const page = readFileSync(path.join(repoRoot, 'app/(app)/bets/new/page.tsx'), 'utf8');
   const okCheck = page.indexOf('if (!mapped.ok)');
@@ -1733,7 +1762,7 @@ test('page: overflow gate unlocks ONLY via a valid scan or a manual payload edit
   assert.ok(marker.includes('setScannerOverflowBlocked(false)'), 'manual edit must lift the gate');
   assert.ok(marker.includes("setSource('manual')"), 'a manual unlock must switch source to manual');
   const editSites = (page.match(/markManualEdit\(/g) ?? []).length;
-  assert.equal(editSites, 8, 'definition + 7 payload-edit sites (leg fields, add/remove leg, total odds, stake, bookmaker, notes)');
+  assert.equal(editSites, 9, 'definition + 8 payload-edit sites (mode, leg fields, add/remove leg, total odds, stake, bookmaker, notes)');
   assert.ok(!/clearError\('/.test(page.slice(page.indexOf('function updateLeg'))),
     'no payload-edit path may bypass markManualEdit by calling clearError directly');
   // No third unlock path exists.

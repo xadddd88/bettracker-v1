@@ -10,6 +10,7 @@ import {
   computeExpressPreviewTotal,
   scannerDataToDrafts,
   emptyLegDraft,
+  switchLegDraftMode,
   createSubmitIntent,
   beginSubmit,
   resolveSubmit,
@@ -130,6 +131,17 @@ export default function NewBetPage() {
 
   function removeLeg(index: number) {
     setLegs(current => (current.length <= 1 ? current : current.filter((_, i) => i !== index)))
+    markManualEdit('legs')
+  }
+
+  function selectBetMode(mode: 'single' | 'express') {
+    if (busy) return
+    if (mode === 'single' && legs.length > 1) {
+      const confirmed = window.confirm('Switch to Single and remove the additional Express legs?')
+      if (!confirmed) return
+      setTotalOdds('')
+    }
+    setLegs(current => switchLegDraftMode(current, mode))
     markManualEdit('legs')
   }
 
@@ -375,13 +387,25 @@ export default function NewBetPage() {
 
       {/* ── Bet type indicator + source ───────────────────── */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="flex gap-1 bg-gray-800 rounded-lg p-1 w-fit">
-          <div className={`px-4 py-1.5 text-sm rounded-md font-medium ${!isExpress ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}>
+        <div className="flex gap-1 bg-gray-800 rounded-lg p-1 w-fit" role="group" aria-label="Bet type">
+          <button
+            type="button"
+            aria-pressed={!isExpress}
+            disabled={busy}
+            onClick={() => selectBetMode('single')}
+            className={`min-h-11 px-4 py-1.5 text-sm rounded-md font-medium disabled:opacity-50 ${!isExpress ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}
+          >
             Single
-          </div>
-          <div className={`px-4 py-1.5 text-sm rounded-md font-medium ${isExpress ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}>
+          </button>
+          <button
+            type="button"
+            aria-pressed={isExpress}
+            disabled={busy}
+            onClick={() => selectBetMode('express')}
+            className={`min-h-11 px-4 py-1.5 text-sm rounded-md font-medium disabled:opacity-50 ${isExpress ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}
+          >
             Express{isExpress ? ` · ${legs.length} legs` : ''}
-          </div>
+          </button>
         </div>
         {source === 'scanner' && (
           <span className="text-xs text-indigo-300 bg-indigo-950/50 border border-indigo-900 rounded-full px-2.5 py-1">

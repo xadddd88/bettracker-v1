@@ -192,6 +192,22 @@ export function emptyLegDraft(sport: TrackedBetSport = 'soccer'): LegDraft {
   return { sport, event_name: '', market_type: '', selection: '', odds: '' }
 }
 
+export type TrackedBetMode = 'single' | 'express'
+
+// The Single / Express selector is an editor action, not a passive label.
+// Switching to Express creates the required second editable leg; switching
+// back to Single keeps the first leg and drops the rest only after the page
+// has obtained the user's confirmation. Keeping this transition pure makes
+// the exact draft-preservation behaviour regression-testable.
+export function switchLegDraftMode(drafts: LegDraft[], mode: TrackedBetMode): LegDraft[] {
+  const first = drafts[0] ?? emptyLegDraft()
+
+  if (mode === 'single') return [first]
+  if (drafts.length >= 2) return drafts
+
+  return [first, emptyLegDraft(first.sport)]
+}
+
 // Build the request legs from drafts. Empty selection collapses to
 // null (the RPC normalizes the same way); odds parse to numbers so
 // the schema — not string coercion — decides validity.
