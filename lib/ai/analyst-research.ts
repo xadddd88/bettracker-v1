@@ -49,6 +49,7 @@ export type AnalystPromptLeg = {
   isLive?: boolean
   periodOrPhase?: string | null
   statusText?: string | null
+  scoreText?: string | null
 }
 
 export type AnalystWebSearchFailureReason =
@@ -228,20 +229,128 @@ RESEARCH INSTRUCTIONS
 export type AnalystLiveEnvelope = {
   couponIsLive?: boolean | null
   couponStatusText?: string | null
-  legs?: Pick<AnalystPromptLeg, 'isLive' | 'statusText'>[] | null
+  legs?: Pick<AnalystPromptLeg, 'isLive' | 'periodOrPhase' | 'statusText' | 'scoreText'>[] | null
+}
+
+const LIVE_STATUS_PATTERN =
+  /(?:^|[^\p{L}\p{N}])(?:live|in[- ]?play|en vivo|лайв|half[- ]?time|halftime|перерва|перерыв)(?=$|[^\p{L}\p{N}])/iu
+
+const LIVE_PHASE_PATTERN =
+  /(?:^|[^\p{L}\p{N}])(?:q[1-4]|[1-5](?:st|nd|rd|th)?[- ]?(?:half|quarter|period|set)|[1-5](?:-?(?:й|я|е))?[- ]?(?:тайм|чверть|період|период|сет)|1h|2h|ot|extra[- ]?time)(?=$|[^\p{L}\p{N}])/iu
+
+function containsPositiveLiveText(value: string | null | undefined, includePhase = false): boolean {
+  const cleaned = cleanPromptValue(value)
+  if (!cleaned) return false
+  return LIVE_STATUS_PATTERN.test(cleaned) || (includePhase && LIVE_PHASE_PATTERN.test(cleaned))
+}
+
+function containsScoreEvidence(value: string | null | undefined): boolean {
+  const cleaned = cleanPromptValue(value)
+  return cleaned !== null && !/^(?:[-—]|n\/?a|not shown|unknown)$/iu.test(cleaned)
 }
 
 export function hasUnsupportedLiveAnalystInput(input: AnalystLiveEnvelope): boolean {
   if (input.couponIsLive === true) return true
 
-  const couponStatus = cleanPromptValue(input.couponStatusText)?.toLocaleLowerCase('en-US') ?? ''
-  if (/(?:^|\s)(?:live|in[- ]?play|en vivo|лайв)(?:\s|$)/iu.test(couponStatus)) return true
+  if (containsPositiveLiveText(input.couponStatusText, true)) return true
 
   return input.legs?.some(leg => {
     if (leg.isLive === true) return true
-    const status = cleanPromptValue(leg.statusText)?.toLocaleLowerCase('en-US') ?? ''
-    return /(?:^|\s)(?:live|in[- ]?play|en vivo|лайв)(?:\s|$)/iu.test(status)
+    if (containsPositiveLiveText(leg.statusText, true)) return true
+    if (containsPositiveLiveText(leg.periodOrPhase, true)) return true
+    return containsScoreEvidence(leg.scoreText)
   }) ?? false
+}
+
+export type AnalystScannerSnapshot<TLeg extends AnalystPromptLeg> = {
+  form: {
+    eventName: string
+    marketType: string
+    selection: string
+    odds: string
+    bookmaker: string
+    eventTime: string
+  }
+  legs: TLeg[] | null
+  liveEnvelope: {
+    isLive: boolean
+    statusText: string | null
+    periodOrPhase: string | null
+    scoreText: string | null
+  }
+}
+
+export function clearAnalystScannerLegsAfterManualEdit<TLeg, TEnvelope>(current: {
+  legs: TLeg[] | null
+  liveEnvelope: TEnvelope
+} | null): { legs: null; liveEnvelope: TEnvelope } | null {
+  if (!current) return null
+  return { legs: null, liveEnvelope: current.liveEnvelope }
+}
+
+/**
+ * Build one replacement snapshot from one successful scanner response.
+ * Missing scanner fields become empty fields instead of inheriting stale data
+ * from an older coupon. The form, legs and live envelope therefore retain one
+ * provenance boundary even when the scanner response is sparse.
+ */
+export function buildAnalystScannerSnapshot<TLeg extends AnalystPromptLeg>(input: {
+  event_name?: string | null
+  market_type?: string | null
+  selection?: string | null
+  odds?: number | null
+  bookmaker?: string | null
+  event_start_text?: string | null
+  legs?: TLeg[] | null
+}): AnalystScannerSnapshot<TLeg> {
+  const legs = Array.isArray(input.legs) && input.legs.length > 0 ? input.legs : null
+  const isLive = hasUnsupportedLiveAnalystInput({ legs })
+  const evidenceLeg = legs?.find(leg => hasUnsupportedLiveAnalystInput({ legs: [leg] }))
+    ?? legs?.find(leg => Boolean(leg.statusText || leg.periodOrPhase || leg.scoreText))
+    ?? null
+
+  return {
+    form: {
+      eventName: cleanPromptValue(input.event_name) ?? '',
+      marketType: cleanPromptValue(input.market_type) ?? '',
+      selection: cleanPromptValue(input.selection) ?? '',
+      odds: typeof input.odds === 'number' && Number.isFinite(input.odds) ? String(input.odds) : '',
+      bookmaker: cleanPromptValue(input.bookmaker) ?? '',
+      eventTime: cleanPromptValue(input.event_start_text) ?? '',
+    },
+    legs,
+    liveEnvelope: {
+      isLive,
+      statusText: cleanPromptValue(evidenceLeg?.statusText) ?? null,
+      periodOrPhase: cleanPromptValue(evidenceLeg?.periodOrPhase) ?? null,
+      scoreText: cleanPromptValue(evidenceLeg?.scoreText) ?? null,
+    },
+  }
+}
+
+/** A synchronous latest-request-wins gate shared by scanner UI and tests. */
+export function createAnalystScanGenerationGate() {
+  let generation = 0
+  let active = false
+
+  return {
+    begin(): number {
+      generation += 1
+      active = true
+      return generation
+    },
+    isCurrent(requestGeneration: number): boolean {
+      return active && requestGeneration === generation
+    },
+    finish(requestGeneration: number): boolean {
+      if (!active || requestGeneration !== generation) return false
+      active = false
+      return true
+    },
+    isActive(): boolean {
+      return active
+    },
+  }
 }
 
 export function resolveAnalystWebSearchTelemetry(input: {
