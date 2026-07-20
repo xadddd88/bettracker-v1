@@ -40,7 +40,7 @@ test('authenticated Analyst production smoke stays outside financial writes', as
     }
   })
 
-  await page.goto('/login', { waitUntil: 'domcontentloaded' })
+  await page.goto('/login', { waitUntil: 'networkidle' })
   await page.getByLabel('Email', { exact: true }).fill(qaEmail)
   await page.getByLabel('Password', { exact: true }).fill(qaPassword)
 
@@ -64,10 +64,10 @@ test('authenticated Analyst production smoke stays outside financial writes', as
     `Supabase password sign-in returned HTTP ${passwordAuthResponse.status()}`,
   ).toBe(200)
 
-  await page.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+  await page.goto('/dashboard', { waitUntil: 'networkidle' })
   await expect(page).toHaveURL(`${baseUrl}/dashboard`)
 
-  await page.goto('/ai', { waitUntil: 'domcontentloaded' })
+  await page.goto('/ai', { waitUntil: 'networkidle' })
   await expect(page).toHaveURL(`${baseUrl}/ai`)
 
   const runMarker = process.env.GITHUB_RUN_ID || String(Date.now())
