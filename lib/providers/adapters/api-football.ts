@@ -38,6 +38,13 @@ interface ApiFootballFixtureRow {
     home?: { id?: number | string | null; name?: string | null } | null
     away?: { id?: number | string | null; name?: string | null } | null
   }
+  goals?: { home?: number | null; away?: number | null } | null
+  score?: {
+    halftime?: { home?: number | null; away?: number | null } | null
+    fulltime?: { home?: number | null; away?: number | null } | null
+    extratime?: { home?: number | null; away?: number | null } | null
+    penalty?: { home?: number | null; away?: number | null } | null
+  } | null
 }
 
 function scaffoldOnly(method: string): never {
@@ -143,6 +150,62 @@ function parseApiFootballFixture(row: unknown): (ProviderMeta & { fixture: Canon
         timezone: toStringOrNull(fixtureRow.fixture?.timezone),
         venueCity,
         statusShort: toStringOrNull(fixtureRow.fixture?.status?.short),
+      },
+    },
+  }
+}
+
+function finiteScore(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null
+}
+
+function parseApiFootballResult(row: unknown): (ProviderMeta & {
+  providerFixtureId: string
+  status: FixtureStatus
+  outcomeData: Record<string, unknown>
+  winnerRef: string | null
+}) | null {
+  const fixtureRow = row as ApiFootballFixtureRow
+  const providerFixtureId = toStringOrNull(fixtureRow.fixture?.id)
+  if (!providerFixtureId) return null
+
+  const status = mapFixtureStatus(fixtureRow.fixture?.status?.short, fixtureRow.fixture?.status?.long)
+  const homeRef = teamRef(fixtureRow.teams?.home?.id, fixtureRow.teams?.home?.name)
+  const awayRef = teamRef(fixtureRow.teams?.away?.id, fixtureRow.teams?.away?.name)
+  const fulltimeHome = finiteScore(fixtureRow.score?.fulltime?.home ?? fixtureRow.goals?.home)
+  const fulltimeAway = finiteScore(fixtureRow.score?.fulltime?.away ?? fixtureRow.goals?.away)
+
+  let winnerRef: string | null = null
+  if (status === 'finished' && fulltimeHome !== null && fulltimeAway !== null) {
+    if (fulltimeHome > fulltimeAway) winnerRef = homeRef
+    if (fulltimeAway > fulltimeHome) winnerRef = awayRef
+  }
+
+  return {
+    providerFixtureId,
+    rawProviderPayload: row,
+    providerUpdatedAt: null,
+    status,
+    winnerRef,
+    outcomeData: {
+      version: 1,
+      statusShort: toStringOrNull(fixtureRow.fixture?.status?.short),
+      homeRef,
+      awayRef,
+      score: {
+        halftime: {
+          home: finiteScore(fixtureRow.score?.halftime?.home),
+          away: finiteScore(fixtureRow.score?.halftime?.away),
+        },
+        fulltime: { home: fulltimeHome, away: fulltimeAway },
+        extratime: {
+          home: finiteScore(fixtureRow.score?.extratime?.home),
+          away: finiteScore(fixtureRow.score?.extratime?.away),
+        },
+        penalty: {
+          home: finiteScore(fixtureRow.score?.penalty?.home),
+          away: finiteScore(fixtureRow.score?.penalty?.away),
+        },
       },
     },
   }
@@ -255,7 +318,7 @@ export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, 
     scaffoldOnly('fetchOdds')
   }
 
-  async fetchResults(_: { providerFixtureIds: string[] }): Promise<
+  async fetchResults(params: { providerFixtureIds: string[] }): Promise<
     Array<
       ProviderMeta & {
         providerFixtureId: string
@@ -265,7 +328,38 @@ export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, 
       }
     >
   > {
-    scaffoldOnly('fetchResults')
+    const providerFixtureIds = [...new Set(params.providerFixtureIds)]
+    if (providerFixtureIds.length < 1 || providerFixtureIds.length > 20) {
+      throw new ProviderError(this.provider, 'invalid_response', 'result fetch requires 1..20 unique fixture IDs')
+    }
+    if (providerFixtureIds.some((id) => !/^\d+$/.test(id))) {
+      throw new ProviderError(this.provider, 'invalid_response', 'result fetch fixture IDs must be numeric')
+    }
+
+    const { API_FOOTBALL_KEY } = getProviderEnv()
+    const url = new URL(`${BASE_URL}/fixtures`)
+    url.searchParams.set('ids', providerFixtureIds.join('-'))
+
+    const body = await providerFetch<ApiFootballFixturesEnvelope>(this.provider, url.toString(), {
+      headers: { 'x-apisports-key': API_FOOTBALL_KEY },
+    })
+    if (hasProviderErrors(body.errors)) {
+      throw sanitizeProviderError(this.provider, 'invalid_response', undefined, url.toString())
+    }
+    if (body.paging?.total !== 1 && !(body.paging?.total === 0 && body.response?.length === 0)) {
+      throw new ProviderError(this.provider, 'invalid_response', 'result response completeness could not be verified')
+    }
+
+    const requested = new Set(providerFixtureIds)
+    const results = (Array.isArray(body.response) ? body.response : [])
+      .map(parseApiFootballResult)
+      .filter((result): result is NonNullable<typeof result> => Boolean(result))
+
+    if (results.some((result) => !requested.has(result.providerFixtureId))) {
+      throw new ProviderError(this.provider, 'invalid_response', 'result response contained an unexpected fixture ID')
+    }
+
+    return results
   }
 
   // Read-only account/quota check — no fixtures/odds/results data touched.

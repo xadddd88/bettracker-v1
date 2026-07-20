@@ -2150,6 +2150,76 @@ await testAsync('ApiFootballAdapter.fetchFixtures maps provider fixtures into ca
   }
 });
 
+await testAsync('ApiFootballAdapter.fetchResults batches IDs and normalizes final and halftime scores', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+  let observedUrl = '';
+  let fetchCalls = 0;
+
+  globalThis.fetch = async (url) => {
+    fetchCalls++;
+    observedUrl = String(url);
+    return jsonResponse({
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [{
+        fixture: { id: 12345, status: { short: 'FT', long: 'Match Finished' } },
+        teams: { home: { id: 33, name: 'Home' }, away: { id: 40, name: 'Away' } },
+        goals: { home: 2, away: 1 },
+        score: {
+          halftime: { home: 0, away: 1 },
+          fulltime: { home: 2, away: 1 },
+          extratime: { home: null, away: null },
+          penalty: { home: null, away: null },
+        },
+      }],
+    });
+  };
+
+  try {
+    const rows = await new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['12345', '12345'] });
+    assert.equal(fetchCalls, 1, 'up to 20 result IDs must use one provider request');
+    assert.equal(new URL(observedUrl).searchParams.get('ids'), '12345');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].status, 'finished');
+    assert.equal(rows[0].winnerRef, 'api_football:team:33');
+    assert.deepEqual(rows[0].outcomeData.score.halftime, { home: 0, away: 1 });
+    assert.deepEqual(rows[0].outcomeData.score.fulltime, { home: 2, away: 1 });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('ApiFootballAdapter.fetchResults rejects unsafe IDs before network and unexpected response fixtures', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+  let fetchCalls = 0;
+
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    return jsonResponse({
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [{ fixture: { id: 999, status: { short: 'FT' } } }],
+    });
+  };
+
+  try {
+    await assert.rejects(
+      () => new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['1;drop table'] }),
+      /must be numeric/
+    );
+    assert.equal(fetchCalls, 0);
+    await assert.rejects(
+      () => new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['12345'] }),
+      /unexpected fixture ID/
+    );
+    assert.equal(fetchCalls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 await testAsync('ApiFootballAdapter.fetchFixtures rejects league filter without season before any network call', async () => {
   const originalFetch = globalThis.fetch;
   const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
@@ -2449,7 +2519,7 @@ await testAsync('runFixtureSync dry-run returns counts without requiring Supabas
   }
 });
 
-await testAsync('fetchOdds/fetchResults/fetchEnrichment remain out of scope and never touch network', async () => {
+await testAsync('unimplemented odds/tennis-results/enrichment methods stay out of scope and never touch network', async () => {
   const originalFetch = globalThis.fetch;
   const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
   const { SportMonksAdapter } = require(path.join(buildDir, 'lib/providers/adapters/sportmonks.js'));
@@ -2464,7 +2534,6 @@ await testAsync('fetchOdds/fetchResults/fetchEnrichment remain out of scope and 
   try {
     const calls = [
       () => new ApiFootballAdapter().fetchOdds({ providerFixtureIds: ['1'] }),
-      () => new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['1'] }),
       () => new ApiTennisAdapter().fetchOdds({ providerFixtureIds: ['1'] }),
       () => new ApiTennisAdapter().fetchResults({ providerFixtureIds: ['1'] }),
       () => new SportMonksAdapter().fetchEnrichment({ providerFixtureId: '1' }),
