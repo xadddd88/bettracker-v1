@@ -104,6 +104,8 @@ test('authenticated Analyst production smoke stays outside financial writes', as
     page.getByRole('button', { name: 'Skip', exact: true }).click(),
   ])
 
-  await expect(page.getByRole('heading', { name: eventName, exact: true })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: eventName, exact: true, level: 1 }),
+  ).toBeVisible()
   expect(forbiddenRequests).toEqual([])
 })
