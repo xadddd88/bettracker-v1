@@ -51,6 +51,22 @@ export type AnalystPromptLeg = {
   statusText?: string | null
 }
 
+export type AnalystWebSearchFailureReason =
+  | 'global_disabled'
+  | 'profile_disabled'
+  | 'profile_unavailable'
+  | 'configuration_rejected'
+  | 'provider_no_cited_results'
+  | 'research_contract_rejected'
+  | 'claim_source_binding_failed'
+
+export type AnalystWebSearchTelemetry = {
+  enabled: boolean
+  attempted: boolean
+  used: boolean
+  failureReason: AnalystWebSearchFailureReason | null
+}
+
 export type BuildAnalystResearchMessageInput = {
   sport: string
   eventName: string
@@ -178,7 +194,6 @@ export function formatCouponLegsForResearch(legs: AnalystPromptLeg[] | null | un
 }
 
 export function buildAnalystResearchMessage(input: BuildAnalystResearchMessageInput): string {
-  const implied = Number(((1 / input.offeredOdds) * 100).toFixed(2))
   const legText = formatCouponLegsForResearch(input.legs)
 
   return `Research and analyze this betting opportunity.
@@ -193,7 +208,7 @@ COUPON SUMMARY
 - Event: ${input.eventName}
 - Market: ${input.marketType}
 - Selection: ${cleanPromptValue(input.selection) ?? 'not shown'}
-- Offered total odds: ${input.offeredOdds} (bookmaker implied probability ${implied}%)
+- Offered total odds: ${input.offeredOdds} (context only; this is not evidence of fair price, probability, edge, or EV)
 - Bookmaker: ${cleanPromptValue(input.bookmaker) ?? 'not shown'}
 - User context: ${cleanPromptValue(input.notes) ?? 'none'}
 - Line: ${input.line ?? 'not shown'}
@@ -203,11 +218,45 @@ ${legText}
 
 RESEARCH INSTRUCTIONS
 1. Identify the exact fixture before using current facts. Treat the fixture as unverified if the teams/date/time are ambiguous.
-2. Search current sources when the tool is available. Separate sourced current facts from conditional market logic.
+2. When the web-search tool is available, a successful report requires current searches and exact cited excerpts. If search or citation binding fails, do not compensate with unsupported current facts.
 3. For a Bet Builder, analyze every leg and explain correlation, shared match-script risk, and why multiplying leg probabilities as independent would be wrong.
 4. Do not invent lineups, injuries, form, competition, kickoff status, probabilities, edge, or line movement.
 5. Even when pricing is impossible, provide a useful qualitative assessment: what must happen, which leg is more fragile, how the legs interact, and what should be checked before kickoff.
 6. Return structured JSON only.`
+}
+
+export function hasUnsupportedLiveAnalystInput(
+  legs: Pick<AnalystPromptLeg, 'isLive' | 'statusText'>[] | null | undefined,
+): boolean {
+  if (!legs?.length) return false
+  return legs.some(leg => {
+    if (leg.isLive === true) return true
+    const status = cleanPromptValue(leg.statusText)?.toLocaleLowerCase('en-US') ?? ''
+    return /(?:^|\s)(?:live|in[- ]?play|en vivo|лайв)(?:\s|$)/iu.test(status)
+  })
+}
+
+export function resolveAnalystWebSearchTelemetry(input: {
+  globalEnabled: boolean
+  profileEnabled: boolean
+  profileReadFailed: boolean
+  attempted: boolean
+  configurationRejected: boolean
+  researchContractAccepted: boolean
+  citedSourceCount: number
+  boundClaimCount: number
+}): AnalystWebSearchTelemetry {
+  const enabled = input.globalEnabled && !input.profileReadFailed && input.profileEnabled
+  const attempted = enabled && input.attempted
+
+  if (!input.globalEnabled) return { enabled: false, attempted: false, used: false, failureReason: 'global_disabled' }
+  if (input.profileReadFailed) return { enabled: false, attempted: false, used: false, failureReason: 'profile_unavailable' }
+  if (!input.profileEnabled) return { enabled: false, attempted: false, used: false, failureReason: 'profile_disabled' }
+  if (input.configurationRejected) return { enabled, attempted, used: false, failureReason: 'configuration_rejected' }
+  if (!input.researchContractAccepted) return { enabled, attempted, used: false, failureReason: 'research_contract_rejected' }
+  if (input.citedSourceCount < 1) return { enabled, attempted, used: false, failureReason: 'provider_no_cited_results' }
+  if (input.boundClaimCount < 1) return { enabled, attempted, used: false, failureReason: 'claim_source_binding_failed' }
+  return { enabled, attempted, used: true, failureReason: null }
 }
 
 function safeHttpUrl(value: unknown): string | null {
@@ -310,9 +359,9 @@ export function containsAnalystPricingClaim(brief: AnalystResearchBrief): boolea
   ].filter(Boolean).join('\n')
 
   const pricingTerm = [
-    'probabilit(?:y|ies)', 'chance', 'edge', 'expected\\s+value', '\\bev\\b', 'fair\\s+odds?', 'implied',
-    'ймовірн(?:ість|ості)', 'шанс', 'переваг(?:а|и)', 'очікуван(?:а|ої)\\s+цінн(?:ість|ості)', 'справедлив(?:ий|ого)\\s+коефіцієнт',
-    'вероятност(?:ь|и)', 'преимуществ(?:о|а)', 'ожидаем(?:ая|ой)\\s+ценност(?:ь|и)', 'справедлив(?:ый|ого)\\s+коэффициент',
+    'probabilit(?:y|ies)', 'chance', 'edge', 'expected\\s+value', '\\bev\\b', 'fair\\s+(?:odds?|price)', 'implied',
+    'ймовірн(?:ість|ості)', 'шанс', 'переваг(?:а|и)', 'очікуван(?:а|ої)\\s+цінн(?:ість|ості)', 'справедлив(?:ий|ого)\\s+коефіцієнт', 'справедлив(?:а|ої)\\s+цін(?:а|и)',
+    'вероятност(?:ь|и)', 'преимуществ(?:о|а)', 'ожидаем(?:ая|ой)\\s+ценност(?:ь|и)', 'справедлив(?:ый|ого)\\s+коэффициент', 'справедлив(?:ая|ой)\\s+цен(?:а|ы|е)',
     'probabilidad', 'posibilidad', 'ventaja', 'valor\\s+esperado', 'cuota\\s+justa',
     'probabilit[ée]', 'avantage', 'valeur\\s+attendue', 'cote\\s+juste',
     'wahrscheinlichkeit', 'vorteil', 'erwartungswert', 'faire\\s+quote',

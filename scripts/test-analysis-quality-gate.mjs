@@ -48,8 +48,10 @@ const {
   completePausedAnthropicTurn,
   containsAnalystPricingClaim,
   extractAnalystResearchSources,
+  hasUnsupportedLiveAnalystInput,
   parseStoredAnalystResearchBrief,
   parseStoredAnalystResearchSources,
+  resolveAnalystWebSearchTelemetry,
   usedSuccessfulWebSearch,
 } = researchModule;
 
@@ -381,6 +383,11 @@ test('scanner preserves the exact coupon date and time for fixture research', ()
     ],
   });
   assert.equal(explicit.event_start_text, 'Сьогодні, 22:10');
+  assert.equal(explicit.odds, 2.91);
+  assert.equal(explicit.legs.length, 2);
+  assert.deepEqual(explicit.legs.map(leg => leg.eventName), ['Іспанія - Аргентина', 'Іспанія - Аргентина']);
+  assert.deepEqual(explicit.legs.map(leg => leg.marketType), ['Тотал', 'Кутові. Тотал']);
+  assert.deepEqual(explicit.legs.map(leg => leg.selection), ['Більше 2.5', 'Більше 6.5']);
 
   const fromRawText = normalizeLooseCouponExtraction({
     rawText: 'Сьогодні, 22:10\nІспанія - Аргентина',
@@ -405,6 +412,14 @@ test('invalid scanner response returns localized actionable error metadata', () 
 });
 
 console.log('\nAnalysis Quality Gate checks\n');
+
+test('live Analyst preflight recognizes explicit and visible live status only', () => {
+  assert.equal(hasUnsupportedLiveAnalystInput([{ isLive: true, statusText: null }]), true);
+  assert.equal(hasUnsupportedLiveAnalystInput([{ isLive: false, statusText: 'Live' }]), true);
+  assert.equal(hasUnsupportedLiveAnalystInput([{ isLive: false, statusText: 'Лайв' }]), true);
+  assert.equal(hasUnsupportedLiveAnalystInput([{ isLive: false, statusText: 'Scheduled' }]), false);
+  assert.equal(hasUnsupportedLiveAnalystInput(null), false);
+});
 
 test('exact live coupon is parsed per leg and blocked as unsupported live analysis', () => {
   const qualityGate = evaluateAnalysisQuality({
@@ -1017,6 +1032,8 @@ test('Analyst research message preserves Bet Builder legs and coupon time contex
   assert.ok(message.includes('Exact date/time text visible on coupon: Сьогодні, 22:10'), message);
   assert.ok(message.includes('User timezone: Europe/Kyiv'), message);
   assert.ok(message.includes('Offered total odds: 2.91'), message);
+  assert.ok(!message.includes('bookmaker implied probability'), message);
+  assert.ok(message.includes('not evidence of fair price, probability, edge, or EV'), message);
   assert.ok(message.includes('Leg 1: event=Іспанія - Аргентина | market=Тотал | selection=Більше 2.5'), message);
   assert.ok(message.includes('Leg 2: event=Іспанія - Аргентина | market=Кутові. Тотал | selection=Більше 6.5'), message);
   assert.ok(message.includes('correlation'), message);
@@ -1200,6 +1217,43 @@ test('Analyst research rejects probability and edge claims but permits ordinary 
   assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'probabilidad 42%' }), true);
   assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'вероятность 42%' }), true);
   assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'Wahrscheinlichkeit 0,42' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'Коефіцієнт 2.08 (~48%) близький до справедливої ціни.' }), true);
+  assert.equal(containsAnalystPricingClaim({ ...brief, verdict: 'Коэффициент 2.08 близок к справедливой цене.' }), true);
+});
+
+test('Analyst web-search telemetry is explicit and fail-closed', () => {
+  assert.deepEqual(resolveAnalystWebSearchTelemetry({
+    globalEnabled: false,
+    profileEnabled: true,
+    profileReadFailed: false,
+    attempted: false,
+    configurationRejected: false,
+    researchContractAccepted: true,
+    citedSourceCount: 1,
+    boundClaimCount: 1,
+  }), { enabled: false, attempted: false, used: false, failureReason: 'global_disabled' });
+
+  assert.deepEqual(resolveAnalystWebSearchTelemetry({
+    globalEnabled: true,
+    profileEnabled: true,
+    profileReadFailed: false,
+    attempted: true,
+    configurationRejected: false,
+    researchContractAccepted: true,
+    citedSourceCount: 0,
+    boundClaimCount: 0,
+  }), { enabled: true, attempted: true, used: false, failureReason: 'provider_no_cited_results' });
+
+  assert.deepEqual(resolveAnalystWebSearchTelemetry({
+    globalEnabled: true,
+    profileEnabled: true,
+    profileReadFailed: false,
+    attempted: true,
+    configurationRejected: false,
+    researchContractAccepted: true,
+    citedSourceCount: 1,
+    boundClaimCount: 1,
+  }), { enabled: true, attempted: true, used: true, failureReason: null });
 });
 
 test('saved research parser rejects partial nested JSON and unsafe stored sources', () => {
@@ -1250,6 +1304,7 @@ test('editorial black action surfaces explicitly retain readable foreground text
 
 test('web Analyst transports coupon legs and time into the research pipeline', () => {
   const routeSource = readFileSync(path.join(repoRoot, 'app/api/ai/analyst/route.ts'), 'utf8');
+  const scannerRouteSource = readFileSync(path.join(repoRoot, 'app/api/ai/scanner/route.ts'), 'utf8');
   const pageSource = readFileSync(path.join(repoRoot, 'app/(app)/ai/page.tsx'), 'utf8');
   const decisionDetailSource = readFileSync(path.join(repoRoot, 'app/(app)/decisions/[id]/page.tsx'), 'utf8');
 
@@ -1258,13 +1313,27 @@ test('web Analyst transports coupon legs and time into the research pipeline', (
   assert.match(routeSource, /research_brief:\s*researchBrief/);
   assert.match(routeSource, /research_sources:\s*researchSources/);
   assert.match(routeSource, /offered_odds:\s*input\.offered_odds/);
-  assert.match(routeSource, /researchBrief\.sourcedClaims\.length\s*>\s*0/);
+  assert.match(routeSource, /boundClaimCount:\s*researchBrief\.sourcedClaims\.length/);
+  assert.match(routeSource, /if \(hasUnsupportedLiveAnalystInput\(input\.legs\)\)/);
+  assert.ok(
+    routeSource.indexOf('if (hasUnsupportedLiveAnalystInput(input.legs))') < routeSource.indexOf('new Anthropic('),
+    'live guard must run before the provider client/call',
+  );
+  assert.match(routeSource, /code:\s*'live_analysis_not_supported'/);
+  assert.match(routeSource, /web_search_enabled:\s*webSearchTelemetry\.enabled/);
+  assert.match(routeSource, /web_search_attempted:\s*webSearchTelemetry\.attempted/);
+  assert.match(routeSource, /web_search_failure_reason:\s*webSearchTelemetry\.failureReason/);
+  assert.match(routeSource, /if \(webSearchEnabled && !webSearchActuallyUsed\)/);
+  assert.doesNotMatch(routeSource, /callAnalystClaude\([^\n]*buildCallParams\(false\)/);
+  assert.match(scannerRouteSource, /For a Bet Builder on one event, every visible component row is a separate leg/);
   assert.doesNotMatch(pageSource, /Current-source research/);
   assert.doesNotMatch(decisionDetailSource, /Current-source research/);
   assert.match(pageSource, /coupon_event_time:\s*form\.event_time/);
   assert.match(pageSource, /client_timezone:\s*Intl\.DateTimeFormat/);
   assert.match(pageSource, /a\.research_brief\.legs\.map/);
   assert.match(pageSource, /ЦІНУ НЕ ПІДТВЕРДЖЕНО/);
+  assert.match(pageSource, /disabled=\{analyzing \|\| liveCouponBlocked\}/);
+  assert.match(pageSource, /Current research verified/);
   assert.match(decisionDetailSource, /researchBrief\.legs\.map/);
   assert.match(decisionDetailSource, /parseStoredAnalystResearchBrief/);
   assert.match(decisionDetailSource, /parseStoredAnalystResearchSources/);

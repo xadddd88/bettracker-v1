@@ -20,6 +20,8 @@ import {
   completePausedAnthropicTurn,
   containsAnalystPricingClaim,
   extractAnalystResearchSources,
+  hasUnsupportedLiveAnalystInput,
+  resolveAnalystWebSearchTelemetry,
   type AnalystResearchBrief,
 } from '@/lib/ai/analyst-research'
 
@@ -426,17 +428,60 @@ export async function POST(req: NextRequest) {
     }
     const input = parsed.data
 
+    // Live markets need current score, phase, clock and live-price inputs.
+    // This route is intentionally pre-match only, so reject before profile
+    // reads, provider calls, persistence, or any generated narrative.
+    if (hasUnsupportedLiveAnalystInput(input.legs)) {
+      await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, {
+        sport: input.sport,
+        error_type: 'live_analysis_not_supported',
+      })
+      const error = input.output_language === 'uk'
+        ? 'Live-аналіз недоступний без поточного рахунку, фази матчу, ігрового часу та актуальної live-лінії. Для цього модуля використовуйте лише pre-match купони.'
+        : 'Live analysis requires the current score, match phase, game clock, and current live odds. This module supports pre-match coupons only.'
+      return NextResponse.json(
+        { success: false, error, code: 'live_analysis_not_supported' },
+        { status: 422 },
+      )
+    }
+
     // 4. Use the same explicit global + per-user search gate as Scout. A
     // failed profile read disables search; it never widens access.
     const globalWebSearchEnabled = process.env.ANTHROPIC_WEB_SEARCH_ENABLED === 'true'
-    let webSearchEnabled = false
+    let profileWebSearchEnabled = false
+    let profileReadFailed = false
     if (globalWebSearchEnabled) {
       const profileRes = await supabase
         .from('profiles')
         .select('web_search_enabled')
         .eq('id', user.id)
         .single()
-      webSearchEnabled = !profileRes.error && (profileRes.data?.web_search_enabled ?? false)
+      profileReadFailed = !!profileRes.error
+      profileWebSearchEnabled = !profileRes.error && (profileRes.data?.web_search_enabled ?? false)
+    }
+    const webSearchEnabled = globalWebSearchEnabled && !profileReadFailed && profileWebSearchEnabled
+
+    if (globalWebSearchEnabled && profileReadFailed) {
+      await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, {
+        sport: input.sport,
+        error_type: 'research_profile_unavailable',
+        web_search_enabled: false,
+        web_search_attempted: false,
+        web_search_failure_reason: 'profile_unavailable',
+      })
+      return NextResponse.json({
+        success: false,
+        error: input.output_language === 'uk'
+          ? 'Не вдалося перевірити налаштування пошуку. Аналіз не запускався — спробуйте ще раз пізніше.'
+          : 'Research settings could not be verified. Analysis was not started; please try again later.',
+        code: 'current_research_unavailable',
+        research: {
+          web_search_enabled: false,
+          web_search_attempted: false,
+          web_search_used: false,
+          web_search_failure_reason: 'profile_unavailable',
+        },
+      }, { status: 503 })
     }
 
     await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_STARTED, {
@@ -480,19 +525,45 @@ export async function POST(req: NextRequest) {
     })
 
     let message: Anthropic.Message
-    let searchFallbackUsed = false
     try {
       message = await callAnalystClaude(anthropic, buildCallParams(webSearchEnabled))
     } catch (error) {
-      // Only a request/configuration rejection is known to precede execution
-      // and can be retried safely. Ambiguous timeout/network/5xx failures are
-      // never automatically retried.
+      // A deterministic web-search configuration rejection is surfaced
+      // directly. A second call without research would only manufacture a
+      // lower-quality narrative, so this route never falls back or retries.
       if (webSearchEnabled && isWebSearchConfigurationError(error)) {
-        searchFallbackUsed = true
-        message = await callAnalystClaude(anthropic, buildCallParams(false))
-      } else {
-        throw error
+        const telemetry = resolveAnalystWebSearchTelemetry({
+          globalEnabled: globalWebSearchEnabled,
+          profileEnabled: profileWebSearchEnabled,
+          profileReadFailed,
+          attempted: true,
+          configurationRejected: true,
+          researchContractAccepted: false,
+          citedSourceCount: 0,
+          boundClaimCount: 0,
+        })
+        await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, {
+          sport: input.sport,
+          error_type: 'current_research_unavailable',
+          web_search_enabled: telemetry.enabled,
+          web_search_attempted: telemetry.attempted,
+          web_search_failure_reason: telemetry.failureReason,
+        })
+        return NextResponse.json({
+          success: false,
+          error: input.output_language === 'uk'
+            ? 'Пошук актуальних джерел недоступний через конфігурацію. Аналіз не збережено.'
+            : 'Current-source search is unavailable due to configuration. The analysis was not saved.',
+          code: 'current_research_unavailable',
+          research: {
+            web_search_enabled: telemetry.enabled,
+            web_search_attempted: telemetry.attempted,
+            web_search_used: telemetry.used,
+            web_search_failure_reason: telemetry.failureReason,
+          },
+        }, { status: 503 })
       }
+      throw error
     }
 
     const extractedResearchSources = extractAnalystResearchSources(message.content)
@@ -551,9 +622,49 @@ export async function POST(req: NextRequest) {
     const researchBrief = alignedResearchBrief ?? buildFallbackResearchBrief(input)
     const boundSourceUrls = new Set(researchBrief.sourcedClaims.map(claim => claim.sourceUrl))
     const researchSources = extractedResearchSources.filter(source => boundSourceUrls.has(source.url))
-    const webSearchActuallyUsed =
-      !searchFallbackUsed && webSearchEnabled &&
-      researchBrief.sourcedClaims.length > 0 && researchSources.length > 0
+    const webSearchTelemetry = resolveAnalystWebSearchTelemetry({
+      globalEnabled: globalWebSearchEnabled,
+      profileEnabled: profileWebSearchEnabled,
+      profileReadFailed,
+      attempted: webSearchEnabled,
+      configurationRejected: false,
+      researchContractAccepted: alignedResearchBrief !== null,
+      citedSourceCount: extractedResearchSources.length,
+      boundClaimCount: researchBrief.sourcedClaims.length,
+    })
+    const webSearchActuallyUsed = webSearchTelemetry.used
+
+    // When current-source research is enabled for this user, it is a hard
+    // dependency: do not persist or display a generic provider narrative if
+    // the model skipped search, citations were missing, or the research
+    // contract/pricing guard failed. The user may retry, but we never retry an
+    // ambiguous provider call automatically.
+    if (webSearchEnabled && !webSearchActuallyUsed) {
+      await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, {
+        sport: input.sport,
+        error_type: 'current_research_unavailable',
+        web_search_enabled: webSearchTelemetry.enabled,
+        web_search_attempted: webSearchTelemetry.attempted,
+        web_search_failure_reason: webSearchTelemetry.failureReason,
+      })
+      const error = input.output_language === 'uk'
+        ? 'Не вдалося підтвердити актуальні дані цитованими джерелами. Аналіз не збережено — спробуйте ще раз пізніше.'
+        : 'Current facts could not be verified with cited sources. The analysis was not saved; please try again later.'
+      return NextResponse.json(
+        {
+          success: false,
+          error,
+          code: 'current_research_unavailable',
+          research: {
+            web_search_enabled: webSearchTelemetry.enabled,
+            web_search_attempted: webSearchTelemetry.attempted,
+            web_search_used: webSearchTelemetry.used,
+            web_search_failure_reason: webSearchTelemetry.failureReason,
+          },
+        },
+        { status: 503 },
+      )
+    }
 
     // 8. Server owns pricing, but the quality gate can suppress it entirely.
     const qualityGate = evaluateAnalysisQuality({
@@ -631,7 +742,10 @@ export async function POST(req: NextRequest) {
       trust_view:          trustPayload.trust_view,
       research_brief:      researchBrief,
       research_sources:    researchSources,
-      web_search_used:     webSearchActuallyUsed,
+      web_search_enabled:  webSearchTelemetry.enabled,
+      web_search_attempted: webSearchTelemetry.attempted,
+      web_search_used:      webSearchActuallyUsed,
+      web_search_failure_reason: webSearchTelemetry.failureReason,
     }
 
     // Decision #048: persistence is server-only. The user client above
@@ -696,7 +810,10 @@ export async function POST(req: NextRequest) {
         confidence_bucket: bucketConfidence(analysis.confidence_score),
         odds_bucket:       bucketOdds(input.offered_odds),
         decision_id:       decisionId,
+        web_search_enabled: webSearchTelemetry.enabled,
+        web_search_attempted: webSearchTelemetry.attempted,
         web_search_used:   webSearchActuallyUsed,
+        web_search_failure_reason: webSearchTelemetry.failureReason,
       }),
       trackServerEvent(user.id, EVENTS.DECISION_CREATED, {
         decision_id:    decisionId,
@@ -725,7 +842,10 @@ export async function POST(req: NextRequest) {
         trust_view:          trustPayload.trust_view,
         research_brief:      researchBrief,
         research_sources:    researchSources,
+        web_search_enabled:  webSearchTelemetry.enabled,
+        web_search_attempted: webSearchTelemetry.attempted,
         web_search_used:     webSearchActuallyUsed,
+        web_search_failure_reason: webSearchTelemetry.failureReason,
         // Input context echoed back (for UI display, PDF, share)
         sport:           input.sport,
         event_name:      input.event_name,
