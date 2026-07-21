@@ -1,18 +1,76 @@
+// Broadcast Noir v3.1 semantic adapter.
+// Canonical values live in /design-system/broadcast-noir.v3.1.json.
+// scripts/test-broadcast-noir-design-system.mjs prevents Web/mobile drift.
+export const semanticColors = {
+  night: '#070A08',
+  field: '#111813',
+  fieldRaised: '#202C23',
+  borderSubtle: '#334036',
+  borderStrong: '#59685E',
+  textPrimary: '#F2F5F0',
+  textMuted: '#8D978F',
+  textQuiet: '#78847B',
+  textQuietRaised: '#8D978F',
+  dataValue: '#C7D0C8',
+  signal: '#BFFF3B',
+  onSignal: '#061008',
+  success: '#67DF91',
+  negative: '#FF7474',
+  review: '#FFC05B',
+} as const;
+
+export const typography = {
+  heroMobile: { fontSize: 34, lineHeight: 38 },
+  heroTablet: { fontSize: 44, lineHeight: 48 },
+  heroDesktop: { fontSize: 56, lineHeight: 60 },
+  pageTitleMobile: { fontSize: 28, lineHeight: 34 },
+  pageTitleDesktop: { fontSize: 36, lineHeight: 42 },
+  sectionMobile: { fontSize: 20, lineHeight: 26 },
+  sectionDesktop: { fontSize: 24, lineHeight: 30 },
+  bodyMobile: { fontSize: 14, lineHeight: 21 },
+  bodyDesktop: { fontSize: 15, lineHeight: 23 },
+  metadataCompact: { fontSize: 11, lineHeight: 16 },
+  metadataPreferred: { fontSize: 12, lineHeight: 17 },
+} as const;
+
+export const geometry = {
+  radiusControl: 8,
+  webTouchMinimum: 44,
+  iosTouchMinimum: 44,
+  androidTouchMinimum: 48,
+} as const;
+
+export const motion = {
+  pressMinimumMs: 80,
+  pressMaximumMs: 120,
+  hoverMinimumMs: 160,
+  hoverMaximumMs: 180,
+  routeMinimumMs: 220,
+  routeMaximumMs: 280,
+  sweepMinimumMs: 280,
+  sweepMaximumMs: 360,
+  successMaximumMs: 800,
+  infiniteDecorativeLoops: false,
+} as const;
+
+// Transitional aliases keep current screens compiling while PRs B-F migrate
+// them to semanticColors and the new primitives. Every value is derived from
+// Broadcast Noir; there is no second theme or independent palette.
 export const colors = {
-  accent: '#050505',
-  accentMuted: '#E8FF00',
-  background: '#F5F5F0',
-  border: '#0A0A0A',
-  danger: '#C3162D',
-  magenta: '#E8FF00',
-  muted: '#676762',
-  placeholder: '#8A8A84',
-  secondaryText: '#252522',
-  success: '#08783E',
-  surface: '#FFFFFF',
-  surfaceMuted: '#E9E9E4',
-  surfaceRaised: '#0A0A0A',
-  text: '#050505',
-  ultraviolet: '#5A45FF',
-  warning: '#8B6200',
+  accent: semanticColors.fieldRaised,
+  accentMuted: semanticColors.fieldRaised,
+  background: semanticColors.night,
+  border: semanticColors.borderStrong,
+  danger: semanticColors.negative,
+  magenta: semanticColors.signal,
+  muted: semanticColors.textQuiet,
+  placeholder: semanticColors.textQuiet,
+  secondaryText: semanticColors.textMuted,
+  success: semanticColors.success,
+  surface: semanticColors.field,
+  surfaceMuted: semanticColors.fieldRaised,
+  surfaceRaised: semanticColors.fieldRaised,
+  text: semanticColors.textPrimary,
+  ultraviolet: semanticColors.signal,
+  warning: semanticColors.review,
 } as const;
