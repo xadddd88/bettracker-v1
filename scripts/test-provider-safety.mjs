@@ -2230,6 +2230,41 @@ await testAsync('ApiFootballAdapter.fetchResults never substitutes extra-time go
   }
 });
 
+await testAsync('ApiFootballAdapter.fetchResults never builds a hybrid full-time score from partial sources', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+
+  globalThis.fetch = async () =>
+    jsonResponse({
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [
+        {
+          fixture: { id: 12345, status: { short: 'FT', long: 'Match Finished' } },
+          teams: { home: { id: 33, name: 'Home' }, away: { id: 40, name: 'Away' } },
+          goals: { home: 3, away: 3 },
+          score: { fulltime: { home: 2, away: null } },
+        },
+        {
+          fixture: { id: 67890, status: { short: 'FT', long: 'Match Finished' } },
+          teams: { home: { id: 50, name: 'Other Home' }, away: { id: 60, name: 'Other Away' } },
+          goals: { home: 2, away: 1 },
+          score: { fulltime: { home: -1, away: -1 } },
+        },
+      ],
+    });
+
+  try {
+    const rows = await new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['12345', '67890'] });
+    for (const row of rows) {
+      assert.deepEqual(row.outcomeData.score.fulltime, { home: null, away: null });
+      assert.equal(row.winnerRef, null, 'partial or invalid full-time data must not invent a winner');
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 await testAsync('ApiFootballAdapter.fetchResults rejects unsafe IDs before network and unexpected response fixtures', async () => {
   const originalFetch = globalThis.fetch;
   const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
@@ -2246,6 +2281,11 @@ await testAsync('ApiFootballAdapter.fetchResults rejects unsafe IDs before netwo
 
   try {
     await assert.rejects(
+      () => new ApiFootballAdapter().fetchResults({ providerFixtureIds: Array(21).fill('12345') }),
+      /requires 1\.\.20 fixture IDs/
+    );
+    assert.equal(fetchCalls, 0, 'the raw batch bound must run before deduplication and network');
+    await assert.rejects(
       () => new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['1;drop table'] }),
       /must be numeric/
     );
@@ -2255,6 +2295,27 @@ await testAsync('ApiFootballAdapter.fetchResults rejects unsafe IDs before netwo
       /unexpected fixture ID/
     );
     assert.equal(fetchCalls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('ApiFootballAdapter.fetchResults rejects rows that contradict paging.total=0', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+
+  globalThis.fetch = async () =>
+    jsonResponse({
+      errors: [],
+      paging: { current: 0, total: 0 },
+      response: [{ fixture: { id: 12345, status: { short: 'FT' } } }],
+    });
+
+  try {
+    await assert.rejects(
+      () => new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['12345'] }),
+      /paging is inconsistent/
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

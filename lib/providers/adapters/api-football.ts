@@ -170,7 +170,7 @@ function parseApiFootballFixture(row: unknown): (ProviderMeta & { fixture: Canon
 }
 
 function finiteScore(value: unknown): number | null {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
 }
 
 function parseApiFootballResult(row: unknown): ProviderMeta & {
@@ -196,12 +196,29 @@ function parseApiFootballResult(row: unknown): ProviderMeta & {
   const statusShort = toStringOrNull(fixtureRow.fixture?.status?.short)?.toUpperCase() ?? null
   const homeRef = teamRef(fixtureRow.teams?.home?.id, fixtureRow.teams?.home?.name)
   const awayRef = teamRef(fixtureRow.teams?.away?.id, fixtureRow.teams?.away?.name)
-  const fulltimeHome = finiteScore(
-    fixtureRow.score?.fulltime?.home ?? (statusShort === 'FT' ? fixtureRow.goals?.home : null)
-  )
-  const fulltimeAway = finiteScore(
-    fixtureRow.score?.fulltime?.away ?? (statusShort === 'FT' ? fixtureRow.goals?.away : null)
-  )
+  const rawFulltimeHome = fixtureRow.score?.fulltime?.home
+  const rawFulltimeAway = fixtureRow.score?.fulltime?.away
+  const explicitFulltimeHome = finiteScore(rawFulltimeHome)
+  const explicitFulltimeAway = finiteScore(rawFulltimeAway)
+  const goalsHome = finiteScore(fixtureRow.goals?.home)
+  const goalsAway = finiteScore(fixtureRow.goals?.away)
+  const hasExplicitFulltimePair = explicitFulltimeHome !== null && explicitFulltimeAway !== null
+  const canUseFtGoalsPair =
+    statusShort === 'FT' &&
+    (rawFulltimeHome === null || rawFulltimeHome === undefined) &&
+    (rawFulltimeAway === null || rawFulltimeAway === undefined) &&
+    explicitFulltimeHome === null &&
+    explicitFulltimeAway === null &&
+    goalsHome !== null &&
+    goalsAway !== null
+  // Never synthesize a score by mixing one side from score.fulltime with the
+  // other side from goals. A partial/conflicting provider pair is unusable.
+  const fulltimeHome = hasExplicitFulltimePair
+    ? explicitFulltimeHome
+    : canUseFtGoalsPair ? goalsHome : null
+  const fulltimeAway = hasExplicitFulltimePair
+    ? explicitFulltimeAway
+    : canUseFtGoalsPair ? goalsAway : null
 
   let winnerRef: string | null = null
   if (status === 'finished' && fulltimeHome !== null && fulltimeAway !== null) {
@@ -356,10 +373,10 @@ export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, 
       }
     >
   > {
-    const providerFixtureIds = [...new Set(params.providerFixtureIds)]
-    if (providerFixtureIds.length < 1 || providerFixtureIds.length > 20) {
-      throw new ProviderError(this.provider, 'invalid_response', 'result fetch requires 1..20 unique fixture IDs')
+    if (!Array.isArray(params.providerFixtureIds) || params.providerFixtureIds.length < 1 || params.providerFixtureIds.length > 20) {
+      throw new ProviderError(this.provider, 'invalid_response', 'result fetch requires 1..20 fixture IDs')
     }
+    const providerFixtureIds = [...new Set(params.providerFixtureIds)]
     if (providerFixtureIds.some((id) => !/^\d+$/.test(id))) {
       throw new ProviderError(this.provider, 'invalid_response', 'result fetch fixture IDs must be numeric')
     }
@@ -380,6 +397,9 @@ export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, 
     }
     if (!Array.isArray(body.response)) {
       throw new ProviderError(this.provider, 'invalid_response', 'result response rows are missing or malformed')
+    }
+    if (pagingTotal === 0 && body.response.length > 0) {
+      throw new ProviderError(this.provider, 'invalid_response', 'result response paging is inconsistent with returned rows')
     }
 
     const requested = new Set(providerFixtureIds)

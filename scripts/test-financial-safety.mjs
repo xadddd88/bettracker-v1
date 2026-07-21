@@ -525,6 +525,33 @@ await withCompiledAlias(async () => {
     }
   });
 
+  test('auto-grader: malformed scores and ambiguous duplicate participant names fail closed', () => {
+    assert.equal(
+      gradeFootballLeg(
+        { eventName: 'A - B', marketType: '1x2', selection: 'A' },
+        finished({ home: -1, away: 0 }, { home: 0, away: 0 })
+      ),
+      'needs_review',
+      'negative full-time scores must never produce a winner'
+    );
+    assert.equal(
+      gradeFootballLeg(
+        { eventName: 'A - B', marketType: 'Total', selection: 'Under 2.5' },
+        finished({ home: 1, away: -1 }, { home: 0, away: 0 })
+      ),
+      'needs_review',
+      'negative score components must never be summed for totals'
+    );
+    assert.equal(
+      gradeFootballLeg(
+        { eventName: 'United - United', marketType: '1x2', selection: 'United' },
+        finished({ home: 1, away: 0 }, { home: 0, away: 0 })
+      ),
+      'needs_review',
+      'duplicate normalized participant names cannot identify a side'
+    );
+  });
+
   test('auto-grader: Express is won only when every leg wins and never auto-reprices void legs', () => {
     assert.equal(gradeExpress(['won', 'won']), 'won');
     assert.equal(gradeExpress(['won', 'lost']), 'lost');

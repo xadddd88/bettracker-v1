@@ -76,7 +76,7 @@ function selectedSide(eventName: string, selection: string): 'home' | 'away' | '
   const value = normalized(selection)
   if (['draw', 'x', 'ничья', 'нічия'].includes(value)) return 'draw'
   const participants = eventParticipants(eventName)
-  if (!participants) return null
+  if (!participants || participants[0] === participants[1]) return null
   if (value === participants[0]) return 'home'
   if (value === participants[1]) return 'away'
   return null
@@ -96,7 +96,15 @@ function parseTotal(selection: string): { direction: 'over' | 'under'; line: num
 }
 
 function scoreReady(score: FootballScorePair): score is { home: number; away: number } {
-  return Number.isInteger(score.home) && Number.isInteger(score.away)
+  const { home, away } = score
+  return (
+    typeof home === 'number' &&
+    typeof away === 'number' &&
+    Number.isSafeInteger(home) &&
+    Number.isSafeInteger(away) &&
+    home >= 0 &&
+    away >= 0
+  )
 }
 
 export function gradeFootballLeg(
