@@ -2137,7 +2137,7 @@ Reference: `docs/finished-fixture-result-presence-dry-run-scope-decision-059.md`
 **Date:** 2026-07-15
 **Proposed by:** CPO + Founder
 **Approved by:** Founder (Decision #060 APPROVED)
-**Status:** EXECUTED / VERIFIED / CLOSED 2026-07-16. Migration 024 was applied and its exact catalog contract and authenticated Phase A RPC smoke were verified. Phase B was approved by the CPO, merged via PR #159 as `1926d9a82759cd1e4e97378ca15addf010c0bf28`, deployed READY, and verified by one separately authorized authenticated production API smoke. Decision #060 is the highest-numbered CLOSED decision. At closure (2026-07-16), #061 was the next unreserved number; #061 and #062 have since been occupied and are ACTIVE, #063 is now a proposed reservation, and the current next unreserved decision is #064.
+**Status:** EXECUTED / VERIFIED / CLOSED 2026-07-16. Migration 024 was applied and its exact catalog contract and authenticated Phase A RPC smoke were verified. Phase B was approved by the CPO, merged via PR #159 as `1926d9a82759cd1e4e97378ca15addf010c0bf28`, deployed READY, and verified by one separately authorized authenticated production API smoke. Decision #060 is the highest-numbered CLOSED decision. At closure (2026-07-16), #061 was the next unreserved number; #061 and #062 have since been occupied and are ACTIVE, #063 is now occupied and CLOSED (docs-only), and the current next unreserved decision is #064.
 
 **Decision:** Deliver one safe atomic write path and a unified mobile-first tracker form for Single and Express/parlay entries: Scanner → editable ordered legs → Bet, while keeping the legacy `create_quick_bet` function unchanged.
 
@@ -2159,7 +2159,7 @@ Reference: `docs/finished-fixture-result-presence-dry-run-scope-decision-059.md`
 
 **Post-execution boundaries:** migrations / RPC changes in Phase B 0; direct DML on financial tables 0; service_role in the user flow 0; provider calls 0; `create_quick_bet` remains unchanged; Analyst/Scout/pricing/probability/edge/EV untouched. No additional synthetic production smoke is authorized by this record. Decision #056 runtime remains NOT APPROVED / NOT RUN. Results ingestion and automated settlement remain HOLD. Decision #050 SMTP round-trip remains PENDING. CSP Phase B remains NOT APPROVED. FP-001 remains ACTIVE.
 
-**Numbering:** Decision #060 occupied and CLOSED. At closure, #061 was the next unreserved number; #061 and #062 are now occupied and ACTIVE, #063 is a proposed reservation, and the current next unreserved decision is #064.
+**Numbering:** Decision #060 occupied and CLOSED. At closure, #061 was the next unreserved number; #061 and #062 are now occupied and ACTIVE, #063 is occupied and CLOSED (docs-only), and the current next unreserved decision is #064.
 
 Reference: `docs/coupon-to-tracker-scope-decision-060.md`
 
@@ -2179,7 +2179,7 @@ Reference: `docs/coupon-to-tracker-scope-decision-060.md`
 
 **Boundaries:** 0 production/Supabase/provider calls; 0 migrations, RPC, or schema changes; `create_tracked_bet`, `create_quick_bet`, and `POST /api/bets/tracked` unchanged; Playwright/Supabase-stub harness NOT implemented (deferred); settlement/results HOLD; Decision #056 runtime NOT APPROVED; FP-001 ACTIVE. Phase A1 is merged/deployed, while Decision #061 remains ACTIVE because Phase A2 is DEFERRED / NOT APPROVED.
 
-**Numbering:** Decision #061 occupied and ACTIVE. #062 is now occupied and ACTIVE (Mobile Phase 0); #063 is a proposed reservation; next unreserved decision #064.
+**Numbering:** Decision #061 occupied and ACTIVE. #062 is now occupied and ACTIVE (Mobile Phase 0); #063 is occupied and CLOSED (docs-only); next unreserved decision #064.
 
 Reference: `docs/daily-flow-acceptance-decision-061.md`
 
@@ -2197,7 +2197,7 @@ Reference: `docs/daily-flow-acceptance-decision-061.md`
 
 **Validation:** merged mobile phases passed their unit/boundary, TypeScript, lint, Expo config/export, GitHub, and Vercel checks. Founder completed and installed replacement development builds on registered Android and iOS devices. Phase 1A financial-safety is 72/72 on local stubs; production/Supabase/provider calls and writes 0, and no EAS build/update is part of Phase 1A.
 
-**Numbering:** Decision #062 occupied and ACTIVE; #063 is a proposed reservation; next unreserved decision #064.
+**Numbering:** Decision #062 occupied and ACTIVE; #063 is occupied and CLOSED (docs-only); next unreserved decision #064.
 
 Reference: `docs/mobile-phase-0-decision-062.md`
 
@@ -2208,7 +2208,7 @@ Phase 1A reference: `docs/mobile-bearer-bridge-decision-062.md`
 ## Decision #063 — Tracked-Leg Fixture Lineage Contract
 **Date:** 2026-07-21
 **Proposed by:** CPO
-**Status:** PROPOSED / DOCS-ONLY. Founder approval and merge pending. No runtime or production authority.
+**Status:** EXECUTED / CLOSED, DOCS-ONLY — Founder-approved; merged via PR #183 as `df4723f2d55b220a4f64f54baf56a3333a8a61b7`. No runtime or production authority.
 
 **Decision:** Before any Tracker leg can be matched to a provider result, the
 leg must carry an additive, server-verified relationship to both a canonical
@@ -2229,10 +2229,23 @@ and derives trusted snapshots. Idempotency binds every ordered leg's lineage,
 and verified lineage is immutable except through a separately approved audited
 correction RPC.
 
-**Non-authorization:** Runtime code 0; migrations/RPCs 0; Supabase/provider
-reads/writes 0; scheduler/result matching/grading callers 0; settlement and
-bankroll mutations 0; deploy/smoke 0. Draft PRs #181/#182 are excluded from the
-main baseline. Decision #057 and FP-001 holds remain active.
+**Non-authorization:** The Decision #063 merge changed documentation/status only:
+runtime code 0; migrations/RPCs 0; Supabase/provider reads/writes 0;
+scheduler/result matching/grading callers 0; settlement and bankroll mutations
+0; production smoke 0. Decision #057 and FP-001 holds remain active.
+
+**Post-merge reconciliation:** PR #182 later merged as `d103947f` and deployed a
+fail-closed grading foundation, but still authorized no production provider
+calls, result writes, scheduler, or automated settlement. PR #181 later applied
+migration `20260721152711_cancel_pending_bet`, merged as `d5ebb87d`, and deployed
+its tracker/Express and pending-cancellation correction. PR #181 is an
+unnumbered operational correction: it does not consume or reassign Decision
+#062, which remains the Mobile Founder client. Its emergency kill switch is
+`docs/cancel-pending-bet-rollback.sql`; the executable SQL is unchanged by the
+governance rename.
+
+**Numbering:** Decision #063 occupied and CLOSED (docs-only). Decision #064 is
+the next unreserved number.
 
 Reference: `docs/tracked-leg-fixture-lineage-contract-decision-063.md`
 
