@@ -1,5 +1,7 @@
 # Decision #062 — mobile Coupon Scanner wiring
 
+Status: MERGED via PR #171 as `43a6ee7fe5944dc1ed64d81a715bd94a7f02d11d` on 2026-07-19. Coupon analysis remains review-only; this status records no production mobile smoke, automatic Tracker save, settlement, or financial write.
+
 ## Scope
 
 This stage connects the prepared mobile Coupon image to the authenticated BetTracker scanner route while preserving the existing founder safety boundary.
