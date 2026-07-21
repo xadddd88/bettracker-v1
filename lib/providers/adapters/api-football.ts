@@ -51,7 +51,7 @@ function scaffoldOnly(method: string): never {
   throw new ProviderError(
     'api_football',
     'unknown',
-    `ApiFootballAdapter.${method} is outside M1.2.b scope — only fixture sync is implemented`
+    `ApiFootballAdapter.${method} is outside the currently approved adapter scope`
   )
 }
 
@@ -80,6 +80,20 @@ function mapFixtureStatus(shortStatus?: string | null, longStatus?: string | nul
   if (['ABD'].includes(short) || long.includes('abandon')) return 'abandoned'
 
   return 'scheduled'
+}
+
+function mapResultStatus(shortStatus?: string | null): FixtureStatus | null {
+  const short = shortStatus?.trim().toUpperCase() ?? ''
+
+  if (['TBD', 'NS'].includes(short)) return 'scheduled'
+  if (['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(short)) return 'live'
+  if (['FT', 'AET', 'PEN'].includes(short)) return 'finished'
+  if (short === 'PST') return 'postponed'
+  if (['CANC', 'CND'].includes(short)) return 'cancelled'
+  if (short === 'ABD') return 'abandoned'
+  if (['AWD', 'WO'].includes(short)) return 'walkover'
+
+  return null
 }
 
 function teamRef(id: unknown, name: unknown): string | null {
@@ -159,17 +173,26 @@ function finiteScore(value: unknown): number | null {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null
 }
 
-function parseApiFootballResult(row: unknown): (ProviderMeta & {
+function parseApiFootballResult(row: unknown): ProviderMeta & {
   providerFixtureId: string
   status: FixtureStatus
   outcomeData: Record<string, unknown>
   winnerRef: string | null
-}) | null {
+} {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) {
+    throw new ProviderError('api_football', 'invalid_response', 'result response contained a malformed row')
+  }
+
   const fixtureRow = row as ApiFootballFixtureRow
   const providerFixtureId = toStringOrNull(fixtureRow.fixture?.id)
-  if (!providerFixtureId) return null
+  if (!providerFixtureId) {
+    throw new ProviderError('api_football', 'invalid_response', 'result response row has no fixture ID')
+  }
 
-  const status = mapFixtureStatus(fixtureRow.fixture?.status?.short, fixtureRow.fixture?.status?.long)
+  const status = mapResultStatus(fixtureRow.fixture?.status?.short)
+  if (!status) {
+    throw new ProviderError('api_football', 'invalid_response', 'result response contained an unknown fixture status')
+  }
   const homeRef = teamRef(fixtureRow.teams?.home?.id, fixtureRow.teams?.home?.name)
   const awayRef = teamRef(fixtureRow.teams?.away?.id, fixtureRow.teams?.away?.name)
   const fulltimeHome = finiteScore(fixtureRow.score?.fulltime?.home ?? fixtureRow.goals?.home)
@@ -211,9 +234,9 @@ function parseApiFootballResult(row: unknown): (ProviderMeta & {
   }
 }
 
-// M1.2.b: fixture fetch only. This path is read-only by itself; writes are
-// gated in lib/providers/fixture-sync.ts and the operator route. Odds/results
-// remain scaffold-only until later milestones.
+// Fixture and result reads are read-only by themselves. Fixture writes remain
+// gated in lib/providers/fixture-sync.ts and the operator route; this result
+// foundation has no caller, scheduler, write, or settlement path.
 export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, ResultSyncAdapter {
   readonly provider = 'api_football' as const
 
@@ -346,17 +369,30 @@ export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, 
     if (hasProviderErrors(body.errors)) {
       throw sanitizeProviderError(this.provider, 'invalid_response', undefined, url.toString())
     }
-    if (body.paging?.total !== 1 && !(body.paging?.total === 0 && body.response?.length === 0)) {
+    const pagingTotal = body.paging?.total
+    if (typeof pagingTotal !== 'number' || !Number.isInteger(pagingTotal) || pagingTotal < 0 || pagingTotal > 1) {
       throw new ProviderError(this.provider, 'invalid_response', 'result response completeness could not be verified')
+    }
+    if (!Array.isArray(body.response)) {
+      throw new ProviderError(this.provider, 'invalid_response', 'result response rows are missing or malformed')
     }
 
     const requested = new Set(providerFixtureIds)
-    const results = (Array.isArray(body.response) ? body.response : [])
-      .map(parseApiFootballResult)
-      .filter((result): result is NonNullable<typeof result> => Boolean(result))
+    const results = body.response.map(parseApiFootballResult)
+    const returned = new Set<string>()
 
-    if (results.some((result) => !requested.has(result.providerFixtureId))) {
-      throw new ProviderError(this.provider, 'invalid_response', 'result response contained an unexpected fixture ID')
+    for (const result of results) {
+      if (!requested.has(result.providerFixtureId)) {
+        throw new ProviderError(this.provider, 'invalid_response', 'result response contained an unexpected fixture ID')
+      }
+      if (returned.has(result.providerFixtureId)) {
+        throw new ProviderError(this.provider, 'invalid_response', 'result response contained a duplicate fixture ID')
+      }
+      returned.add(result.providerFixtureId)
+    }
+
+    if (returned.size !== requested.size) {
+      throw new ProviderError(this.provider, 'invalid_response', 'result response omitted a requested fixture ID')
     }
 
     return results

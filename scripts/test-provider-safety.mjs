@@ -2220,6 +2220,66 @@ await testAsync('ApiFootballAdapter.fetchResults rejects unsafe IDs before netwo
   }
 });
 
+await testAsync('ApiFootballAdapter.fetchResults rejects unknown statuses and incomplete or malformed result sets', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+  const envelopes = [
+    {
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [{ fixture: { id: 12345, status: { short: 'MYSTERY' } } }],
+    },
+    {
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [{ fixture: { id: 12345, status: { short: 'FT' } } }],
+    },
+    {
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [
+        { fixture: { id: 12345, status: { short: 'FT' } } },
+        { fixture: { id: 12345, status: { short: 'FT' } } },
+      ],
+    },
+    {
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [{ fixture: { status: { short: 'FT' } } }],
+    },
+  ];
+  let fetchCalls = 0;
+
+  globalThis.fetch = async () => {
+    const envelope = envelopes[fetchCalls];
+    fetchCalls++;
+    return jsonResponse(envelope);
+  };
+
+  try {
+    const adapter = new ApiFootballAdapter();
+    await assert.rejects(
+      () => adapter.fetchResults({ providerFixtureIds: ['12345'] }),
+      /unknown fixture status/
+    );
+    await assert.rejects(
+      () => adapter.fetchResults({ providerFixtureIds: ['12345', '67890'] }),
+      /omitted a requested fixture ID/
+    );
+    await assert.rejects(
+      () => adapter.fetchResults({ providerFixtureIds: ['12345'] }),
+      /duplicate fixture ID/
+    );
+    await assert.rejects(
+      () => adapter.fetchResults({ providerFixtureIds: ['12345'] }),
+      /no fixture ID/
+    );
+    assert.equal(fetchCalls, 4);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 await testAsync('ApiFootballAdapter.fetchFixtures rejects league filter without season before any network call', async () => {
   const originalFetch = globalThis.fetch;
   const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));

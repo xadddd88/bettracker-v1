@@ -6,7 +6,15 @@ export interface FootballScorePair {
 }
 
 export interface FootballResultSnapshot {
-  status: 'scheduled' | 'live' | 'finished' | 'postponed' | 'cancelled' | 'abandoned' | 'walkover'
+  status:
+    | 'scheduled'
+    | 'live'
+    | 'finished'
+    | 'postponed'
+    | 'cancelled'
+    | 'abandoned'
+    | 'walkover'
+    | 'unknown'
   fulltime: FootballScorePair
   halftime: FootballScorePair
 }
@@ -16,6 +24,44 @@ export interface FootballTrackedLeg {
   marketType: string
   selection: string | null
 }
+
+const FULL_TIME_1X2_MARKETS = new Set([
+  '1x2',
+  'match winner',
+  'результат матча',
+  'результат матчу',
+])
+
+const FIRST_HALF_1X2_MARKETS = new Set([
+  'first half - 1x2',
+  '1st half - 1x2',
+  '1-я половина - 1x2',
+  '1-й тайм - 1x2',
+  'перша половина - 1x2',
+])
+
+const FULL_TIME_GOAL_TOTAL_MARKETS = new Set([
+  'total',
+  'match total',
+  'full time total',
+  'total goals',
+  'тотал',
+  'тотал матча',
+  'тотал матчу',
+  'общий тотал',
+  'загальний тотал',
+])
+
+const FIRST_HALF_GOAL_TOTAL_MARKETS = new Set([
+  'first half total',
+  '1st half total',
+  'first half goals total',
+  '1-я половина - тотал',
+  '1-й тайм - тотал',
+  'тотал 1-го тайма',
+  'перша половина - тотал',
+  'тотал 1-го тайму',
+])
 
 function normalized(value: string | null | undefined): string {
   return value?.trim().toLocaleLowerCase().replace(/[–—]/g, '-').replace(/\s+/g, ' ') ?? ''
@@ -46,7 +92,7 @@ function parseTotal(selection: string): { direction: 'over' | 'under'; line: num
   const match = value.match(/(\d+(?:\.\d+)?)/)
   if (!direction || !match) return null
   const line = Number(match[1])
-  if (!Number.isFinite(line) || line < 0 || Number.isInteger(line)) return null
+  if (!Number.isFinite(line) || line < 0 || !Number.isInteger(line * 2) || Number.isInteger(line)) return null
   return { direction, line }
 }
 
@@ -58,25 +104,31 @@ export function gradeFootballLeg(
   leg: FootballTrackedLeg,
   result: FootballResultSnapshot
 ): AutomaticLegGrade {
-  if (result.status === 'cancelled') return 'void'
-  if (result.status === 'postponed' || result.status === 'abandoned' || result.status === 'walkover') {
+  if (
+    result.status === 'postponed' ||
+    result.status === 'cancelled' ||
+    result.status === 'abandoned' ||
+    result.status === 'walkover' ||
+    result.status === 'unknown'
+  ) {
     return 'needs_review'
   }
-  if (result.status !== 'finished') return 'pending'
+  if (result.status === 'scheduled' || result.status === 'live') return 'pending'
+  if (result.status !== 'finished') return 'needs_review'
 
   const market = normalized(leg.marketType)
-  const isFirstHalf = /(first half|1st half|1[- ]?я половина|1[- ]?й тайм|1[- ]?й половин|перша половина)/i.test(market)
-  const score = isFirstHalf ? result.halftime : result.fulltime
-  if (!scoreReady(score)) return 'needs_review'
-
-  if (/(1x2|match winner|результат матча|результат матчу)/i.test(market)) {
+  if (FULL_TIME_1X2_MARKETS.has(market) || FIRST_HALF_1X2_MARKETS.has(market)) {
+    const score = FIRST_HALF_1X2_MARKETS.has(market) ? result.halftime : result.fulltime
+    if (!scoreReady(score)) return 'needs_review'
     const side = selectedSide(leg.eventName, leg.selection ?? '')
     if (!side) return 'needs_review'
     const actual = score.home === score.away ? 'draw' : score.home > score.away ? 'home' : 'away'
     return side === actual ? 'won' : 'lost'
   }
 
-  if (/(total|тотал)/i.test(market)) {
+  if (FULL_TIME_GOAL_TOTAL_MARKETS.has(market) || FIRST_HALF_GOAL_TOTAL_MARKETS.has(market)) {
+    const score = FIRST_HALF_GOAL_TOTAL_MARKETS.has(market) ? result.halftime : result.fulltime
+    if (!scoreReady(score)) return 'needs_review'
     const total = parseTotal(leg.selection ?? '')
     if (!total) return 'needs_review'
     const goals = score.home + score.away
