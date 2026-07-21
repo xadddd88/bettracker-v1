@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-21 (PRs #181–#183 reconciled; Decision #063 closed docs-only; Decision #064 next unreserved)
+> Last updated: 2026-07-21 (mobile PRs #170/#171 and Decision #063 reconciled; Decision #064 next unreserved)
 
 ## 1. Executive Status
 
@@ -15,7 +15,7 @@
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
 | Latest completed operational milestone | **PR #181 — Express/tracker correction and safe pending-bet cancellation; migration `20260721152711_cancel_pending_bet` applied; merged as `d5ebb87d`, deployed READY** |
 | Highest-numbered closed decision | **#063 — Tracked-Leg Fixture Lineage Contract (docs-only; merged via PR #183 as `df4723f`)** |
-| Active decisions | **#062 — Mobile Founder client (Phases 0/1B/1C merged; Phase 1A Bearer bridge in Draft review)**; **#061 — Founder Daily Flow Acceptance**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
+| Active decisions | **#062 — Mobile Founder client (Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171; Event analysis and automatic Tracker save remain deferred)**; **#061 — Founder Daily Flow Acceptance**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
 | Next unreserved decision | **#064** — #063 is occupied and closed by the merged docs-only tracked-leg fixture lineage contract |
 
@@ -34,6 +34,8 @@ One preliminary password-auth attempt failed before any tracked-bet POST because
 Decision #061 (Founder Daily Flow Acceptance) is ACTIVE. Its Phase A read-only assessment found three P0/P1 correctness defects in the tracker input lifecycle; Phase A1 was merged via PR #162 as `a6d4ebbefcf49af71729c64cd33886d0592cf1fd` and deployed READY as `dpl_CkCEBy243hsJDcymMgZycZnby8Pw`. The accepted implementation head is `9fd1441f70bb782d51f444a0be85a405c8123ff0`, and all 7 resulting blob hashes match that head. Phase A1 closes the defects client-side only: the scanner adapter fails closed on >20 raw legs as a discriminated union (no truncation, no partial import, fixed non-echoing refusal message) and the refusal arms a submit gate checked before validation, UUID minting, and any network call — the leftover previous draft cannot be saved as the wrong bet until a valid scan replaces it or a deliberate manual payload edit takes ownership and switches source to manual; a repeat scan fully replaces every scanner-derived field (stale stake/bookmaker can no longer carry over; notes stay user-owned); and one `busy` lock (`<fieldset disabled>` + `aria-busy` + synchronous ref guards on all scan entry points and submit) freezes the whole draft during scans and in-flight financial submits without ever cancelling the financial fetch. Post-deployment runtime errors were 0. No production smoke or scanner/API/Supabase runtime call or write was performed for Phase A1. The Playwright/Supabase-stub browser E2E harness proposed in Phase A remains deferred and was not approved or run. Phase A1 changed no migrations, RPCs, schemas, or API routes.
 
 2026-07-21 reconciliation checkpoint: PR #183 recorded Decision #063 and merged as `df4723f2d55b220a4f64f54baf56a3333a8a61b7`; PR #182 merged as `d103947f9193891589cda1c5f1073e3004d84307` and deployed its fail-closed result-grading foundation without authorizing production provider calls, result writes, scheduling, or automated settlement; PR #181 applied production migration `20260721152711_cancel_pending_bet`, passed a fully rolled-back transactional smoke, merged as `d5ebb87d891169b5e3c7959381d4a5011e10e07e`, and deployed READY as `dpl_6FqYmN7gmLSvJPKSeX4USkJ1xJPp`. PR #181 is an unnumbered tracker/cancellation correction and does not consume or reassign Decision #062; #062 remains the Mobile Founder client.
+
+Mobile repository checkpoint: PR #170 merged the Decision #062 Phase 1A authenticated Bearer bridge as `5ef838d5d863bf8dd0436e437d1ad85f06525a36`; PR #171 merged the authenticated mobile Coupon Scanner as `43a6ee7fe5944dc1ed64d81a715bd94a7f02d11d`. Coupon analysis remains review-only and never saves a Tracker bet automatically; Event analysis remains deferred. This documentation receipt asserts no new production mobile smoke, Supabase/provider call, settlement, or financial write.
 
 ## 2. Current Production Facts
 
@@ -214,7 +216,7 @@ Decision #061 — Playwright / Supabase-stub E2E harness — DEFERRED, NOT APPRO
 #059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY (eligibility BLOCKED)
 #060 — Founder-First Coupon-to-Tracker — EXECUTED / VERIFIED / CLOSED 2026-07-16 (Phase A + Phase B production API smoke)
 #061 — Founder Daily Flow Acceptance — ACTIVE; Phase A1 merged via PR #162 as a6d4ebb, deployed READY; Phase A2 browser E2E deferred / not approved
-#062 — Mobile Founder client — ACTIVE; Phases 0/1B/1C merged; replacement Android+iOS development builds installed; Phase 1A Bearer bridge in Draft review; native API wiring/runtime remains deferred
+#062 — Mobile Founder client — ACTIVE; Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171; Event analysis and automatic Tracker save remain deferred
 #063 — Tracked-Leg Fixture Lineage Contract — EXECUTED / CLOSED, DOCS-ONLY; Founder-approved; merged via PR #183 as df4723f; no runtime or production authority
 #064 — next unreserved decision (#063 is occupied and closed)
 ```
