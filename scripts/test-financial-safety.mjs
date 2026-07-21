@@ -406,6 +406,161 @@ test('deposit route source: no direct financial table access remains', () => {
   assert.ok(src.includes("rpc('adjust_bankroll'"), 'deposit route must call adjust_bankroll');
 });
 
+// ── Result grading foundation (candidate-only; no financial write) ───────
+
+console.log('\nAutomatic tracker result grading foundation:');
+
+await withCompiledAlias(async () => {
+  const { gradeFootballLeg, gradeExpress } = require(
+    path.join(buildDir, 'lib/bets/football-result-grading.js')
+  );
+  const finished = (fulltime, halftime) => ({ status: 'finished', fulltime, halftime });
+
+  test('auto-grader: first-half 1x2 resolves the selected away team from the halftime score', () => {
+    const grade = gradeFootballLeg(
+      {
+        eventName: 'ФК Елгава - Рижская футбольная школа',
+        marketType: '1-я половина - 1x2',
+        selection: 'Рижская футбольная школа',
+      },
+      finished({ home: 1, away: 2 }, { home: 0, away: 1 })
+    );
+    assert.equal(grade, 'won');
+  });
+
+  test('auto-grader: half-goal totals resolve over/under without inventing push semantics', () => {
+    const over = gradeFootballLeg(
+      { eventName: 'SK Super Nova - Grobinas SC', marketType: 'Тотал', selection: 'больше 1.5' },
+      finished({ home: 1, away: 1 }, { home: 0, away: 0 })
+    );
+    const under = gradeFootballLeg(
+      { eventName: 'A - B', marketType: 'Total', selection: 'Under 2.5' },
+      finished({ home: 1, away: 0 }, { home: 0, away: 0 })
+    );
+    assert.equal(over, 'won');
+    assert.equal(under, 'won');
+  });
+
+  test('auto-grader: ambiguous markets and non-final exceptional states fail closed', () => {
+    const score = finished({ home: 2, away: 0 }, { home: 1, away: 0 });
+    assert.equal(
+      gradeFootballLeg({ eventName: 'A - B', marketType: 'Asian handicap', selection: '-0.25' }, score),
+      'needs_review'
+    );
+    assert.equal(
+      gradeFootballLeg(
+        { eventName: 'A - B', marketType: 'Total', selection: 'Over 2' },
+        score
+      ),
+      'needs_review',
+      'whole lines require push semantics and must never auto-grade'
+    );
+    assert.equal(
+      gradeFootballLeg(
+        { eventName: 'A - B', marketType: '1x2', selection: 'A' },
+        { status: 'abandoned', fulltime: { home: 1, away: 0 }, halftime: { home: 1, away: 0 } }
+      ),
+      'needs_review'
+    );
+    assert.equal(
+      gradeFootballLeg(
+        { eventName: 'A - B', marketType: '1x2', selection: 'A' },
+        { status: 'cancelled', fulltime: { home: 0, away: 0 }, halftime: { home: 0, away: 0 } }
+      ),
+      'needs_review',
+      'bookmaker-specific cancelled-fixture policy must never be invented'
+    );
+    assert.equal(
+      gradeFootballLeg(
+        { eventName: 'A - B', marketType: '1x2', selection: 'A' },
+        { status: 'unknown', fulltime: { home: 2, away: 0 }, halftime: { home: 1, away: 0 } }
+      ),
+      'needs_review'
+    );
+  });
+
+  test('auto-grader: only exact match-goal total markets with x.5 lines are supported', () => {
+    const score = finished({ home: 2, away: 1 }, { home: 1, away: 0 });
+    const blockedMarkets = [
+      'Team Total',
+      'Home Team Total',
+      'Individual Total',
+      'Corners Total',
+      'Cards Total',
+      'Тотал угловых',
+      'Тотал карточек',
+      'Индивидуальный тотал',
+    ];
+
+    for (const marketType of blockedMarkets) {
+      assert.equal(
+        gradeFootballLeg({ eventName: 'A - B', marketType, selection: 'Over 1.5' }, score),
+        'needs_review',
+        `${marketType} must not be graded from match goals`
+      );
+    }
+
+    for (const line of ['Over 2.25', 'Over 2.75', 'Under 2.25', 'Under 2.75']) {
+      assert.equal(
+        gradeFootballLeg({ eventName: 'A - B', marketType: 'Total', selection: line }, score),
+        'needs_review',
+        `${line} requires quarter-line settlement semantics`
+      );
+    }
+
+    for (const selection of [
+      'Over 9.5 corners',
+      'Больше 9.5 угловых',
+      'Більше 9.5 кутових',
+      'Under 4.5 cards',
+      'Меньше 4.5 карточек',
+      'Over 1.5 team goals',
+      'Больше 1.5 индивидуальный тотал',
+    ]) {
+      assert.equal(
+        gradeFootballLeg({ eventName: 'A - B', marketType: 'Total', selection }, score),
+        'needs_review',
+        `${selection} must not be graded from match goals through a bare Total market`
+      );
+    }
+  });
+
+  test('auto-grader: malformed scores and ambiguous duplicate participant names fail closed', () => {
+    assert.equal(
+      gradeFootballLeg(
+        { eventName: 'A - B', marketType: '1x2', selection: 'A' },
+        finished({ home: -1, away: 0 }, { home: 0, away: 0 })
+      ),
+      'needs_review',
+      'negative full-time scores must never produce a winner'
+    );
+    assert.equal(
+      gradeFootballLeg(
+        { eventName: 'A - B', marketType: 'Total', selection: 'Under 2.5' },
+        finished({ home: 1, away: -1 }, { home: 0, away: 0 })
+      ),
+      'needs_review',
+      'negative score components must never be summed for totals'
+    );
+    assert.equal(
+      gradeFootballLeg(
+        { eventName: 'United - United', marketType: '1x2', selection: 'United' },
+        finished({ home: 1, away: 0 }, { home: 0, away: 0 })
+      ),
+      'needs_review',
+      'duplicate normalized participant names cannot identify a side'
+    );
+  });
+
+  test('auto-grader: Express is won only when every leg wins and never auto-reprices void legs', () => {
+    assert.equal(gradeExpress(['won', 'won']), 'won');
+    assert.equal(gradeExpress(['won', 'lost']), 'lost');
+    assert.equal(gradeExpress(['won', 'pending']), 'pending');
+    assert.equal(gradeExpress(['won', 'void']), 'needs_review');
+    assert.equal(gradeExpress(['won']), 'needs_review');
+  });
+});
+
 // ── Decision #058: canonical settlement metrics & status presentation ──
 // One shared pure contract for Win Rate / ROI / Net Profit / settled count /
 // pending stake (G4), and explicit Partial/Unknown presentation with no Void

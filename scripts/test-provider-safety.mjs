@@ -2150,6 +2150,237 @@ await testAsync('ApiFootballAdapter.fetchFixtures maps provider fixtures into ca
   }
 });
 
+await testAsync('ApiFootballAdapter.fetchResults batches IDs and normalizes final and halftime scores', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+  let observedUrl = '';
+  let fetchCalls = 0;
+
+  globalThis.fetch = async (url) => {
+    fetchCalls++;
+    observedUrl = String(url);
+    return jsonResponse({
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [{
+        fixture: { id: 12345, status: { short: 'FT', long: 'Match Finished' } },
+        teams: { home: { id: 33, name: 'Home' }, away: { id: 40, name: 'Away' } },
+        goals: { home: 2, away: 1 },
+        score: {
+          halftime: { home: 0, away: 1 },
+          fulltime: { home: 2, away: 1 },
+          extratime: { home: null, away: null },
+          penalty: { home: null, away: null },
+        },
+      }],
+    });
+  };
+
+  try {
+    const rows = await new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['12345', '12345'] });
+    assert.equal(fetchCalls, 1, 'up to 20 result IDs must use one provider request');
+    assert.equal(new URL(observedUrl).searchParams.get('ids'), '12345');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].status, 'finished');
+    assert.equal(rows[0].winnerRef, 'api_football:team:33');
+    assert.deepEqual(rows[0].outcomeData.score.halftime, { home: 0, away: 1 });
+    assert.deepEqual(rows[0].outcomeData.score.fulltime, { home: 2, away: 1 });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('ApiFootballAdapter.fetchResults never substitutes extra-time goals for a missing 90-minute score', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+
+  globalThis.fetch = async () =>
+    jsonResponse({
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [
+        {
+          fixture: { id: 12345, status: { short: 'FT', long: 'Match Finished' } },
+          teams: { home: { id: 33, name: 'Home' }, away: { id: 40, name: 'Away' } },
+          goals: { home: 2, away: 1 },
+          score: { fulltime: { home: null, away: null } },
+        },
+        {
+          fixture: { id: 67890, status: { short: 'AET', long: 'After Extra Time' } },
+          teams: { home: { id: 50, name: 'AET Home' }, away: { id: 60, name: 'AET Away' } },
+          goals: { home: 2, away: 1 },
+          score: { fulltime: { home: null, away: null }, extratime: { home: 1, away: 0 } },
+        },
+      ],
+    });
+
+  try {
+    const rows = await new ApiFootballAdapter().fetchResults({
+      providerFixtureIds: ['12345', '67890'],
+    });
+    const ft = rows.find((row) => row.providerFixtureId === '12345');
+    const aet = rows.find((row) => row.providerFixtureId === '67890');
+
+    assert.deepEqual(ft.outcomeData.score.fulltime, { home: 2, away: 1 });
+    assert.equal(ft.winnerRef, 'api_football:team:33');
+    assert.deepEqual(aet.outcomeData.score.fulltime, { home: null, away: null });
+    assert.equal(aet.winnerRef, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('ApiFootballAdapter.fetchResults never builds a hybrid full-time score from partial sources', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+
+  globalThis.fetch = async () =>
+    jsonResponse({
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [
+        {
+          fixture: { id: 12345, status: { short: 'FT', long: 'Match Finished' } },
+          teams: { home: { id: 33, name: 'Home' }, away: { id: 40, name: 'Away' } },
+          goals: { home: 3, away: 3 },
+          score: { fulltime: { home: 2, away: null } },
+        },
+        {
+          fixture: { id: 67890, status: { short: 'FT', long: 'Match Finished' } },
+          teams: { home: { id: 50, name: 'Other Home' }, away: { id: 60, name: 'Other Away' } },
+          goals: { home: 2, away: 1 },
+          score: { fulltime: { home: -1, away: -1 } },
+        },
+      ],
+    });
+
+  try {
+    const rows = await new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['12345', '67890'] });
+    for (const row of rows) {
+      assert.deepEqual(row.outcomeData.score.fulltime, { home: null, away: null });
+      assert.equal(row.winnerRef, null, 'partial or invalid full-time data must not invent a winner');
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('ApiFootballAdapter.fetchResults rejects unsafe IDs before network and unexpected response fixtures', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+  let fetchCalls = 0;
+
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    return jsonResponse({
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [{ fixture: { id: 999, status: { short: 'FT' } } }],
+    });
+  };
+
+  try {
+    await assert.rejects(
+      () => new ApiFootballAdapter().fetchResults({ providerFixtureIds: Array(21).fill('12345') }),
+      /requires 1\.\.20 fixture IDs/
+    );
+    assert.equal(fetchCalls, 0, 'the raw batch bound must run before deduplication and network');
+    await assert.rejects(
+      () => new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['1;drop table'] }),
+      /must be numeric/
+    );
+    assert.equal(fetchCalls, 0);
+    await assert.rejects(
+      () => new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['12345'] }),
+      /unexpected fixture ID/
+    );
+    assert.equal(fetchCalls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('ApiFootballAdapter.fetchResults rejects rows that contradict paging.total=0', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+
+  globalThis.fetch = async () =>
+    jsonResponse({
+      errors: [],
+      paging: { current: 0, total: 0 },
+      response: [{ fixture: { id: 12345, status: { short: 'FT' } } }],
+    });
+
+  try {
+    await assert.rejects(
+      () => new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['12345'] }),
+      /paging is inconsistent/
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await testAsync('ApiFootballAdapter.fetchResults rejects unknown statuses and incomplete or malformed result sets', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+  const envelopes = [
+    {
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [{ fixture: { id: 12345, status: { short: 'MYSTERY' } } }],
+    },
+    {
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [{ fixture: { id: 12345, status: { short: 'FT' } } }],
+    },
+    {
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [
+        { fixture: { id: 12345, status: { short: 'FT' } } },
+        { fixture: { id: 12345, status: { short: 'FT' } } },
+      ],
+    },
+    {
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [{ fixture: { status: { short: 'FT' } } }],
+    },
+  ];
+  let fetchCalls = 0;
+
+  globalThis.fetch = async () => {
+    const envelope = envelopes[fetchCalls];
+    fetchCalls++;
+    return jsonResponse(envelope);
+  };
+
+  try {
+    const adapter = new ApiFootballAdapter();
+    await assert.rejects(
+      () => adapter.fetchResults({ providerFixtureIds: ['12345'] }),
+      /unknown fixture status/
+    );
+    await assert.rejects(
+      () => adapter.fetchResults({ providerFixtureIds: ['12345', '67890'] }),
+      /omitted a requested fixture ID/
+    );
+    await assert.rejects(
+      () => adapter.fetchResults({ providerFixtureIds: ['12345'] }),
+      /duplicate fixture ID/
+    );
+    await assert.rejects(
+      () => adapter.fetchResults({ providerFixtureIds: ['12345'] }),
+      /no fixture ID/
+    );
+    assert.equal(fetchCalls, 4);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 await testAsync('ApiFootballAdapter.fetchFixtures rejects league filter without season before any network call', async () => {
   const originalFetch = globalThis.fetch;
   const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
@@ -2449,7 +2680,7 @@ await testAsync('runFixtureSync dry-run returns counts without requiring Supabas
   }
 });
 
-await testAsync('fetchOdds/fetchResults/fetchEnrichment remain out of scope and never touch network', async () => {
+await testAsync('unimplemented odds/tennis-results/enrichment methods stay out of scope and never touch network', async () => {
   const originalFetch = globalThis.fetch;
   const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
   const { SportMonksAdapter } = require(path.join(buildDir, 'lib/providers/adapters/sportmonks.js'));
@@ -2464,7 +2695,6 @@ await testAsync('fetchOdds/fetchResults/fetchEnrichment remain out of scope and 
   try {
     const calls = [
       () => new ApiFootballAdapter().fetchOdds({ providerFixtureIds: ['1'] }),
-      () => new ApiFootballAdapter().fetchResults({ providerFixtureIds: ['1'] }),
       () => new ApiTennisAdapter().fetchOdds({ providerFixtureIds: ['1'] }),
       () => new ApiTennisAdapter().fetchResults({ providerFixtureIds: ['1'] }),
       () => new SportMonksAdapter().fetchEnrichment({ providerFixtureId: '1' }),

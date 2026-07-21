@@ -38,13 +38,20 @@ interface ApiFootballFixtureRow {
     home?: { id?: number | string | null; name?: string | null } | null
     away?: { id?: number | string | null; name?: string | null } | null
   }
+  goals?: { home?: number | null; away?: number | null } | null
+  score?: {
+    halftime?: { home?: number | null; away?: number | null } | null
+    fulltime?: { home?: number | null; away?: number | null } | null
+    extratime?: { home?: number | null; away?: number | null } | null
+    penalty?: { home?: number | null; away?: number | null } | null
+  } | null
 }
 
 function scaffoldOnly(method: string): never {
   throw new ProviderError(
     'api_football',
     'unknown',
-    `ApiFootballAdapter.${method} is outside M1.2.b scope — only fixture sync is implemented`
+    `ApiFootballAdapter.${method} is outside the currently approved adapter scope`
   )
 }
 
@@ -73,6 +80,20 @@ function mapFixtureStatus(shortStatus?: string | null, longStatus?: string | nul
   if (['ABD'].includes(short) || long.includes('abandon')) return 'abandoned'
 
   return 'scheduled'
+}
+
+function mapResultStatus(shortStatus?: string | null): FixtureStatus | null {
+  const short = shortStatus?.trim().toUpperCase() ?? ''
+
+  if (['TBD', 'NS'].includes(short)) return 'scheduled'
+  if (['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(short)) return 'live'
+  if (['FT', 'AET', 'PEN'].includes(short)) return 'finished'
+  if (short === 'PST') return 'postponed'
+  if (['CANC', 'CND'].includes(short)) return 'cancelled'
+  if (short === 'ABD') return 'abandoned'
+  if (['AWD', 'WO'].includes(short)) return 'walkover'
+
+  return null
 }
 
 function teamRef(id: unknown, name: unknown): string | null {
@@ -148,9 +169,96 @@ function parseApiFootballFixture(row: unknown): (ProviderMeta & { fixture: Canon
   }
 }
 
-// M1.2.b: fixture fetch only. This path is read-only by itself; writes are
-// gated in lib/providers/fixture-sync.ts and the operator route. Odds/results
-// remain scaffold-only until later milestones.
+function finiteScore(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
+}
+
+function parseApiFootballResult(row: unknown): ProviderMeta & {
+  providerFixtureId: string
+  status: FixtureStatus
+  outcomeData: Record<string, unknown>
+  winnerRef: string | null
+} {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) {
+    throw new ProviderError('api_football', 'invalid_response', 'result response contained a malformed row')
+  }
+
+  const fixtureRow = row as ApiFootballFixtureRow
+  const providerFixtureId = toStringOrNull(fixtureRow.fixture?.id)
+  if (!providerFixtureId) {
+    throw new ProviderError('api_football', 'invalid_response', 'result response row has no fixture ID')
+  }
+
+  const status = mapResultStatus(fixtureRow.fixture?.status?.short)
+  if (!status) {
+    throw new ProviderError('api_football', 'invalid_response', 'result response contained an unknown fixture status')
+  }
+  const statusShort = toStringOrNull(fixtureRow.fixture?.status?.short)?.toUpperCase() ?? null
+  const homeRef = teamRef(fixtureRow.teams?.home?.id, fixtureRow.teams?.home?.name)
+  const awayRef = teamRef(fixtureRow.teams?.away?.id, fixtureRow.teams?.away?.name)
+  const rawFulltimeHome = fixtureRow.score?.fulltime?.home
+  const rawFulltimeAway = fixtureRow.score?.fulltime?.away
+  const explicitFulltimeHome = finiteScore(rawFulltimeHome)
+  const explicitFulltimeAway = finiteScore(rawFulltimeAway)
+  const goalsHome = finiteScore(fixtureRow.goals?.home)
+  const goalsAway = finiteScore(fixtureRow.goals?.away)
+  const hasExplicitFulltimePair = explicitFulltimeHome !== null && explicitFulltimeAway !== null
+  const canUseFtGoalsPair =
+    statusShort === 'FT' &&
+    (rawFulltimeHome === null || rawFulltimeHome === undefined) &&
+    (rawFulltimeAway === null || rawFulltimeAway === undefined) &&
+    explicitFulltimeHome === null &&
+    explicitFulltimeAway === null &&
+    goalsHome !== null &&
+    goalsAway !== null
+  // Never synthesize a score by mixing one side from score.fulltime with the
+  // other side from goals. A partial/conflicting provider pair is unusable.
+  const fulltimeHome = hasExplicitFulltimePair
+    ? explicitFulltimeHome
+    : canUseFtGoalsPair ? goalsHome : null
+  const fulltimeAway = hasExplicitFulltimePair
+    ? explicitFulltimeAway
+    : canUseFtGoalsPair ? goalsAway : null
+
+  let winnerRef: string | null = null
+  if (status === 'finished' && fulltimeHome !== null && fulltimeAway !== null) {
+    if (fulltimeHome > fulltimeAway) winnerRef = homeRef
+    if (fulltimeAway > fulltimeHome) winnerRef = awayRef
+  }
+
+  return {
+    providerFixtureId,
+    rawProviderPayload: row,
+    providerUpdatedAt: null,
+    status,
+    winnerRef,
+    outcomeData: {
+      version: 1,
+      statusShort,
+      homeRef,
+      awayRef,
+      score: {
+        halftime: {
+          home: finiteScore(fixtureRow.score?.halftime?.home),
+          away: finiteScore(fixtureRow.score?.halftime?.away),
+        },
+        fulltime: { home: fulltimeHome, away: fulltimeAway },
+        extratime: {
+          home: finiteScore(fixtureRow.score?.extratime?.home),
+          away: finiteScore(fixtureRow.score?.extratime?.away),
+        },
+        penalty: {
+          home: finiteScore(fixtureRow.score?.penalty?.home),
+          away: finiteScore(fixtureRow.score?.penalty?.away),
+        },
+      },
+    },
+  }
+}
+
+// Fixture and result reads are read-only by themselves. Fixture writes remain
+// gated in lib/providers/fixture-sync.ts and the operator route; this result
+// foundation has no caller, scheduler, write, or settlement path.
 export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, ResultSyncAdapter {
   readonly provider = 'api_football' as const
 
@@ -255,7 +363,7 @@ export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, 
     scaffoldOnly('fetchOdds')
   }
 
-  async fetchResults(_: { providerFixtureIds: string[] }): Promise<
+  async fetchResults(params: { providerFixtureIds: string[] }): Promise<
     Array<
       ProviderMeta & {
         providerFixtureId: string
@@ -265,7 +373,54 @@ export class ApiFootballAdapter implements FixtureSyncAdapter, OddsSyncAdapter, 
       }
     >
   > {
-    scaffoldOnly('fetchResults')
+    if (!Array.isArray(params.providerFixtureIds) || params.providerFixtureIds.length < 1 || params.providerFixtureIds.length > 20) {
+      throw new ProviderError(this.provider, 'invalid_response', 'result fetch requires 1..20 fixture IDs')
+    }
+    const providerFixtureIds = [...new Set(params.providerFixtureIds)]
+    if (providerFixtureIds.some((id) => !/^\d+$/.test(id))) {
+      throw new ProviderError(this.provider, 'invalid_response', 'result fetch fixture IDs must be numeric')
+    }
+
+    const { API_FOOTBALL_KEY } = getProviderEnv()
+    const url = new URL(`${BASE_URL}/fixtures`)
+    url.searchParams.set('ids', providerFixtureIds.join('-'))
+
+    const body = await providerFetch<ApiFootballFixturesEnvelope>(this.provider, url.toString(), {
+      headers: { 'x-apisports-key': API_FOOTBALL_KEY },
+    })
+    if (hasProviderErrors(body.errors)) {
+      throw sanitizeProviderError(this.provider, 'invalid_response', undefined, url.toString())
+    }
+    const pagingTotal = body.paging?.total
+    if (typeof pagingTotal !== 'number' || !Number.isInteger(pagingTotal) || pagingTotal < 0 || pagingTotal > 1) {
+      throw new ProviderError(this.provider, 'invalid_response', 'result response completeness could not be verified')
+    }
+    if (!Array.isArray(body.response)) {
+      throw new ProviderError(this.provider, 'invalid_response', 'result response rows are missing or malformed')
+    }
+    if (pagingTotal === 0 && body.response.length > 0) {
+      throw new ProviderError(this.provider, 'invalid_response', 'result response paging is inconsistent with returned rows')
+    }
+
+    const requested = new Set(providerFixtureIds)
+    const results = body.response.map(parseApiFootballResult)
+    const returned = new Set<string>()
+
+    for (const result of results) {
+      if (!requested.has(result.providerFixtureId)) {
+        throw new ProviderError(this.provider, 'invalid_response', 'result response contained an unexpected fixture ID')
+      }
+      if (returned.has(result.providerFixtureId)) {
+        throw new ProviderError(this.provider, 'invalid_response', 'result response contained a duplicate fixture ID')
+      }
+      returned.add(result.providerFixtureId)
+    }
+
+    if (returned.size !== requested.size) {
+      throw new ProviderError(this.provider, 'invalid_response', 'result response omitted a requested fixture ID')
+    }
+
+    return results
   }
 
   // Read-only account/quota check — no fixtures/odds/results data touched.
