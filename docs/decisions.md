@@ -2189,19 +2189,21 @@ Reference: `docs/daily-flow-acceptance-decision-061.md`
 **Date:** 2026-07-17
 **Proposed by:** CPO + Founder
 **Approved by:** Founder (`APPROVE #062 MOBILE PHASE 0`)
-**Status:** ACTIVE — Phase 0, Phase 1B capture shell, and Phase 1C product shell are merged. Founder replacement Android and iOS development builds have been installed. Phase 1A Bearer bridge is implemented in Draft review; no production runtime/smoke is authorized by that implementation.
+**Status:** ACTIVE — Phase 0, Phase 1B capture shell, Phase 1C product shell, the Phase 1A Bearer bridge, and the authenticated mobile Coupon Scanner are merged. Founder replacement Android and iOS development builds have been installed. PR #170 merged Phase 1A as `5ef838d5d863bf8dd0436e437d1ad85f06525a36`; PR #171 merged the Coupon Scanner as `43a6ee7fe5944dc1ed64d81a715bd94a7f02d11d`. No production mobile smoke is recorded by this reconciliation.
 
 **Decision:** Establish the first native Founder product slice in `apps/mobile`: password authentication, encrypted persisted session, protected navigation, and read-only owner-scoped bet list/detail. Single and Express legs are rendered in `leg_index` order with nullable selection and currency-aware amounts.
 
-**Boundary:** Public Supabase URL/publishable key only in the native bundle; existing RLS remains the authorization boundary. Phase 0 remains read-only. Phase 1B added offline-safe camera/gallery JPEG preparation with no real AI request. Phase 1C added the Home/AI/Tracker/Stats/More shell and local-only tracker draft editor. The separately reviewed Phase 1A server bridge accepts a verified user Bearer for Scanner/Tracker routes without exposing service-role credentials and preserves browser cookies when Authorization is absent. Native route wiring, real AI calls, mobile financial writes, settlement, deposit, analytics, migrations, and policy changes remain deferred.
+**Boundary:** Public Supabase URL/publishable key only in the native bundle; existing RLS remains the authorization boundary. Phase 0 remains read-only. Phase 1B added offline-safe camera/gallery JPEG preparation. Phase 1C added the Home/AI/Tracker/Stats/More shell and local-only tracker draft editor. The merged Phase 1A server bridge accepts a verified user Bearer for Scanner/Tracker routes without exposing service-role credentials and preserves browser cookies when Authorization is absent. The merged Coupon Scanner sends the prepared image only after explicit Founder action and renders a review-only result. Event analysis, automatic Tracker save, mobile Tracker write wiring, settlement, deposit, analytics, migrations, and policy changes remain deferred.
 
-**Validation:** merged mobile phases passed their unit/boundary, TypeScript, lint, Expo config/export, GitHub, and Vercel checks. Founder completed and installed replacement development builds on registered Android and iOS devices. Phase 1A financial-safety is 72/72 on local stubs; production/Supabase/provider calls and writes 0, and no EAS build/update is part of Phase 1A.
+**Validation and merge checkpoint:** PR #170 reported financial-safety 72/72, rate-limit 12/12, TypeScript and lint passing before merge. PR #171 reported mobile tests 80/80, mobile and root typecheck/lint, Expo dependency/config/export, financial-safety 72/72, and rate-limit 12/12 passing before merge. Both PR records report zero production/Supabase/AI/provider runtime calls and writes during implementation and validation; no EAS Build or EAS Update is recorded. This docs-only reconciliation adds no new runtime evidence.
 
 **Numbering:** Decision #062 occupied and ACTIVE; #063 is occupied and CLOSED (docs-only); next unreserved decision #064.
 
 Reference: `docs/mobile-phase-0-decision-062.md`
 
 Phase 1A reference: `docs/mobile-bearer-bridge-decision-062.md`
+
+Coupon Scanner reference: `apps/mobile/docs/decision-062-mobile-coupon-scanner-wiring.md`
 
 ---
 
