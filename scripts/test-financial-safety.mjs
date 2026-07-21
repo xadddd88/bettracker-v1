@@ -507,6 +507,22 @@ await withCompiledAlias(async () => {
         `${line} requires quarter-line settlement semantics`
       );
     }
+
+    for (const selection of [
+      'Over 9.5 corners',
+      'Больше 9.5 угловых',
+      'Більше 9.5 кутових',
+      'Under 4.5 cards',
+      'Меньше 4.5 карточек',
+      'Over 1.5 team goals',
+      'Больше 1.5 индивидуальный тотал',
+    ]) {
+      assert.equal(
+        gradeFootballLeg({ eventName: 'A - B', marketType: 'Total', selection }, score),
+        'needs_review',
+        `${selection} must not be graded from match goals through a bare Total market`
+      );
+    }
   });
 
   test('auto-grader: Express is won only when every leg wins and never auto-reprices void legs', () => {

@@ -193,10 +193,15 @@ function parseApiFootballResult(row: unknown): ProviderMeta & {
   if (!status) {
     throw new ProviderError('api_football', 'invalid_response', 'result response contained an unknown fixture status')
   }
+  const statusShort = toStringOrNull(fixtureRow.fixture?.status?.short)?.toUpperCase() ?? null
   const homeRef = teamRef(fixtureRow.teams?.home?.id, fixtureRow.teams?.home?.name)
   const awayRef = teamRef(fixtureRow.teams?.away?.id, fixtureRow.teams?.away?.name)
-  const fulltimeHome = finiteScore(fixtureRow.score?.fulltime?.home ?? fixtureRow.goals?.home)
-  const fulltimeAway = finiteScore(fixtureRow.score?.fulltime?.away ?? fixtureRow.goals?.away)
+  const fulltimeHome = finiteScore(
+    fixtureRow.score?.fulltime?.home ?? (statusShort === 'FT' ? fixtureRow.goals?.home : null)
+  )
+  const fulltimeAway = finiteScore(
+    fixtureRow.score?.fulltime?.away ?? (statusShort === 'FT' ? fixtureRow.goals?.away : null)
+  )
 
   let winnerRef: string | null = null
   if (status === 'finished' && fulltimeHome !== null && fulltimeAway !== null) {
@@ -212,7 +217,7 @@ function parseApiFootballResult(row: unknown): ProviderMeta & {
     winnerRef,
     outcomeData: {
       version: 1,
-      statusShort: toStringOrNull(fixtureRow.fixture?.status?.short),
+      statusShort,
       homeRef,
       awayRef,
       score: {

@@ -2190,6 +2190,46 @@ await testAsync('ApiFootballAdapter.fetchResults batches IDs and normalizes fina
   }
 });
 
+await testAsync('ApiFootballAdapter.fetchResults never substitutes extra-time goals for a missing 90-minute score', async () => {
+  const originalFetch = globalThis.fetch;
+  const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));
+
+  globalThis.fetch = async () =>
+    jsonResponse({
+      errors: [],
+      paging: { current: 1, total: 1 },
+      response: [
+        {
+          fixture: { id: 12345, status: { short: 'FT', long: 'Match Finished' } },
+          teams: { home: { id: 33, name: 'Home' }, away: { id: 40, name: 'Away' } },
+          goals: { home: 2, away: 1 },
+          score: { fulltime: { home: null, away: null } },
+        },
+        {
+          fixture: { id: 67890, status: { short: 'AET', long: 'After Extra Time' } },
+          teams: { home: { id: 50, name: 'AET Home' }, away: { id: 60, name: 'AET Away' } },
+          goals: { home: 2, away: 1 },
+          score: { fulltime: { home: null, away: null }, extratime: { home: 1, away: 0 } },
+        },
+      ],
+    });
+
+  try {
+    const rows = await new ApiFootballAdapter().fetchResults({
+      providerFixtureIds: ['12345', '67890'],
+    });
+    const ft = rows.find((row) => row.providerFixtureId === '12345');
+    const aet = rows.find((row) => row.providerFixtureId === '67890');
+
+    assert.deepEqual(ft.outcomeData.score.fulltime, { home: 2, away: 1 });
+    assert.equal(ft.winnerRef, 'api_football:team:33');
+    assert.deepEqual(aet.outcomeData.score.fulltime, { home: null, away: null });
+    assert.equal(aet.winnerRef, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 await testAsync('ApiFootballAdapter.fetchResults rejects unsafe IDs before network and unexpected response fixtures', async () => {
   const originalFetch = globalThis.fetch;
   const { ApiFootballAdapter } = require(path.join(buildDir, 'lib/providers/adapters/api-football.js'));

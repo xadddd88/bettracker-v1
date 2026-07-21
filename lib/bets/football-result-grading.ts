@@ -84,14 +84,13 @@ function selectedSide(eventName: string, selection: string): 'home' | 'away' | '
 
 function parseTotal(selection: string): { direction: 'over' | 'under'; line: number } | null {
   const value = normalized(selection).replace(',', '.')
-  const direction = /(over|больше|більше|тотал больше|тотал більше)/i.test(value)
-    ? 'over'
-    : /(under|меньше|менше|тотал меньше|тотал менше)/i.test(value)
-      ? 'under'
-      : null
-  const match = value.match(/(\d+(?:\.\d+)?)/)
-  if (!direction || !match) return null
-  const line = Number(match[1])
+  const match =
+    /^(?:total\s+)?(over|under)\s*(\d+(?:\.\d+)?)$/i.exec(value) ??
+    /^(?:тотал\s+)?(больше|меньше|більше|менше)\s*(\d+(?:\.\d+)?)$/i.exec(value)
+  if (!match) return null
+
+  const direction = /^(?:over|больше|більше)$/i.test(match[1]) ? 'over' : 'under'
+  const line = Number(match[2])
   if (!Number.isFinite(line) || line < 0 || !Number.isInteger(line * 2) || Number.isInteger(line)) return null
   return { direction, line }
 }
