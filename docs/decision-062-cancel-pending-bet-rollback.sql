@@ -1,6 +1,6 @@
 -- Decision #062 — pending-bet cancellation emergency kill switch.
 --
--- Use only after migration 20260720172528_cancel_pending_bet has been
+-- Use only after migration 20260721152711_cancel_pending_bet has been
 -- applied and an operational rollback has been explicitly approved.
 -- This disables new cancellation/refund calls immediately while retaining:
 --   * bets.archived_at and every archived bet/leg;
