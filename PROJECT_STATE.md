@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-19 (Decision #062 mobile Phases 0/1B/1C merged; Android+iOS development builds installed; Phase 1A Bearer bridge in Draft review)
+> Last updated: 2026-07-21 (Decision #063 tracked-leg fixture lineage contract proposed / docs-only; Founder approval and merge pending)
 
 ## 1. Executive Status
 
@@ -17,7 +17,7 @@
 | Highest-numbered closed decision | **#060 — Founder-First Coupon-to-Tracker** |
 | Active decisions | **#062 — Mobile Founder client (Phases 0/1B/1C merged; Phase 1A Bearer bridge in Draft review)**; **#061 — Founder Daily Flow Acceptance**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
-| Next unreserved decision | **#063** |
+| Next unreserved decision | **#064** — #063 is reserved by the proposed docs-only tracked-leg fixture lineage contract |
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 completed one canonical-linked base-response dry-run with zero writes. Decision #055 then closed the trust/storage contract. Decision #056's Class A structural-presence implementation is merged and deployed (PR #146); its production provider call remains not approved and has not been run. Decision #057 closed the results-ingestion and settlement trust contract (docs-evidence only; no results runtime, result writes, or automated settlement is approved).
 
@@ -166,7 +166,7 @@ External beta remains paused because the product vision is not yet complete. Imp
 2. Decision #054 Report-Only observation period; enforced CSP and nonce/hash Phase B remain unapproved.
 3. Decision #056 structural-presence runtime execution (implementation is merged and deployed; the production provider call remains separately blocked and has not been run).
 4. Odds ingestion/normalization and user-facing trust validation.
-5. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated. Decision #058 unifies the metric formulas (G4) and removes the misleading Void fallback (G12), but adds no new settlement semantics.
+5. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated. Decision #058 unifies the metric formulas (G4) and removes the misleading Void fallback (G12), but adds no new settlement semantics. Tracker legs currently have no safe relationship to `canonical_fixtures` or `fixture_provider_links`; proposed Decision #063 defines that fail-closed lineage contract but authorizes no implementation or matching.
 6. Trusted Analyst/Scout v2 using verified provider data rather than ungrounded pricing.
 7. Full i18n UX, including Arabic RTL.
 8. Mobile/tablet product polish and closed-beta onboarding.
@@ -210,7 +210,8 @@ Decision #061 — Playwright / Supabase-stub E2E harness — DEFERRED, NOT APPRO
 #060 — Founder-First Coupon-to-Tracker — EXECUTED / VERIFIED / CLOSED 2026-07-16 (Phase A + Phase B production API smoke)
 #061 — Founder Daily Flow Acceptance — ACTIVE; Phase A1 merged via PR #162 as a6d4ebb, deployed READY; Phase A2 browser E2E deferred / not approved
 #062 — Mobile Founder client — ACTIVE; Phases 0/1B/1C merged; replacement Android+iOS development builds installed; Phase 1A Bearer bridge in Draft review; native API wiring/runtime remains deferred
-#063 — next unreserved decision
+#063 — Tracked-Leg Fixture Lineage Contract — PROPOSED / DOCS-ONLY; Founder approval and merge pending
+#064 — next unreserved decision (#063 is a proposed reservation; retire it if abandoned)
 ```
 
 PR #90 is closed without merge; its policy is not adopted. Decision #020 is never reused.
