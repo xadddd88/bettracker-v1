@@ -1514,11 +1514,14 @@ await asyncTest('Anthropic pause_turn continuation preserves protocol state and 
   );
 });
 
-test('editorial black action surfaces explicitly retain readable foreground text', () => {
+test('Broadcast Noir compatibility surfaces explicitly retain semantic foreground text', () => {
   const css = readFileSync(path.join(repoRoot, 'app/globals.css'), 'utf8');
-  assert.match(css, /\.web-editorial \.btn-primary[\s\S]*?color:\s*#ffffff\s*!important/);
-  assert.match(css, /\.web-editorial \.bg-black[\s\S]*?color:\s*#ffffff\s*!important/);
-  assert.match(css, /\.web-editorial \.bg-indigo-600\.text-white[\s\S]*?color:\s*#ffffff\s*!important/);
+  assert.match(css, /\.web-editorial \.btn-primary[\s\S]*?color:\s*var\(--on-signal\)\s*!important/);
+  assert.match(
+    css,
+    /\.web-editorial \.bg-black[\s\S]*?background:\s*var\(--field\)\s*!important;\s*color:\s*var\(--text-primary\)\s*!important/,
+  );
+  assert.match(css, /\.web-editorial \.bg-indigo-600\.text-white[\s\S]*?color:\s*var\(--on-signal\)\s*!important/);
 });
 
 test('web Analyst transports coupon legs and time into the research pipeline', () => {
