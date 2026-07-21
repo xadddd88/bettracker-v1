@@ -1948,7 +1948,7 @@ test('#061 A1: write path untouched — route, RPC, migration 024 and the intent
 // ── Tracker pending cancellation — soft delete + atomic refund ──
 
 const CANCEL_MIGRATION = 'supabase/migrations/20260721152711_cancel_pending_bet.sql';
-const CANCEL_ROLLBACK = 'docs/decision-062-cancel-pending-bet-rollback.sql';
+const CANCEL_ROLLBACK = 'docs/cancel-pending-bet-rollback.sql';
 const CANCEL_ROUTE = 'app/api/bets/[id]/cancel/route.js';
 const CANCEL_BET_ID = 'aaaaaaaa-1111-4111-8111-bbbbbbbbbbbb';
 const CANCEL_KEY = 'cccccccc-2222-4222-8222-dddddddddddd';

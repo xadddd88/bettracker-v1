@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-21 (Decision #063 tracked-leg fixture lineage contract proposed / docs-only; Founder approval and merge pending)
+> Last updated: 2026-07-21 (PRs #181–#183 reconciled; Decision #063 closed docs-only; Decision #064 next unreserved)
 
 ## 1. Executive Status
 
@@ -13,11 +13,11 @@
 | Production | `https://btdk.app` |
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
-| Latest completed operational milestone | **Decision #061 Phase A1 — merged via PR #162 as `a6d4ebb`, deployed READY** |
-| Highest-numbered closed decision | **#060 — Founder-First Coupon-to-Tracker** |
+| Latest completed operational milestone | **PR #181 — Express/tracker correction and safe pending-bet cancellation; migration `20260721152711_cancel_pending_bet` applied; merged as `d5ebb87d`, deployed READY** |
+| Highest-numbered closed decision | **#063 — Tracked-Leg Fixture Lineage Contract (docs-only; merged via PR #183 as `df4723f`)** |
 | Active decisions | **#062 — Mobile Founder client (Phases 0/1B/1C merged; Phase 1A Bearer bridge in Draft review)**; **#061 — Founder Daily Flow Acceptance**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
-| Next unreserved decision | **#064** — #063 is reserved by the proposed docs-only tracked-leg fixture lineage contract |
+| Next unreserved decision | **#064** — #063 is occupied and closed by the merged docs-only tracked-leg fixture lineage contract |
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 completed one canonical-linked base-response dry-run with zero writes. Decision #055 then closed the trust/storage contract. Decision #056's Class A structural-presence implementation is merged and deployed (PR #146); its production provider call remains not approved and has not been run. Decision #057 closed the results-ingestion and settlement trust contract (docs-evidence only; no results runtime, result writes, or automated settlement is approved).
 
@@ -32,6 +32,8 @@ The separately authorized Phase B production smoke verified the authenticated AP
 One preliminary password-auth attempt failed before any tracked-bet POST because the temporary Auth fixture required token-field normalization; it produced no bet or stake write. After the successful smoke, global sign-out left 0 active sessions and deletion of the temporary user cascade-cleaned users, identities, sessions, profiles, bankrolls, transactions, bets, legs, and decisions to zero. Provider calls were 0. Decision #060 is EXECUTED / VERIFIED / CLOSED; no additional synthetic smoke is authorized by this record.
 
 Decision #061 (Founder Daily Flow Acceptance) is ACTIVE. Its Phase A read-only assessment found three P0/P1 correctness defects in the tracker input lifecycle; Phase A1 was merged via PR #162 as `a6d4ebbefcf49af71729c64cd33886d0592cf1fd` and deployed READY as `dpl_CkCEBy243hsJDcymMgZycZnby8Pw`. The accepted implementation head is `9fd1441f70bb782d51f444a0be85a405c8123ff0`, and all 7 resulting blob hashes match that head. Phase A1 closes the defects client-side only: the scanner adapter fails closed on >20 raw legs as a discriminated union (no truncation, no partial import, fixed non-echoing refusal message) and the refusal arms a submit gate checked before validation, UUID minting, and any network call — the leftover previous draft cannot be saved as the wrong bet until a valid scan replaces it or a deliberate manual payload edit takes ownership and switches source to manual; a repeat scan fully replaces every scanner-derived field (stale stake/bookmaker can no longer carry over; notes stay user-owned); and one `busy` lock (`<fieldset disabled>` + `aria-busy` + synchronous ref guards on all scan entry points and submit) freezes the whole draft during scans and in-flight financial submits without ever cancelling the financial fetch. Post-deployment runtime errors were 0. No production smoke or scanner/API/Supabase runtime call or write was performed for Phase A1. The Playwright/Supabase-stub browser E2E harness proposed in Phase A remains deferred and was not approved or run. Phase A1 changed no migrations, RPCs, schemas, or API routes.
+
+2026-07-21 reconciliation checkpoint: PR #183 recorded Decision #063 and merged as `df4723f2d55b220a4f64f54baf56a3333a8a61b7`; PR #182 merged as `d103947f9193891589cda1c5f1073e3004d84307` and deployed its fail-closed result-grading foundation without authorizing production provider calls, result writes, scheduling, or automated settlement; PR #181 applied production migration `20260721152711_cancel_pending_bet`, passed a fully rolled-back transactional smoke, merged as `d5ebb87d891169b5e3c7959381d4a5011e10e07e`, and deployed READY as `dpl_6FqYmN7gmLSvJPKSeX4USkJ1xJPp`. PR #181 is an unnumbered tracker/cancellation correction and does not consume or reassign Decision #062; #062 remains the Mobile Founder client.
 
 ## 2. Current Production Facts
 
@@ -166,7 +168,7 @@ External beta remains paused because the product vision is not yet complete. Imp
 2. Decision #054 Report-Only observation period; enforced CSP and nonce/hash Phase B remain unapproved.
 3. Decision #056 structural-presence runtime execution (implementation is merged and deployed; the production provider call remains separately blocked and has not been run).
 4. Odds ingestion/normalization and user-facing trust validation.
-5. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated. Decision #058 unifies the metric formulas (G4) and removes the misleading Void fallback (G12), but adds no new settlement semantics. Tracker legs currently have no safe relationship to `canonical_fixtures` or `fixture_provider_links`; proposed Decision #063 defines that fail-closed lineage contract but authorizes no implementation or matching.
+5. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated. Decision #058 unifies the metric formulas (G4) and removes the misleading Void fallback (G12), but adds no new settlement semantics. Tracker legs currently have no safe relationship to `canonical_fixtures` or `fixture_provider_links`; closed docs-only Decision #063 defines that fail-closed lineage contract but authorizes no implementation or matching.
 6. Trusted Analyst/Scout v2 using verified provider data rather than ungrounded pricing.
 7. Full i18n UX, including Arabic RTL.
 8. Mobile/tablet product polish and closed-beta onboarding.
@@ -191,6 +193,9 @@ Decision #061 — Playwright / Supabase-stub E2E harness — DEFERRED, NOT APPRO
 ## 7. Documentation and Migration Status
 
 - Decision #053 reconciled this file, README, the numbering ledger, and the migration inventory.
+- Decision #063 was approved and merged docs-only via PR #183 as `df4723f`; #064 remains the next unreserved number.
+- PR #182 merged as `d103947f` and deployed the fail-closed grading foundation without production provider calls, result writes, scheduling, or automatic settlement.
+- PR #181 applied production migration `20260721152711_cancel_pending_bet`, merged as `d5ebb87d`, and deployed READY. Its emergency kill switch is `docs/cancel-pending-bet-rollback.sql`; the executable SQL is unchanged by the governance rename.
 - `supabase/migrations` contains numbered files through 024, with no 008 file. Decision #060 is **EXECUTED / VERIFIED / CLOSED**. Migration 024 production version: `20260716142736_create_tracked_bet_024`; Phase B added no migrations.
 - Production's timestamped migration ledger does not represent all earlier manually applied history.
 - A fresh-database bootstrap is **not yet certified**; see `docs/migration-state-reconciliation-053.md`.
@@ -210,8 +215,8 @@ Decision #061 — Playwright / Supabase-stub E2E harness — DEFERRED, NOT APPRO
 #060 — Founder-First Coupon-to-Tracker — EXECUTED / VERIFIED / CLOSED 2026-07-16 (Phase A + Phase B production API smoke)
 #061 — Founder Daily Flow Acceptance — ACTIVE; Phase A1 merged via PR #162 as a6d4ebb, deployed READY; Phase A2 browser E2E deferred / not approved
 #062 — Mobile Founder client — ACTIVE; Phases 0/1B/1C merged; replacement Android+iOS development builds installed; Phase 1A Bearer bridge in Draft review; native API wiring/runtime remains deferred
-#063 — Tracked-Leg Fixture Lineage Contract — PROPOSED / DOCS-ONLY; Founder approval and merge pending
-#064 — next unreserved decision (#063 is a proposed reservation; retire it if abandoned)
+#063 — Tracked-Leg Fixture Lineage Contract — EXECUTED / CLOSED, DOCS-ONLY; Founder-approved; merged via PR #183 as df4723f; no runtime or production authority
+#064 — next unreserved decision (#063 is occupied and closed)
 ```
 
 PR #90 is closed without merge; its policy is not adopted. Decision #020 is never reused.
