@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-21
 **Proposed by:** CPO
-**Status:** PROPOSED / DOCS-ONLY. This contract does not authorize a migration, RPC, API change, provider call, result write, matching job, settlement, bankroll mutation, deploy, or production smoke.
+**Status:** EXECUTED / CLOSED, DOCS-ONLY — Founder-approved; merged via PR #183 as `df4723f2d55b220a4f64f54baf56a3333a8a61b7`. This contract does not authorize a migration, RPC, API change, provider call, result write, matching job, settlement, bankroll mutation, deploy, or production smoke.
 
 ## Purpose
 
