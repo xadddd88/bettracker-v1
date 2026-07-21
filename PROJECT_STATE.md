@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-21 (mobile PRs #170/#171 and Decision #063 reconciled; Decision #064 next unreserved)
+> Last updated: 2026-07-21 (Decision #064 implementation Draft opened; migration 025 unapplied; Decision #065 next unreserved)
 
 ## 1. Executive Status
 
@@ -15,9 +15,9 @@
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
 | Latest completed operational milestone | **PR #181 — Express/tracker correction and safe pending-bet cancellation; migration `20260721152711_cancel_pending_bet` applied; merged as `d5ebb87d`, deployed READY** |
 | Highest-numbered closed decision | **#063 — Tracked-Leg Fixture Lineage Contract (docs-only; merged via PR #183 as `df4723f`)** |
-| Active decisions | **#062 — Mobile Founder client (Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171; Event analysis and automatic Tracker save remain deferred)**; **#061 — Founder Daily Flow Acceptance**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
+| Active decisions | **#064 — Tracked-Leg Fixture Lineage Foundation (implementation Draft; migration 025 + `create_tracked_bet_v2` unapplied; no caller/runtime authority)**; **#062 — Mobile Founder client (Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171; Event analysis and automatic Tracker save remain deferred)**; **#061 — Founder Daily Flow Acceptance**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
-| Next unreserved decision | **#064** — #063 is occupied and closed by the merged docs-only tracked-leg fixture lineage contract |
+| Next unreserved decision | **#065** — #064 is occupied and active as a review-only implementation Draft |
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 completed one canonical-linked base-response dry-run with zero writes. Decision #055 then closed the trust/storage contract. Decision #056's Class A structural-presence implementation is merged and deployed (PR #146); its production provider call remains not approved and has not been run. Decision #057 closed the results-ingestion and settlement trust contract (docs-evidence only; no results runtime, result writes, or automated settlement is approved).
 
@@ -170,7 +170,7 @@ External beta remains paused because the product vision is not yet complete. Imp
 2. Decision #054 Report-Only observation period; enforced CSP and nonce/hash Phase B remain unapproved.
 3. Decision #056 structural-presence runtime execution (implementation is merged and deployed; the production provider call remains separately blocked and has not been run).
 4. Odds ingestion/normalization and user-facing trust validation.
-5. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated. Decision #058 unifies the metric formulas (G4) and removes the misleading Void fallback (G12), but adds no new settlement semantics. Tracker legs currently have no safe relationship to `canonical_fixtures` or `fixture_provider_links`; closed docs-only Decision #063 defines that fail-closed lineage contract but authorizes no implementation or matching.
+5. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated. Decision #058 unifies the metric formulas (G4) and removes the misleading Void fallback (G12), but adds no new settlement semantics. Tracker legs in production still have no safe relationship to `canonical_fixtures` or `fixture_provider_links`. Closed docs-only Decision #063 defines the contract; active Decision #064 now contains an unapplied migration/RPC Draft only, with no application caller or matching authority.
 6. Trusted Analyst/Scout v2 using verified provider data rather than ungrounded pricing.
 7. Full i18n UX, including Arabic RTL.
 8. Mobile/tablet product polish and closed-beta onboarding.
@@ -190,15 +190,17 @@ external beta invitations — PAUSED
 CSP enforcement / nonce / strict-dynamic — NOT APPROVED in Phase A
 Decision #060 — EXECUTED / VERIFIED / CLOSED; no further synthetic runtime smoke authorized
 Decision #061 — Playwright / Supabase-stub E2E harness — DEFERRED, NOT APPROVED
+Decision #064 — migration 025 / create_tracked_bet_v2 — REVIEW-ONLY DRAFT, UNAPPLIED; no application caller
 ```
 
 ## 7. Documentation and Migration Status
 
 - Decision #053 reconciled this file, README, the numbering ledger, and the migration inventory.
-- Decision #063 was approved and merged docs-only via PR #183 as `df4723f`; #064 remains the next unreserved number.
+- Decision #063 was approved and merged docs-only via PR #183 as `df4723f`.
+- Decision #064 is opened as a review-only implementation Draft: additive migration 025, `create_tracked_bet_v2`, lineage constraints/triggers, rollback, and status docs. The migration is unapplied and no caller/runtime authority exists; #065 is next unreserved.
 - PR #182 merged as `d103947f` and deployed the fail-closed grading foundation without production provider calls, result writes, scheduling, or automatic settlement.
 - PR #181 applied production migration `20260721152711_cancel_pending_bet`, merged as `d5ebb87d`, and deployed READY. Its emergency kill switch is `docs/cancel-pending-bet-rollback.sql`; the executable SQL is unchanged by the governance rename.
-- `supabase/migrations` contains numbered files through 024, with no 008 file. Decision #060 is **EXECUTED / VERIFIED / CLOSED**. Migration 024 production version: `20260716142736_create_tracked_bet_024`; Phase B added no migrations.
+- `supabase/migrations` contains numbered files through 025, with no 008 file. Migration 025 is review-only and unapplied. Decision #060 is **EXECUTED / VERIFIED / CLOSED**. Migration 024 production version: `20260716142736_create_tracked_bet_024`; Phase B added no migrations.
 - Production's timestamped migration ledger does not represent all earlier manually applied history.
 - A fresh-database bootstrap is **not yet certified**; see `docs/migration-state-reconciliation-053.md`.
 - Never run `001_initial_schema.sql` against production as a general setup command.
@@ -218,7 +220,8 @@ Decision #061 — Playwright / Supabase-stub E2E harness — DEFERRED, NOT APPRO
 #061 — Founder Daily Flow Acceptance — ACTIVE; Phase A1 merged via PR #162 as a6d4ebb, deployed READY; Phase A2 browser E2E deferred / not approved
 #062 — Mobile Founder client — ACTIVE; Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171; Event analysis and automatic Tracker save remain deferred
 #063 — Tracked-Leg Fixture Lineage Contract — EXECUTED / CLOSED, DOCS-ONLY; Founder-approved; merged via PR #183 as df4723f; no runtime or production authority
-#064 — next unreserved decision (#063 is occupied and closed)
+#064 — Tracked-Leg Fixture Lineage Foundation — ACTIVE / IMPLEMENTATION DRAFT; migration 025 and create_tracked_bet_v2 unapplied; no caller/runtime authority
+#065 — next unreserved decision (#064 is occupied and active)
 ```
 
 PR #90 is closed without merge; its policy is not adopted. Decision #020 is never reused.
