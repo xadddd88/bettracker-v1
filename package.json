@@ -18,7 +18,8 @@
     "test:auth-invite": "npm run build:provider-scripts && node scripts/test-auth-invite.mjs",
     "test:fp001-quarantine": "node scripts/test-fp001-quarantine.mjs",
     "test:rate-limit": "npm run build:provider-scripts && node scripts/test-rate-limit.mjs",
-    "test:csp-security": "npm run build:provider-scripts && node scripts/test-csp-security.mjs"
+    "test:csp-security": "npm run build:provider-scripts && node scripts/test-csp-security.mjs",
+    "test:design-system": "node scripts/test-broadcast-noir-design-system.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
