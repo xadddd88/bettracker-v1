@@ -20,6 +20,7 @@ export default async function DashboardPage() {
     .from('bets')
     .select('*, legs:bet_legs(*)')
     .eq('user_id', user!.id)
+    .is('archived_at', null)
     .order('placed_at', { ascending: false })
 
   const { data: bankroll } = await supabase
@@ -185,12 +186,27 @@ export default async function DashboardPage() {
                 <Link href={`/bets/${bet.id}`} className="group grid min-h-24 grid-cols-[32px_1fr_auto] items-center gap-3 py-4 transition-colors hover:bg-[#e8ff00] md:grid-cols-[48px_minmax(0,1fr)_110px_110px] md:px-3">
                   <span className="font-mono text-[9px] text-black/45">{String(index + 1).padStart(2, '0')}</span>
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-black uppercase tracking-[0.02em]">
+                    <div className="text-sm font-black uppercase tracking-[0.02em]">
                       {multiLeg ? `Express / ${bet.legs!.length} legs` : leg?.event_name || 'Untitled record'}
                     </div>
-                    <div className="mt-1 truncate text-xs text-black/55">
-                      {multiLeg ? bet.legs!.map(item => item.selection || item.market_type).join(' / ') : leg?.market_type || '—'}
-                    </div>
+                    {multiLeg ? (
+                      <ol className="mt-2 space-y-2" aria-label={`${bet.legs!.length} Express legs`}>
+                        {bet.legs!.map((item, legIndex) => (
+                          <li key={item.id} className="grid grid-cols-[24px_minmax(0,1fr)_auto] gap-2 text-xs">
+                            <span className="font-mono text-[9px] text-black/40">{String(legIndex + 1).padStart(2, '0')}</span>
+                            <span className="min-w-0">
+                              <span className="block break-words font-semibold text-black/80">{item.event_name}</span>
+                              <span className="mt-0.5 block break-words text-black/55">
+                                {[item.market_type, item.selection].filter(Boolean).join(' · ') || '—'}
+                              </span>
+                            </span>
+                            <span className="font-mono text-[10px] font-bold text-black/65">{Number(item.odds).toFixed(2)}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <div className="mt-1 break-words text-xs text-black/55">{leg?.market_type || '—'}</div>
+                    )}
                   </div>
                   <div className="text-right font-mono text-xs md:text-left">
                     <div className="text-[8px] uppercase tracking-[0.14em] text-black/45">Stake</div>

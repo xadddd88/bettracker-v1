@@ -113,7 +113,12 @@ function makeStubClient(cfg = {}) {
             ? { data: cfg.profileRow, error: null }
             : { data: null, error: { message: 'row not found' } };
         },
-        async maybeSingle() { return { data: null, error: null }; },
+        async maybeSingle() {
+          entry.ops.push({ op: 'maybeSingle' });
+          return cfg.maybeSingleRow !== undefined
+            ? { data: cfg.maybeSingleRow, error: null }
+            : { data: null, error: null };
+        },
         then(resolve, reject) {
           return Promise.resolve({ data: null, error: cfg.updateError ?? null }).then(resolve, reject);
         },
@@ -128,6 +133,7 @@ function clearCompiledFinancialModules() {
   for (const relPath of [
     'app/api/bankroll/deposit/route.js',
     'app/api/settings/route.js',
+    'app/api/bets/[id]/cancel/route.js',
     'lib/supabase/server.js',
     'lib/analytics/server.js',
     'lib/money.js',
@@ -1805,6 +1811,35 @@ test('scanner: single-leg coupon never gets a total odds value; legacy flattened
   assert.equal(legacy.legs[0].event_name, 'A vs B');
 });
 
+test('editor: Single / Express mode switch is behavioural and preserves the first draft', () => {
+  const { emptyLegDraft, switchLegDraftMode } = loadTrackedBetLib();
+  const first = { ...emptyLegDraft('soccer'), event_name: 'A vs B', odds: '1.80' };
+  const express = switchLegDraftMode([first], 'express');
+  assert.equal(express.length, 2, 'Express must create a second editable leg');
+  assert.deepEqual(express[0], first, 'Express must preserve the existing first leg');
+  assert.equal(express[1].sport, 'soccer', 'the new leg inherits the first leg sport');
+  const single = switchLegDraftMode(express, 'single');
+  assert.deepEqual(single, [first], 'Single keeps the first leg and removes Express-only legs');
+});
+
+test('page: Single / Express controls are real accessible buttons, not passive indicators', () => {
+  const page = readFileSync(path.join(repoRoot, 'app/(app)/bets/new/page.tsx'), 'utf8');
+  assert.ok(page.includes('onClick={() => selectBetMode(\'single\')}'), 'Single must invoke the mode transition');
+  assert.ok(page.includes('onClick={() => selectBetMode(\'express\')}'), 'Express must invoke the mode transition');
+  assert.ok(page.includes('aria-pressed={!isExpress}') && page.includes('aria-pressed={isExpress}'),
+    'both mode buttons must expose their selected state');
+  assert.ok(page.includes("window.confirm('Switch to Single and remove the additional Express legs?')"),
+    'dropping additional legs requires explicit confirmation');
+});
+
+test('dashboard: an Express summary renders every event, market, selection and individual odds', () => {
+  const dashboard = readFileSync(path.join(repoRoot, 'app/(app)/dashboard/page.tsx'), 'utf8');
+  assert.ok(dashboard.includes('bet.legs!.map((item, legIndex) => ('), 'dashboard must map all Express legs');
+  assert.ok(dashboard.includes('{item.event_name}'), 'each Express event must be visible');
+  assert.ok(dashboard.includes('[item.market_type, item.selection]'), 'each leg market and selection must be visible');
+  assert.ok(dashboard.includes('Number(item.odds).toFixed(2)'), 'each leg coefficient must be visible');
+});
+
 test('page: overflow branch runs BEFORE any state write, with the fixed non-echoing message', () => {
   const page = readFileSync(path.join(repoRoot, 'app/(app)/bets/new/page.tsx'), 'utf8');
   const okCheck = page.indexOf('if (!mapped.ok)');
@@ -1888,7 +1923,7 @@ test('page: overflow gate unlocks ONLY via a valid scan or a manual payload edit
   assert.ok(marker.includes('setScannerOverflowBlocked(false)'), 'manual edit must lift the gate');
   assert.ok(marker.includes("setSource('manual')"), 'a manual unlock must switch source to manual');
   const editSites = (page.match(/markManualEdit\(/g) ?? []).length;
-  assert.equal(editSites, 8, 'definition + 7 payload-edit sites (leg fields, add/remove leg, total odds, stake, bookmaker, notes)');
+  assert.equal(editSites, 9, 'definition + 8 payload-edit sites (mode, leg fields, add/remove leg, total odds, stake, bookmaker, notes)');
   assert.ok(!/clearError\('/.test(page.slice(page.indexOf('function updateLeg'))),
     'no payload-edit path may bypass markManualEdit by calling clearError directly');
   // No third unlock path exists.
@@ -1907,6 +1942,193 @@ test('#061 A1: write path untouched — route, RPC, migration 024 and the intent
   const lib = loadTrackedBetLib();
   for (const fn of ['createSubmitIntent', 'beginSubmit', 'resolveSubmit', 'fingerprintPayload', 'scannerDataToDrafts']) {
     assert.equal(typeof lib[fn], 'function', `${fn} must remain exported from the shared helper`);
+  }
+});
+
+// ── Tracker pending cancellation — soft delete + atomic refund ──
+
+const CANCEL_MIGRATION = 'supabase/migrations/20260721152711_cancel_pending_bet.sql';
+const CANCEL_ROLLBACK = 'docs/decision-062-cancel-pending-bet-rollback.sql';
+const CANCEL_ROUTE = 'app/api/bets/[id]/cancel/route.js';
+const CANCEL_BET_ID = 'aaaaaaaa-1111-4111-8111-bbbbbbbbbbbb';
+const CANCEL_KEY = 'cccccccc-2222-4222-8222-dddddddddddd';
+
+function cancelRequest(key = CANCEL_KEY) {
+  return new Request(`https://example.test/api/bets/${CANCEL_BET_ID}/cancel`, {
+    method: 'POST',
+    headers: { 'idempotency-key': key },
+  });
+}
+
+function cancelContext(id = CANCEL_BET_ID) {
+  return { params: Promise.resolve({ id }) };
+}
+
+await testAsync('cancel route: anonymous and invalid requests fail before the RPC', async () => {
+  const anonymous = makeStubClient({ user: null, maybeSingleRow: { id: CANCEL_BET_ID } });
+  await withFinancialRoute(CANCEL_ROUTE, anonymous, async ({ POST }) => {
+    const response = await POST(cancelRequest(), cancelContext());
+    assert.equal(response.status, 401);
+    assert.equal(anonymous.calls.rpc.length, 0);
+  });
+
+  const authenticated = makeStubClient({ maybeSingleRow: { id: CANCEL_BET_ID } });
+  await withFinancialRoute(CANCEL_ROUTE, authenticated, async ({ POST }) => {
+    const response = await POST(cancelRequest('not-a-uuid'), cancelContext());
+    assert.equal(response.status, 400);
+    assert.equal(authenticated.calls.rpc.length, 0);
+  });
+});
+
+await testAsync('cancel route: verifies ownership then delegates the exact request to one RPC', async () => {
+  const stub = makeStubClient({
+    maybeSingleRow: { id: CANCEL_BET_ID },
+    rpcResults: {
+      cancel_pending_bet: {
+        data: { bet_id: CANCEL_BET_ID, refund_amount: 100, balance: 555, replayed: false },
+        error: null,
+      },
+    },
+  });
+  await withFinancialRoute(CANCEL_ROUTE, stub, async ({ POST }) => {
+    const response = await POST(cancelRequest(), cancelContext());
+    const result = await readJsonResponse(response);
+    assert.equal(result.status, 200);
+    assert.equal(result.body.success, true);
+    assert.equal(stub.calls.rpc.length, 1);
+    assert.deepEqual(stub.calls.rpc[0], {
+      name: 'cancel_pending_bet',
+      args: { p_bet_id: CANCEL_BET_ID, p_idempotency_key: CANCEL_KEY },
+    });
+    const ownership = stub.calls.from.find((entry) => entry.table === 'bets');
+    assert.ok(ownership?.ops.some((op) => op.op === 'eq' && op.col === 'user_id' && op.val === 'user-1'));
+    assert.ok(!stub.calls.from.some((entry) => entry.ops.some((op) => ['update', 'insert', 'delete'].includes(op.op))),
+      'route must perform no direct table writes');
+  });
+});
+
+await testAsync('cancel route: not-owned and settled/conflicting bets return sanitized errors', async () => {
+  const missing = makeStubClient();
+  await withFinancialRoute(CANCEL_ROUTE, missing, async ({ POST }) => {
+    const response = await POST(cancelRequest(), cancelContext());
+    assert.equal(response.status, 404);
+    assert.equal(missing.calls.rpc.length, 0);
+  });
+
+  for (const [dbMessage, expectedStatus, expectedError] of [
+    ['bet_not_cancellable', 409, 'Only pending bets can be deleted'],
+    ['idempotency_conflict with secret ledger detail', 409, 'Cancellation request conflict'],
+    ['stake_ledger_mismatch row=secret', 500, 'Bet could not be deleted safely'],
+  ]) {
+    const stub = makeStubClient({
+      maybeSingleRow: { id: CANCEL_BET_ID },
+      rpcResults: { cancel_pending_bet: { data: null, error: { message: dbMessage } } },
+    });
+    await withFinancialRoute(CANCEL_ROUTE, stub, async ({ POST }) => {
+      const response = await POST(cancelRequest(), cancelContext());
+      const result = await readJsonResponse(response);
+      assert.equal(result.status, expectedStatus);
+      assert.equal(result.body.error, expectedError);
+      assert.ok(!JSON.stringify(result.body).includes('secret'), 'raw database diagnostics leaked');
+    });
+  }
+});
+
+test('cancel: migration retains the audit record and never hard-deletes financial data', () => {
+  const sql = readFileSync(path.join(repoRoot, CANCEL_MIGRATION), 'utf8');
+  assert.ok(sql.includes('ADD COLUMN IF NOT EXISTS archived_at timestamptz'), 'archived_at soft-delete column missing');
+  assert.ok(sql.includes("SET status = 'void'"), 'cancelled bet must become void');
+  assert.ok(sql.includes("SET leg_status = 'void'"), 'cancelled legs must become void');
+  assert.ok(!/DELETE\s+FROM\s+public\.(bets|bet_legs|bankrolls|bankroll_transactions)/i.test(sql),
+    'financial audit rows must never be hard-deleted');
+});
+
+test('cancel: emergency rollback disables the RPC but preserves schema and financial audit data', () => {
+  const migration = readFileSync(path.join(repoRoot, CANCEL_MIGRATION), 'utf8');
+  const rollback = readFileSync(path.join(repoRoot, CANCEL_ROLLBACK), 'utf8');
+  assert.ok(migration.includes(CANCEL_ROLLBACK), 'migration must point to the reviewed rollback artifact');
+  assert.ok(/REVOKE EXECUTE ON FUNCTION public\.cancel_pending_bet\(uuid, text\)[\s\S]*?FROM PUBLIC, anon, authenticated;/.test(rollback),
+    'rollback must revoke the cancellation RPC from every public caller');
+  assert.ok(rollback.includes("has_function_privilege(\n       'authenticated'"),
+    'rollback must verify that authenticated EXECUTE is gone');
+  assert.ok(rollback.includes("to_regclass('public.uq_bankroll_tx_one_tracker_cancel')"),
+    'rollback must retain and verify the one-refund-per-bet backstop');
+  assert.ok(rollback.includes("column_name = 'archived_at'"),
+    'rollback must retain and verify the archive marker');
+  assert.ok(!/DROP\s+(TABLE|COLUMN|INDEX|FUNCTION)|DELETE\s+FROM/i.test(rollback),
+    'rollback must not destroy schema or financial audit records');
+});
+
+test('cancel: refund is ownership-scoped, locked, ledger-verified and atomic', () => {
+  const sql = readFileSync(path.join(repoRoot, CANCEL_MIGRATION), 'utf8');
+  assert.ok(sql.includes('v_user_id        uuid := auth.uid()'), 'identity must come only from auth.uid()');
+  assert.ok(/WHERE id = p_bet_id\s+AND user_id = v_user_id\s+FOR UPDATE;/.test(sql),
+    'owned bet row must be locked before cancellation');
+  assert.ok(/WHERE id = v_bet\.bankroll_id\s+AND user_id = v_user_id\s+FOR UPDATE;/.test(sql),
+    'owned bankroll row must be locked before refund');
+  assert.ok(sql.includes("AND type = 'stake'") && sql.includes('AND amount = -v_bet.stake'),
+    'the original matching stake debit must be verified');
+  assert.ok(sql.includes('IF v_stake_tx_count IS DISTINCT FROM 1 THEN'),
+    'missing or duplicate stake ledger rows must fail closed');
+  assert.ok(sql.includes('v_new_balance := v_balance + v_bet.stake'), 'refund must equal the stored stake exactly');
+  assert.ok(sql.includes("'action',           'tracker_cancel'"), 'refund ledger entry must carry an audit action');
+});
+
+test('cancel: idempotency prevents a double refund even across different retry keys', () => {
+  const sql = readFileSync(path.join(repoRoot, CANCEL_MIGRATION), 'utf8');
+  assert.ok(sql.includes('uq_bankroll_tx_one_tracker_cancel'), 'one-refund-per-bet unique backstop missing');
+  assert.ok(sql.includes('lower(idempotency_key) = v_key'), 'same-key replay lookup missing');
+  assert.ok(sql.includes('IF v_bet.archived_at IS NOT NULL THEN'), 'fresh-key replay after an ambiguous response missing');
+  assert.ok((sql.match(/'replayed',\s+true/g) ?? []).length >= 2,
+    'both same-key and fresh-key retries must return as replays');
+  assert.ok(/REVOKE EXECUTE ON FUNCTION public\.cancel_pending_bet\(uuid, text\)[\s\S]*?FROM PUBLIC, anon;/.test(sql),
+    'cancel RPC must be revoked from PUBLIC and anon');
+  assert.ok(/GRANT EXECUTE ON FUNCTION public\.cancel_pending_bet\(uuid, text\)[\s\S]*?TO authenticated;/.test(sql),
+    'cancel RPC must be callable only by authenticated users');
+});
+
+test('cancel: route validates UUIDs, verifies ownership and writes only through the RPC', () => {
+  const route = readFileSync(path.join(repoRoot, 'app/api/bets/[id]/cancel/route.ts'), 'utf8');
+  assert.ok(route.includes("req.headers.get('idempotency-key')"), 'required idempotency header missing');
+  assert.ok(route.includes(".eq('user_id', user.id)"), 'route ownership precheck missing');
+  assert.ok(route.includes("rpc('cancel_pending_bet'"), 'route must delegate the atomic write to cancel_pending_bet');
+  for (const table of ['bets', 'bet_legs', 'bankrolls', 'bankroll_transactions']) {
+    assert.ok(!new RegExp(`from\\('${table}'\\)[\\s\\S]{0,300}\\.(update|insert|delete)\\(`).test(route),
+      `route must not write ${table} directly`);
+  }
+  assert.ok(!route.includes('error.message }, { status: 500'), 'raw database errors must not reach the client');
+});
+
+test('cancel: web controls require confirmation and explain the refund/audit behavior', () => {
+  const detail = readFileSync(path.join(repoRoot, 'app/(app)/bets/[id]/SettleActions.tsx'), 'utf8');
+  const quick = readFileSync(path.join(repoRoot, 'components/bets/QuickSettle.tsx'), 'utf8');
+  for (const [name, src] of [['detail', detail], ['list', quick]]) {
+    assert.ok(src.includes('window.confirm('), `${name}: destructive confirmation missing`);
+    assert.ok(src.includes('/cancel`'), `${name}: cancel endpoint missing`);
+    assert.ok(src.includes("'Idempotency-Key': crypto.randomUUID()"), `${name}: idempotency key missing`);
+    assert.ok(src.includes('stake will be returned'), `${name}: refund consequence must be explicit`);
+  }
+  assert.ok(detail.includes('The financial audit record is retained.'), 'detail must explain that deletion is a soft delete');
+});
+
+test('cancel: every product bet read excludes archived cancellations', () => {
+  const reads = [
+    'app/(app)/dashboard/page.tsx',
+    'app/(app)/bets/page.tsx',
+    'app/(app)/bets/[id]/page.tsx',
+    'app/(app)/coach/page.tsx',
+    'app/api/coach/route.ts',
+    'app/api/risk/evaluate/route.ts',
+    'app/(app)/analytics/page.tsx',
+    'app/api/bets/[id]/settle/route.ts',
+    'apps/mobile/src/bets/data.ts',
+  ];
+  for (const file of reads) {
+    const src = readFileSync(path.join(repoRoot, file), 'utf8');
+    const betReads = src.split(".from('bets')").length - 1;
+    const archivedFilters = src.split(".is('archived_at', null)").length - 1;
+    assert.ok(betReads > 0, `${file}: expected at least one bets read`);
+    assert.ok(archivedFilters >= betReads, `${file}: every bets read must exclude archived rows`);
   }
 });
 

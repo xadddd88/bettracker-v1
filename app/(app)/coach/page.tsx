@@ -20,6 +20,7 @@ export default async function CoachPage() {
       .from('bets')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user!.id)
+      .is('archived_at', null)
       .in('status', ['won', 'lost', 'void']),
   ])
 

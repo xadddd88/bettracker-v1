@@ -131,6 +131,7 @@ export interface Bet {
   pnl?: number | null
   placed_at: string
   settled_at?: string
+  archived_at?: string
   settlement_outcome?: 'won' | 'lost' | 'void'
   bookmaker?: string
   source: BetSource

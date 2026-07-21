@@ -23,6 +23,7 @@ export async function POST(
     .select('id, status')
     .eq('id', id)
     .eq('user_id', user.id)
+    .is('archived_at', null)
     .single()
 
   if (!betRow) {

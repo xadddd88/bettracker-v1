@@ -40,6 +40,7 @@ export default async function BetsPage() {
       .from('bets')
       .select('*, legs:bet_legs(*)')
       .eq('user_id', user!.id)
+      .is('archived_at', null)
       .order('placed_at', { ascending: false })
       // Express legs display in coupon order (Decision #060 Phase B);
       // legacy legs have NULL leg_index and keep their old position.

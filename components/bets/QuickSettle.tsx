@@ -11,7 +11,7 @@ interface Props {
 
 export default function QuickSettle({ betId }: Props) {
   const router   = useRouter()
-  const [busy,  setBusy]  = useState<'won' | 'lost' | 'void' | null>(null)
+  const [busy,  setBusy]  = useState<'won' | 'lost' | 'void' | 'delete' | null>(null)
   const [error, setError] = useState('')
   const lockRef = useRef(false)
 
@@ -30,6 +30,30 @@ export default function QuickSettle({ betId }: Props) {
       const json = await res.json()
       if (res.status === 409) { setError('Already settled'); return }
       if (!res.ok || !json.success) { setError(json.error ?? 'Settlement failed'); return }
+      router.refresh()
+    } catch {
+      setError('Network error — try again')
+    } finally {
+      lockRef.current = false
+      setBusy(null)
+    }
+  }
+
+  async function cancelBet() {
+    if (lockRef.current) return
+    if (!window.confirm('Delete this pending bet? The stake will be returned to your bankroll. This cannot be undone.')) return
+
+    lockRef.current = true
+    setBusy('delete')
+    setError('')
+    trackClientEvent(EVENTS.BET_CANCEL_CLICKED, { bet_id: betId, from_page: 'tracker_list' })
+    try {
+      const res = await fetch(`/api/bets/${betId}/cancel`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) { setError(json.error ?? 'Bet could not be deleted'); return }
       router.refresh()
     } catch {
       setError('Network error — try again')
@@ -62,6 +86,13 @@ export default function QuickSettle({ betId }: Props) {
         disabled={busy !== null}
       >
         {busy === 'void' ? '…' : 'Void'}
+      </button>
+      <button
+        className="min-h-11 px-3 py-1 text-xs font-medium text-red-300 underline decoration-red-900 underline-offset-4 transition-colors hover:text-red-200 disabled:opacity-40 sm:ml-auto"
+        onClick={cancelBet}
+        disabled={busy !== null}
+      >
+        {busy === 'delete' ? 'Deleting…' : 'Delete'}
       </button>
       {error && <span className="text-[10px] text-red-400 basis-full sm:basis-auto sm:ml-1">{error}</span>}
     </div>

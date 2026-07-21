@@ -59,6 +59,7 @@ export async function fetchBets(userId: string): Promise<BetDto[]> {
     .from('bets')
     .select(BET_COLUMNS)
     .eq('user_id', userId)
+    .is('archived_at', null)
     .order('placed_at', { ascending: false })
     .order('leg_index', { ascending: true, referencedTable: 'bet_legs' });
   if (error) throw sanitizeReadError(error.message, error.code);
@@ -71,6 +72,7 @@ export async function fetchBet(userId: string, id: string): Promise<BetDto> {
     .select(BET_COLUMNS)
     .eq('user_id', userId)
     .eq('id', id)
+    .is('archived_at', null)
     .order('leg_index', { ascending: true, referencedTable: 'bet_legs' })
     .maybeSingle();
   if (error) throw sanitizeReadError(error.message, error.code);
