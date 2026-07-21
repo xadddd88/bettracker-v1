@@ -22,7 +22,7 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'XADDD — BetTracker',
+  title: 'BetTracker — Evidence before action',
   description: 'Decision intelligence for betting analysis and tracking.',
 }
 

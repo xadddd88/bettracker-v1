@@ -161,7 +161,7 @@ export default function AiCaptureScreen() {
   return (
     <ScrollView contentContainerStyle={[styles.content, androidTopInset]} contentInsetAdjustmentBehavior="automatic" style={styles.screen}>
       <Animated.View entering={FadeInDown.duration(380).reduceMotion(ReduceMotion.System)} style={styles.masthead}>
-        <Text style={styles.wordmark}>XADDD</Text><Text style={styles.mastheadMeta}>AI CAPTURE / 02</Text>
+        <Text style={styles.wordmark}>BETTRACKER</Text><Text style={styles.mastheadMeta}>AI CAPTURE / 02</Text>
       </Animated.View>
 
       <Animated.View entering={FadeIn.duration(420).reduceMotion(ReduceMotion.System)} style={styles.hero}>

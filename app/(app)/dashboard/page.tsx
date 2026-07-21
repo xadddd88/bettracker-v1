@@ -95,7 +95,7 @@ export default async function DashboardPage() {
       {!profile?.onboarding_completed && <div className="mb-5"><OnboardingCard /></div>}
 
       <header className="flex min-h-12 items-center border-y border-black px-3 md:px-4">
-        <div className="font-display text-lg font-black tracking-[-0.06em]">XADDD</div>
+        <div className="font-display text-lg font-black tracking-[-0.045em]">BETTRACKER</div>
         <div className="ml-4 flex-1 font-mono text-[8px] font-bold tracking-[0.18em] text-black/45">FOUNDER EDITION / WEB</div>
         <Link href="/settings" className="flex min-h-11 items-center text-[9px] font-black uppercase tracking-[0.12em] hover:underline">
           Account
