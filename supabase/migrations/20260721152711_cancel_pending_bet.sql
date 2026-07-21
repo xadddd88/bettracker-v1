@@ -10,7 +10,7 @@
 -- reads exclude archived_at rows, while the ledger continues to
 -- explain every balance change.
 -- Emergency kill switch / operational rollback:
---   docs/decision-062-cancel-pending-bet-rollback.sql
+--   docs/cancel-pending-bet-rollback.sql
 -- It revokes authenticated EXECUTE without deleting schema or audit data.
 -- ============================================================
 
