@@ -3,128 +3,181 @@
 @tailwind utilities;
 
 :root {
-  --bg: #f5f5f0;
-  --surface-1: #ffffff;
-  --surface-2: #e9e9e4;
-  --text-1: #050505;
-  --text-2: #676762;
-  --accent: #e8ff00;
-  --accent-soft: rgba(232, 255, 0, 0.16);
+  /* Broadcast Noir v3.1 — one global semantic layer. */
+  --night: #070A08;
+  --field: #111813;
+  --field-raised: #202C23;
+  --border-subtle: #334036;
+  --border-strong: #59685E;
+  --text-primary: #F2F5F0;
+  --text-muted: #8D978F;
+  --text-quiet: #78847B;
+  --text-quiet-raised: #8D978F;
+  --data-value: #C7D0C8;
+  --signal: #BFFF3B;
+  --on-signal: #061008;
+  --success: #67DF91;
+  --negative: #FF7474;
+  --review: #FFC05B;
+  --radius-control: 8px;
+
+  /* Existing component aliases now resolve to Broadcast Noir. */
+  --bg: var(--night);
+  --surface-1: var(--field);
+  --surface-2: var(--field-raised);
+  --text-1: var(--text-primary);
+  --text-2: var(--text-muted);
+  --accent: var(--signal);
+  --accent-soft: color-mix(in srgb, var(--signal) 14%, transparent);
   --accent-glow: transparent;
-  --accent-rail: #050505;
+  --accent-rail: var(--signal);
   --body-overlay: none;
   --body-texture: none;
   --body-texture-size: auto;
-  --win: #08783e;
-  --loss: #c3162d;
-  --pending: #8b6200;
-  --neutral: #676762;
-  --border: #0a0a0a;
-  --radius: 0;
+  --win: var(--success);
+  --loss: var(--negative);
+  --pending: var(--review);
+  --neutral: var(--text-quiet);
+  --border: var(--border-strong);
+  --radius: var(--radius-control);
   --sidebar-width: 244px;
 }
 
-@keyframes editorial-enter {
-  from { opacity: 0; transform: translateY(18px); }
+@keyframes broadcast-enter {
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes editorial-shift {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-
-@keyframes editorial-rule-in {
+@keyframes signal-sweep {
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }
 }
 
 @layer base {
-  html {
-    background: var(--bg);
-  }
+  html { background: var(--night); }
 
   body {
     @apply antialiased font-sans;
-    background: var(--bg);
-    color: var(--text-1);
+    background: var(--night);
+    color: var(--text-primary);
     min-height: 100vh;
   }
 
-  * {
-    border-color: var(--border);
-  }
+  * { border-color: var(--border-strong); }
 
   ::selection {
-    background: var(--accent);
-    color: #050505;
+    background: var(--signal);
+    color: var(--on-signal);
   }
 
   :focus-visible {
-    outline: 2px solid #050505;
+    outline: 2px solid var(--signal);
     outline-offset: 3px;
   }
 }
 
 @layer components {
+  .bn-page,
   .editorial-page {
-    animation: editorial-enter 420ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+    animation: broadcast-enter 240ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  }
+
+  .bn-panel,
+  .editorial-panel {
+    background: var(--field);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
   }
 
   .editorial-kicker {
-    @apply font-mono text-[10px] font-bold uppercase tracking-[0.2em];
-    color: var(--text-2);
+    @apply font-mono text-[11px] font-bold uppercase tracking-[0.12em];
+    color: var(--text-quiet);
   }
 
   .editorial-rule {
+    animation: signal-sweep 320ms ease-out both;
+    background: var(--border-strong);
     height: 1px;
-    background: #050505;
     transform-origin: left;
-    animation: editorial-rule-in 620ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
-  }
-
-  .editorial-panel {
-    background: var(--surface-1);
-    border: 1px solid #050505;
   }
 
   .editorial-dark {
-    background: #050505;
-    color: #ffffff;
+    background: var(--field);
+    color: var(--text-primary);
   }
 
+  .bn-button,
+  .editorial-action,
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.06em] focus:outline-none disabled:cursor-not-allowed disabled:opacity-45;
+    border-radius: var(--radius-control);
+    transition: background-color 170ms ease, border-color 170ms ease, color 170ms ease, opacity 170ms ease, transform 100ms ease;
+  }
+
+  .bn-button:active,
+  .editorial-action:active,
+  .btn:active { transform: scale(0.985); }
+
+  .bn-button-primary,
+  .btn-primary {
+    background: var(--signal);
+    border: 1px solid var(--signal);
+    color: var(--on-signal);
+  }
+
+  .bn-button-primary:hover,
+  .btn-primary:hover { filter: brightness(0.94); }
+
+  .bn-button-secondary,
+  .btn-ghost,
   .editorial-action {
-    @apply inline-flex min-h-12 items-center justify-center px-5 text-[11px] font-extrabold uppercase tracking-[0.12em];
-    border: 1px solid currentColor;
-    transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
+    background: var(--field);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
   }
 
+  .bn-button-secondary:hover,
+  .btn-ghost:hover,
   .editorial-action:hover {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #050505;
-    transform: translateY(-2px);
+    background: var(--field-raised);
+    border-color: var(--signal);
   }
 
-  .editorial-action:active {
-    transform: translateY(1px) scale(0.99);
+  .bn-button-destructive {
+    background: var(--field);
+    border: 1px solid var(--negative);
+    color: var(--negative);
+  }
+
+  .bn-status {
+    @apply inline-flex min-h-8 items-center gap-1.5 px-2.5 text-xs font-extrabold;
+    background: var(--field);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+  }
+
+  .bn-status-icon { font-weight: 900; }
+  .bn-status-success { border-color: var(--success); color: var(--success); }
+  .bn-status-review { border-color: var(--review); color: var(--review); }
+  .bn-status-negative { border-color: var(--negative); color: var(--negative); }
+  .bn-status-neutral { color: var(--text-muted); }
+
+  .bn-data-value {
+    color: var(--data-value);
+    font-variant-numeric: tabular-nums;
   }
 
   .editorial-ticker {
-    overflow: hidden;
-    background: var(--accent);
-    border-block: 1px solid #050505;
-    color: #050505;
+    background: var(--field-raised);
+    border-block: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    overflow-x: auto;
   }
 
-  .editorial-ticker-track {
-    display: flex;
-    width: max-content;
-    animation: editorial-shift 22s linear infinite;
-  }
+  .editorial-ticker-track { display: flex; width: max-content; }
 
   .editorial-ticker-copy {
-    @apply whitespace-nowrap py-3 font-mono text-[10px] font-black uppercase tracking-[0.18em];
+    @apply whitespace-nowrap py-3 font-mono text-[11px] font-black uppercase tracking-[0.12em];
     padding-inline: 2rem;
   }
 
@@ -134,102 +187,63 @@
   .card-status-loss,
   .card-status-pending,
   .card-status-watch {
-    background: var(--surface-1);
-    border: 1px solid #050505;
-    border-radius: 0;
-    box-shadow: none;
     @apply p-4;
+    background: var(--field);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    box-shadow: none;
   }
 
-  .card-status-win { border-left: 4px solid var(--win); }
-  .card-status-loss { border-left: 4px solid var(--loss); }
-  .card-status-pending { border-left: 4px solid var(--pending); }
-  .card-status-watch { border-left: 4px solid var(--neutral); }
-
-  .btn {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.08em] focus:outline-none disabled:cursor-not-allowed disabled:opacity-45;
-    border-radius: 0;
-    transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
-  }
-
-  .btn:hover { transform: translateY(-1px); }
-  .btn:active { transform: translateY(1px) scale(0.99); }
-
-  .btn-primary {
-    @apply btn;
-    background: #050505;
-    border: 1px solid #050505;
-    color: #ffffff;
-  }
-
-  .btn-primary:hover {
-    background: var(--accent);
-    border-color: #050505;
-    color: #050505;
-    filter: none;
-  }
-
-  .btn-ghost {
-    @apply btn;
-    background: transparent;
-    border: 1px solid #050505;
-    color: #050505;
-  }
-
-  .btn-ghost:hover {
-    background: #050505;
-    color: #ffffff;
-  }
+  .card-highlight { border-color: var(--signal); }
+  .card-status-win { border-left: 4px solid var(--success); }
+  .card-status-loss { border-left: 4px solid var(--negative); }
+  .card-status-pending { border-left: 4px solid var(--review); }
+  .card-status-watch { border-left: 4px solid var(--border-strong); }
 
   .input {
     @apply w-full px-3 py-2 text-sm focus:outline-none;
     min-height: 44px;
-    background: #ffffff;
-    border: 1px solid #050505;
-    border-radius: 0;
-    color: #050505;
-    transition: box-shadow 160ms ease, background-color 160ms ease;
+    background: var(--field);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    color: var(--text-primary);
+    transition: border-color 160ms ease, box-shadow 160ms ease;
   }
 
-  .input::placeholder { color: #8a8a84; }
-
-  .input:focus {
-    border-color: #050505;
-    box-shadow: inset 0 -3px 0 var(--accent);
-  }
+  .input::placeholder { color: var(--text-quiet); }
+  .input:focus { border-color: var(--signal); box-shadow: 0 0 0 1px var(--signal); }
 
   .label {
-    @apply mb-1 block font-mono text-[10px] font-bold uppercase tracking-[0.14em];
-    color: var(--text-2);
+    @apply mb-1 block font-mono text-[11px] font-bold uppercase tracking-[0.1em];
+    color: var(--text-muted);
   }
 
   .stat-card {
     @apply flex flex-col gap-2 p-4;
     background: transparent;
     border: 0;
-    border-top: 1px solid #050505;
+    border-top: 1px solid var(--border-strong);
     border-radius: 0;
   }
 
   .stat-label {
-    @apply font-mono text-[9px] font-bold uppercase tracking-[0.16em];
-    color: var(--text-2);
+    @apply font-mono text-[11px] font-bold uppercase tracking-[0.1em];
+    color: var(--text-quiet);
   }
 
   .stat-value {
     @apply font-display text-2xl font-black tracking-tight;
-    color: var(--text-1);
+    color: var(--data-value);
+    font-variant-numeric: tabular-nums;
   }
 }
 
-/* Existing feature pages inherit the new system without touching business logic. */
+/* Current screens migrate through this one compatibility adapter. */
 .web-editorial .rounded-xl,
 .web-editorial .rounded-lg,
 .web-editorial .rounded-md,
 .web-editorial .rounded-full,
-.web-editorial .rounded-t-2xl {
-  border-radius: 0 !important;
-}
+.web-editorial .rounded-t-2xl { border-radius: var(--radius-control) !important; }
 
 .web-editorial .text-white,
 .web-editorial .text-gray-100,
@@ -237,80 +251,48 @@
 .web-editorial .text-gray-300,
 .web-editorial .text-slate-100,
 .web-editorial .text-slate-200,
-.web-editorial .text-slate-300 {
-  color: #050505 !important;
-}
+.web-editorial .text-slate-300 { color: var(--text-primary) !important; }
 
 .web-editorial .text-gray-400,
 .web-editorial .text-gray-500,
 .web-editorial .text-gray-600,
 .web-editorial .text-slate-400,
 .web-editorial .text-slate-500,
-.web-editorial .text-slate-600 {
-  color: #676762 !important;
-}
+.web-editorial .text-slate-600 { color: var(--text-muted) !important; }
 
 .web-editorial .bg-gray-950,
-.web-editorial .bg-night-950 {
-  background-color: var(--bg) !important;
-}
+.web-editorial .bg-night-950 { background-color: var(--night) !important; }
 
 .web-editorial .bg-gray-900,
 .web-editorial .bg-gray-800,
 .web-editorial .bg-night-900,
-.web-editorial .bg-night-800 {
-  background-color: var(--surface-1) !important;
-}
+.web-editorial .bg-night-800 { background-color: var(--field) !important; }
 
-.web-editorial .bg-indigo-600 {
-  background-color: #050505 !important;
-}
-
+.web-editorial .bg-indigo-600 { background-color: var(--signal) !important; color: var(--on-signal) !important; }
 .web-editorial .border-indigo-500,
 .web-editorial .border-indigo-600,
-.web-editorial .border-indigo-900 {
-  border-color: #050505 !important;
-}
-
-.web-editorial .text-indigo-400 {
-  color: #050505 !important;
-}
-
-/* The broad legacy text remap above keeps old dark pages readable on paper,
-   but selected controls are intentionally black surfaces. Pin their foreground
-   explicitly so a `.text-white` utility can never become black-on-black. */
-.web-editorial .btn-primary,
-.web-editorial .btn-primary.text-white,
-.web-editorial .btn-primary .text-white,
-.web-editorial .bg-black,
-.web-editorial .bg-black.text-white,
-.web-editorial .bg-black .text-white,
-.web-editorial .bg-indigo-600.text-white {
-  color: #ffffff !important;
-}
-
-.web-editorial .btn-primary:hover,
-.web-editorial .btn-primary:hover .text-white {
-  color: #050505 !important;
-}
+.web-editorial .border-indigo-900 { border-color: var(--signal) !important; }
+.web-editorial .text-indigo-400 { color: var(--signal) !important; }
 
 .web-editorial .border-gray-600,
 .web-editorial .border-gray-700,
 .web-editorial .border-gray-800,
 .web-editorial .border-night-700,
-.web-editorial .border-night-800 {
-  border-color: #050505 !important;
-}
+.web-editorial .border-night-800 { border-color: var(--border-strong) !important; }
 
-.web-editorial .editorial-dark .text-white { color: #ffffff !important; }
-.web-editorial .editorial-dark.text-white { color: #ffffff !important; }
-.web-editorial .editorial-dark.hover\:text-black:hover,
-.web-editorial .editorial-dark .hover\:text-black:hover { color: #050505 !important; }
-.web-editorial .hover\:bg-black:hover.hover\:text-white { color: #ffffff !important; }
+.web-editorial .btn-primary,
+.web-editorial .btn-primary.text-white,
+.web-editorial .btn-primary .text-white,
+.web-editorial .bg-indigo-600.text-white { color: var(--on-signal) !important; }
+
+.web-editorial .bg-black,
+.web-editorial .bg-black.text-white,
+.web-editorial .bg-black .text-white { background: var(--field) !important; color: var(--text-primary) !important; }
+
 .web-editorial .editorial-dark .text-gray-300,
 .web-editorial .editorial-dark .text-gray-400,
 .web-editorial .editorial-dark .text-slate-300,
-.web-editorial .editorial-dark .text-slate-400 { color: #c8c8c3 !important; }
+.web-editorial .editorial-dark .text-slate-400 { color: var(--text-muted) !important; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
