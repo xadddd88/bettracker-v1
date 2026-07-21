@@ -1,6 +1,6 @@
 # Decision #062 — Mobile Phase 1A Bearer Bridge
 
-Status: RESTACKED ON CURRENT MAIN; DRAFT REVIEW; no production runtime or smoke authorized by this implementation.
+Status: MERGED via PR #170 as `5ef838d5d863bf8dd0436e437d1ad85f06525a36` on 2026-07-19. This repository-state receipt records no production mobile smoke, Supabase/provider call, financial write, or new runtime authority.
 
 ## Purpose
 
