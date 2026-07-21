@@ -2205,5 +2205,38 @@ Phase 1A reference: `docs/mobile-bearer-bridge-decision-062.md`
 
 ---
 
-*Last updated: 2026-07-17*
+## Decision #063 — Tracked-Leg Fixture Lineage Contract
+**Date:** 2026-07-21
+**Proposed by:** CPO
+**Status:** PROPOSED / DOCS-ONLY. Founder approval and merge pending. No runtime or production authority.
+
+**Decision:** Before any Tracker leg can be matched to a provider result, the
+leg must carry an additive, server-verified relationship to both a canonical
+fixture and the exact provider link used to derive immutable provider, kickoff,
+timezone, and mapping snapshots. Text names, OCR timestamps, odds,
+name-time fuzzy matching, and legacy inference are never identity evidence.
+
+**States:** `verified` requires a consistent canonical/link tuple with exact
+mapping evidence and complete authoritative snapshots; `unresolved` and
+`needs_review` keep every authoritative identity field null and remain
+ineligible for result matching or automated financial action. Legacy legs stay
+unresolved and are never bulk-backfilled by names.
+
+**Future implementation boundary:** Use a separately approved additive
+`create_tracked_bet_v2` path. The client may submit only source/version and
+canonical/link references, while the RPC locks and validates the identity graph
+and derives trusted snapshots. Idempotency binds every ordered leg's lineage,
+and verified lineage is immutable except through a separately approved audited
+correction RPC.
+
+**Non-authorization:** Runtime code 0; migrations/RPCs 0; Supabase/provider
+reads/writes 0; scheduler/result matching/grading callers 0; settlement and
+bankroll mutations 0; deploy/smoke 0. Draft PRs #181/#182 are excluded from the
+main baseline. Decision #057 and FP-001 holds remain active.
+
+Reference: `docs/tracked-leg-fixture-lineage-contract-decision-063.md`
+
+---
+
+*Last updated: 2026-07-21*
 *Owner: All (each role contributes)*

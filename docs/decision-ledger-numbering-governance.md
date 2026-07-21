@@ -1,7 +1,7 @@
 # Decision Ledger / Numbering Governance
 
-Status: CURRENT — Decision #062 ACTIVE (mobile Phases 0/1B/1C merged; Phase 1A Bearer bridge in Draft review); Decision #061 ACTIVE (Phase A1 merged via PR #162 as `a6d4ebb`, deployed READY; Phase A2 browser E2E remains outside main); Decision #060 EXECUTED / VERIFIED / CLOSED 2026-07-16; Decision #056 implementation merged/deployed, runtime provider call not approved / not run
-Last updated: 2026-07-19
+Status: PROPOSED UPDATE — Decision #063 reserved for the docs-only Tracked-Leg Fixture Lineage Contract; Founder approval and merge pending. Decisions #061/#062 remain ACTIVE; Decision #060 remains the highest-numbered CLOSED decision.
+Last updated: 2026-07-21
 
 ## Purpose
 
@@ -13,13 +13,14 @@ This file prevents decision-number collisions. Historical numbers are immutable:
 Occupied: #001-#019, #021-#031, #033-#062
 Do not reuse: #020
 Retired reservation / do not reuse: #032
+Proposed reservation: #063 — Tracked-Leg Fixture Lineage Contract
 Highest-numbered closed: #060 — Founder-First Coupon-to-Tracker (Phase A + Phase B production API smoke verified)
 Active approved: #061 — Founder Daily Flow Acceptance (Phase A1 fail-closed tracker input lifecycle;
                  Playwright/Supabase-stub harness deferred)
                  #062 — Mobile Founder client (0/1B/1C merged; 1A Bearer bridge in Draft review)
                  #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run
                  (implementation merged/deployed; runtime provider call not approved / not run)
-Next unreserved: #063
+Next unreserved after acceptance of #063: #064
 ```
 
 ## Recent Decisions
@@ -45,6 +46,7 @@ Next unreserved: #063
 | #060 | Founder-First Coupon-to-Tracker — EXECUTED / VERIFIED / CLOSED 2026-07-16; Phase A + Phase B production API smoke verified |
 | #061 | Founder Daily Flow Acceptance — ACTIVE; Phase A read-only assessment delivered; Phase A1 merged via PR #162 as `a6d4ebb`, deployed READY; Phase A2 browser E2E deferred / not approved |
 | #062 | Mobile Founder client — ACTIVE; Phases 0/1B/1C merged; replacement Android+iOS development builds installed; Phase 1A Bearer bridge in Draft review with no production runtime |
+| #063 | Tracked-Leg Fixture Lineage Contract — PROPOSED / DOCS-ONLY; Founder approval and merge pending; no runtime authority |
 
 ## Retired / Superseded Tracks
 
