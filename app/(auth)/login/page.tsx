@@ -103,9 +103,9 @@ export default function LoginPage() {
       <section className="flex items-center bg-[var(--field)] px-5 py-10 text-[var(--text-primary)] md:px-10 lg:px-12">
         <div className="editorial-page w-full max-w-xl lg:mx-auto">
           <div className="flex items-end justify-between border-b border-[var(--border-strong)] pb-4">
-            <div>
+            <div className="min-w-0">
               <p className="editorial-kicker">Access / BetTracker</p>
-              <h2 className="mt-3 font-display text-[clamp(2.7rem,6vw,5rem)] font-black uppercase leading-[0.83] tracking-[-0.07em]">
+              <h2 className="mt-3 font-display text-[clamp(2.7rem,4.8vw,4rem)] font-black uppercase leading-[0.83] tracking-[-0.07em]">
                 Founder<br />workspace
               </h2>
             </div>
