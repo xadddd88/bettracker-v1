@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-19 (Decision #062 mobile Phases 0/1B/1C merged; Android+iOS development builds installed; Phase 1A Bearer bridge in Draft review)
+> Last updated: 2026-07-21 (Decision #063 tracked-leg fixture lineage contract proposed / docs-only; Founder approval and merge pending)
 
 ## 1. Executive Status
 
@@ -17,7 +17,7 @@
 | Highest-numbered closed decision | **#060 — Founder-First Coupon-to-Tracker** |
 | Active decisions | **#062 — Mobile Founder client (Phases 0/1B/1C merged; Phase 1A Bearer bridge in Draft review)**; **#061 — Founder Daily Flow Acceptance**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
-| Next unreserved decision | **#063** |
+| Next unreserved decision | **#064** — #063 is reserved by the proposed docs-only tracked-leg fixture lineage contract |
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 completed one canonical-linked base-response dry-run with zero writes. Decision #055 then closed the trust/storage contract. Decision #056's Class A structural-presence implementation is merged and deployed (PR #146); its production provider call remains not approved and has not been run. Decision #057 closed the results-ingestion and settlement trust contract (docs-evidence only; no results runtime, result writes, or automated settlement is approved).
 
@@ -211,7 +211,7 @@ Decision #061 — Playwright / Supabase-stub E2E harness — DEFERRED, NOT APPRO
 #061 — Founder Daily Flow Acceptance — ACTIVE; Phase A1 merged via PR #162 as a6d4ebb, deployed READY; Phase A2 browser E2E deferred / not approved
 #062 — Mobile Founder client — ACTIVE; Phases 0/1B/1C merged; replacement Android+iOS development builds installed; Phase 1A Bearer bridge in Draft review; native API wiring/runtime remains deferred
 #063 — Tracked-Leg Fixture Lineage Contract — PROPOSED / DOCS-ONLY; Founder approval and merge pending
-#064 — next unreserved decision after acceptance of #063
+#064 — next unreserved decision (#063 is a proposed reservation; retire it if abandoned)
 ```
 
 PR #90 is closed without merge; its policy is not adopted. Decision #020 is never reused.

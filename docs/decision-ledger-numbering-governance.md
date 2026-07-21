@@ -20,7 +20,7 @@ Active approved: #061 — Founder Daily Flow Acceptance (Phase A1 fail-closed tr
                  #062 — Mobile Founder client (0/1B/1C merged; 1A Bearer bridge in Draft review)
                  #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run
                  (implementation merged/deployed; runtime provider call not approved / not run)
-Next unreserved after acceptance of #063: #064
+Next unreserved: #064 (#063 is a proposed reservation; retire it if abandoned)
 ```
 
 ## Recent Decisions
@@ -52,7 +52,7 @@ Next unreserved after acceptance of #063: #064
 
 - **#020:** never reuse. PR #90 tried to claim it for Third-Party Manual Context Policy, but that PR is closed without merge and the policy is not adopted.
 - **#032:** the old M1.3 filter-evidence reservation is retired after PR #106 was superseded. Keep the number unused to preserve audit history.
-- A revived third-party manual-context policy must use **#063 or later** in a fresh PR.
+- A revived third-party manual-context policy must use **#064 or later** in a fresh PR.
 
 ## Rules
 

@@ -2137,7 +2137,7 @@ Reference: `docs/finished-fixture-result-presence-dry-run-scope-decision-059.md`
 **Date:** 2026-07-15
 **Proposed by:** CPO + Founder
 **Approved by:** Founder (Decision #060 APPROVED)
-**Status:** EXECUTED / VERIFIED / CLOSED 2026-07-16. Migration 024 was applied and its exact catalog contract and authenticated Phase A RPC smoke were verified. Phase B was approved by the CPO, merged via PR #159 as `1926d9a82759cd1e4e97378ca15addf010c0bf28`, deployed READY, and verified by one separately authorized authenticated production API smoke. Decision #060 is the highest-numbered CLOSED decision. At closure (2026-07-16), #061 was the next unreserved number; #061 and #062 have since been occupied and are ACTIVE, and the current next unreserved decision is #063.
+**Status:** EXECUTED / VERIFIED / CLOSED 2026-07-16. Migration 024 was applied and its exact catalog contract and authenticated Phase A RPC smoke were verified. Phase B was approved by the CPO, merged via PR #159 as `1926d9a82759cd1e4e97378ca15addf010c0bf28`, deployed READY, and verified by one separately authorized authenticated production API smoke. Decision #060 is the highest-numbered CLOSED decision. At closure (2026-07-16), #061 was the next unreserved number; #061 and #062 have since been occupied and are ACTIVE, #063 is now a proposed reservation, and the current next unreserved decision is #064.
 
 **Decision:** Deliver one safe atomic write path and a unified mobile-first tracker form for Single and Express/parlay entries: Scanner → editable ordered legs → Bet, while keeping the legacy `create_quick_bet` function unchanged.
 
@@ -2159,7 +2159,7 @@ Reference: `docs/finished-fixture-result-presence-dry-run-scope-decision-059.md`
 
 **Post-execution boundaries:** migrations / RPC changes in Phase B 0; direct DML on financial tables 0; service_role in the user flow 0; provider calls 0; `create_quick_bet` remains unchanged; Analyst/Scout/pricing/probability/edge/EV untouched. No additional synthetic production smoke is authorized by this record. Decision #056 runtime remains NOT APPROVED / NOT RUN. Results ingestion and automated settlement remain HOLD. Decision #050 SMTP round-trip remains PENDING. CSP Phase B remains NOT APPROVED. FP-001 remains ACTIVE.
 
-**Numbering:** Decision #060 occupied and CLOSED. At closure, #061 was the next unreserved number; #061 and #062 are now occupied and ACTIVE, and the current next unreserved decision is #063.
+**Numbering:** Decision #060 occupied and CLOSED. At closure, #061 was the next unreserved number; #061 and #062 are now occupied and ACTIVE, #063 is a proposed reservation, and the current next unreserved decision is #064.
 
 Reference: `docs/coupon-to-tracker-scope-decision-060.md`
 
@@ -2179,7 +2179,7 @@ Reference: `docs/coupon-to-tracker-scope-decision-060.md`
 
 **Boundaries:** 0 production/Supabase/provider calls; 0 migrations, RPC, or schema changes; `create_tracked_bet`, `create_quick_bet`, and `POST /api/bets/tracked` unchanged; Playwright/Supabase-stub harness NOT implemented (deferred); settlement/results HOLD; Decision #056 runtime NOT APPROVED; FP-001 ACTIVE. Phase A1 is merged/deployed, while Decision #061 remains ACTIVE because Phase A2 is DEFERRED / NOT APPROVED.
 
-**Numbering:** Decision #061 occupied and ACTIVE. #062 is now occupied and ACTIVE (Mobile Phase 0); next unreserved decision #063.
+**Numbering:** Decision #061 occupied and ACTIVE. #062 is now occupied and ACTIVE (Mobile Phase 0); #063 is a proposed reservation; next unreserved decision #064.
 
 Reference: `docs/daily-flow-acceptance-decision-061.md`
 
@@ -2197,7 +2197,7 @@ Reference: `docs/daily-flow-acceptance-decision-061.md`
 
 **Validation:** merged mobile phases passed their unit/boundary, TypeScript, lint, Expo config/export, GitHub, and Vercel checks. Founder completed and installed replacement development builds on registered Android and iOS devices. Phase 1A financial-safety is 72/72 on local stubs; production/Supabase/provider calls and writes 0, and no EAS build/update is part of Phase 1A.
 
-**Numbering:** Decision #062 occupied and ACTIVE; next unreserved decision #063.
+**Numbering:** Decision #062 occupied and ACTIVE; #063 is a proposed reservation; next unreserved decision #064.
 
 Reference: `docs/mobile-phase-0-decision-062.md`
 
