@@ -2137,7 +2137,7 @@ Reference: `docs/finished-fixture-result-presence-dry-run-scope-decision-059.md`
 **Date:** 2026-07-15
 **Proposed by:** CPO + Founder
 **Approved by:** Founder (Decision #060 APPROVED)
-**Status:** EXECUTED / VERIFIED / CLOSED 2026-07-16. Migration 024 was applied and its exact catalog contract and authenticated Phase A RPC smoke were verified. Phase B was approved by the CPO, merged via PR #159 as `1926d9a82759cd1e4e97378ca15addf010c0bf28`, deployed READY, and verified by one separately authorized authenticated production API smoke. Decision #060 is the highest-numbered CLOSED decision. At closure (2026-07-16), #061 was the next unreserved number; #061 and #062 have since been occupied and are ACTIVE, #063 is now occupied and CLOSED (docs-only), and the current next unreserved decision is #064.
+**Status:** EXECUTED / VERIFIED / CLOSED 2026-07-16. Migration 024 was applied and its exact catalog contract and authenticated Phase A RPC smoke were verified. Phase B was approved by the CPO, merged via PR #159 as `1926d9a82759cd1e4e97378ca15addf010c0bf28`, deployed READY, and verified by one separately authorized authenticated production API smoke. At closure (2026-07-16), Decision #060 was the highest-numbered CLOSED decision and #061 was the next unreserved number; #061 and #062 have since been occupied and are ACTIVE, #063 is now occupied and CLOSED (docs-only), and the current next unreserved decision is #065.
 
 **Decision:** Deliver one safe atomic write path and a unified mobile-first tracker form for Single and Express/parlay entries: Scanner → editable ordered legs → Bet, while keeping the legacy `create_quick_bet` function unchanged.
 
@@ -2159,7 +2159,7 @@ Reference: `docs/finished-fixture-result-presence-dry-run-scope-decision-059.md`
 
 **Post-execution boundaries:** migrations / RPC changes in Phase B 0; direct DML on financial tables 0; service_role in the user flow 0; provider calls 0; `create_quick_bet` remains unchanged; Analyst/Scout/pricing/probability/edge/EV untouched. No additional synthetic production smoke is authorized by this record. Decision #056 runtime remains NOT APPROVED / NOT RUN. Results ingestion and automated settlement remain HOLD. Decision #050 SMTP round-trip remains PENDING. CSP Phase B remains NOT APPROVED. FP-001 remains ACTIVE.
 
-**Numbering:** Decision #060 occupied and CLOSED. At closure, #061 was the next unreserved number; #061 and #062 are now occupied and ACTIVE, #063 is occupied and CLOSED (docs-only), and the current next unreserved decision is #064.
+**Numbering:** Decision #060 occupied and CLOSED. At closure, #061 was the next unreserved number; #061 and #062 are now occupied and ACTIVE, #063 is occupied and CLOSED (docs-only), and the current next unreserved decision is #065.
 
 Reference: `docs/coupon-to-tracker-scope-decision-060.md`
 
@@ -2179,7 +2179,7 @@ Reference: `docs/coupon-to-tracker-scope-decision-060.md`
 
 **Boundaries:** 0 production/Supabase/provider calls; 0 migrations, RPC, or schema changes; `create_tracked_bet`, `create_quick_bet`, and `POST /api/bets/tracked` unchanged; Playwright/Supabase-stub harness NOT implemented (deferred); settlement/results HOLD; Decision #056 runtime NOT APPROVED; FP-001 ACTIVE. Phase A1 is merged/deployed, while Decision #061 remains ACTIVE because Phase A2 is DEFERRED / NOT APPROVED.
 
-**Numbering:** Decision #061 occupied and ACTIVE. #062 is now occupied and ACTIVE (Mobile Phase 0); #063 is occupied and CLOSED (docs-only); next unreserved decision #064.
+**Numbering:** Decision #061 occupied and ACTIVE. #062 is occupied and ACTIVE (Mobile); #063 is occupied and CLOSED (docs-only); #064 is occupied and ACTIVE as an implementation Draft; next unreserved decision #065.
 
 Reference: `docs/daily-flow-acceptance-decision-061.md`
 
@@ -2197,7 +2197,7 @@ Reference: `docs/daily-flow-acceptance-decision-061.md`
 
 **Validation and merge checkpoint:** PR #170 reported financial-safety 72/72, rate-limit 12/12, TypeScript and lint passing before merge. PR #171 reported mobile tests 80/80, mobile and root typecheck/lint, Expo dependency/config/export, financial-safety 72/72, and rate-limit 12/12 passing before merge. Both PR records report zero production/Supabase/AI/provider runtime calls and writes during implementation and validation; no EAS Build or EAS Update is recorded. This docs-only reconciliation adds no new runtime evidence.
 
-**Numbering:** Decision #062 occupied and ACTIVE; #063 is occupied and CLOSED (docs-only); next unreserved decision #064.
+**Numbering:** Decision #062 occupied and ACTIVE; #063 is occupied and CLOSED (docs-only); #064 is occupied and ACTIVE as an implementation Draft; next unreserved decision #065.
 
 Reference: `docs/mobile-phase-0-decision-062.md`
 
@@ -2247,9 +2247,52 @@ unnumbered operational correction: it does not consume or reassign Decision
 governance rename.
 
 **Numbering:** Decision #063 occupied and CLOSED (docs-only). Decision #064 is
-the next unreserved number.
+occupied and ACTIVE as an implementation Draft; Decision #065 is next unreserved.
 
 Reference: `docs/tracked-leg-fixture-lineage-contract-decision-063.md`
+
+---
+
+## Decision #064 — Tracked-Leg Fixture Lineage Foundation
+**Date:** 2026-07-21
+**Proposed by:** CPO
+**Approved by:** Founder (Draft PR scope only)
+**Status:** ACTIVE / IMPLEMENTATION DRAFT — migration 025 and `create_tracked_bet_v2` are review-only and unapplied. No application caller or runtime/production authority.
+
+**Decision:** Implement step 2 of the closed Decision #063 contract as an
+additive, unapplied schema/RPC foundation. Existing and v1-created legs remain
+`unresolved / legacy / version 0`. Version 1 can store `unresolved`,
+`needs_review`, or an exact server-verified fixture/provider tuple with
+immutable snapshots.
+
+**Trust boundary:** `create_tracked_bet_v2` accepts only lineage version/source
+and canonical/provider-link IDs. It locks and validates the live tuple, requires
+`mapping_confidence='exact'`, applies the explicit sport allowlist, and derives
+provider, provider fixture ID, kickoff, UTC timezone, mapping evidence, and
+verification time itself. Both identity FKs use `ON DELETE RESTRICT`; lineage
+fields cannot be updated after insert.
+
+**Idempotency:** the ordered normalized request hash includes the v2 contract
+marker and client-authorized lineage references, but not derived snapshots.
+Exact replay therefore returns the original stored snapshot even after a later
+canonical/provider update; any changed lineage reference conflicts with zero
+writes.
+
+**Draft artifacts:** `supabase/migrations/025_tracked_leg_fixture_lineage.sql`,
+`docs/decision-064-rollback.sql`, and Decision/status documentation. The rollback
+refuses to remove the foundation if any non-legacy lineage row exists.
+
+**Non-authorization:** migration apply, catalog/runtime smoke, tests gate,
+application/API/web/mobile caller, fixture picker, Supabase operations, provider
+calls, result matching/writes, grading caller, scheduler, settlement, payout,
+refund, bankroll runtime change, Ready, merge, production deployment, and
+production smoke are all outside this Draft approval. Decision #057 and FP-001
+holds remain active.
+
+**Numbering:** Decision #064 is occupied and ACTIVE. Decision #065 is next
+unreserved.
+
+Reference: `docs/tracked-leg-fixture-lineage-foundation-decision-064.md`
 
 ---
 
