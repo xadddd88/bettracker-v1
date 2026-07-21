@@ -1948,6 +1948,7 @@ test('#061 A1: write path untouched — route, RPC, migration 024 and the intent
 // ── Tracker pending cancellation — soft delete + atomic refund ──
 
 const CANCEL_MIGRATION = 'supabase/migrations/20260720172528_cancel_pending_bet.sql';
+const CANCEL_ROLLBACK = 'docs/decision-062-cancel-pending-bet-rollback.sql';
 const CANCEL_ROUTE = 'app/api/bets/[id]/cancel/route.js';
 const CANCEL_BET_ID = 'aaaaaaaa-1111-4111-8111-bbbbbbbbbbbb';
 const CANCEL_KEY = 'cccccccc-2222-4222-8222-dddddddddddd';
@@ -2040,6 +2041,22 @@ test('cancel: migration retains the audit record and never hard-deletes financia
   assert.ok(sql.includes("SET leg_status = 'void'"), 'cancelled legs must become void');
   assert.ok(!/DELETE\s+FROM\s+public\.(bets|bet_legs|bankrolls|bankroll_transactions)/i.test(sql),
     'financial audit rows must never be hard-deleted');
+});
+
+test('cancel: emergency rollback disables the RPC but preserves schema and financial audit data', () => {
+  const migration = readFileSync(path.join(repoRoot, CANCEL_MIGRATION), 'utf8');
+  const rollback = readFileSync(path.join(repoRoot, CANCEL_ROLLBACK), 'utf8');
+  assert.ok(migration.includes(CANCEL_ROLLBACK), 'migration must point to the reviewed rollback artifact');
+  assert.ok(/REVOKE EXECUTE ON FUNCTION public\.cancel_pending_bet\(uuid, text\)[\s\S]*?FROM PUBLIC, anon, authenticated;/.test(rollback),
+    'rollback must revoke the cancellation RPC from every public caller');
+  assert.ok(rollback.includes("has_function_privilege(\n       'authenticated'"),
+    'rollback must verify that authenticated EXECUTE is gone');
+  assert.ok(rollback.includes("to_regclass('public.uq_bankroll_tx_one_tracker_cancel')"),
+    'rollback must retain and verify the one-refund-per-bet backstop');
+  assert.ok(rollback.includes("column_name = 'archived_at'"),
+    'rollback must retain and verify the archive marker');
+  assert.ok(!/DROP\s+(TABLE|COLUMN|INDEX|FUNCTION)|DELETE\s+FROM/i.test(rollback),
+    'rollback must not destroy schema or financial audit records');
 });
 
 test('cancel: refund is ownership-scoped, locked, ledger-verified and atomic', () => {
