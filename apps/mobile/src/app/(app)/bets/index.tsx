@@ -46,7 +46,7 @@ export default function BetsScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <EditorialBackdrop />
       <Animated.View entering={FadeInDown.duration(380).reduceMotion(ReduceMotion.System)} style={styles.header}>
-        <View style={styles.masthead}><Text style={styles.wordmark}>XADDD</Text><Text style={styles.mastheadSection}>TRACKER / ARCHIVE</Text></View>
+        <View style={styles.masthead}><Text style={styles.wordmark}>BETTRACKER</Text><Text style={styles.mastheadSection}>TRACKER / ARCHIVE</Text></View>
         <View style={styles.headingRow}>
           <Text style={styles.title}>MY{`\n`}BETS</Text>
           <Text style={styles.count}>{String(bets.length).padStart(2, '0')}</Text>

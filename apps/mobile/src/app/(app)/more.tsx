@@ -16,7 +16,7 @@ export default function MoreScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenHeader
-          eyebrow="XADDD"
+          eyebrow="BETTRACKER"
           subtitle="Profile, preferences and secure access."
           title="Account"
         />
@@ -68,7 +68,7 @@ export default function MoreScreen() {
           </View>
         ) : null}
 
-        <Text style={styles.version}>xaddd mobile</Text>
+        <Text style={styles.version}>BetTracker mobile</Text>
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,4 +1,4 @@
-# xaddd mobile
+# BetTracker mobile
 
 Expo SDK 57 development client for the Founder-first BetTracker flow.
 

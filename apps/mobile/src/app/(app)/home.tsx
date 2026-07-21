@@ -51,7 +51,7 @@ export default function HomeScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
         <Animated.View entering={FadeIn.duration(300).reduceMotion(ReduceMotion.System)} style={styles.masthead}>
-          <Text style={styles.wordmark}>XADDD</Text>
+          <Text style={styles.wordmark}>BETTRACKER</Text>
           <Text style={styles.mastheadMeta}>FOUNDER EDITION / 2026</Text>
           <Pressable accessibilityLabel="Account and settings" accessibilityRole="button" onPress={() => router.push('/(app)/more')} style={styles.account}>
             <Text style={styles.accountText}>ACCOUNT</Text>

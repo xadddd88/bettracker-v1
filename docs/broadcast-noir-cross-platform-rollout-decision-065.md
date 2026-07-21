@@ -1,7 +1,7 @@
 # Decision #065 — Broadcast Noir Cross-Platform Rollout
 
 Date: 2026-07-21
-Status: ACTIVE / DRAFT PR A
+Status: ACTIVE / DRAFT PR A + STACKED DRAFT PR B
 Approved by: Founder
 
 ## Decision
@@ -28,6 +28,27 @@ platform-neutral source and platform adapters:
 
 No screen, route, navigation destination, content hierarchy, API, RPC, database,
 provider, financial, or settlement behavior is redesigned in PR A.
+
+## PR B scope
+
+PR B is stacked on the exact PR A head so its review diff remains limited to
+shell and platform behavior. It adds:
+
+- compact responsive Web header and account/tools menu, replacing the old
+  Floodlight sidebar without changing destinations;
+- equal-width mobile Web navigation segments using signal/onSignal semantics;
+- iPhone/Android bottom-tab styling with the approved Home, Scan, and Tracker
+  destinations only;
+- one safe-area owner for the native tab bar, removing the manual duplicated
+  bottom inset calculation;
+- reviewed BetTracker icon, adaptive icon, monochrome icon, favicon, and splash
+  assets on the Broadcast Noir night field;
+- Android predictive Back opt-in plus static regression assertions and an
+  explicit device-evidence matrix.
+
+The visible product name becomes BetTracker. Native identity and compatibility
+values — Expo slug, URL scheme, iOS bundle identifier, Android package, EAS
+project ID, runtime version, and update URL — remain unchanged.
 
 ## Semantic contract
 
@@ -97,6 +118,12 @@ smoke, Ready transition, merge, deployment, EAS Build, or EAS Update.
 FP-001, Decision #057, Decision #064, and all existing auth, rate-limit,
 idempotency, scanner no-auto-save, and financial boundaries remain active.
 
+PR B additionally authorizes only the shell/navigation/native-brand boundary
+listed above. It authorizes no new route, data read/write, provider call,
+financial behavior, Event First state, EAS Build, EAS Update, Ready transition,
+merge, production deployment, or production smoke. Predictive Back cannot be
+marked complete until the documented device matrix is recorded.
+
 ## Acceptance evidence
 
 PR A is acceptable only when:
@@ -112,5 +139,5 @@ PR A is acceptable only when:
 
 ## Numbering
 
-Decision #065 is occupied and ACTIVE as Draft PR A. Decision #066 is the next
-unreserved number.
+Decision #065 is occupied and ACTIVE as Draft PR A plus stacked Draft PR B.
+Decision #066 is the next unreserved number.

@@ -453,9 +453,11 @@ test('Expo Tabs owns the bottom safe area without an overlaid custom bar', () =>
 
   assert.match(source, /import \{ Tabs \} from 'expo-router'/);
   assert.match(source, /tabBarStyle/);
-  assert.match(source, /useSafeAreaInsets\(\)/);
-  assert.match(source, /height:\s*58\s*\+\s*insets\.bottom/);
-  assert.match(source, /paddingBottom:\s*Math\.max\(insets\.bottom,\s*6\)/);
+  assert.doesNotMatch(source, /useSafeAreaInsets\(\)/);
+  assert.doesNotMatch(source, /height:\s*\d+\s*\+\s*insets\.bottom/);
+  assert.doesNotMatch(source, /paddingBottom:\s*Math\.max\(insets\.bottom/);
+  assert.match(source, /tabBarActiveBackgroundColor:\s*semanticColors\.signal/);
+  assert.match(source, /tabBarActiveTintColor:\s*semanticColors\.onSignal/);
   assert.doesNotMatch(source, /position:\s*['"]absolute['"]/);
   assert.equal(existsSync(join(root, 'src/ui/bottom-navigation.tsx')), false);
 });
@@ -524,7 +526,8 @@ test('authenticated layout exposes three focused tabs and keeps Tracker detail i
   for (const route of ['stats', 'more']) {
     assert.match(layout, new RegExp(`name=["']${route}["'][\\s\\S]*?href:\\s*null`));
   }
-  assert.match(layout, /tabBarItemStyle:\s*\{\s*minHeight:\s*52/);
+  assert.match(layout, /minHeight:\s*Platform\.OS === 'android' \? 48 : 44/);
+  assert.match(layout, /backBehavior="history"/);
   assert.match(layout, /name="index" options=\{\{ href: null \}\}/);
 
   assert.match(trackerLayout, /<Stack/);

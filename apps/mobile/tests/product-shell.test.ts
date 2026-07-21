@@ -24,11 +24,32 @@ test('product shell exposes three focused sections with Tracker as a nested Stac
     assert.match(tabs, new RegExp(`name=["']${route}["'][\\s\\S]*?href:\\s*null`));
   }
   assert.match(tabs, /tabBarHideOnKeyboard:\s*true/);
-  assert.match(tabs, /useSafeAreaInsets\(\)/);
-  assert.match(tabs, /paddingBottom:\s*Math\.max\(insets\.bottom,\s*6\)/);
+  assert.match(tabs, /tabBarActiveBackgroundColor:\s*semanticColors\.signal/);
+  assert.match(tabs, /tabBarActiveTintColor:\s*semanticColors\.onSignal/);
+  assert.match(tabs, /Platform\.OS === 'android' \? 48 : 44/);
+  assert.doesNotMatch(tabs, /useSafeAreaInsets/);
   assert.match(tracker, /import \{ Stack \} from 'expo-router'/);
   assert.match(tracker, /name="\[id\]"/);
   assert.match(tracker, /name="new"/);
+});
+
+test('Broadcast Noir native shell keeps stable identity and opts into predictive Back', () => {
+  const config = JSON.parse(source('app.json')) as {
+    expo: {
+      android: { package: string; predictiveBackGestureEnabled: boolean };
+      ios: { bundleIdentifier: string };
+      name: string;
+      scheme: string;
+      slug: string;
+    };
+  };
+
+  assert.equal(config.expo.name, 'BetTracker');
+  assert.equal(config.expo.android.predictiveBackGestureEnabled, true);
+  assert.equal(config.expo.slug, 'xaddd');
+  assert.equal(config.expo.scheme, 'xaddd');
+  assert.equal(config.expo.ios.bundleIdentifier, 'com.dmitriykhodakivskyi.xaddd');
+  assert.equal(config.expo.android.package, 'com.dmitriykhodakivskyi.xaddd');
 });
 
 test('Phase 1B AI route is preserved without a colliding placeholder', () => {

@@ -91,6 +91,8 @@ jobs:
         run: npm ci
       - name: Verify semantic parity and contrast
         run: npm run test:design-system
+      - name: Verify shell, routes, brand assets and native config
+        run: npm run test:design-shell
       - name: Typecheck Web primitives
         run: npx tsc --noEmit
       - name: Install mobile dependencies
