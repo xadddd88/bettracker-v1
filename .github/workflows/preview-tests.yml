@@ -73,6 +73,35 @@ jobs:
         run: npm run test:rate-limit
       - name: "CSP security suite (Decision #054)"
         run: npm run test:csp-security
+      - name: "Broadcast Noir parity and contrast gate (Decision #065)"
+        run: npm run test:design-system
+
+  # ── Job: Cross-platform design-system compile gate ─────────────────────────
+  design-system:
+    name: Broadcast Noir Web & mobile primitives
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install Web dependencies
+        run: npm ci
+      - name: Verify semantic parity and contrast
+        run: npm run test:design-system
+      - name: Typecheck Web primitives
+        run: npx tsc --noEmit
+      - name: Install mobile dependencies
+        working-directory: apps/mobile
+        run: npm ci
+      - name: Typecheck mobile primitives
+        working-directory: apps/mobile
+        run: npm run typecheck
+      - name: Run mobile regression suite
+        working-directory: apps/mobile
+        run: npm test
 
   # ── Job 3: Smoke tests against Vercel preview deployment ───────────────────
   smoke:
