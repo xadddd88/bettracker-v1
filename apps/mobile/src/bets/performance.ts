@@ -27,6 +27,19 @@ export type MobilePerformance = {
 
 type CorePerformance = Omit<MobilePerformance, 'bySport'>;
 
+const KNOWN_SPORTS = new Set(['basketball', 'cs2', 'ice_hockey', 'mma', 'other', 'soccer', 'tennis']);
+
+function normalizedSport(sport: string | null): string {
+  const normalized = sport?.trim().toLowerCase() ?? '';
+  return KNOWN_SPORTS.has(normalized) ? normalized : 'other';
+}
+
+export function betSportBucket(bet: Pick<BetDto, 'legs'>): string {
+  const sports = bet.legs.map((leg) => normalizedSport(leg.sport));
+  if (sports.length === 0) return 'other';
+  return new Set(sports).size === 1 ? sports[0]! : 'mixed';
+}
+
 function calculateCore(bets: readonly BetDto[]): CorePerformance {
   let won = 0;
   let lost = 0;
@@ -80,7 +93,7 @@ function calculateCore(bets: readonly BetDto[]): CorePerformance {
 export function calculateMobilePerformance(bets: readonly BetDto[]): MobilePerformance {
   const groups = new Map<string, BetDto[]>();
   for (const bet of bets) {
-    const sport = bet.legs[0]?.sport ?? 'other';
+    const sport = betSportBucket(bet);
     groups.set(sport, [...(groups.get(sport) ?? []), bet]);
   }
 

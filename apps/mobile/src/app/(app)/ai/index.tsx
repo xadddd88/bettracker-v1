@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { useNetworkState } from 'expo-network';
+import { useRouter } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -13,6 +14,7 @@ import { captureFromCamera, captureFromLibrary, type CaptureOutcome, type Captur
 import { analysisBodyByteLength, MAX_ANALYZE_JSON_BYTES, type CaptureMode } from '@/ai/image-policy';
 import { scanPreparedCoupon } from '@/ai/scanner-client';
 import type { ScannerAnalysis } from '@/ai/scanner-model';
+import { setScannerDraftHandoff } from '@/bets/scanner-draft-handoff';
 import { BroadcastStatus } from '@/ui/broadcast-noir-primitives';
 import { MotionPressable } from '@/ui/motion';
 import { geometry, semanticColors, typography } from '@/ui/theme';
@@ -38,6 +40,7 @@ type Feedback = { canOpenSettings?: boolean; message: string; tone: 'error' | 'i
 type ActionButtonProps = { disabled?: boolean; icon: SymbolViewProps['name']; label: string; onPress: () => void; tone?: 'danger' | 'primary' | 'secondary' };
 
 export default function AiCaptureScreen() {
+  const router = useRouter();
   const networkState = useNetworkState();
   const safeAreaInsets = useSafeAreaInsets();
   const operationLockRef = useRef(false);
@@ -159,6 +162,12 @@ export default function AiCaptureScreen() {
     catch { setFeedback({ message: 'Settings could not be opened. Open device settings manually.', tone: 'error' }); }
   }
 
+  function continueToTracker() {
+    if (!analysis || busy) return;
+    setScannerDraftHandoff(analysis);
+    router.push('/(app)/bets/new');
+  }
+
   return (
     <ScrollView contentContainerStyle={[styles.content, androidTopInset]} contentInsetAdjustmentBehavior="automatic" style={styles.screen}>
       <Animated.View entering={FadeInDown.duration(380).reduceMotion(ReduceMotion.System)} style={styles.masthead}>
@@ -231,7 +240,17 @@ export default function AiCaptureScreen() {
           {feedback.canOpenSettings ? <ActionButton icon={{ android: 'settings', ios: 'gearshape', web: 'settings' }} label="Open settings" onPress={() => void openSettings()} /> : null}
         </View>
       ) : null}
-      {analysis ? <AnalysisResultPanel analysis={analysis} /> : null}
+      {analysis ? (
+        <>
+          <AnalysisResultPanel analysis={analysis} />
+          <ActionButton
+            icon={{ android: 'arrow_forward', ios: 'arrow.right', web: 'arrow_forward' }}
+            label="Continue to Tracker"
+            onPress={continueToTracker}
+            tone="primary"
+          />
+        </>
+      ) : null}
       <View style={styles.boundary}><Text style={styles.boundaryText}>• NO FINANCIAL RECORD IS SAVED AUTOMATICALLY</Text></View>
       <ActionButton disabled={!prepared || busy || offline} icon={{ android: 'auto_awesome', ios: 'sparkles', web: 'auto_awesome' }} label="Analyze" onPress={() => void analyze()} tone="primary" />
     </ScrollView>

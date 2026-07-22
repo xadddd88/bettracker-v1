@@ -19,6 +19,7 @@ const SPORT_LABEL: Record<string, string> = {
   cs2: 'CS2',
   ice_hockey: 'Ice Hockey',
   mma: 'MMA',
+  mixed: 'Mixed',
   other: 'Other',
   soccer: 'Soccer',
   tennis: 'Tennis',

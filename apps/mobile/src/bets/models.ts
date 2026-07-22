@@ -95,6 +95,10 @@ export function resolveBetStatus(value: string): BetStatus {
   return (BET_STATUSES as readonly string[]).includes(value) ? value as BetStatus : 'unknown';
 }
 
+export function isSupportedSettlementStatus(status: string): boolean {
+  return status === 'won' || status === 'lost' || status === 'void';
+}
+
 export function sortLegs<T extends { legIndex: number | null }>(legs: T[]): T[] {
   return legs
     .map((leg, originalIndex) => ({ leg, originalIndex }))
@@ -159,17 +163,14 @@ export function formatMoney(value: number, currency: string): string {
 }
 
 export function betFinancialSummary(
-  bet: Pick<BetDto, 'pnl' | 'potentialPayout'>,
+  bet: Pick<BetDto, 'pnl' | 'status'>,
   currency: string,
-): { label: 'P&L' | 'Payout'; value: string } {
-  if (bet.pnl !== null) {
+): { label: 'P&L'; value: string } {
+  if (isSupportedSettlementStatus(bet.status) && bet.pnl !== null) {
     return { label: 'P&L', value: formatMoney(bet.pnl, currency) };
   }
 
-  return {
-    label: 'Payout',
-    value: bet.potentialPayout === null ? '—' : formatMoney(bet.potentialPayout, currency),
-  };
+  return { label: 'P&L', value: '—' };
 }
 
 export function betTitle(bet: BetDto): string {

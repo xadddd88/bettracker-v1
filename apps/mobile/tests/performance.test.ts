@@ -56,3 +56,23 @@ test('empty and unsupported-only samples never invent zero percentages', () => {
   assert.equal(unsupported.settled, 0);
   assert.equal(unsupported.roi, null);
 });
+
+test('By sport keeps same-sport Express and isolates mixed-sport Express', () => {
+  const sameSport = bet('won', 10, 10, 'tennis');
+  sameSport.id = 'same-sport-express';
+  sameSport.betType = 'parlay';
+  sameSport.legs.push({ ...sameSport.legs[0]!, id: 'same-leg-2', legIndex: 2 });
+
+  const mixedSport = bet('lost', 10, -10, 'soccer');
+  mixedSport.id = 'mixed-sport-express';
+  mixedSport.betType = 'parlay';
+  mixedSport.legs.push({ ...mixedSport.legs[0]!, id: 'mixed-leg-2', legIndex: 2, sport: 'basketball' });
+
+  const unknownSport = bet('pending', 10, null, 'unrecognized');
+
+  const metrics = calculateMobilePerformance([sameSport, mixedSport, unknownSport]);
+  assert.equal(metrics.bySport.find((row) => row.label === 'tennis')?.total, 1);
+  assert.equal(metrics.bySport.find((row) => row.label === 'mixed')?.total, 1);
+  assert.equal(metrics.bySport.find((row) => row.label === 'other')?.total, 1);
+  assert.equal(metrics.bySport.some((row) => row.label === 'soccer'), false);
+});
