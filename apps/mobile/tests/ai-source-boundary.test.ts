@@ -543,7 +543,7 @@ test('AI capture screen exposes secure scanner and responsive states', () => {
   const source = readFileSync(path, 'utf8');
 
   for (const label of [
-    'Scan screenshot',
+    'CAPTURE.',
     'Coupon',
     'Event',
     'Take photo',
@@ -578,5 +578,9 @@ test('AI capture screen exposes secure scanner and responsive states', () => {
   assert.match(source, /contentFit="contain"/);
   assert.match(source, /Linking\.openSettings\(\)/);
   assert.match(source, /accessibilityState=\{\{\s*selected:\s*mode === option\.value\s*\}\}/);
-  assert.match(source, /minHeight:\s*(?:44|5[2-9]|[6-9]\d)/);
+  assert.match(source, /const touchMinimum = Platform\.OS === 'android' \? geometry\.androidTouchMinimum : geometry\.iosTouchMinimum/);
+  assert.match(source, /minHeight:\s*touchMinimum/);
+  assert.match(source, /BroadcastStatus label="Needs review" status="review"/);
+  assert.match(source, /withTiming\(1, \{ duration: reduceMotion \? 0 : 320 \}\)/);
+  assert.doesNotMatch(source, /withRepeat|EditorialBackdrop|KineticType/);
 });
