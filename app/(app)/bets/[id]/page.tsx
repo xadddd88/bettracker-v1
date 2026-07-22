@@ -1,18 +1,22 @@
-import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import type { Bet } from '@/types'
-import SettleActions from './SettleActions'
-import { PageView } from '@/lib/analytics/PageView'
+import { notFound } from 'next/navigation'
+
+import {
+  BroadcastDataValue,
+  BroadcastPanel,
+  BroadcastStatus,
+} from '@/components/ui/BroadcastNoir'
 import { EVENTS } from '@/lib/analytics/events'
+import { PageView } from '@/lib/analytics/PageView'
 import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
 import { isSupportedSettlementStatus } from '@/lib/bets/settlement-metrics'
+import { createClient } from '@/lib/supabase/server'
+import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
+import type { Bet } from '@/types'
 
-export default async function BetDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
+import SettleActions from './SettleActions'
+
+export default async function BetDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -23,17 +27,16 @@ export default async function BetDetailPage({
     .eq('id', id)
     .eq('user_id', user!.id)
     .is('archived_at', null)
-    // Express legs display in coupon order (Decision #060 Phase B).
     .order('leg_index', { referencedTable: 'bet_legs', ascending: true })
     .single()
 
   if (!data) notFound()
 
   const bet = data as Bet
-  const leg = bet.legs?.[0]
-  const isParlay = (bet.legs?.length || 0) > 1
+  const legs = bet.legs ?? []
+  const isExpress = legs.length > 1
+  const resolved = resolveBetStatus(bet.status)
 
-  // Resolve currency symbol from bankroll if available, else default
   const { data: bankroll } = await supabase
     .from('bankrolls')
     .select('currency')
@@ -42,124 +45,130 @@ export default async function BetDetailPage({
     .single()
 
   const currency = bankroll?.currency || 'USD'
-  const sym = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'UAH' ? '₴' : currency
-
-  const eventLabel = isParlay
-    ? bet.legs!.map(l => l.event_name).join(' · ')
-    : leg?.event_name || '—'
+  const totalOdds = bet.total_odds ?? legs[0]?.odds
 
   return (
-    <div className="max-w-xl flex flex-col gap-6">
-      <PageView event={EVENTS.BET_DETAIL_VIEWED} props={{ sport: leg?.sport, status: bet.status, is_parlay: isParlay }} />
-      <div className="flex items-center gap-2">
-        <Link href="/bets" className="text-gray-500 hover:text-gray-300 text-sm transition-colors">
-          ← Bets
-        </Link>
-      </div>
+    <main className="bn-page mx-auto flex w-full max-w-4xl flex-col gap-4 pb-8">
+      <PageView event={EVENTS.BET_DETAIL_VIEWED} props={{ sport: legs[0]?.sport, status: bet.status, is_parlay: isExpress }} />
 
-      <div className="card flex flex-col gap-5">
-        <div className="flex items-start justify-between gap-3">
-          <h1 className="text-lg font-bold text-white leading-snug">{eventLabel}</h1>
-          <StatusBadge status={bet.status} />
+      <Link className="bn-button bn-button-secondary w-fit" href="/bets">← Tracker</Link>
+
+      <BroadcastPanel className="p-5 sm:p-7">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="editorial-kicker">Saved record · {isExpress ? `${legs.length}-leg Express` : 'Single'}</p>
+            <h1 className="mt-3 break-words font-display text-[clamp(2rem,6vw,4.5rem)] font-black leading-[0.98] tracking-[-0.05em] text-bn-text">
+              {isExpress ? 'Express coupon' : legs[0]?.event_name || 'Tracked bet'}
+            </h1>
+          </div>
+          <BroadcastStatus className="shrink-0" status={statusTone(resolved.key)}>{resolved.label}</BroadcastStatus>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
-          {!isParlay && leg?.market_type && <Row label="Market"    value={leg.market_type} />}
-          {!isParlay && leg?.selection   && <Row label="Selection" value={leg.selection} />}
-          {bet.total_odds != null && (
-            <Row label="Odds" value={bet.total_odds.toFixed(2)} />
-          )}
-          <Row label="Stake" value={`${sym}${bet.stake.toFixed(2)}`} />
-          {bet.bookmaker && <Row label="Bookmaker" value={bet.bookmaker} />}
-          {isSupportedSettlementStatus(bet.status) && bet.pnl != null && (
-            <Row
-              label="P&L"
-              value={`${bet.pnl >= 0 ? '+' : ''}${sym}${bet.pnl.toFixed(2)}`}
-              color={bet.pnl >= 0 ? 'text-green-400' : 'text-red-400'}
-            />
-          )}
-          <Row
-            label="Placed"
-            value={new Date(bet.placed_at).toLocaleDateString('en-GB', {
-              day: '2-digit', month: 'short', year: 'numeric',
-            })}
+        <dl className="mt-7 grid grid-cols-2 gap-px overflow-hidden rounded-control border border-bn-border-subtle bg-bn-border-subtle sm:grid-cols-4">
+          <DataPoint label="Stake" value={formatMoney(bet.stake, currency)} />
+          <DataPoint label="Total odds" value={totalOdds?.toFixed(2) ?? '—'} />
+          <DataPoint
+            label="P&L"
+            value={isSupportedSettlementStatus(bet.status) && bet.pnl != null ? formatMoney(bet.pnl, currency, true) : '—'}
           />
-          {bet.settled_at && (
-            <Row
-              label="Settled"
-              value={new Date(bet.settled_at).toLocaleDateString('en-GB', {
-                day: '2-digit', month: 'short', year: 'numeric',
-              })}
-            />
-          )}
+          <DataPoint label="Bookmaker" value={bet.bookmaker || '—'} />
+        </dl>
+      </BroadcastPanel>
+
+      <BroadcastPanel className="overflow-hidden p-0">
+        <div className="flex min-h-14 items-center justify-between gap-4 border-b border-bn-border-strong px-5 py-3 sm:px-7">
+          <h2 className="font-display text-xl font-black tracking-[-0.035em] text-bn-text">{isExpress ? 'Coupon legs' : 'Selection'}</h2>
+          <span className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-quiet">{legs.length} ordered</span>
         </div>
 
-        {isParlay && (
-          <div className="border-t border-gray-800 pt-4">
-            <div className="text-xs text-gray-500 mb-2">Legs</div>
-            <div className="flex flex-col gap-2">
-              {bet.legs!.map((l, i) => (
-                <div key={l.id} className="flex items-start gap-2 text-sm">
-                  <span className="text-gray-600 text-xs w-4">{i + 1}.</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-white break-words">{l.event_name}</div>
-                    {l.selection && (
-                      <div className="text-xs text-gray-400 break-words">Selection: {l.selection}</div>
-                    )}
+        {legs.length ? (
+          <ol aria-label="Coupon legs" className="divide-y divide-bn-border-strong">
+            {legs.map((leg, index) => (
+              <li className="grid grid-cols-[2rem_minmax(0,1fr)_auto] gap-3 px-5 py-5 sm:px-7" key={leg.id}>
+                <span className="font-mono text-[11px] font-bold tabular-nums text-bn-quiet">{String(index + 1).padStart(2, '0')}</span>
+                <div className="min-w-0">
+                  <div className="break-words text-sm font-bold leading-5 text-bn-text">{leg.event_name}</div>
+                  <div className="mt-1 break-words text-xs leading-5 text-bn-muted">
+                    {[leg.market_type, leg.selection].filter(Boolean).join(' · ') || 'Selection not recorded'}
                   </div>
-                  <span className="text-gray-400">{l.market_type}</span>
-                  <span className="text-gray-500 font-mono">@{l.odds.toFixed(2)}</span>
                 </div>
-              ))}
-            </div>
-          </div>
+                <BroadcastDataValue className="text-sm font-black">{leg.odds?.toFixed(2) ?? '—'}</BroadcastDataValue>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="p-6 text-sm text-bn-muted">Leg details were not recorded.</p>
         )}
+      </BroadcastPanel>
 
-        {bet.notes && (
-          <div className="border-t border-gray-800 pt-4 text-sm text-gray-400">
-            {bet.notes}
+      <BroadcastPanel className="p-5 sm:p-7">
+        <h2 className="font-display text-xl font-black tracking-[-0.035em] text-bn-text">Record details</h2>
+        <dl className="mt-5 divide-y divide-bn-border-subtle">
+          <DetailRow label="Placed" value={formatDateTime(bet.placed_at)} />
+          {bet.settled_at ? <DetailRow label="Settled" value={formatDateTime(bet.settled_at)} /> : null}
+          <DetailRow label="Source" value={bet.source || '—'} />
+        </dl>
+        {bet.notes ? (
+          <div className="mt-5 border-t border-bn-border-strong pt-5">
+            <div className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-quiet">Notes</div>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-bn-muted">{bet.notes}</p>
           </div>
-        )}
-      </div>
+        ) : null}
+      </BroadcastPanel>
 
       <SettleActions
         betId={bet.id}
         status={bet.status}
         pnl={bet.pnl}
         settledAt={bet.settled_at}
-        sym={sym}
+        currency={currency}
       />
+    </main>
+  )
+}
+
+function DataPoint({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 bg-bn-field p-4">
+      <dt className="font-mono text-[11px] font-bold uppercase tracking-[0.06em] text-bn-quiet">{label}</dt>
+      <dd><BroadcastDataValue className="mt-2 block break-words text-sm font-black">{value}</BroadcastDataValue></dd>
     </div>
   )
 }
 
-function Row({ label, value, color }: { label: string; value: string; color?: string }) {
+function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className={`font-medium text-white mt-0.5 ${color ?? ''}`}>{value}</div>
+    <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-4 py-3 text-sm">
+      <dt className="text-bn-muted">{label}</dt>
+      <dd className="break-words text-right font-semibold text-bn-text">{value}</dd>
     </div>
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
-  // Canonical resolver (Decision #058): explicit entry for every status key,
-  // 'Unknown' label for unrecognized values — nothing renders as Void unless
-  // it IS void.
-  const styles: Record<BetStatusKey, string> = {
-    won:        'text-green-400 bg-green-950 border border-green-900',
-    lost:       'text-red-400 bg-red-950 border border-red-900',
-    pending:    'text-yellow-400 bg-yellow-950 border border-yellow-900',
-    void:       'text-gray-400 bg-gray-800 border border-gray-700',
-    push:       'text-blue-400 bg-blue-950 border border-blue-900',
-    cashed_out: 'text-purple-400 bg-purple-950 border border-purple-900',
-    partial:    'text-slate-300 bg-slate-800 border border-slate-700',
-    unknown:    'text-slate-500 bg-slate-900 border border-slate-700',
-  }
-  const resolved = resolveBetStatus(status)
-  return (
-    <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${styles[resolved.key]}`}>
-      {resolved.label}
-    </span>
-  )
+function statusTone(status: BetStatusKey): BroadcastNoirStatus {
+  if (status === 'won') return 'success'
+  if (status === 'lost') return 'negative'
+  if (status === 'pending' || status === 'partial') return 'review'
+  return 'neutral'
+}
+
+function formatMoney(value: number, currency: string, showPositive = false) {
+  const formatted = new Intl.NumberFormat('en', {
+    currency,
+    currencyDisplay: 'narrowSymbol',
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+    style: 'currency',
+  }).format(value)
+  return showPositive && value > 0 ? `+${formatted}` : formatted
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value))
 }

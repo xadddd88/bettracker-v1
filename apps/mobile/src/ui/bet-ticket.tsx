@@ -20,13 +20,6 @@ export function BetTicket({ animationDelay = 0, bet, currency, onPress }: BetTic
   const status = STATUS_PRESENTATION[bet.status];
   const financial = betFinancialSummary(bet, currency);
   const totalOdds = bet.totalOdds ?? bet.legs[0]?.odds ?? null;
-  const statusTone = bet.status === 'won'
-    ? 'success'
-    : bet.status === 'lost'
-      ? 'negative'
-      : bet.status === 'pending'
-        ? 'review'
-        : 'neutral';
 
   return (
     <Animated.View
@@ -36,7 +29,7 @@ export function BetTicket({ animationDelay = 0, bet, currency, onPress }: BetTic
       <MotionPressable accessibilityHint="Opens bet details" accessibilityRole="button" glow="none" onPress={onPress} style={styles.ticket}>
         <View style={styles.metaRow}>
           <Text style={styles.type}>{coupon.isExpress ? `EXPRESS / ${coupon.legs.length}` : 'SINGLE'}</Text>
-          <BroadcastStatus label={status.label} status={statusTone} />
+          <BroadcastStatus label={status.label} status={status.tone} />
         </View>
         <View style={styles.legs}>
           {coupon.legs.length ? coupon.legs.map((leg, index) => (

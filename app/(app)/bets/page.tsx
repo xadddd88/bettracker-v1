@@ -1,35 +1,18 @@
-import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import type { Bet } from '@/types'
-import { PageView } from '@/lib/analytics/PageView'
-import { EVENTS } from '@/lib/analytics/events'
+
 import QuickSettle from '@/components/bets/QuickSettle'
-import { calcSettlementMetrics, isSupportedSettlementStatus } from '@/lib/bets/settlement-metrics'
+import {
+  BroadcastDataValue,
+  BroadcastPanel,
+  BroadcastStatus,
+} from '@/components/ui/BroadcastNoir'
+import { EVENTS } from '@/lib/analytics/events'
+import { PageView } from '@/lib/analytics/PageView'
 import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
-
-const SPORT_ICON: Record<string, string> = {
-  football:   '⚽',
-  soccer:     '⚽',
-  tennis:     '🎾',
-  basketball: '🏀',
-  hockey:     '🏒',
-  ice_hockey: '🏒',
-  other:      '🎯',
-}
-
-// Styles are keyed by the canonical resolver key (Decision #058): every
-// key — including 'partial' and 'unknown' — has an explicit entry, so no
-// status can silently fall back to the Void presentation (G12).
-const STATUS_STYLE: Record<BetStatusKey, { bg: string; text: string }> = {
-  won:       { bg: 'bg-green-950 border border-green-900', text: 'text-green-400' },
-  lost:      { bg: 'bg-red-950 border border-red-900',    text: 'text-red-400' },
-  pending:   { bg: 'bg-yellow-950 border border-yellow-900', text: 'text-yellow-400' },
-  void:      { bg: 'bg-gray-800 border border-gray-700',  text: 'text-gray-400' },
-  push:      { bg: 'bg-blue-950 border border-blue-900',  text: 'text-blue-400' },
-  cashed_out:{ bg: 'bg-purple-950 border border-purple-900', text: 'text-purple-400' },
-  partial:   { bg: 'bg-slate-800 border border-slate-700', text: 'text-slate-300' },
-  unknown:   { bg: 'bg-slate-900 border border-slate-700', text: 'text-slate-500' },
-}
+import { calcSettlementMetrics, isSupportedSettlementStatus } from '@/lib/bets/settlement-metrics'
+import { createClient } from '@/lib/supabase/server'
+import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
+import type { Bet } from '@/types'
 
 export default async function BetsPage() {
   const supabase = await createClient()
@@ -42,8 +25,6 @@ export default async function BetsPage() {
       .eq('user_id', user!.id)
       .is('archived_at', null)
       .order('placed_at', { ascending: false })
-      // Express legs display in coupon order (Decision #060 Phase B);
-      // legacy legs have NULL leg_index and keep their old position.
       .order('leg_index', { referencedTable: 'bet_legs', ascending: true }),
     supabase
       .from('bankrolls')
@@ -55,167 +36,164 @@ export default async function BetsPage() {
 
   const bets: Bet[] = data || []
   const currency = bankroll?.currency || 'USD'
-  const sym = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'UAH' ? '₴' : currency
-
-  // Canonical settlement metrics (Decision #058): settled = won+lost+void,
-  // void excluded from Win Rate and ROI, unsupported/unknown statuses
-  // excluded from every financial metric.
-  const m = calcSettlementMetrics(bets)
-  const totalStaked = bets.reduce((s, b) => s + b.stake, 0)
+  const metrics = calcSettlementMetrics(bets)
+  const totalStaked = bets.reduce((sum, bet) => sum + bet.stake, 0)
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+    <main className="bn-page mx-auto flex w-full max-w-6xl flex-col gap-4 pb-8">
       <PageView event={EVENTS.BETS_LIST_VIEWED} props={{ bet_count: bets.length }} />
 
-      {/* Header */}
-      <div className="grid gap-6 border-y border-black py-6 sm:grid-cols-[1fr_auto] sm:items-end">
+      <BroadcastPanel className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div>
-          <p className="editorial-kicker">03 / Decision archive</p>
-          <h1 className="mt-3 font-display text-[clamp(3.4rem,9vw,7.5rem)] font-black uppercase leading-[0.8] tracking-[-0.075em]">Tracker</h1>
-          <p className="mt-5 max-w-xl text-sm text-black/55">
-            {bets.length} records / {m.settledCount} settled / live P&amp;L tracking
+          <p className="editorial-kicker">Tracker · persisted records</p>
+          <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">
+            Bets
+          </h1>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-bn-muted">
+            {bets.length} saved record{bets.length === 1 ? '' : 's'} · {metrics.pendingCount} open · {metrics.settledCount} settled
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/ai" className="btn-ghost">Scan coupon</Link>
-          <Link href="/bets/new" className="btn-primary">Add bet ↗</Link>
+        <div className="grid gap-2 min-[420px]:grid-cols-2">
+          <Link href="/ai" className="bn-button bn-button-secondary">Scan coupon</Link>
+          <Link href="/bets/new" className="bn-button bn-button-primary">Add bet</Link>
         </div>
-      </div>
+      </BroadcastPanel>
 
-      {/* Summary strip */}
-      {bets.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: 'Total staked',  value: `${sym}${totalStaked.toFixed(0)}` },
-            { label: 'Win rate',      value: m.winRate != null ? `${m.winRate.toFixed(0)}%` : '—' },
-            { label: 'ROI',           value: m.roi != null ? `${m.roi >= 0 ? '+' : ''}${m.roi.toFixed(1)}%` : '—', color: m.roi != null && m.roi < 0 ? 'text-red-400' : 'text-green-400' },
-            { label: 'Total P&L',     value: m.settledCount ? `${m.netProfit >= 0 ? '+' : ''}${sym}${m.netProfit.toFixed(2)}` : '—', color: m.netProfit >= 0 ? 'text-green-400' : 'text-red-400' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="stat-card">
-              <div className="stat-label">{label}</div>
-              <div className={`stat-value text-lg ${color || 'text-white'}`}>{value}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      {bets.length > 0 ? (
+        <BroadcastPanel className="grid grid-cols-2 overflow-hidden p-0 md:grid-cols-4">
+          <Metric label="Total staked" value={formatMoney(totalStaked, currency)} />
+          <Metric label="Win rate" value={metrics.winRate == null ? '—' : `${metrics.winRate.toFixed(0)}%`} />
+          <Metric label="ROI" value={metrics.roi == null ? '—' : `${metrics.roi >= 0 ? '+' : ''}${metrics.roi.toFixed(1)}%`} />
+          <Metric label="Net P&L" value={metrics.settledCount ? formatMoney(metrics.netProfit, currency, true) : '—'} />
+        </BroadcastPanel>
+      ) : null}
 
-      {/* Status guide */}
-      {bets.length > 0 && (
-        <div className="flex flex-wrap gap-x-5 gap-y-1 px-1">
-          <span className="text-[10px] text-gray-600"><span className="text-yellow-400">●</span> Pending — awaiting result</span>
-          <span className="text-[10px] text-gray-600"><span className="text-green-400">●</span> Won — settled as win</span>
-          <span className="text-[10px] text-gray-600"><span className="text-red-400">●</span> Lost — settled as loss</span>
-          <span className="text-[10px] text-gray-600"><span className="text-gray-400">●</span> Void — cancelled, stake returned</span>
-          <span className="text-[10px] text-gray-600"><span className="text-purple-400">●</span> Cashed out — closed early</span>
-        </div>
-      )}
-
-      {/* Bet list */}
       {bets.length === 0 ? (
-        <div className="card text-center py-14">
-          <div className="text-4xl mb-3">🎯</div>
-          <p className="font-medium text-white mb-1">No bets tracked yet</p>
-          <p className="text-gray-400 text-sm mb-5">
-            Place a bet from an AI analysis, or add manually. Results update win rate, ROI, and P&amp;L automatically.
-          </p>
-          <div className="flex gap-3 justify-center">
-            <Link href="/ai" className="btn-ghost text-sm">Analyze a match</Link>
-            <Link href="/bets/new" className="btn-primary text-sm">+ Add bet</Link>
+        <BroadcastPanel className="grid min-h-72 place-items-center p-6 text-center">
+          <div className="max-w-md">
+            <BroadcastStatus status="neutral">Empty · no saved bets</BroadcastStatus>
+            <h2 className="mt-5 font-display text-3xl font-black tracking-[-0.04em] text-bn-text">Start with one explicit record</h2>
+            <p className="mt-3 text-sm leading-6 text-bn-muted">
+              Scan a coupon or enter it manually. Nothing is saved until you review the draft and press Save.
+            </p>
+            <div className="mt-6 grid gap-2 min-[420px]:grid-cols-2">
+              <Link href="/ai" className="bn-button bn-button-secondary">Scan coupon</Link>
+              <Link href="/bets/new" className="bn-button bn-button-primary">Add manually</Link>
+            </div>
           </div>
-        </div>
+        </BroadcastPanel>
       ) : (
-        <div className="card p-0 divide-y divide-gray-800">
-          {bets.map((bet) => {
-            const legs     = bet.legs ?? []
-            const isParlay = legs.length > 1
-            const leg      = legs[0]
-            const sport    = leg?.sport || 'other'
-            const resolved = resolveBetStatus(bet.status)
-            const status   = { ...STATUS_STYLE[resolved.key], label: resolved.label }
+        <BroadcastPanel className="overflow-hidden p-0">
+          <div className="flex min-h-14 items-center justify-between gap-4 border-b border-bn-border-strong px-4 py-3 sm:px-6">
+            <h2 className="font-display text-xl font-black tracking-[-0.035em] text-bn-text">Most recent first</h2>
+            <span className="font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-bn-quiet">Ordered legs</span>
+          </div>
+          <ol aria-label="Tracked bets" className="divide-y divide-bn-border-strong">
+            {bets.map((bet) => {
+              const legs = bet.legs ?? []
+              const resolved = resolveBetStatus(bet.status)
+              const totalOdds = bet.total_odds ?? legs[0]?.odds
 
-            const eventLabel = isParlay
-              ? legs.map(l => l.event_name).join(' · ')
-              : leg?.event_name || '—'
+              return (
+                <li key={bet.id}>
+                  <Link
+                    aria-label={`Open ${legs.length > 1 ? `${legs.length}-leg Express` : legs[0]?.event_name || 'tracked bet'}`}
+                    className="grid gap-4 px-4 py-5 transition-colors hover:bg-bn-raised sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start"
+                    href={`/bets/${bet.id}`}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-[11px] font-black uppercase tracking-[0.1em] text-bn-muted">
+                          {legs.length > 1 ? `Express · ${legs.length} legs` : 'Single'}
+                        </span>
+                        <BroadcastStatus status={statusTone(resolved.key)}>{resolved.label}</BroadcastStatus>
+                      </div>
 
-            const marketLabel = isParlay
-              ? legs.map(l => [l.market_type, l.selection].filter(Boolean).join(' ')).join(' / ')
-              : [leg?.market_type, leg?.selection].filter(Boolean).join(' · ') || '—'
-
-            const date = new Date(bet.placed_at).toLocaleDateString('uk-UA', {
-              day: '2-digit', month: '2-digit', year: 'numeric',
-            })
-
-            return (
-              <div key={bet.id}>
-              <Link href={`/bets/${bet.id}`} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2 px-4 py-4 hover:bg-gray-800/30 transition-colors sm:flex sm:items-center sm:gap-4">
-
-                {/* Sport icon */}
-                <div className="text-xl flex-shrink-0 w-7 text-center">
-                  {SPORT_ICON[sport] || '🎯'}
-                </div>
-
-                {/* Event + market */}
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-white text-sm leading-snug line-clamp-1">
-                    {eventLabel}
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span className="text-xs text-gray-400 line-clamp-1">{marketLabel}</span>
-                    <span className="text-xs text-gray-600">·</span>
-                    <span className="text-xs text-gray-600">{date}</span>
-                  </div>
-                </div>
-
-                {/* Mobile metadata row; contents restores the desktop flex row. */}
-                <div className="col-start-2 min-w-0 flex flex-wrap items-center gap-x-3 gap-y-1 sm:contents">
-                  <span className="text-[11px] text-gray-500 sm:hidden">
-                    Odds <span className="font-mono text-gray-300">{bet.total_odds?.toFixed(2) || '—'}</span>
-                  </span>
-                  <span className="text-[11px] text-gray-500 sm:hidden">
-                    Stake <span className="text-gray-300">{sym}{bet.stake}</span>
-                  </span>
-
-                  {/* Odds */}
-                  <div className="flex-shrink-0 text-right hidden sm:block">
-                    <div className="text-xs text-gray-500 mb-0.5">Odds</div>
-                    <div className="text-sm font-mono text-white">
-                      {bet.total_odds?.toFixed(2) || '—'}
+                      {legs.length > 0 ? (
+                        <ol aria-label="Coupon legs" className="mt-4 space-y-3">
+                          {legs.map((leg, index) => (
+                            <li className="grid grid-cols-[1.75rem_minmax(0,1fr)_auto] gap-3" key={leg.id}>
+                              <span className="font-mono text-[11px] font-bold tabular-nums text-bn-quiet">{String(index + 1).padStart(2, '0')}</span>
+                              <span className="min-w-0">
+                                <span className="block break-words text-sm font-bold leading-5 text-bn-text">{leg.event_name}</span>
+                                <span className="mt-1 block break-words text-xs leading-5 text-bn-muted">
+                                  {[leg.market_type, leg.selection].filter(Boolean).join(' · ') || 'Selection not recorded'}
+                                </span>
+                              </span>
+                              <BroadcastDataValue className="text-sm font-black">{leg.odds?.toFixed(2) ?? '—'}</BroadcastDataValue>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <p className="mt-4 text-sm text-bn-muted">Leg details were not recorded.</p>
+                      )}
                     </div>
-                  </div>
 
-                  {/* Stake */}
-                  <div className="flex-shrink-0 text-right hidden sm:block">
-                    <div className="text-xs text-gray-500 mb-0.5">Stake</div>
-                    <div className="text-sm text-gray-200">{sym}{bet.stake}</div>
-                  </div>
-
-                  {/* Status */}
-                  <div className="flex-shrink-0">
-                    <span className={`inline-block text-xs px-2.5 py-1 rounded-full font-medium ${status.bg} ${status.text}`}>
-                      {status.label}
-                    </span>
-                  </div>
-
-                  {/* P&L — settlement P&L is only defined for won/lost/void
-                      (Decision #058); unsupported/unknown statuses show “—” */}
-                  <div className="flex-shrink-0 text-right sm:w-20">
-                    {bet.pnl == null || !isSupportedSettlementStatus(bet.status) ? (
-                      <span className="text-gray-600 text-sm">—</span>
-                    ) : (
-                      <span className={`text-sm font-bold ${bet.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {bet.pnl >= 0 ? '+' : ''}{sym}{bet.pnl.toFixed(2)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-              </Link>
-              {bet.status === 'pending' && <QuickSettle betId={bet.id} />}
-              </div>
-            )
-          })}
-        </div>
+                    <dl className="grid grid-cols-3 gap-4 border-t border-bn-border-subtle pt-4 lg:min-w-64 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+                      <DataPoint label="Stake" value={formatMoney(bet.stake, currency)} />
+                      <DataPoint label="Total odds" value={totalOdds?.toFixed(2) ?? '—'} />
+                      <DataPoint
+                        label={isSupportedSettlementStatus(bet.status) ? 'P&L' : 'Recorded P&L'}
+                        value={bet.pnl == null || !isSupportedSettlementStatus(bet.status)
+                          ? '—'
+                          : formatMoney(bet.pnl, currency, true)}
+                      />
+                      <div className="col-span-3 font-mono text-[11px] text-bn-quiet">
+                        {formatDate(bet.placed_at)}
+                      </div>
+                    </dl>
+                  </Link>
+                  {bet.status === 'pending' ? <QuickSettle betId={bet.id} /> : null}
+                </li>
+              )
+            })}
+          </ol>
+        </BroadcastPanel>
       )}
+    </main>
+  )
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 border-b border-r border-bn-border-subtle p-4 sm:p-5">
+      <div className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-quiet">{label}</div>
+      <BroadcastDataValue className="mt-2 block break-words font-display text-xl font-black tracking-[-0.025em] sm:text-2xl">{value}</BroadcastDataValue>
     </div>
   )
+}
+
+function DataPoint({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="font-mono text-[11px] font-bold uppercase tracking-[0.06em] text-bn-quiet">{label}</dt>
+      <dd><BroadcastDataValue className="mt-1 block break-words text-sm font-black">{value}</BroadcastDataValue></dd>
+    </div>
+  )
+}
+
+function statusTone(status: BetStatusKey): BroadcastNoirStatus {
+  if (status === 'won') return 'success'
+  if (status === 'lost') return 'negative'
+  if (status === 'pending' || status === 'partial') return 'review'
+  return 'neutral'
+}
+
+function formatMoney(value: number, currency: string, showPositive = false) {
+  const formatted = new Intl.NumberFormat('en', {
+    currency,
+    currencyDisplay: 'narrowSymbol',
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+    style: 'currency',
+  }).format(value)
+  return showPositive && value > 0 ? `+${formatted}` : formatted
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value))
 }

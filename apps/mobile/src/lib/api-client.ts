@@ -1,5 +1,6 @@
 export type ApiFailureCode =
   | 'configuration'
+  | 'conflict'
   | 'invalid_response'
   | 'network'
   | 'rate_limited'
@@ -7,6 +8,8 @@ export type ApiFailureCode =
   | 'server'
   | 'timeout'
   | 'unauthorized';
+
+export type ApiOperation = 'scanner' | 'tracked_bet';
 
 export type ApiResult<T> =
   | { ok: true; data: T; status: number }
@@ -20,6 +23,7 @@ type AuthenticatedJsonRequest = {
   fetchImpl?: FetchLike;
   getAccessToken(refresh: boolean): Promise<string | null>;
   path: `/api/${string}`;
+  operation?: ApiOperation;
   timeoutMs?: number;
 };
 
@@ -56,7 +60,28 @@ export function resolveApiUrl(path: `/api/${string}`, configuredBase = process.e
   return target.toString();
 }
 
-function failureForResponse(response: Response): Exclude<ApiResult<never>, { ok: true }> {
+function operationCopy(operation: ApiOperation) {
+  return operation === 'tracked_bet'
+    ? {
+        invalid: 'The saved response was invalid. Check Tracker before retrying.',
+        network: 'Could not save the bet. Check your connection and try again.',
+        rateLimited: 'Too many save attempts. Wait before trying again.',
+        rejected: 'The bet could not be saved. Review the highlighted details.',
+        server: 'The bet could not be saved. Retrying the same draft is safe.',
+        timeout: 'Saving timed out. Retry the unchanged draft to reuse the same request key.',
+      }
+    : {
+        invalid: 'Scanner returned an invalid response.',
+        network: 'Could not reach the scanner. Check your connection.',
+        rateLimited: 'Too many scans. Wait a moment and try again.',
+        rejected: 'The scanner could not read this image safely.',
+        server: 'Scanner is temporarily unavailable.',
+        timeout: 'Scanner timed out. Try again once.',
+      };
+}
+
+function failureForResponse(response: Response, operation: ApiOperation): Exclude<ApiResult<never>, { ok: true }> {
+  const copy = operationCopy(operation);
   if (response.status === 401) {
     return { ok: false, code: 'unauthorized', message: 'Your session expired. Sign in again.', status: 401 };
   }
@@ -65,18 +90,26 @@ function failureForResponse(response: Response): Exclude<ApiResult<never>, { ok:
     return {
       ok: false,
       code: 'rate_limited',
-      message: 'Too many scans. Wait a moment and try again.',
+      message: copy.rateLimited,
       status: 429,
       ...(Number.isFinite(retryAfter) && retryAfter >= 0 ? { retryAfter } : {}),
     };
   }
   if (response.status === 504) {
-    return { ok: false, code: 'timeout', message: 'Scanner timed out. Try again once.', status: 504 };
+    return { ok: false, code: 'timeout', message: copy.timeout, status: 504 };
+  }
+  if (response.status === 409) {
+    return {
+      ok: false,
+      code: 'conflict',
+      message: 'This save request conflicts with an earlier attempt. Edit the draft before starting a new intent.',
+      status: 409,
+    };
   }
   if (response.status === 400 || response.status === 413 || response.status === 422) {
-    return { ok: false, code: 'request_rejected', message: 'The scanner could not read this image safely.', status: response.status };
+    return { ok: false, code: 'request_rejected', message: copy.rejected, status: response.status };
   }
-  return { ok: false, code: 'server', message: 'Scanner is temporarily unavailable.', status: response.status };
+  return { ok: false, code: 'server', message: copy.server, status: response.status };
 }
 
 async function requestOnce(
@@ -85,6 +118,7 @@ async function requestOnce(
   serializedBody: string,
   timeoutMs: number,
   fetchImpl: FetchLike,
+  operation: ApiOperation,
 ): Promise<{ response: Response } | { failure: Exclude<ApiResult<never>, { ok: true }> }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -103,8 +137,8 @@ async function requestOnce(
     return { response };
   } catch {
     return controller.signal.aborted
-      ? { failure: { ok: false, code: 'timeout', message: 'Scanner timed out. Try again once.', status: null } }
-      : { failure: { ok: false, code: 'network', message: 'Could not reach the scanner. Check your connection.', status: null } };
+      ? { failure: { ok: false, code: 'timeout', message: operationCopy(operation).timeout, status: null } }
+      : { failure: { ok: false, code: 'network', message: operationCopy(operation).network, status: null } };
   } finally {
     clearTimeout(timer);
   }
@@ -115,6 +149,7 @@ export async function authenticatedJsonRequest<T>({
   body,
   fetchImpl = fetch,
   getAccessToken,
+  operation = 'scanner',
   path,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: AuthenticatedJsonRequest): Promise<ApiResult<T>> {
@@ -136,7 +171,7 @@ export async function authenticatedJsonRequest<T>({
   }
 
   const serializedBody = JSON.stringify(body);
-  let attempt = await requestOnce(url, token, serializedBody, timeoutMs, fetchImpl);
+  let attempt = await requestOnce(url, token, serializedBody, timeoutMs, fetchImpl, operation);
   if ('failure' in attempt) return attempt.failure;
 
   if (attempt.response.status === 401) {
@@ -145,17 +180,17 @@ export async function authenticatedJsonRequest<T>({
     } catch {
       token = null;
     }
-    if (!token) return failureForResponse(attempt.response);
-    attempt = await requestOnce(url, token, serializedBody, timeoutMs, fetchImpl);
+    if (!token) return failureForResponse(attempt.response, operation);
+    attempt = await requestOnce(url, token, serializedBody, timeoutMs, fetchImpl, operation);
     if ('failure' in attempt) return attempt.failure;
   }
 
   const { response } = attempt;
-  if (!response.ok) return failureForResponse(response);
+  if (!response.ok) return failureForResponse(response, operation);
 
   try {
     return { ok: true, data: await response.json() as T, status: response.status };
   } catch {
-    return { ok: false, code: 'invalid_response', message: 'Scanner returned an invalid response.', status: response.status };
+    return { ok: false, code: 'invalid_response', message: operationCopy(operation).invalid, status: response.status };
   }
 }

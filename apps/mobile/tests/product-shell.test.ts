@@ -57,10 +57,11 @@ test('Phase 1B AI route is preserved without a colliding placeholder', () => {
   assert.equal(existsSync(join(root, 'src/app/(app)/ai.tsx')), false);
 });
 
-test('local tracker editor cannot perform network or financial writes', () => {
+test('mobile tracker editor saves only through the audited authenticated endpoint', () => {
   const editor = source('src/app/(app)/bets/new.tsx');
   const draft = source('src/bets/draft.ts');
-  const combined = `${editor}\n${draft}`;
+  const saveClient = source('src/bets/save.ts');
+  const intent = source('src/bets/submit-intent.ts');
 
   for (const forbidden of [
     /\bfetch\s*\(/,
@@ -68,15 +69,23 @@ test('local tracker editor cannot perform network or financial writes', () => {
     /\bsupabase\b/i,
     /\.rpc\s*\(/,
     /create_tracked_bet/,
-    /idempotency/i,
     /service[_-]?role/i,
     /\/api\//,
   ]) {
-    assert.doesNotMatch(combined, forbidden);
+    assert.doesNotMatch(editor, forbidden);
   }
 
-  assert.match(editor, /Bet is valid\. Secure saving will be enabled in the next phase\./);
+  assert.match(editor, /saveTrackedBet\(reviewedPayload, begin\.key\)/);
   assert.match(editor, /Review bet/);
+  assert.match(editor, /Save bet/);
+  assert.match(editor, /router\.replace\(\{ pathname: '\/\(app\)\/bets\/\[id\]'/);
+  assert.match(saveClient, /authenticatedJsonRequest<SavedBetResponse>/);
+  assert.match(saveClient, /path: '\/api\/bets\/tracked'/);
+  assert.match(saveClient, /operation: 'tracked_bet'/);
+  assert.match(saveClient, /idempotency_key: idempotencyKey/);
+  assert.doesNotMatch(`${draft}\n${intent}\n${saveClient}`, /\.rpc\s*\(|service[_-]?role/i);
+  assert.match(intent, /status: 'in_flight'/);
+  assert.match(intent, /conflict_unchanged/);
 });
 
 test('support routes remain available outside the focused tab bar', () => {
@@ -109,7 +118,7 @@ test('daily Home uses the read model and exposes trusted Adaptive Action', () =>
   assert.doesNotMatch(data, /select\s*\(\s*['"`]\s*\*/);
 });
 
-test('legacy editorial motion remains isolated from the migrated Home', () => {
+test('legacy editorial motion remains isolated from migrated Home, Scanner and Tracker', () => {
   const backdrop = source('src/ui/time-warp.tsx');
   const motion = source('src/ui/motion.tsx');
   const ticket = source('src/ui/bet-ticket.tsx');
@@ -137,6 +146,7 @@ test('legacy editorial motion remains isolated from the migrated Home', () => {
     'src/app/(app)/bets/new.tsx',
     'src/app/(app)/bets/[id].tsx',
   ]) {
-    assert.match(source(path), /(?:EditorialBackdrop|TimeWarpBackdrop)/);
+    assert.doesNotMatch(source(path), /(?:EditorialBackdrop|TimeWarpBackdrop|KineticType|WarpRail)/);
+    assert.match(source(path), /Broadcast(?:Button|Panel|Status)/);
   }
 });
