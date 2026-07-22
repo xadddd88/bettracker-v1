@@ -33,7 +33,7 @@ export default function AppLayout() {
           paddingTop: 4,
         },
         tabBarLabelPosition: 'below-icon',
-        tabBarLabelStyle: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
         tabBarStyle: {
           backgroundColor: semanticColors.night,
           borderTopColor: semanticColors.borderStrong,

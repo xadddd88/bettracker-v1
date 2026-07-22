@@ -1,8 +1,8 @@
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors } from './theme';
+import { geometry, semanticColors } from './theme';
 
 type ScreenHeaderProps = {
   action?: ReactNode;
@@ -56,7 +56,7 @@ export function ActionCard({
   tone = 'neutral',
 }: ActionCardProps) {
   const accent = tone === 'accent';
-  const tintColor = accent ? colors.background : colors.accent;
+  const tintColor = accent ? semanticColors.onSignal : semanticColors.signal;
 
   return (
     <Pressable
@@ -109,20 +109,20 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   eyebrow: {
-    color: colors.accent,
+    color: semanticColors.signal,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.8,
   },
   title: {
-    color: colors.text,
+    color: semanticColors.textPrimary,
     fontSize: 28,
     fontWeight: '800',
     lineHeight: 34,
     marginTop: 4,
   },
   subtitle: {
-    color: colors.muted,
+    color: semanticColors.textMuted,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 4,
@@ -134,36 +134,36 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionTitle: {
-    color: colors.secondaryText,
+    color: semanticColors.textPrimary,
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   sectionDetail: {
-    color: colors.placeholder,
+    color: semanticColors.textQuiet,
     fontSize: 11,
   },
   actionCard: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: semanticColors.field,
+    borderColor: semanticColors.borderStrong,
     borderCurve: 'continuous',
-    borderRadius: 16,
+    borderRadius: geometry.radiusControl,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
-    minHeight: 82,
+    minHeight: Platform.OS === 'android' ? 82 : 78,
     padding: 14,
   },
   actionCardAccent: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
+    backgroundColor: semanticColors.signal,
+    borderColor: semanticColors.signal,
   },
   iconBox: {
     alignItems: 'center',
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: 12,
+    backgroundColor: semanticColors.fieldRaised,
+    borderRadius: geometry.radiusControl,
     height: 44,
     justifyContent: 'center',
     width: 44,
@@ -187,24 +187,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionLabel: {
-    color: colors.text,
+    color: semanticColors.textPrimary,
     fontSize: 16,
     fontWeight: '800',
   },
   actionLabelAccent: {
-    color: colors.background,
+    color: semanticColors.onSignal,
   },
   actionDescription: {
-    color: colors.muted,
+    color: semanticColors.textMuted,
     fontSize: 12,
     lineHeight: 18,
   },
   actionDescriptionAccent: {
-    color: '#12304a',
+    color: semanticColors.onSignal,
   },
   badge: {
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: 999,
+    backgroundColor: semanticColors.fieldRaised,
+    borderRadius: geometry.radiusControl,
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
@@ -212,22 +212,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(7,17,31,0.13)',
   },
   badgeText: {
-    color: colors.accent,
-    fontSize: 9,
+    color: semanticColors.signal,
+    fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
   badgeTextAccent: {
-    color: colors.background,
+    color: semanticColors.onSignal,
   },
   chevron: {
-    color: colors.muted,
+    color: semanticColors.textMuted,
     fontSize: 26,
     lineHeight: 28,
   },
   chevronAccent: {
-    color: colors.background,
+    color: semanticColors.onSignal,
   },
   pressed: {
     opacity: 0.72,

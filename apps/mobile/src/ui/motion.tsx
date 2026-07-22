@@ -13,6 +13,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { semanticColors } from './theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -68,6 +69,6 @@ export function MotionPressable({
 
 const styles = StyleSheet.create({
   wipe: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: semanticColors.signal,
   },
 });

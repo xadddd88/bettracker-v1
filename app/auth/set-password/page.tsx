@@ -58,63 +58,69 @@ export default function SetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="text-3xl font-bold text-white mb-1">BetTracker</div>
-          <div className="text-sm text-gray-500">Set your password</div>
-        </div>
+    <main className="web-editorial flex min-h-screen items-center justify-center bg-[var(--night)] px-4 py-10 text-[var(--text-primary)]">
+      <div className="editorial-page w-full max-w-md">
+        <header className="mb-8 border-y border-[var(--border-strong)] py-6 text-center">
+          <p className="editorial-kicker">Secure account setup</p>
+          <h1 className="mt-3 font-display text-4xl font-black uppercase tracking-[-0.05em]">BetTracker</h1>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">Set your password</p>
+        </header>
 
-        <div className="card">
+        <section className="bn-panel p-5 sm:p-6" aria-live="polite">
           {!ready ? (
-            <div className="text-center text-sm text-gray-400 py-4">Loading…</div>
+            <div className="py-4 text-center text-sm text-[var(--text-muted)]">Loading…</div>
           ) : !hasSession ? (
-            <div className="text-center py-4">
-              <div className="text-sm text-gray-300 mb-3">
+            <div className="py-4 text-center">
+              <p className="mb-4 text-sm leading-6 text-[var(--text-muted)]">
                 This page can only be opened from your invite email link.
-              </div>
-              <a href="/login" className="text-xs text-indigo-400 hover:text-indigo-300">Go to sign in</a>
+              </p>
+              <a href="/login" className="bn-button bn-button-secondary">Go to sign in</a>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="label">New password</label>
+                <label className="label" htmlFor="new-password">New password</label>
                 <input
+                  id="new-password"
                   className="input"
                   type="password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
                   minLength={8}
                   required
                 />
               </div>
               <div>
-                <label className="label">Confirm password</label>
+                <label className="label" htmlFor="confirm-password">Confirm password</label>
                 <input
+                  id="confirm-password"
                   className="input"
                   type="password"
                   placeholder="••••••••"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
+                  autoComplete="new-password"
                   minLength={8}
                   required
                 />
               </div>
 
               {error && (
-                <div className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
-                  {error}
+                <div className="bn-status bn-status-negative w-full justify-start" role="alert">
+                  <span className="bn-status-icon" aria-hidden>×</span>
+                  <span>{error}</span>
                 </div>
               )}
 
-              <button type="submit" className="btn-primary w-full mt-1" disabled={submitting}>
+              <button type="submit" className="bn-button bn-button-primary mt-1 w-full" disabled={submitting}>
                 {submitting ? 'Saving…' : 'Set password & continue'}
               </button>
             </form>
           )}
-        </div>
+        </section>
       </div>
-    </div>
+    </main>
   )
 }

@@ -1,17 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { MessageSquarePlus, Star, X } from 'lucide-react'
 import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
+import { BroadcastStatus } from '@/components/ui/BroadcastNoir'
 
 type Category = 'bug' | 'suggestion' | 'general' | 'praise'
 
 const CATEGORIES: { value: Category; label: string }[] = [
-  { value: 'bug',        label: '🐛 Bug' },
-  { value: 'suggestion', label: '💡 Suggestion' },
-  { value: 'praise',     label: '⭐ Praise' },
-  { value: 'general',    label: '💬 General' },
+  { value: 'bug',        label: 'Bug' },
+  { value: 'suggestion', label: 'Suggestion' },
+  { value: 'praise',     label: 'Praise' },
+  { value: 'general',    label: 'General' },
 ]
+
+const DIALOG_TITLE_ID = 'feedback-dialog-title'
 
 export default function FeedbackWidget() {
   const [open,     setOpen]     = useState(false)
@@ -22,6 +26,45 @@ export default function FeedbackWidget() {
   const [loading,  setLoading]  = useState(false)
   const [done,     setDone]     = useState(false)
   const [error,    setError]    = useState('')
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    dialogRef.current?.querySelector<HTMLElement>('button, textarea')?.focus()
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        closeModal()
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), textarea:not([disabled])'
+      )
+      if (!focusable?.length) return
+      const items = Array.from(focusable)
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
 
   function openModal() {
     setOpen(true)
@@ -37,6 +80,7 @@ export default function FeedbackWidget() {
     setCategory('general')
     setMessage('')
     setError('')
+    requestAnimationFrame(() => triggerRef.current?.focus())
   }
 
   async function submit() {
@@ -71,39 +115,48 @@ export default function FeedbackWidget() {
     <>
       {/* Floating trigger — clears mobile bottom nav on small screens */}
       <button
+        ref={triggerRef}
+        type="button"
         onClick={openModal}
-        className="editorial-dark fixed bottom-20 right-0 z-40 flex min-h-11 items-center gap-2 border border-black bg-[#050505] px-4 font-mono text-[9px] font-black uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#e8ff00] hover:text-black md:bottom-6"
+        className="bn-button bn-button-secondary fixed bottom-20 right-0 z-40 rounded-r-none border-r-0 md:bottom-6"
         aria-label="Open feedback form"
       >
-        <span aria-hidden>+</span>
+        <MessageSquarePlus aria-hidden="true" className="h-4 w-4" />
         <span>Feedback</span>
       </button>
 
       {/* Backdrop + dialog */}
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center"
           onClick={e => { if (e.target === e.currentTarget) closeModal() }}
         >
-          <div className="w-full max-w-sm overflow-hidden border border-black bg-[#f5f5f0]">
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={DIALOG_TITLE_ID}
+            className="w-full max-w-md overflow-hidden border border-[var(--border-strong)] bg-[var(--field)] text-[var(--text-primary)]"
+          >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-black px-5 py-4">
-              <h2 className="font-display text-lg font-black uppercase tracking-[-0.04em]">Beta feedback</h2>
+            <div className="flex items-center justify-between border-b border-[var(--border-strong)] px-5 py-4">
+              <h2 id={DIALOG_TITLE_ID} className="font-display text-xl font-black uppercase tracking-[-0.04em]">Beta feedback</h2>
               <button
+                type="button"
                 onClick={closeModal}
-                className="min-h-11 min-w-11 text-xs transition-colors hover:bg-black hover:text-white"
+                className="bn-button bn-button-secondary min-w-11 px-0"
                 aria-label="Close"
               >
-                &#x2715;
+                <X aria-hidden="true" className="h-4 w-4" />
               </button>
             </div>
 
             {done ? (
               <div className="px-5 py-10 text-center">
-                <div className="text-4xl mb-3">🙏</div>
-                <p className="text-sm font-semibold text-black">Thank you!</p>
-                <p className="text-xs text-slate-400 mt-1">Your feedback helps us build a better product.</p>
-                <button className="mt-5 btn-primary w-full text-sm" onClick={closeModal}>
+                <BroadcastStatus status="success">Feedback received</BroadcastStatus>
+                <p className="mt-5 text-sm font-semibold text-[var(--text-primary)]">Thank you.</p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">Your feedback helps us build a better product.</p>
+                <button className="bn-button bn-button-primary mt-5 w-full" onClick={closeModal}>
                   Close
                 </button>
               </div>
@@ -111,7 +164,7 @@ export default function FeedbackWidget() {
               <div className="px-5 py-4 flex flex-col gap-4">
                 {/* Star rating */}
                 <div>
-                  <p className="label mb-2">How&apos;s BetTracker AI working for you?</p>
+                  <p className="label mb-2">How&apos;s BetTracker working for you?</p>
                   <div
                     className="flex gap-1"
                     onMouseLeave={() => setHovered(0)}
@@ -119,14 +172,18 @@ export default function FeedbackWidget() {
                     {[1, 2, 3, 4, 5].map(n => (
                       <button
                         key={n}
+                        type="button"
                         onClick={() => setRating(n)}
                         onMouseEnter={() => setHovered(n)}
-                        className={`text-2xl transition-all hover:scale-110 ${
-                          n <= activeRating ? 'opacity-100' : 'opacity-25'
+                        className={`flex min-h-11 min-w-11 items-center justify-center border transition-colors ${
+                          n <= activeRating
+                            ? 'border-[var(--signal)] text-[var(--signal)]'
+                            : 'border-[var(--border-strong)] text-[var(--text-quiet)]'
                         }`}
+                        aria-pressed={rating === n}
                         aria-label={`${n} star${n === 1 ? '' : 's'}`}
                       >
-                        ⭐
+                        <Star aria-hidden="true" className="h-5 w-5" fill={n <= activeRating ? 'currentColor' : 'none'} />
                       </button>
                     ))}
                   </div>
@@ -139,11 +196,13 @@ export default function FeedbackWidget() {
                     {CATEGORIES.map(c => (
                       <button
                         key={c.value}
+                        type="button"
                         onClick={() => setCategory(c.value)}
-                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        aria-pressed={category === c.value}
+                        className={`bn-button ${
                           category === c.value
-                            ? 'border-amber-600 bg-amber-600/10 text-amber-400'
-                            : 'border-gray-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                            ? 'bn-button-primary'
+                            : 'bn-button-secondary'
                         }`}
                       >
                         {c.label}
@@ -156,7 +215,7 @@ export default function FeedbackWidget() {
                 <div>
                   <p className="label mb-2">
                     Message{' '}
-                    <span className="text-slate-600 font-normal">(optional)</span>
+                    <span className="font-normal text-[var(--text-quiet)]">(optional)</span>
                   </p>
                   <textarea
                     className="input resize-none text-sm"
@@ -168,10 +227,10 @@ export default function FeedbackWidget() {
                   />
                 </div>
 
-                {error && <p className="text-xs text-red-400">{error}</p>}
+                {error && <p className="text-xs text-[var(--negative)]" role="alert">{error}</p>}
 
                 <button
-                  className="btn-primary w-full"
+                  className="bn-button bn-button-primary w-full"
                   onClick={submit}
                   disabled={loading}
                 >
