@@ -1,18 +1,18 @@
 import { Stack } from 'expo-router';
 
-import { colors } from '@/ui/theme';
+import { semanticColors } from '@/ui/theme';
 
 export default function BetsLayout() {
   return (
     <Stack
       screenOptions={{
         animation: 'slide_from_right',
-        contentStyle: { backgroundColor: colors.background },
+        contentStyle: { backgroundColor: semanticColors.night },
         gestureEnabled: true,
         headerBackTitle: 'Tracker',
         headerShadowVisible: false,
-        headerStyle: { backgroundColor: '#050505' },
-        headerTintColor: '#FFFFFF',
+        headerStyle: { backgroundColor: semanticColors.night },
+        headerTintColor: semanticColors.textPrimary,
         headerTitleStyle: { fontSize: 11, fontWeight: '900' },
       }}
     >

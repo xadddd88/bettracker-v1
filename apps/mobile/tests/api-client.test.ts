@@ -218,3 +218,53 @@ test('invalid JSON response is sanitized', async () => {
     status: 200,
   });
 });
+
+test('tracked-bet failures keep save-specific copy and fail closed on conflicts', async () => {
+  const fixtures = [
+    { code: 'conflict', status: 409 },
+    { code: 'request_rejected', status: 422 },
+    { code: 'rate_limited', status: 429 },
+  ] as const;
+
+  for (const fixture of fixtures) {
+    let calls = 0;
+    const result = await authenticatedJsonRequest({
+      baseUrl: API_BASE,
+      body: { idempotency_key: 'intent-key' },
+      fetchImpl: async () => {
+        calls += 1;
+        return new Response('{}', { status: fixture.status });
+      },
+      getAccessToken: async () => 'token',
+      operation: 'tracked_bet',
+      path: '/api/bets/tracked',
+    });
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.code, fixture.code);
+      assert.doesNotMatch(result.message, /scanner/i);
+    }
+    assert.equal(calls, 1);
+  }
+});
+
+test('tracked-bet timeout is never retried and tells the user to preserve the intent', async () => {
+  const result = await authenticatedJsonRequest({
+    baseUrl: API_BASE,
+    body: { idempotency_key: 'intent-key' },
+    fetchImpl: async (_url, init) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+    }),
+    getAccessToken: async () => 'token',
+    operation: 'tracked_bet',
+    path: '/api/bets/tracked',
+    timeoutMs: 5,
+  });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.code, 'timeout');
+    assert.match(result.message, /same request key/i);
+  }
+});

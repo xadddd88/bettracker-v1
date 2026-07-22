@@ -43,10 +43,10 @@ export function BroadcastButton({ label, style, tone = 'primary', ...props }: Br
   );
 }
 
-type Status = 'success' | 'review' | 'negative' | 'neutral';
-const statusSymbols: Record<Status, string> = { success: '✓', review: '!', negative: '×', neutral: '•' };
+export type BroadcastStatusTone = 'success' | 'review' | 'negative' | 'neutral';
+const statusSymbols: Record<BroadcastStatusTone, string> = { success: '✓', review: '!', negative: '×', neutral: '•' };
 
-export function BroadcastStatus({ label, status }: { label: string; status: Status }) {
+export function BroadcastStatus({ label, status }: { label: string; status: BroadcastStatusTone }) {
   return (
     <View accessibilityLabel={`${status}: ${label}`} style={[styles.status, styles[`status_${status}`]]}>
       <Text aria-hidden style={[styles.statusIcon, styles[`statusText_${status}`]]}>{statusSymbols[status]}</Text>

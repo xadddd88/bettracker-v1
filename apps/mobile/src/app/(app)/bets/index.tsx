@@ -1,17 +1,16 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, ReduceMotion } from 'react-native-reanimated';
 
 import { useAuth } from '@/auth/auth-context';
 import { fetchBets, fetchCurrency } from '@/bets/data';
 import { readErrorMessage } from '@/bets/errors';
-import { type BetDto } from '@/bets/models';
+import { formatMoney, type BetDto } from '@/bets/models';
+import { summarizeBets } from '@/bets/summary';
 import { BetTicket } from '@/ui/bet-ticket';
-import { MotionPressable } from '@/ui/motion';
-import { colors } from '@/ui/theme';
-import { EditorialBackdrop, EditorialRule } from '@/ui/time-warp';
+import { BroadcastButton, BroadcastPanel, BroadcastStatus } from '@/ui/broadcast-noir-primitives';
+import { semanticColors, typography } from '@/ui/theme';
 
 export default function BetsScreen() {
   const router = useRouter();
@@ -42,67 +41,135 @@ export default function BetsScreen() {
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
+  const summary = summarizeBets(bets);
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-      <EditorialBackdrop />
-      <Animated.View entering={FadeInDown.duration(380).reduceMotion(ReduceMotion.System)} style={styles.header}>
-        <View style={styles.masthead}><Text style={styles.wordmark}>BETTRACKER</Text><Text style={styles.mastheadSection}>TRACKER / ARCHIVE</Text></View>
-        <View style={styles.headingRow}>
-          <Text style={styles.title}>MY{`\n`}BETS</Text>
-          <Text style={styles.count}>{String(bets.length).padStart(2, '0')}</Text>
-        </View>
-        <EditorialRule label="MOST RECENT FIRST" />
-        <View style={styles.actions}>
-          <HeaderAction label="SCAN" onPress={() => router.push('/(app)/ai')} />
-          <HeaderAction inverted label="+ ADD BET" onPress={() => router.push('/(app)/bets/new')} />
-        </View>
-      </Animated.View>
+      <FlatList
+        contentContainerStyle={[styles.list, bets.length === 0 && styles.grow]}
+        data={loading ? [] : bets}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={(
+          <View style={styles.headerStack}>
+            <BroadcastPanel style={styles.header}>
+              <Text style={styles.eyebrow}>TRACKER · PERSISTED RECORDS</Text>
+              <Text maxFontSizeMultiplier={1.6} style={styles.title}>Bets</Text>
+              <Text style={styles.subtitle}>
+                {bets.length} saved · {summary.openCount} open · {summary.settledCount} settled
+              </Text>
+              <View style={styles.actions}>
+                <BroadcastButton
+                  label="Scan coupon"
+                  onPress={() => router.push('/(app)/ai')}
+                  style={styles.action}
+                  tone="secondary"
+                />
+                <BroadcastButton
+                  label="Add bet"
+                  onPress={() => router.push('/(app)/bets/new')}
+                  style={styles.action}
+                />
+              </View>
+            </BroadcastPanel>
 
-      {loading ? (
-        <View style={styles.centered}><ActivityIndicator color={colors.text} size="large" /><Text style={styles.muted}>LOADING ARCHIVE</Text></View>
-      ) : error && bets.length === 0 ? (
-        <View style={styles.centered}><Text accessibilityLiveRegion="polite" role="alert" style={styles.error}>{error}</Text><Pressable accessibilityRole="button" onPress={() => void load()} style={styles.retryButton}><Text style={styles.retryText}>TRY AGAIN</Text></Pressable></View>
-      ) : (
-        <FlatList
-          contentContainerStyle={[styles.list, bets.length === 0 && styles.emptyList]}
-          data={bets}
-          keyExtractor={(item) => item.id}
-          ListEmptyComponent={<View style={styles.centered}><Text style={styles.emptyTitle}>NO RECORDS</Text><Text style={styles.muted}>PREPARE THE FIRST BETTING DECISION.</Text><Pressable accessibilityRole="button" onPress={() => router.push('/(app)/bets/new')} style={styles.retryButton}><Text style={styles.retryText}>PREPARE A BET</Text></Pressable></View>}
-          ListHeaderComponent={error ? <Text style={styles.inlineError}>{error}</Text> : null}
-          refreshControl={<RefreshControl colors={[colors.text]} onRefresh={() => void load(true)} refreshing={refreshing} tintColor={colors.text} />}
-          renderItem={({ index, item }) => <BetTicket animationDelay={Math.min(index, 7) * 55} bet={item} currency={currency} onPress={() => router.push({ pathname: '/(app)/bets/[id]', params: { id: item.id } })} />}
-        />
-      )}
+            {bets.length > 0 ? (
+              <BroadcastPanel accessibilityLabel="Tracker summary" style={styles.summary}>
+                <Metric label="OPEN" value={String(summary.openCount)} />
+                <View style={styles.summaryDivider} />
+                <Metric label="SETTLED" value={String(summary.settledCount)} />
+                <View style={styles.summaryDivider} />
+                <Metric label="NET P&L" value={summary.settledCount ? formatMoney(summary.netPnl, currency) : '—'} />
+              </BroadcastPanel>
+            ) : null}
+
+            {error && bets.length > 0 ? (
+              <View accessibilityLiveRegion="polite" role="alert" style={styles.inlineError}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+          </View>
+        )}
+        ListEmptyComponent={loading ? (
+          <StatePanel label="Loading saved bets" loading />
+        ) : error ? (
+          <StatePanel actionLabel="Try again" label={error} onAction={() => void load()} tone="negative" />
+        ) : (
+          <StatePanel
+            actionLabel="Add manually"
+            label="No saved bets. Nothing appears here until you review a draft and press Save."
+            onAction={() => router.push('/(app)/bets/new')}
+          />
+        )}
+        refreshControl={(
+          <RefreshControl
+            colors={[semanticColors.signal]}
+            onRefresh={() => void load(true)}
+            refreshing={refreshing}
+            tintColor={semanticColors.signal}
+          />
+        )}
+        renderItem={({ item }) => (
+          <BetTicket
+            bet={item}
+            currency={currency}
+            onPress={() => router.push({ pathname: '/(app)/bets/[id]', params: { id: item.id } })}
+          />
+        )}
+      />
     </SafeAreaView>
   );
 }
 
-function HeaderAction({ inverted = false, label, onPress }: { inverted?: boolean; label: string; onPress: () => void }) {
-  return <MotionPressable accessibilityRole="button" onPress={onPress} style={[styles.action, inverted && styles.actionInverted]}><Text style={[styles.actionText, inverted && styles.actionTextInverted]}>{label}</Text><Text style={[styles.actionArrow, inverted && styles.actionTextInverted]}>↗</Text></MotionPressable>;
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.metric}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text numberOfLines={1} style={styles.metricValue}>{value}</Text>
+    </View>
+  );
+}
+
+function StatePanel({
+  actionLabel,
+  label,
+  loading = false,
+  onAction,
+  tone = 'neutral',
+}: {
+  actionLabel?: string;
+  label: string;
+  loading?: boolean;
+  onAction?: () => void;
+  tone?: 'negative' | 'neutral';
+}) {
+  return (
+    <BroadcastPanel style={styles.statePanel}>
+      {loading ? <ActivityIndicator color={semanticColors.signal} size="large" /> : null}
+      <BroadcastStatus label={tone === 'negative' ? 'Error' : loading ? 'Loading' : 'Empty'} status={tone} />
+      <Text accessibilityLiveRegion="polite" role={tone === 'negative' ? 'alert' : undefined} style={styles.stateText}>{label}</Text>
+      {actionLabel && onAction ? <BroadcastButton label={actionLabel} onPress={onAction} /> : null}
+    </BroadcastPanel>
+  );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: colors.background, flex: 1 },
-  header: { paddingHorizontal: 14 },
-  masthead: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', minHeight: 42 },
-  wordmark: { color: colors.text, fontSize: 15, fontWeight: '900' },
-  mastheadSection: { color: colors.muted, fontSize: 8, fontWeight: '700', letterSpacing: 1, marginLeft: 'auto' },
-  headingRow: { alignItems: 'flex-end', flexDirection: 'row', minHeight: 148, paddingVertical: 20 },
-  title: { color: colors.text, flex: 1, fontSize: 54, fontWeight: '900', letterSpacing: -3, lineHeight: 48 },
-  count: { color: colors.text, fontSize: 29, fontVariant: ['tabular-nums'], fontWeight: '300' },
-  actions: { flexDirection: 'row', marginHorizontal: -14, marginTop: 12 },
-  action: { backgroundColor: '#FFFFFF', borderBottomColor: colors.border, borderBottomWidth: 1, borderTopColor: colors.border, borderTopWidth: 1, flex: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 58, padding: 14 },
-  actionInverted: { backgroundColor: '#050505' },
-  actionText: { color: colors.text, fontSize: 10, fontWeight: '900', letterSpacing: 0.7 },
-  actionTextInverted: { color: '#FFFFFF' },
-  actionArrow: { color: colors.text, fontSize: 17 },
-  list: { paddingBottom: 30, paddingHorizontal: 14 },
-  emptyList: { flexGrow: 1 },
-  centered: { alignItems: 'center', flex: 1, gap: 14, justifyContent: 'center', padding: 28 },
-  muted: { color: colors.muted, fontSize: 10, fontWeight: '700', letterSpacing: 0.8, lineHeight: 16, textAlign: 'center' },
-  error: { color: colors.danger, fontSize: 13, lineHeight: 20, textAlign: 'center' },
-  inlineError: { backgroundColor: colors.danger, color: '#FFFFFF', fontSize: 11, fontWeight: '700', padding: 12 },
-  emptyTitle: { color: colors.text, fontSize: 34, fontWeight: '900', letterSpacing: -1.5 },
-  retryButton: { alignItems: 'center', backgroundColor: '#050505', justifyContent: 'center', minHeight: 48, paddingHorizontal: 22 },
-  retryText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  safeArea: { backgroundColor: semanticColors.night, flex: 1 },
+  list: { gap: 0, paddingBottom: 32, paddingHorizontal: 14 },
+  grow: { flexGrow: 1 },
+  headerStack: { gap: 12, paddingBottom: 4 },
+  header: { gap: 0, marginTop: 4, padding: 18 },
+  eyebrow: { color: semanticColors.textQuietRaised, fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
+  title: { color: semanticColors.textPrimary, fontSize: 48, fontWeight: '900', letterSpacing: -2.4, lineHeight: 52, marginTop: 10 },
+  subtitle: { color: semanticColors.textMuted, fontSize: typography.bodyMobile.fontSize, lineHeight: typography.bodyMobile.lineHeight, marginTop: 8 },
+  actions: { flexDirection: 'row', gap: 8, marginTop: 18 },
+  action: { flex: 1 },
+  summary: { alignItems: 'stretch', flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 15 },
+  metric: { alignItems: 'center', flex: 1, gap: 5, justifyContent: 'center', minWidth: 0 },
+  metricLabel: { color: semanticColors.textQuietRaised, fontSize: 11, fontWeight: '800', letterSpacing: 0.7 },
+  metricValue: { color: semanticColors.dataValue, fontSize: 15, fontVariant: ['tabular-nums'], fontWeight: '900', maxWidth: '100%' },
+  summaryDivider: { alignSelf: 'stretch', backgroundColor: semanticColors.borderSubtle, width: 1 },
+  inlineError: { borderColor: semanticColors.negative, borderRadius: 8, borderWidth: 1, padding: 12 },
+  errorText: { color: semanticColors.negative, fontSize: 12, lineHeight: 18 },
+  statePanel: { alignItems: 'center', gap: 16, justifyContent: 'center', marginTop: 12, minHeight: 260, padding: 24 },
+  stateText: { color: semanticColors.textMuted, fontSize: 14, lineHeight: 21, maxWidth: 300, textAlign: 'center' },
 });
