@@ -749,7 +749,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           ))}
         </div>
 
-        <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={handleFileChange} />
+        <input ref={fileRef} aria-label="Coupon screenshot" type="file" accept="image/*" className="sr-only" onChange={handleFileChange} />
         {previewUrl ? (
           <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_18rem]">
             <div className="relative min-h-80 bg-bn-night">
@@ -785,13 +785,15 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
       </section>
 
       {/* ── Sport selector ──────────────────────────────────── */}
-      <div>
-        <label className="label mb-2">Sport</label>
+      <fieldset>
+        <legend className="label mb-2">Sport</legend>
         <div className="flex flex-wrap gap-2">
           {SPORTS.map(s => (
             <button
+              aria-pressed={sport === s.value}
               key={s.value}
               onClick={() => setSport(s.value)}
+              type="button"
               className={`min-h-11 rounded-control border px-3 py-2 text-sm font-bold transition-colors ${
                 sport === s.value
                   ? 'border-bn-signal bg-bn-signal text-bn-on-signal'
@@ -802,14 +804,15 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
             </button>
           ))}
         </div>
-      </div>
+      </fieldset>
 
       {/* ── Form ────────────────────────────────────────────── */}
       <div className="bn-panel flex flex-col gap-4 p-4 sm:p-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
-            <label className="label">Event *</label>
+            <label className="label" htmlFor="ai-event-name">Event *</label>
             <input
+              id="ai-event-name"
               className={`input ${errors.event_name ? 'border-bn-negative' : ''}`}
               placeholder="Germany vs Netherlands"
               value={form.event_name}
@@ -819,8 +822,9 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           </div>
 
           <div>
-            <label className="label">Market *</label>
+            <label className="label" htmlFor="ai-market-type">Market *</label>
             <input
+              id="ai-market-type"
               className={`input ${errors.market_type ? 'border-bn-negative' : ''}`}
               placeholder="Match Winner / Total / Handicap"
               value={form.market_type}
@@ -830,8 +834,9 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           </div>
 
           <div>
-            <label className="label">Selection</label>
+            <label className="label" htmlFor="ai-selection">Selection</label>
             <input
+              id="ai-selection"
               className="input"
               placeholder="Germany / Over / -1"
               value={form.selection}
@@ -840,8 +845,9 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           </div>
 
           <div>
-            <label className="label">Odds *</label>
+            <label className="label" htmlFor="ai-odds">Odds *</label>
             <input
+              id="ai-odds"
               className={`input ${errors.odds ? 'border-bn-negative' : ''}`}
               type="number" step="0.01" min="1.01" placeholder={scoutId ? 'Enter current odds' : '1.85'}
               value={form.odds}
@@ -851,8 +857,9 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           </div>
 
           <div>
-            <label className="label">Line</label>
+            <label className="label" htmlFor="ai-line">Line</label>
             <input
+              id="ai-line"
               className="input"
               type="number" step="0.5" placeholder="+1.5 / 2.5"
               value={form.line}
@@ -861,8 +868,9 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           </div>
 
           <div>
-            <label className="label">Bookmaker</label>
+            <label className="label" htmlFor="ai-bookmaker">Bookmaker</label>
             <input
+              id="ai-bookmaker"
               className="input"
               placeholder="Bet365, Pinnacle…"
               value={form.bookmaker}
@@ -871,15 +879,16 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           </div>
 
           <div>
-            <label className="label">Output language</label>
-            <select className="input" value={locale} onChange={e => setLocale(e.target.value as Locale)}>
+            <label className="label" htmlFor="ai-output-language">Output language</label>
+            <select id="ai-output-language" className="input" value={locale} onChange={e => setLocale(e.target.value as Locale)}>
               {LOCALES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
             </select>
           </div>
 
           <div className="sm:col-span-2">
-            <label className="label">Coupon date / time</label>
+            <label className="label" htmlFor="ai-coupon-date-time">Coupon date / time</label>
             <input
+              id="ai-coupon-date-time"
               className="input"
               placeholder="Today, 22:10 / 19.07.2026, 22:10"
               value={form.event_time}
@@ -889,8 +898,9 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           </div>
 
           <div className="sm:col-span-2">
-            <label className="label">Context / Notes</label>
+            <label className="label" htmlFor="ai-context-notes">Context / Notes</label>
             <textarea
+              id="ai-context-notes"
               className="input resize-none" rows={2}
               placeholder="Injuries, lineups, motivation, recent form, anything relevant…"
               value={form.notes}
@@ -1282,16 +1292,20 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           {/* Stake input — shown when Place Bet is clicked */}
           {showStake && !showRisk && (
             <div className="grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                placeholder="Stake amount"
-                className="input flex-1"
-                value={stakeStr}
-                onChange={e => { setStakeStr(e.target.value); setRootErr('') }}
-                autoFocus
-              />
+              <div>
+                <label className="label" htmlFor="ai-stake">Stake</label>
+                <input
+                  id="ai-stake"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="Stake amount"
+                  className="input flex-1"
+                  value={stakeStr}
+                  onChange={e => { setStakeStr(e.target.value); setRootErr('') }}
+                  autoFocus
+                />
+              </div>
               <button
                 className="btn-primary px-5"
                 onClick={() => {

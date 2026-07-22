@@ -26,7 +26,8 @@
     "test:design-tracker": "node scripts/test-broadcast-noir-tracker.mjs",
     "test:design-stats": "node scripts/test-broadcast-noir-stats-decisions.mjs",
     "test:design-rollout": "node scripts/test-broadcast-noir-rollout.mjs",
-    "test:corrective-pr-h": "npm run build:provider-scripts && node scripts/test-corrective-pr-h.mjs"
+    "test:corrective-pr-h": "npm run build:provider-scripts && node scripts/test-corrective-pr-h.mjs",
+    "test:web-acceptance": "node scripts/test-web-acceptance.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
@@ -44,10 +45,12 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@playwright/test": "1.61.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.5.2",
+    "axe-core": "4.12.1",
     "eslint": "^9",
     "eslint-config-next": "^15.1.3",
     "postcss": "^8",

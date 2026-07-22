@@ -17,6 +17,8 @@ const CATEGORIES: { value: Category; label: string }[] = [
 export default function FeedbackWidget() {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const successRef = useRef<HTMLDivElement>(null)
   const [open,     setOpen]     = useState(false)
   const [rating,   setRating]   = useState(0)
   const [hovered,  setHovered]  = useState(0)
@@ -47,11 +49,45 @@ export default function FeedbackWidget() {
     if (!open) return
     closeRef.current?.focus()
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') closeModal()
+      if (event.key === 'Escape') {
+        closeModal()
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ) ?? []).filter(element => element.getAttribute('aria-hidden') !== 'true')
+      if (!focusable.length) {
+        event.preventDefault()
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const focusIsOutside = !dialogRef.current?.contains(document.activeElement)
+      if (event.shiftKey && (document.activeElement === first || focusIsOutside)) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && (document.activeElement === last || focusIsOutside)) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    function containFocus(event: FocusEvent) {
+      if (!dialogRef.current?.contains(event.target as Node)) closeRef.current?.focus()
     }
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    document.addEventListener('focusin', containFocus)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('focusin', containFocus)
+    }
   }, [open])
+
+  useEffect(() => {
+    if (open && done) successRef.current?.focus()
+  }, [done, open])
 
   async function submit() {
     if (rating === 0) {
@@ -100,7 +136,8 @@ export default function FeedbackWidget() {
           className="fixed inset-0 z-50 flex items-end justify-center bg-bn-night/90 p-4 sm:items-center"
           onClick={e => { if (e.target === e.currentTarget) closeModal() }}
         >
-          <BroadcastPanel aria-labelledby="feedback-title" aria-modal="true" className="w-full max-w-sm overflow-hidden" role="dialog">
+          <div className="w-full max-w-sm" ref={dialogRef}>
+          <BroadcastPanel aria-labelledby="feedback-title" aria-modal="true" className="w-full overflow-hidden" role="dialog">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-bn-border-strong px-5 py-4">
               <h2 id="feedback-title" className="font-display text-lg font-black uppercase tracking-[-0.04em] text-bn-text">Beta feedback</h2>
@@ -115,7 +152,7 @@ export default function FeedbackWidget() {
             </div>
 
             {done ? (
-              <div className="px-5 py-10 text-center">
+              <div ref={successRef} className="px-5 py-10 text-center" tabIndex={-1}>
                 <BroadcastStatus status="success">Feedback sent</BroadcastStatus>
                 <p className="mt-3 text-sm font-semibold text-bn-text">Thank you!</p>
                 <p className="mt-1 text-xs text-bn-muted">Your feedback helps us build a better product.</p>
@@ -166,11 +203,12 @@ export default function FeedbackWidget() {
 
                 {/* Message */}
                 <div>
-                  <p className="label mb-2">
+                  <label className="label mb-2 block" htmlFor="feedback-message">
                     Message{' '}
                     <span className="font-normal text-bn-quiet">(optional)</span>
-                  </p>
+                  </label>
                   <textarea
+                    id="feedback-message"
                     className="input resize-none text-sm"
                     rows={3}
                     placeholder="Tell us anything…"
@@ -192,6 +230,7 @@ export default function FeedbackWidget() {
               </div>
             )}
           </BroadcastPanel>
+          </div>
         </div>
       )}
     </>

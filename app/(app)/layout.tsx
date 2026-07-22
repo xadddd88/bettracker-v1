@@ -16,11 +16,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <AppHeader user={user} />
 
-      <main className="min-w-0 flex-1 overflow-y-auto">
+      <div className="min-w-0 flex-1 overflow-y-auto">
         <div className="editorial-page mx-auto min-h-full w-full max-w-[1600px] border-x border-[var(--border-subtle)] px-4 pb-24 pt-4 md:px-8 md:pb-10 md:pt-8">
           {children}
         </div>
-      </main>
+      </div>
 
       <MobileNav />
       <FeedbackWidget />

@@ -39,6 +39,25 @@ jobs:
       - name: Lint
         run: npm run lint
 
+  # Hermetic authenticated Web acceptance: local Auth/data stub, browser-level
+  # network denylist and no production credentials or DB/provider/AI writes.
+  web-acceptance:
+    name: Hermetic Web acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run authenticated Web acceptance
+        run: npm run test:web-acceptance
+
   # ── Job 2: Provider safety + FP-001 quality gate regression suites ─────────
   # Stubbed-network suites: no provider calls, no Supabase. These are the
   # trust-layer regression guards (FP-001) — a PR that reintroduces pricing in
