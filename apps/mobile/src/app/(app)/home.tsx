@@ -2,19 +2,17 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, ReduceMotion } from 'react-native-reanimated';
 
 import { useAuth } from '@/auth/auth-context';
 import { fetchBankroll, fetchBets } from '@/bets/data';
 import { readErrorMessage } from '@/bets/errors';
-import { formatMoney, type BetDto } from '@/bets/models';
+import { couponPresentation, formatMoney, type BetDto, type BetStatus } from '@/bets/models';
+import { STATUS_PRESENTATION } from '@/bets/presentation';
 import { summarizeBets } from '@/bets/summary';
-import { BetTicket } from '@/ui/bet-ticket';
+import { resolveHomeAction } from '@/home/adaptive-action';
+import { BroadcastButton, BroadcastDataValue, BroadcastStatus } from '@/ui/broadcast-noir-primitives';
 import { MotionPressable } from '@/ui/motion';
-import { colors } from '@/ui/theme';
-import { EditorialBackdrop, EditorialRule, KineticType } from '@/ui/time-warp';
-
-const ENTER = FadeInDown.duration(420).reduceMotion(ReduceMotion.System);
+import { semanticColors } from '@/ui/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -45,173 +43,227 @@ export default function HomeScreen() {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const summary = useMemo(() => summarizeBets(bets), [bets]);
+  const action = useMemo(
+    () => resolveHomeAction({ draftAvailable: false, pendingCount: summary.openCount }),
+    [summary.openCount],
+  );
   const recent = bets.slice(0, 3);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Animated.View entering={FadeIn.duration(300).reduceMotion(ReduceMotion.System)} style={styles.masthead}>
-          <Text style={styles.wordmark}>BETTRACKER</Text>
-          <Text style={styles.mastheadMeta}>FOUNDER EDITION / 2026</Text>
-          <Pressable accessibilityLabel="Account and settings" accessibilityRole="button" onPress={() => router.push('/(app)/more')} style={styles.account}>
+        <View style={styles.masthead}>
+          <View style={styles.brandMark} />
+          <View style={styles.brandCopy}>
+            <Text style={styles.wordmark}>BETTRACKER</Text>
+            <Text style={styles.mastheadMeta}>FOUNDER / HOME</Text>
+          </View>
+          <Pressable
+            accessibilityLabel="Account and settings"
+            accessibilityRole="button"
+            onPress={() => router.push('/(app)/more')}
+            style={({ pressed }) => [styles.account, pressed ? styles.pressed : null]}
+          >
             <Text style={styles.accountText}>ACCOUNT</Text>
           </Pressable>
-        </Animated.View>
-
-        <Animated.View entering={ENTER} style={styles.hero}>
-          <EditorialBackdrop dark />
-          <KineticType label="DECIDE" />
-          <View style={styles.heroTopline}>
-            <Text style={styles.heroIndex}>SYSTEM 001</Text>
-            <Text style={styles.heroIndex}>LIVE DATA</Text>
-          </View>
-          <View style={styles.heroCopy}>
-            <Text style={styles.heroTitle}>BETTING{`\n`}DECISIONS{`\n`}IN FOCUS</Text>
-            <Text style={styles.heroBody}>Capture the evidence. Review the context. Track the outcome.</Text>
-          </View>
-          <View style={styles.heroActions}>
-            <EditorialAction label="SCAN NOW" onPress={() => router.push('/(app)/ai')} primary />
-            <EditorialAction label="OPEN TRACKER" onPress={() => router.push('/(app)/bets')} />
-          </View>
-        </Animated.View>
-
-        <View style={styles.signalBand}>
-          <Text numberOfLines={1} style={styles.signalText}>ANALYZE  /  VERIFY  /  TRACK  /  ANALYZE  /  VERIFY  /  TRACK</Text>
         </View>
 
-        <Animated.View entering={FadeInDown.delay(90).duration(420).reduceMotion(ReduceMotion.System)} style={styles.portfolio}>
-          <View style={styles.sectionTopline}>
-            <Text style={styles.sectionIndex}>01</Text>
-            <Text style={styles.sectionName}>PORTFOLIO</Text>
-            <Text style={styles.sectionMeta}>{summary.openCount} OPEN</Text>
+        <View accessibilityLabel="Adaptive action" style={styles.actionStage}>
+          <View style={styles.actionTopline}>
+            <Text style={styles.kicker}>ADAPTIVE ACTION</Text>
+            <Text style={styles.actionState}>{loading ? 'SYNCING' : error ? 'UNAVAILABLE' : 'READY'}</Text>
           </View>
+
           {loading ? (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator color={colors.text} />
-              <Text style={styles.loadingText}>SYNCING ACCOUNT</Text>
+            <View style={styles.centerState}>
+              <ActivityIndicator color={semanticColors.signal} size="large" />
+              <Text style={styles.stateTitle}>SYNCING ACCOUNT</Text>
+              <Text style={styles.stateBody}>No action is suggested until saved records are available.</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.centerState}>
+              <BroadcastStatus label="Sync interrupted" status="review" />
+              <Text accessibilityLiveRegion="polite" style={styles.stateTitle}>HOME DATA UNAVAILABLE</Text>
+              <Text style={styles.stateBody}>Your records were not changed. Retry when the connection is available.</Text>
+              <BroadcastButton label="Retry account sync" onPress={() => void load()} style={styles.actionButton} tone="secondary" />
             </View>
           ) : (
-            <>
-              <Text adjustsFontSizeToFit numberOfLines={1} style={styles.balance}>
-                {balance === null ? '—' : formatMoney(balance, currency)}
-              </Text>
-              <View style={styles.metrics}>
-                <Metric label="NET P&L" value={summary.settledCount === 0 ? '—' : formatMoney(summary.netPnl, currency)} />
-                <Metric label="TRACKED" value={String(bets.length).padStart(2, '0')} />
-                <Metric label="SETTLED" value={String(summary.settledCount).padStart(2, '0')} />
-              </View>
-            </>
+            <View style={styles.actionBody}>
+              <View style={styles.actionGlyph}><Text style={styles.actionGlyphText}>{action.kind === 'review_pending' ? '!' : action.kind === 'continue_draft' ? 'D' : '+'}</Text></View>
+              <Text style={styles.actionMeta}>{action.meta.toUpperCase()}</Text>
+              <Text style={styles.actionTitle}>{action.label.toUpperCase()}</Text>
+              <Text style={styles.actionDetail}>{action.detail}</Text>
+              <BroadcastButton label={action.kind === 'review_pending' ? 'OPEN TRACKER' : action.kind === 'continue_draft' ? 'OPEN DRAFT' : 'OPEN SCANNER'} onPress={() => router.push(action.href)} style={styles.actionButton} />
+              <Text style={styles.safetyNote}>NO AUTOMATIC SAVE OR SETTLEMENT</Text>
+            </View>
           )}
-          {error ? (
-            <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.errorBand}>
-              <Text accessibilityLiveRegion="polite" style={styles.errorText}>{error} — RETRY</Text>
-            </Pressable>
-          ) : null}
-        </Animated.View>
+        </View>
 
-        <View style={styles.actionSplit}>
-          <SplitAction index="A" label="SCAN COUPON" onPress={() => router.push('/(app)/ai')} />
-          <SplitAction index="B" label="ADD BET" onPress={() => router.push('/(app)/bets/new')} inverted />
+        <View accessibilityLabel="Portfolio summary" style={styles.metrics}>
+          <Metric label="BANKROLL" value={loading || error || balance === null ? '—' : formatMoney(balance, currency)} />
+          <Metric label="NET P&L" value={loading || error || summary.settledCount === 0 ? '—' : formatSignedMoney(summary.netPnl, currency)} />
+          <Metric label="OPEN BETS" value={loading || error ? '—' : String(summary.openCount)} />
+          <Metric label="SETTLED" value={loading || error ? '—' : String(summary.settledCount)} />
         </View>
 
         <View style={styles.recentSection}>
-          <View style={styles.sectionTopline}>
-            <Text style={styles.sectionIndex}>02</Text>
-            <Text style={styles.sectionName}>RECENT BETS</Text>
-            <Pressable accessibilityRole="button" onPress={() => router.push('/(app)/bets')} style={styles.viewAll}>
-              <Text style={styles.viewAllText}>VIEW ALL →</Text>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.kicker}>RECENT RECORDS</Text>
+              <Text style={styles.sectionTitle}>SINGLE & EXPRESS</Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/(app)/bets')} style={({ pressed }) => [styles.viewAll, pressed ? styles.pressed : null]}>
+              <Text style={styles.viewAllText}>VIEW TRACKER</Text>
             </Pressable>
           </View>
-          <EditorialRule label={`${recent.length} RECORDS`} />
-          {recent.length === 0 && !loading ? (
+
+          {!loading && !error && recent.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>NO RECORDS</Text>
-              <Text style={styles.emptyText}>Scan a coupon or prepare the first decision.</Text>
+              <Text style={styles.emptyTitle}>NO TRACKED RECORDS</Text>
+              <Text style={styles.emptyText}>The scanner prepares an editable draft. You decide whether to save it.</Text>
             </View>
-          ) : recent.map((bet, index) => (
-            <BetTicket
-              animationDelay={index * 70}
+          ) : null}
+
+          {!loading && !error ? recent.map((bet) => (
+            <HomeRecord
               bet={bet}
-              compact
               currency={currency}
               key={bet.id}
               onPress={() => router.push({ pathname: '/(app)/bets/[id]', params: { id: bet.id } })}
             />
-          ))}
+          )) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function EditorialAction({ label, onPress, primary = false }: { label: string; onPress: () => void; primary?: boolean }) {
-  return (
-    <MotionPressable accessibilityRole="button" onPress={onPress} style={[styles.editorialAction, primary ? styles.editorialActionPrimary : null]}>
-      <Text style={[styles.editorialActionText, primary ? styles.editorialActionTextPrimary : null]}>{label}</Text>
-    </MotionPressable>
-  );
-}
+function HomeRecord({ bet, currency, onPress }: { bet: BetDto; currency: string; onPress: () => void }) {
+  const coupon = couponPresentation(bet);
+  const totalOdds = bet.totalOdds ?? (coupon.isExpress ? null : coupon.legs[0]?.odds ?? null);
+  const status = statusTone(bet.status);
+  const pnl = supportedPnl(bet, currency);
 
-function SplitAction({ index, inverted = false, label, onPress }: { index: string; inverted?: boolean; label: string; onPress: () => void }) {
   return (
-    <MotionPressable accessibilityRole="button" onPress={onPress} style={[styles.splitAction, inverted && styles.splitActionInverted]}>
-      <Text style={[styles.splitIndex, inverted && styles.splitTextInverted]}>{index}</Text>
-      <Text style={[styles.splitLabel, inverted && styles.splitTextInverted]}>{label}</Text>
-      <Text style={[styles.splitArrow, inverted && styles.splitTextInverted]}>↗</Text>
+    <MotionPressable accessibilityHint="Opens bet details" accessibilityRole="button" glow="none" onPress={onPress} style={styles.record}>
+      <View style={styles.recordTopline}>
+        <Text style={styles.recordType}>{coupon.label.toUpperCase()}</Text>
+        <BroadcastStatus label={STATUS_PRESENTATION[bet.status].label} status={status} />
+      </View>
+
+      <View style={styles.legs}>
+        {coupon.legs.map((leg, index) => (
+          <View key={leg.id} style={styles.leg}>
+            <Text style={styles.legIndex}>{String(index + 1).padStart(2, '0')}</Text>
+            <View style={styles.legCopy}>
+              <Text style={styles.event}>{leg.eventName || 'Event not recorded'}</Text>
+              <Text style={styles.selection}>{[leg.marketType, leg.selection].filter(Boolean).join(' · ') || 'Selection not recorded'}</Text>
+            </View>
+            <BroadcastDataValue>{leg.odds === null ? '—' : leg.odds.toFixed(2)}</BroadcastDataValue>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.recordMetrics}>
+        <RecordMetric label="TOTAL ODDS" value={totalOdds === null ? '—' : totalOdds.toFixed(2)} />
+        <RecordMetric label="STAKE" value={formatMoney(bet.stake, currency)} />
+        <RecordMetric label={pnl.label} value={pnl.value} />
+        <Text style={styles.arrow}>→</Text>
+      </View>
     </MotionPressable>
   );
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <View style={styles.metric}><Text style={styles.metricLabel}>{label}</Text><Text style={styles.metricValue}>{value}</Text></View>;
+  return (
+    <View style={styles.metric}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text adjustsFontSizeToFit numberOfLines={1} style={styles.metricValue}>{value}</Text>
+    </View>
+  );
+}
+
+function RecordMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.recordMetric}>
+      <Text style={styles.recordMetricLabel}>{label}</Text>
+      <Text numberOfLines={1} style={styles.recordMetricValue}>{value}</Text>
+    </View>
+  );
+}
+
+function statusTone(status: BetStatus): 'success' | 'review' | 'negative' | 'neutral' {
+  if (status === 'won') return 'success';
+  if (status === 'lost') return 'negative';
+  if (status === 'pending') return 'review';
+  return 'neutral';
+}
+
+function supportedPnl(bet: BetDto, currency: string): { label: string; value: string } {
+  if ((bet.status === 'won' || bet.status === 'lost' || bet.status === 'void') && bet.pnl !== null) {
+    return { label: 'P&L', value: formatSignedMoney(bet.pnl, currency) };
+  }
+  if (bet.status === 'pending' && bet.potentialPayout !== null) {
+    return { label: 'PAYOUT', value: formatMoney(bet.potentialPayout, currency) };
+  }
+  return { label: 'P&L', value: '—' };
+}
+
+function formatSignedMoney(value: number, currency: string): string {
+  const formatted = formatMoney(Math.abs(value), currency);
+  return `${value >= 0 ? '+' : '-'}${formatted}`;
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: colors.background, flex: 1 },
-  content: { backgroundColor: colors.background, paddingBottom: 28 },
-  masthead: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', minHeight: 48, paddingHorizontal: 12 },
-  wordmark: { color: colors.text, fontSize: 17, fontWeight: '900', letterSpacing: -0.6 },
-  mastheadMeta: { color: colors.muted, flex: 1, fontSize: 8, letterSpacing: 0.9, marginLeft: 10 },
-  account: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingLeft: 10 },
-  accountText: { color: colors.text, fontSize: 9, fontWeight: '700', letterSpacing: 0.8 },
-  hero: { backgroundColor: '#050505', minHeight: 470, overflow: 'hidden', padding: 18 },
-  heroTopline: { flexDirection: 'row', justifyContent: 'space-between', zIndex: 2 },
-  heroIndex: { color: '#FFFFFF', fontSize: 8, fontWeight: '700', letterSpacing: 1.3 },
-  heroCopy: { flex: 1, justifyContent: 'center', zIndex: 2 },
-  heroTitle: { color: '#FFFFFF', fontSize: 43, fontWeight: '900', letterSpacing: -2.5, lineHeight: 40 },
-  heroBody: { color: '#C8C8C3', fontSize: 12, lineHeight: 17, marginTop: 18, maxWidth: 255 },
-  heroActions: { flexDirection: 'row', gap: 8, zIndex: 2 },
-  editorialAction: { alignItems: 'center', borderColor: '#FFFFFF', borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 10 },
-  editorialActionPrimary: { backgroundColor: '#FFFFFF' },
-  editorialActionText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
-  editorialActionTextPrimary: { color: '#050505' },
-  signalBand: { backgroundColor: colors.accentMuted, borderBottomColor: colors.border, borderBottomWidth: 1, borderTopColor: colors.border, borderTopWidth: 1, justifyContent: 'center', minHeight: 42, overflow: 'hidden', paddingHorizontal: 12 },
-  signalText: { color: '#050505', fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
-  portfolio: { paddingHorizontal: 14, paddingVertical: 22 },
-  sectionTopline: { alignItems: 'center', flexDirection: 'row', gap: 10, minHeight: 32 },
-  sectionIndex: { color: colors.muted, fontSize: 9, fontWeight: '700' },
-  sectionName: { color: colors.text, flex: 1, fontSize: 10, fontWeight: '900', letterSpacing: 1.3 },
-  sectionMeta: { color: colors.text, fontSize: 9, fontWeight: '700' },
-  balance: { color: colors.text, fontSize: 56, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: -3.2, marginVertical: 22 },
-  metrics: { borderBottomColor: colors.border, borderBottomWidth: 1, borderTopColor: colors.border, borderTopWidth: 1, flexDirection: 'row' },
-  metric: { borderRightColor: colors.border, borderRightWidth: 1, flex: 1, gap: 6, paddingHorizontal: 9, paddingVertical: 13 },
-  metricLabel: { color: colors.muted, fontSize: 8, fontWeight: '700', letterSpacing: 1 },
-  metricValue: { color: colors.text, fontSize: 16, fontVariant: ['tabular-nums'], fontWeight: '800' },
-  loadingRow: { alignItems: 'center', flexDirection: 'row', gap: 10, minHeight: 136 },
-  loadingText: { color: colors.muted, fontSize: 9, fontWeight: '700', letterSpacing: 1 },
-  errorBand: { backgroundColor: colors.danger, marginTop: 12, minHeight: 44, padding: 12 },
-  errorText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
-  actionSplit: { borderBottomColor: colors.border, borderBottomWidth: 1, borderTopColor: colors.border, borderTopWidth: 1, flexDirection: 'row' },
-  splitAction: { backgroundColor: '#FFFFFF', flex: 1, minHeight: 112, padding: 12 },
-  splitActionInverted: { backgroundColor: '#050505' },
-  splitIndex: { color: colors.muted, fontSize: 9 },
-  splitLabel: { color: colors.text, fontSize: 15, fontWeight: '900', marginTop: 'auto' },
-  splitArrow: { color: colors.text, fontSize: 20, position: 'absolute', right: 12, top: 10 },
-  splitTextInverted: { color: '#FFFFFF' },
-  recentSection: { paddingHorizontal: 14, paddingTop: 22 },
-  viewAll: { justifyContent: 'center', minHeight: 44 },
-  viewAllText: { color: colors.text, fontSize: 9, fontWeight: '800' },
-  empty: { gap: 8, minHeight: 180, paddingVertical: 50 },
-  emptyTitle: { color: colors.text, fontSize: 26, fontWeight: '900' },
-  emptyText: { color: colors.muted, fontSize: 12 },
+  safeArea: { backgroundColor: semanticColors.night, flex: 1 },
+  content: { backgroundColor: semanticColors.night, paddingBottom: 32, paddingHorizontal: 16 },
+  masthead: { alignItems: 'center', borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, flexDirection: 'row', minHeight: 64 },
+  brandMark: { backgroundColor: semanticColors.signal, height: 10, marginRight: 10, width: 10 },
+  brandCopy: { flex: 1 },
+  wordmark: { color: semanticColors.textPrimary, fontSize: 18, fontWeight: '900' },
+  mastheadMeta: { color: semanticColors.textQuiet, fontSize: 11, fontWeight: '700', marginTop: 2 },
+  account: { alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingHorizontal: 8 },
+  accountText: { color: semanticColors.textMuted, fontSize: 11, fontWeight: '800' },
+  pressed: { opacity: 0.76 },
+  actionStage: { backgroundColor: semanticColors.field, borderColor: semanticColors.borderStrong, borderWidth: 1, marginTop: 18, minHeight: 390, padding: 20 },
+  actionTopline: { flexDirection: 'row', justifyContent: 'space-between' },
+  kicker: { color: semanticColors.textQuiet, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
+  actionState: { color: semanticColors.textMuted, fontSize: 11, fontWeight: '800' },
+  actionBody: { flex: 1, justifyContent: 'center', paddingVertical: 26 },
+  actionGlyph: { alignItems: 'center', backgroundColor: semanticColors.fieldRaised, borderColor: semanticColors.borderStrong, borderWidth: 1, height: 48, justifyContent: 'center', marginBottom: 22, width: 48 },
+  actionGlyphText: { color: semanticColors.signal, fontSize: 22, fontWeight: '900' },
+  actionMeta: { color: semanticColors.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
+  actionTitle: { color: semanticColors.textPrimary, fontSize: 34, fontWeight: '900', lineHeight: 38, marginTop: 8 },
+  actionDetail: { color: semanticColors.textMuted, fontSize: 14, lineHeight: 21, marginTop: 16 },
+  actionButton: { marginTop: 24, width: '100%' },
+  safetyNote: { color: semanticColors.textQuiet, fontSize: 11, fontWeight: '700', letterSpacing: 0.7, marginTop: 12, textAlign: 'center' },
+  centerState: { alignItems: 'flex-start', flex: 1, justifyContent: 'center', paddingVertical: 28 },
+  stateTitle: { color: semanticColors.textPrimary, fontSize: 26, fontWeight: '900', lineHeight: 31, marginTop: 20 },
+  stateBody: { color: semanticColors.textMuted, fontSize: 14, lineHeight: 21, marginTop: 12 },
+  metrics: { borderColor: semanticColors.borderStrong, borderWidth: 1, flexDirection: 'row', flexWrap: 'wrap', marginTop: 18 },
+  metric: { borderBottomColor: semanticColors.borderSubtle, borderBottomWidth: 1, borderRightColor: semanticColors.borderSubtle, borderRightWidth: 1, minHeight: 92, padding: 14, width: '50%' },
+  metricLabel: { color: semanticColors.textQuiet, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
+  metricValue: { color: semanticColors.dataValue, fontSize: 22, fontVariant: ['tabular-nums'], fontWeight: '900', marginTop: 12 },
+  recentSection: { marginTop: 28 },
+  sectionHeader: { alignItems: 'center', borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 72 },
+  sectionTitle: { color: semanticColors.textPrimary, fontSize: 22, fontWeight: '900', marginTop: 4 },
+  viewAll: { alignItems: 'center', borderColor: semanticColors.borderStrong, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 12 },
+  viewAllText: { color: semanticColors.textPrimary, fontSize: 11, fontWeight: '900' },
+  empty: { minHeight: 180, paddingVertical: 44 },
+  emptyTitle: { color: semanticColors.textPrimary, fontSize: 25, fontWeight: '900' },
+  emptyText: { color: semanticColors.textMuted, fontSize: 14, lineHeight: 21, marginTop: 10 },
+  record: { borderBottomColor: semanticColors.borderSubtle, borderBottomWidth: 1, minHeight: 144, paddingVertical: 18 },
+  recordTopline: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
+  recordType: { color: semanticColors.textMuted, flex: 1, fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  legs: { gap: 12, marginTop: 16 },
+  leg: { alignItems: 'flex-start', flexDirection: 'row', gap: 10 },
+  legIndex: { color: semanticColors.textQuiet, fontSize: 11, fontVariant: ['tabular-nums'], marginTop: 1, width: 22 },
+  legCopy: { flex: 1, minWidth: 0 },
+  event: { color: semanticColors.textPrimary, fontSize: 13, fontWeight: '800', lineHeight: 18 },
+  selection: { color: semanticColors.textMuted, fontSize: 12, lineHeight: 17, marginTop: 3 },
+  recordMetrics: { alignItems: 'flex-end', flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 18 },
+  recordMetric: { gap: 4, minWidth: 58 },
+  recordMetricLabel: { color: semanticColors.textQuiet, fontSize: 11, fontWeight: '700' },
+  recordMetricValue: { color: semanticColors.dataValue, fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '800' },
+  arrow: { color: semanticColors.signal, fontSize: 22, marginLeft: 'auto' },
 });
