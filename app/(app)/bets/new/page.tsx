@@ -344,21 +344,22 @@ export default function NewBetPage() {
     Number.isFinite(stakeNum) && stakeNum > 0 && Number.isFinite(effectiveTotal) && effectiveTotal > 1
 
   return (
-    <div className="max-w-xl" onPaste={handlePaste}>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Add Bet</h1>
-        <p className="text-sm text-gray-500 mt-1">Paste a screenshot or fill in manually</p>
-      </div>
+    <div className="max-w-3xl" onPaste={handlePaste}>
+      <header className="mb-6 border-y border-[var(--border-strong)] py-6">
+        <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-quiet)]">Tracker / New record</p>
+        <h1 className="mt-3 font-display text-5xl font-black uppercase tracking-[0] text-[var(--text-primary)] sm:text-7xl">Add bet</h1>
+        <p className="mt-3 text-sm text-[var(--text-muted)]">Paste a screenshot or fill in every field manually.</p>
+      </header>
 
       {/* ── Scanner zone (locked while busy) ──────────────── */}
       <div
         aria-busy={busy}
-        className={`mb-4 border-2 border-dashed rounded-xl px-4 py-5 text-center transition-colors ${
+        className={`mb-4 border px-4 py-6 text-center transition-colors ${
           scanning
-            ? 'border-indigo-500 bg-indigo-950/30'
+            ? 'border-[var(--signal)] bg-[var(--field-raised)]'
             : busy
-              ? 'border-gray-800 opacity-60 cursor-not-allowed'
-              : 'border-gray-700 hover:border-indigo-600 hover:bg-gray-800/40 cursor-pointer'
+              ? 'cursor-not-allowed border-[var(--border-subtle)] opacity-60'
+              : 'cursor-pointer border-[var(--border-strong)] bg-[var(--field)] hover:border-[var(--signal)] hover:bg-[var(--field-raised)]'
         }`}
         onClick={() => !busy && fileRef.current?.click()}
       >
@@ -371,29 +372,29 @@ export default function NewBetPage() {
           onChange={handleFileChange}
         />
         {scanning ? (
-          <div className="flex items-center justify-center gap-2 text-indigo-400 text-sm">
+          <div className="flex items-center justify-center gap-2 text-sm text-[var(--signal)]">
             <span className="animate-spin">⏳</span> {scanMsg}
           </div>
         ) : scanMsg ? (
-          <div className="text-sm text-gray-300">{scanMsg}</div>
+          <div className="text-sm text-[var(--text-primary)]">{scanMsg}</div>
         ) : (
           <div>
-            <div className="flex justify-center mb-1 text-gray-500 text-sm uppercase tracking-widest font-mono">SCAN</div>
-            <p className="text-sm text-gray-400 font-medium">Paste screenshot (Ctrl+V) or click to upload</p>
-            <p className="text-xs text-gray-600 mt-0.5">Single and express coupons are supported</p>
+            <div className="mb-2 flex justify-center font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-quiet)]">Scanner input</div>
+            <p className="text-sm font-medium text-[var(--text-primary)]">Paste screenshot (Ctrl+V) or click to upload</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">Single and Express coupons are supported. Review every extracted field.</p>
           </div>
         )}
       </div>
 
       {/* ── Bet type indicator + source ───────────────────── */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="flex gap-1 bg-gray-800 rounded-lg p-1 w-fit" role="group" aria-label="Bet type">
+        <div className="flex w-full border border-[var(--border-strong)] bg-[var(--field)] p-1 sm:w-fit" role="group" aria-label="Bet type">
           <button
             type="button"
             aria-pressed={!isExpress}
             disabled={busy}
             onClick={() => selectBetMode('single')}
-            className={`min-h-11 px-4 py-1.5 text-sm rounded-md font-medium disabled:opacity-50 ${!isExpress ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}
+            className={`min-h-11 flex-1 px-4 py-1.5 text-sm font-bold disabled:opacity-50 sm:flex-none ${!isExpress ? 'bg-[var(--signal)] text-[var(--on-signal)]' : 'text-[var(--text-muted)]'}`}
           >
             Single
           </button>
@@ -402,19 +403,19 @@ export default function NewBetPage() {
             aria-pressed={isExpress}
             disabled={busy}
             onClick={() => selectBetMode('express')}
-            className={`min-h-11 px-4 py-1.5 text-sm rounded-md font-medium disabled:opacity-50 ${isExpress ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}
+            className={`min-h-11 flex-1 px-4 py-1.5 text-sm font-bold disabled:opacity-50 sm:flex-none ${isExpress ? 'bg-[var(--signal)] text-[var(--on-signal)]' : 'text-[var(--text-muted)]'}`}
           >
             Express{isExpress ? ` · ${legs.length} legs` : ''}
           </button>
         </div>
         {source === 'scanner' && (
-          <span className="text-xs text-indigo-300 bg-indigo-950/50 border border-indigo-900 rounded-full px-2.5 py-1">
-            from scanner
+          <span className="border border-[var(--review)] bg-[var(--field)] px-2.5 py-1 text-xs font-bold text-[var(--review)]">
+            Scanner draft / review required
           </span>
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="card flex flex-col gap-4" aria-busy={busy}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 border-y border-[var(--border-strong)] py-5" aria-busy={busy}>
         {/* Decision #061 Phase A1: ONE native disabled boundary. While
             a scan or a financial submit is running, every input, select,
             textarea and button inside — leg fields, Add leg, Remove leg,
@@ -424,15 +425,15 @@ export default function NewBetPage() {
         <fieldset disabled={busy} className="contents">
         {/* ── Legs (order preserved) ──────────────────────── */}
         {legs.map((leg, index) => (
-          <div key={index} className="border border-gray-800 rounded-xl p-3 sm:p-4 flex flex-col gap-3">
+          <div key={index} className="flex flex-col gap-3 border border-[var(--border-strong)] bg-[var(--field)] p-3 sm:p-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <span className="font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-quiet)]">
                 {isExpress ? `Leg ${index + 1}` : 'Bet'}
               </span>
               {legs.length > 1 && (
                 <button
                   type="button"
-                  className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 disabled:opacity-50"
+                  className="min-h-11 px-2 py-1 text-xs font-bold text-[var(--negative)] disabled:opacity-50"
                   onClick={() => removeLeg(index)}
                   aria-label={`Remove leg ${index + 1}`}
                   disabled={busy}
@@ -452,7 +453,7 @@ export default function NewBetPage() {
                   onChange={e => updateLeg(index, 'event_name', e.target.value)}
                 />
                 {errors[`legs.${index}.event_name`] && (
-                  <p className="text-xs text-red-400 mt-1">{errors[`legs.${index}.event_name`]}</p>
+                  <p className="mt-1 text-xs text-[var(--negative)]">{errors[`legs.${index}.event_name`]}</p>
                 )}
               </div>
 
@@ -465,7 +466,7 @@ export default function NewBetPage() {
                   onChange={e => updateLeg(index, 'market_type', e.target.value)}
                 />
                 {errors[`legs.${index}.market_type`] && (
-                  <p className="text-xs text-red-400 mt-1">{errors[`legs.${index}.market_type`]}</p>
+                  <p className="mt-1 text-xs text-[var(--negative)]">{errors[`legs.${index}.market_type`]}</p>
                 )}
               </div>
 
@@ -488,7 +489,7 @@ export default function NewBetPage() {
                   onChange={e => updateLeg(index, 'odds', e.target.value)}
                 />
                 {errors[`legs.${index}.odds`] && (
-                  <p className="text-xs text-red-400 mt-1">{errors[`legs.${index}.odds`]}</p>
+                  <p className="mt-1 text-xs text-[var(--negative)]">{errors[`legs.${index}.odds`]}</p>
                 )}
               </div>
 
@@ -508,7 +509,7 @@ export default function NewBetPage() {
           </div>
         ))}
 
-        {errors.legs && <p className="text-xs text-red-400">{errors.legs}</p>}
+        {errors.legs && <p className="text-xs text-[var(--negative)]">{errors.legs}</p>}
 
         <button
           type="button"
@@ -530,11 +531,11 @@ export default function NewBetPage() {
               onChange={e => { setTotalOdds(e.target.value); markManualEdit('total_odds') }}
             />
             {previewTotal != null && (
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
                 Calculated from legs: {previewTotal} (preview only — the saved value is what you enter here)
               </p>
             )}
-            {errors.total_odds && <p className="text-xs text-red-400 mt-1">{errors.total_odds}</p>}
+            {errors.total_odds && <p className="mt-1 text-xs text-[var(--negative)]">{errors.total_odds}</p>}
           </div>
         )}
 
@@ -548,7 +549,7 @@ export default function NewBetPage() {
               value={stake}
               onChange={e => { setStake(e.target.value); markManualEdit('stake') }}
             />
-            {errors.stake && <p className="text-xs text-red-400 mt-1">{errors.stake}</p>}
+            {errors.stake && <p className="mt-1 text-xs text-[var(--negative)]">{errors.stake}</p>}
           </div>
 
           <div>
@@ -574,14 +575,14 @@ export default function NewBetPage() {
         </div>
 
         {showPayoutPreview && (
-          <div className="bg-gray-800 rounded-lg px-4 py-3 flex justify-between text-sm">
-            <span className="text-gray-400">Potential payout (preview)</span>
-            <span className="text-white font-semibold">{(stakeNum * effectiveTotal).toFixed(2)}</span>
+          <div className="flex justify-between border border-[var(--border-strong)] bg-[var(--field-raised)] px-4 py-3 text-sm">
+            <span className="text-[var(--text-muted)]">Potential payout (preview)</span>
+            <span className="font-mono font-semibold text-[var(--data-value)]">{(stakeNum * effectiveTotal).toFixed(2)}</span>
           </div>
         )}
 
         {errors._root && (
-          <div className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
+          <div className="border border-[var(--negative)] bg-[var(--field)] px-3 py-2 text-xs text-[var(--negative)]" role="alert">
             {errors._root}
           </div>
         )}
