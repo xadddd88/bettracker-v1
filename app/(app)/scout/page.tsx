@@ -22,12 +22,13 @@ export default async function ScoutPage() {
   const pulsePresets   = getActiveScoutPresets(today)
 
   return (
-    <div className="max-w-2xl flex flex-col gap-6">
+    <div className="bn-page max-w-3xl flex flex-col gap-6">
       <PageView event={EVENTS.SCOUT_PAGE_VIEWED} />
       <div>
-        <h1 className="text-2xl font-bold text-white">Scout</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Research opportunity discovery — find markets that may have value, then analyse them in the AI Analyst.
+        <p className="editorial-kicker">Research desk</p>
+        <h1 className="mt-2 font-display text-3xl font-black text-[var(--text-primary)]">Scout</h1>
+        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
+          Discover research candidates, verify the missing context, then move them to AI Analyst for a gated review.
         </p>
       </div>
       <ScoutForm initialOpportunities={opportunities} pulsePresets={pulsePresets} />

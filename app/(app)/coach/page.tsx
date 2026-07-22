@@ -28,11 +28,12 @@ export default async function CoachPage() {
   const settledBetsCount = settledRes.count ?? 0
 
   return (
-    <div className="max-w-2xl flex flex-col gap-6">
+    <div className="bn-page max-w-3xl flex flex-col gap-6">
       <PageView event={EVENTS.COACH_PAGE_VIEWED} />
       <div>
-        <h1 className="text-2xl font-bold text-white">Coach</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="editorial-kicker">Retrospective desk</p>
+        <h1 className="mt-2 font-display text-3xl font-black text-[var(--text-primary)]">Coach</h1>
+        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
           AI-powered retrospective review of your settled bets — patterns, leaks, and actionable advice.
         </p>
       </div>
