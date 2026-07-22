@@ -21,25 +21,6 @@
   --review: #FFC05B;
   --radius-control: 8px;
 
-  /* Existing component aliases now resolve to Broadcast Noir. */
-  --bg: var(--night);
-  --surface-1: var(--field);
-  --surface-2: var(--field-raised);
-  --text-1: var(--text-primary);
-  --text-2: var(--text-muted);
-  --accent: var(--signal);
-  --accent-soft: color-mix(in srgb, var(--signal) 14%, transparent);
-  --accent-glow: transparent;
-  --accent-rail: var(--signal);
-  --body-overlay: none;
-  --body-texture: none;
-  --body-texture-size: auto;
-  --win: var(--success);
-  --loss: var(--negative);
-  --pending: var(--review);
-  --neutral: var(--text-quiet);
-  --border: var(--border-strong);
-  --radius: var(--radius-control);
   --sidebar-width: 244px;
 }
 
@@ -172,20 +153,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .editorial-ticker {
-    background: var(--field-raised);
-    border-block: 1px solid var(--border-strong);
-    color: var(--text-primary);
-    overflow-x: auto;
-  }
-
-  .editorial-ticker-track { display: flex; width: max-content; }
-
-  .editorial-ticker-copy {
-    @apply whitespace-nowrap py-3 font-mono text-[11px] font-black uppercase tracking-[0.12em];
-    padding-inline: 2rem;
-  }
-
   .card,
   .card-highlight,
   .card-status-win,
@@ -242,62 +209,6 @@
     font-variant-numeric: tabular-nums;
   }
 }
-
-/* Current screens migrate through this one compatibility adapter. */
-.web-editorial .rounded-xl,
-.web-editorial .rounded-lg,
-.web-editorial .rounded-md,
-.web-editorial .rounded-full,
-.web-editorial .rounded-t-2xl { border-radius: var(--radius-control) !important; }
-
-.web-editorial .text-white,
-.web-editorial .text-gray-100,
-.web-editorial .text-gray-200,
-.web-editorial .text-gray-300,
-.web-editorial .text-slate-100,
-.web-editorial .text-slate-200,
-.web-editorial .text-slate-300 { color: var(--text-primary) !important; }
-
-.web-editorial .text-gray-400,
-.web-editorial .text-gray-500,
-.web-editorial .text-gray-600,
-.web-editorial .text-slate-400,
-.web-editorial .text-slate-500,
-.web-editorial .text-slate-600 { color: var(--text-muted) !important; }
-
-.web-editorial .bg-gray-950,
-.web-editorial .bg-night-950 { background-color: var(--night) !important; }
-
-.web-editorial .bg-gray-900,
-.web-editorial .bg-gray-800,
-.web-editorial .bg-night-900,
-.web-editorial .bg-night-800 { background-color: var(--field) !important; }
-
-.web-editorial .bg-indigo-600 { background-color: var(--signal) !important; color: var(--on-signal) !important; }
-.web-editorial .border-indigo-500,
-.web-editorial .border-indigo-600,
-.web-editorial .border-indigo-900 { border-color: var(--signal) !important; }
-.web-editorial .text-indigo-400 { color: var(--signal) !important; }
-
-.web-editorial .border-gray-600,
-.web-editorial .border-gray-700,
-.web-editorial .border-gray-800,
-.web-editorial .border-night-700,
-.web-editorial .border-night-800 { border-color: var(--border-strong) !important; }
-
-.web-editorial .btn-primary,
-.web-editorial .btn-primary.text-white,
-.web-editorial .btn-primary .text-white,
-.web-editorial .bg-indigo-600.text-white { color: var(--on-signal) !important; }
-
-.web-editorial .bg-black,
-.web-editorial .bg-black.text-white,
-.web-editorial .bg-black .text-white { background: var(--field) !important; color: var(--text-primary) !important; }
-
-.web-editorial .editorial-dark .text-gray-300,
-.web-editorial .editorial-dark .text-gray-400,
-.web-editorial .editorial-dark .text-slate-300,
-.web-editorial .editorial-dark .text-slate-400 { color: var(--text-muted) !important; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

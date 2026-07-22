@@ -120,7 +120,7 @@ function linkedBetStatusTone(status: BetStatusKey): BroadcastNoirStatus {
 }
 
 function ScoreBar({ score }: { score: number }) {
-  const color = score > 0 ? 'bg-bn-success' : score < 0 ? 'bg-bn-negative' : 'bg-bn-data'
+  const color = score < 0 ? 'bg-bn-negative' : 'bg-bn-data'
   return (
     <div className="mt-1 flex items-center gap-2" aria-label={`Factor score ${score > 0 ? `plus ${score}` : score} out of 3`}>
       <div aria-hidden="true" className="relative h-1.5 flex-1 rounded-control bg-bn-raised">
@@ -437,7 +437,7 @@ export default async function DecisionDetailPage({
         <BroadcastPanel className="flex flex-col gap-2 p-5 sm:p-7">
           <h3 className="mb-1 text-sm font-semibold text-bn-text">{trustView?.factorAnalysisLabel ?? 'Factor Analysis'}</h3>
           {displayFactors.map((f: Factor, i: number) => (
-            <div key={i} className="border-b border-bn-border py-2 last:border-0">
+            <div key={i} className="border-b border-bn-border-subtle py-2 last:border-0">
               <span className="text-sm text-bn-text">{f.name}</span>
               <ScoreBar score={f.score} />
               <p className="mt-1 text-xs text-bn-muted">{f.detail}</p>

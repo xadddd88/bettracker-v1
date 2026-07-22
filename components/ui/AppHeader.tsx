@@ -61,7 +61,7 @@ export default function AppHeader({ user }: { user: User }) {
           aria-label="BetTracker home"
           className="flex min-h-11 shrink-0 items-center gap-2.5 rounded-[var(--radius-control)] focus:outline-none"
         >
-          <span className="h-2.5 w-2.5 rounded-full bg-[var(--signal)]" aria-hidden />
+          <span className="h-2.5 w-2.5 rounded-control bg-[var(--signal)]" aria-hidden />
           <span className="font-display text-lg font-black uppercase tracking-[-0.045em]">BetTracker</span>
         </Link>
 
@@ -88,7 +88,7 @@ export default function AppHeader({ user }: { user: User }) {
 
         <details ref={accountMenuRef} className="group relative ml-auto">
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--field)] px-2.5 text-[var(--text-muted)] marker:content-none hover:border-[var(--signal)] hover:text-[var(--text-primary)]">
-            <span className="grid h-7 w-7 place-items-center rounded-full border border-[var(--border-strong)] font-mono text-[10px] font-black text-[var(--text-primary)]">
+            <span className="grid h-7 w-7 place-items-center rounded-control border border-[var(--border-strong)] font-mono text-[10px] font-black text-[var(--text-primary)]">
               {initials}
             </span>
             <span className="hidden text-[10px] font-extrabold uppercase tracking-[0.08em] sm:inline">Account</span>

@@ -4,6 +4,7 @@ import BankrollView from './BankrollView'
 import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
 import type { Bankroll, BankrollTransaction } from '@/types'
+import { BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
 
 export default async function BankrollPage() {
   const supabase = await createClient()
@@ -35,12 +36,13 @@ export default async function BankrollPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <main className="bn-page mx-auto flex w-full max-w-5xl flex-col gap-4 pb-8">
       <PageView event={EVENTS.BANKROLL_PAGE_VIEWED} />
-      <div>
-        <h1 className="text-2xl font-bold text-white">Bankroll</h1>
-        <p className="text-sm text-gray-500 mt-1">Your dedicated betting fund — track deposits, stake usage, and net results from settled bets.</p>
-      </div>
+      <BroadcastPanel className="p-5 sm:p-7">
+        <p className="editorial-kicker">Ledger · recorded transactions</p>
+        <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Bankroll</h1>
+        <p className="mt-4 max-w-2xl text-sm leading-6 text-bn-muted">Your dedicated betting fund — deposits, stake usage, and net results from settled bets.</p>
+      </BroadcastPanel>
       {bankroll ? (
         <BankrollView
           bankroll={bankroll}
@@ -49,11 +51,10 @@ export default async function BankrollPage() {
           stats={{ totalDeposited, totalWithdrawn, netFromBets }}
         />
       ) : (
-        <div className="card text-center py-12">
-          <p className="text-red-400 text-sm font-medium mb-1">Bankroll not set up</p>
-          <p className="text-gray-500 text-xs">Your default bankroll could not be loaded. Try refreshing — if this persists, contact support.</p>
-        </div>
+        <BroadcastPanel className="grid min-h-64 place-items-center p-6 text-center">
+          <div><BroadcastStatus status="negative">Bankroll not set up</BroadcastStatus><p className="mt-4 text-xs text-bn-muted">Your default bankroll could not be loaded. Try refreshing — if this persists, contact support.</p></div>
+        </BroadcastPanel>
       )}
-    </div>
+    </main>
   )
 }

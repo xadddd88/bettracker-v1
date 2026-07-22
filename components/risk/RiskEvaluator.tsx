@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
+import { BroadcastButton, BroadcastDataValue, BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
+import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
 
 interface RiskResult {
   risk_level:                'low' | 'medium' | 'high' | 'very_high'
@@ -22,11 +24,11 @@ interface Props {
   onAdjustStake: () => void
 }
 
-const RISK_CONFIG: Record<RiskResult['risk_level'], { label: string; color: string; border: string; bg: string }> = {
-  low:       { label: 'Low',       color: 'text-green-400',  border: 'border-green-800',  bg: 'bg-green-950/20'  },
-  medium:    { label: 'Medium',    color: 'text-yellow-400', border: 'border-yellow-800', bg: 'bg-yellow-950/20' },
-  high:      { label: 'High',      color: 'text-orange-400', border: 'border-orange-800', bg: 'bg-orange-950/20' },
-  very_high: { label: 'Very High', color: 'text-red-400',    border: 'border-red-800',    bg: 'bg-red-950/20'    },
+const RISK_CONFIG: Record<RiskResult['risk_level'], { label: string; status: BroadcastNoirStatus }> = {
+  low:       { label: 'Low', status: 'neutral' },
+  medium:    { label: 'Medium', status: 'review' },
+  high:      { label: 'High', status: 'negative' },
+  very_high: { label: 'Very High', status: 'negative' },
 }
 
 export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, onAdjustStake }: Props) {
@@ -89,30 +91,26 @@ export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, 
 
   if (loading) {
     return (
-      <div className="card border border-gray-700 flex items-center gap-3 py-4">
-        <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin shrink-0" />
-        <span className="text-sm text-gray-400">Evaluating risk…</span>
-      </div>
+      <BroadcastPanel aria-live="polite" className="flex items-center gap-3 p-4"><BroadcastStatus status="neutral">Busy · evaluating risk</BroadcastStatus></BroadcastPanel>
     )
   }
 
   // On fetch error: still let the user place
   if (error || !result) {
     return (
-      <div className="card border border-gray-700 flex flex-col gap-3">
-        <p className="text-xs text-gray-500">{error || 'Risk check unavailable.'}</p>
+      <BroadcastPanel className="flex flex-col gap-3 p-4">
+        <BroadcastStatus className="w-full" status="review">{error || 'Risk check unavailable.'}</BroadcastStatus>
         <div className="flex gap-2">
-          <button
-            className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700"
+          <BroadcastButton className="flex-1" tone="secondary"
             onClick={onAdjustStake}
           >
             Adjust Stake
-          </button>
-          <button className="btn-primary flex-1" onClick={() => handleConfirm()} disabled={confirming}>
+          </BroadcastButton>
+          <BroadcastButton className="flex-1" onClick={() => handleConfirm()} disabled={confirming}>
             {confirming ? '…' : 'Place Bet'}
-          </button>
+          </BroadcastButton>
         </div>
-      </div>
+      </BroadcastPanel>
     )
   }
 
@@ -120,37 +118,35 @@ export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, 
   const hasWarnings = result.warnings.length > 0
 
   return (
-    <div className={`card border ${cfg.border} ${cfg.bg} flex flex-col gap-3`}>
+    <BroadcastPanel className="flex flex-col gap-3 p-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-300">Risk Check</span>
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${cfg.color} ${cfg.border} bg-black/20`}>
-          {cfg.label} Risk
-        </span>
+        <span className="text-sm font-medium text-bn-text">Risk Check</span>
+        <BroadcastStatus status={cfg.status}>{cfg.label} Risk</BroadcastStatus>
       </div>
 
       {/* Metrics */}
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-gray-500">Stake</span>
-          <span className={`text-sm font-semibold ${cfg.color}`}>
+          <span className="text-xs text-bn-muted">Stake</span>
+          <BroadcastDataValue className="text-sm font-semibold">
             {result.stake_percent_of_bankroll.toFixed(1)}%
-          </span>
-          <span className="text-xs text-gray-600">of bankroll</span>
+          </BroadcastDataValue>
+          <span className="text-xs text-bn-quiet">of bankroll</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-gray-500">Open bets</span>
-          <span className="text-sm font-semibold text-gray-300">
+          <span className="text-xs text-bn-muted">Open bets</span>
+          <BroadcastDataValue className="text-sm font-semibold">
             {result.pending_exposure_percent.toFixed(1)}%
-          </span>
-          <span className="text-xs text-gray-600">exposure</span>
+          </BroadcastDataValue>
+          <span className="text-xs text-bn-quiet">exposure</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-gray-500">Suggested max</span>
-          <span className="text-sm font-semibold text-gray-300">
+          <span className="text-xs text-bn-muted">Suggested max</span>
+          <BroadcastDataValue className="text-sm font-semibold">
             {result.recommended_max_stake}
-          </span>
-          <span className="text-xs text-gray-600">2% guideline</span>
+          </BroadcastDataValue>
+          <span className="text-xs text-bn-quiet">2% guideline</span>
         </div>
       </div>
 
@@ -158,24 +154,20 @@ export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, 
       {hasWarnings && (
         <div className="flex flex-col gap-1.5">
           {result.warnings.map((w, i) => (
-            <div key={i} className="flex gap-2 text-xs text-yellow-300 bg-yellow-950/30 border border-yellow-900/60 rounded-lg px-3 py-2">
-              <span className="shrink-0">⚠</span>
-              <span>{w}</span>
-            </div>
+            <BroadcastStatus className="w-full" key={i} status="review">{w}</BroadcastStatus>
           ))}
         </div>
       )}
 
       {/* Total exposure line */}
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-bn-muted">
         Total exposure after bet:{' '}
-        <span className="text-gray-300 font-medium">{result.total_exposure_after_bet.toFixed(1)}%</span> of bankroll
+        <BroadcastDataValue className="font-medium">{result.total_exposure_after_bet.toFixed(1)}%</BroadcastDataValue> of bankroll
       </p>
 
       {/* Actions */}
       <div className="flex gap-2">
-        <button
-          className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700"
+        <BroadcastButton className="flex-1" tone="secondary"
           onClick={() => {
             trackClientEvent(EVENTS.RISK_STAKE_ADJUSTED, {
               risk_level: result.risk_level,
@@ -185,18 +177,18 @@ export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, 
           }}
         >
           Adjust Stake
-        </button>
-        <button
-          className="flex-1 btn-primary"
+        </BroadcastButton>
+        <BroadcastButton
+          className="flex-1"
           disabled={confirming}
           onClick={() => handleConfirm(result.risk_level)}
         >
           {confirming ? '…' : 'Place anyway'}
-        </button>
+        </BroadcastButton>
       </div>
 
       {/* Disclaimer */}
-      <p className="text-xs text-gray-600 text-center">{result.disclaimer}</p>
-    </div>
+      <p className="text-center text-xs text-bn-muted">{result.disclaimer}</p>
+    </BroadcastPanel>
   )
 }

@@ -8,7 +8,7 @@ import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
 import { bucketOdds, bucketStake } from '@/lib/analytics/buckets'
 import RiskEvaluator from '@/components/risk/RiskEvaluator'
-import { Camera, Loader2, Eye, X, CheckCircle, Search } from 'lucide-react'
+import { Camera, Eye, X, CheckCircle, Search } from 'lucide-react'
 import {
   buildAnalystTrustView,
   localizeAnalystTrustSport,
@@ -28,6 +28,8 @@ import {
   type AnalystResearchSource,
   type AnalystWebSearchFailureReason,
 } from '@/lib/ai/analyst-research'
+import { BroadcastStatus } from '@/components/ui/BroadcastNoir'
+import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
 
 // ─── Image helper ─────────────────────────────────────────────
 function fileToBase64(file: File): Promise<{ data: string; media_type: string }> {
@@ -173,17 +175,24 @@ const LOCALES: { value: Locale; label: string }[] = [
   { value: 'ar',   label: '\u0627\u0644\u0639\u0631\u0628\u064A\u0629' },
 ]
 
-const REC_CONFIG: Record<Recommendation, { label: string; color: string; bg: string }> = {
-  bet:      { label: 'BET',      color: 'text-bn-signal',   bg: 'bg-bn-field border-bn-signal' },
-  watch:    { label: 'WATCH',    color: 'text-bn-review',   bg: 'bg-bn-field border-bn-review' },
-  skip:     { label: 'SKIP',     color: 'text-bn-muted',    bg: 'bg-bn-field border-bn-border-strong' },
-  no_value: { label: 'NO VALUE', color: 'text-bn-negative', bg: 'bg-bn-field border-bn-negative' },
+const REC_CONFIG: Record<Recommendation, { label: string; status: BroadcastNoirStatus }> = {
+  bet:      { label: 'BET', status: 'neutral' },
+  watch:    { label: 'WATCH', status: 'review' },
+  skip:     { label: 'SKIP', status: 'neutral' },
+  no_value: { label: 'NO VALUE', status: 'neutral' },
 }
 
-const RISK_CONFIG: Record<RiskLevel, { label: string; color: string }> = {
-  low:    { label: 'Low Risk',    color: 'text-bn-muted' },
-  medium: { label: 'Medium Risk', color: 'text-bn-review' },
-  high:   { label: 'High Risk',   color: 'text-bn-negative' },
+const RISK_CONFIG: Record<RiskLevel, { label: string; status: BroadcastNoirStatus }> = {
+  low:    { label: 'Low Risk', status: 'neutral' },
+  medium: { label: 'Medium Risk', status: 'review' },
+  high:   { label: 'High Risk', status: 'negative' },
+}
+
+function scanStatusTone(message: string, scanning: boolean, mode: CaptureMode): BroadcastNoirStatus {
+  if (scanning) return 'neutral'
+  if (message.startsWith('✅')) return 'success'
+  if (mode === 'event') return 'review'
+  return 'negative'
 }
 
 // ─── Score bar ────────────────────────────────────────────────
@@ -751,9 +760,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               <p id="capture-heading" className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-text">Preview ready</p>
               <p className="text-sm leading-6 text-bn-muted">Replace or remove the image before continuing. Coupon extraction remains editable below.</p>
               {scanMsg ? (
-                <div aria-live="polite" className={`rounded-control border p-3 text-sm ${scanning ? 'border-bn-signal text-bn-text' : scanMsg.startsWith('✅') ? 'border-bn-success text-bn-success' : captureMode === 'event' ? 'border-bn-review text-bn-review' : 'border-bn-negative text-bn-negative'}`}>
-                  {scanning ? <Loader2 aria-hidden="true" className="mr-2 inline animate-spin" size={14} /> : null}{scanMsg.replace('✅ ', '')}
-                </div>
+                <BroadcastStatus className="w-full" aria-live="polite" status={scanStatusTone(scanMsg, scanning, captureMode)}>{scanMsg.replace('✅ ', '')}</BroadcastStatus>
               ) : null}
               <div className="mt-auto grid gap-2">
                 <button className="bn-button bn-button-secondary" disabled={scanning} onClick={() => fileRef.current?.click()} type="button">Replace image</button>
@@ -803,7 +810,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           <div className="sm:col-span-2">
             <label className="label">Event *</label>
             <input
-              className={`input ${errors.event_name ? 'border-red-600' : ''}`}
+              className={`input ${errors.event_name ? 'border-bn-negative' : ''}`}
               placeholder="Germany vs Netherlands"
               value={form.event_name}
               onChange={e => setField('event_name', e.target.value)}
@@ -814,7 +821,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           <div>
             <label className="label">Market *</label>
             <input
-              className={`input ${errors.market_type ? 'border-red-600' : ''}`}
+              className={`input ${errors.market_type ? 'border-bn-negative' : ''}`}
               placeholder="Match Winner / Total / Handicap"
               value={form.market_type}
               onChange={e => setField('market_type', e.target.value)}
@@ -835,7 +842,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           <div>
             <label className="label">Odds *</label>
             <input
-              className={`input ${errors.odds ? 'border-red-600' : ''}`}
+              className={`input ${errors.odds ? 'border-bn-negative' : ''}`}
               type="number" step="0.01" min="1.01" placeholder={scoutId ? 'Enter current odds' : '1.85'}
               value={form.odds}
               onChange={e => setField('odds', e.target.value)}
@@ -922,17 +929,15 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
         )}
 
         {liveCouponBlocked && (
-          <div className="rounded-control border border-bn-review bg-bn-field px-4 py-3 text-sm font-bold leading-5 text-bn-review" role="alert">
+          <BroadcastStatus className="w-full" role="alert" status="review">
             {locale === 'uk'
               ? 'LIVE ЗАБЛОКОВАНО: для чесного аналізу потрібні поточний рахунок, фаза, ігровий час та актуальна live-лінія. Цей модуль працює лише з pre-match купонами.'
               : 'LIVE BLOCKED: a trustworthy analysis needs the current score, phase, game clock, and current live odds. This module supports pre-match coupons only.'}
-          </div>
+          </BroadcastStatus>
         )}
 
         {rootErr && !analysis && (
-          <div className="rounded-control border border-bn-negative bg-bn-field px-4 py-3 text-sm font-bold text-bn-negative" role="alert">
-            {rootErr}
-          </div>
+          <BroadcastStatus className="w-full" role="alert" status="negative">{rootErr}</BroadcastStatus>
         )}
 
         <button
@@ -941,9 +946,9 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           disabled={analyzing || scanning || liveCouponBlocked}
         >
           {analyzing ? (
-            <><Loader2 size={14} className="animate-spin" /> Analyzing…</>
+            <>Analyzing…</>
           ) : scanning ? (
-            <><Loader2 size={14} className="animate-spin" /> Scanning…</>
+            <>Scanning…</>
           ) : liveCouponBlocked ? (
             <>Live analysis unavailable</>
           ) : (
@@ -955,14 +960,10 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
       {/* ── Analysis result ─────────────────────────────────── */}
       {a && (
         <div className="flex flex-col gap-4">
-          <section className={`rounded-control border px-5 py-4 ${a.web_search_used ? 'border-bn-signal bg-bn-field text-bn-signal' : 'border-bn-border-strong bg-bn-field text-bn-text'}`} aria-label="Web research status">
-            <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em]">
-              {a.web_search_used
-                ? 'Current research verified'
-                : a.web_search_attempted
-                  ? 'Current research unavailable'
-                  : 'Web research disabled'}
-            </p>
+          <section className="rounded-control border border-bn-border-strong bg-bn-field px-5 py-4 text-bn-text" aria-label="Web research status">
+            <BroadcastStatus status={a.web_search_used ? 'success' : a.web_search_attempted ? 'review' : 'neutral'}>
+              {a.web_search_used ? 'Current research verified' : a.web_search_attempted ? 'Current research unavailable' : 'Web research disabled'}
+            </BroadcastStatus>
             <p className="mt-2 text-sm font-bold leading-5">
               {a.web_search_used
                 ? `${a.research_sources?.length ?? 0} cited source${a.research_sources?.length === 1 ? '' : 's'} bound to exact claims.`
@@ -1109,24 +1110,24 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               ? 'Якісний розбір наведено вище; точну ймовірність та EV приховано.'
               : 'Qualitative research is shown above; probability and EV remain withheld.'
             return (
-              <div className={`rounded-control border p-4 ${rec.bg} flex flex-col gap-3`}>
+              <div className="flex flex-col gap-3 rounded-control border border-bn-border-strong bg-bn-field p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <span className={`text-lg font-bold ${showPricing ? rec.color : 'text-bn-review'}`}>
+                    <BroadcastStatus status={showPricing ? rec.status : 'review'}>
                       {showPricing ? rec.label : a.research_brief ? researchedNoPriceLabel : trust?.label ?? gate?.label ?? 'INSUFFICIENT DATA'}
-                    </span>
+                    </BroadcastStatus>
                     <p className="mt-1 text-xs text-bn-muted">
                       {showPricing ? recDetail[a.recommendation] : a.research_brief ? researchedNoPriceSupport : trust?.supportLabel ?? gate?.supportLabel ?? 'Unsupported / partially supported bet'}
                     </p>
                   </div>
                   {showPricing ? (
                   <div className="text-right shrink-0">
-                    <span className={`text-xs font-medium ${risk.color}`}>{risk.label}</span>
+                      <BroadcastStatus status={risk.status}>{risk.label}</BroadcastStatus>
                     <p className="mt-1 text-[11px] text-bn-muted">edge · confidence · market</p>
                   </div>
                   ) : (
                     <div className="text-right shrink-0">
-                      <span className={`text-xs font-medium ${risk.color}`}>{localizedRiskLabel(a.risk_level, risk.label, trust)}</span>
+                      <BroadcastStatus status={risk.status}>{localizedRiskLabel(a.risk_level, risk.label, trust)}</BroadcastStatus>
                       <p className="mt-1 text-[11px] text-bn-muted">{trust ? `${trust.riskWarningLabel} / ${trust.dataCoverageLabel}` : 'risk warning / data coverage'}</p>
                     </div>
                   )}
@@ -1256,7 +1257,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
             </button>
             <button
               onClick={handleShare}
-              className={`bn-button ${copied ? 'border-bn-success text-bn-success' : 'bn-button-secondary'}`}
+              className="bn-button bn-button-secondary"
             >
               {copied ? `\u2705 ${trustView?.copiedLabel ?? 'Copied!'}` : `\uD83D\uDD17 ${trustView?.copyToShareLabel ?? 'Copy to share'}`}
             </button>
@@ -1264,9 +1265,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
           {/* Actions */}
           {rootErr && (
-            <div className="rounded-control border border-bn-negative bg-bn-field px-3 py-2 text-xs text-bn-negative" role="alert">
-              {rootErr}
-            </div>
+            <BroadcastStatus className="w-full" role="alert" status="negative">{rootErr}</BroadcastStatus>
           )}
 
           {/* Risk evaluator — shown after stake is entered */}

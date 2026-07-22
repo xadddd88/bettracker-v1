@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '@/auth/auth-context';
-import { colors } from '@/ui/theme';
+import { semanticColors } from '@/ui/theme';
 
 function RootNavigator() {
   const { booting, configurationError, session } = useAuth();
@@ -11,7 +11,7 @@ function RootNavigator() {
   if (booting) {
     return (
       <View accessibilityLabel="Restoring session" style={styles.centered}>
-        <ActivityIndicator color={colors.accent} size="large" />
+        <ActivityIndicator color={semanticColors.signal} size="large" />
         <Text style={styles.message}>Restoring your session…</Text>
       </View>
     );
@@ -27,7 +27,7 @@ function RootNavigator() {
   }
 
   return (
-    <Stack screenOptions={{ contentStyle: { backgroundColor: colors.background }, headerShown: false }}>
+    <Stack screenOptions={{ contentStyle: { backgroundColor: semanticColors.night }, headerShown: false }}>
       <Stack.Protected guard={!session}>
         <Stack.Screen name="sign-in" />
       </Stack.Protected>
@@ -50,12 +50,12 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   centered: {
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: semanticColors.night,
     flex: 1,
     gap: 16,
     justifyContent: 'center',
     padding: 28,
   },
-  title: { color: colors.text, fontSize: 22, fontWeight: '700', textAlign: 'center' },
-  message: { color: colors.muted, fontSize: 15, lineHeight: 22, textAlign: 'center' },
+  title: { color: semanticColors.textPrimary, fontSize: 22, fontWeight: '700', textAlign: 'center' },
+  message: { color: semanticColors.textMuted, fontSize: 15, lineHeight: 22, textAlign: 'center' },
 });
