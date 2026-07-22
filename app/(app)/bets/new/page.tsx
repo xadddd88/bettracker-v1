@@ -444,8 +444,9 @@ export default function NewBetPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
-                <label className="label">Event *</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-event`}>Event *</label>
                 <input
+                  id={`tracker-leg-${index}-event`}
                   className={`input w-full ${errors[`legs.${index}.event_name`] ? '!border-bn-negative' : ''}`}
                   placeholder="Germany vs Netherlands"
                   value={leg.event_name}
@@ -457,8 +458,9 @@ export default function NewBetPage() {
               </div>
 
               <div>
-                <label className="label">Market *</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-market`}>Market *</label>
                 <input
+                  id={`tracker-leg-${index}-market`}
                   className={`input w-full ${errors[`legs.${index}.market_type`] ? '!border-bn-negative' : ''}`}
                   placeholder="П1 / т2.5 / Ф1 +1"
                   value={leg.market_type}
@@ -470,8 +472,9 @@ export default function NewBetPage() {
               </div>
 
               <div>
-                <label className="label">Selection</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-selection`}>Selection</label>
                 <input
+                  id={`tracker-leg-${index}-selection`}
                   className="input w-full"
                   placeholder="Germany"
                   value={leg.selection}
@@ -480,8 +483,9 @@ export default function NewBetPage() {
               </div>
 
               <div>
-                <label className="label">Odds *</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-odds`}>Odds *</label>
                 <input
+                  id={`tracker-leg-${index}-odds`}
                   className={`input w-full ${errors[`legs.${index}.odds`] ? '!border-bn-negative' : ''}`}
                   type="number" step="0.0001" min="1.01" inputMode="decimal" placeholder="1.85"
                   value={leg.odds}
@@ -493,8 +497,9 @@ export default function NewBetPage() {
               </div>
 
               <div>
-                <label className="label">Sport</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-sport`}>Sport</label>
                 <select
+                  id={`tracker-leg-${index}-sport`}
                   className="input w-full"
                   value={leg.sport}
                   onChange={e => updateLeg(index, 'sport', e.target.value)}
@@ -522,8 +527,9 @@ export default function NewBetPage() {
         {/* ── Express total odds (UI preview never submits) ── */}
         {isExpress && (
           <div>
-            <label className="label">Total odds (express) *</label>
+            <label className="label" htmlFor="tracker-total-odds">Total odds (express) *</label>
             <input
+              id="tracker-total-odds"
               className={`input w-full ${errors.total_odds ? '!border-bn-negative' : ''}`}
               type="number" step="0.0001" min="1.01" inputMode="decimal" placeholder="7.25"
               value={totalOdds}
@@ -541,8 +547,9 @@ export default function NewBetPage() {
         {/* ── Money + meta ───────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="label">Stake *</label>
+            <label className="label" htmlFor="tracker-stake">Stake *</label>
             <input
+              id="tracker-stake"
               className={`input w-full ${errors.stake ? '!border-bn-negative' : ''}`}
               type="number" step="0.01" min="0.01" inputMode="decimal" placeholder="50"
               value={stake}
@@ -552,8 +559,9 @@ export default function NewBetPage() {
           </div>
 
           <div>
-            <label className="label">Bookmaker</label>
+            <label className="label" htmlFor="tracker-bookmaker">Bookmaker</label>
             <select
+              id="tracker-bookmaker"
               className="input w-full"
               value={bookmaker}
               onChange={e => { setBookmaker(e.target.value); markManualEdit('bookmaker') }}
@@ -564,8 +572,9 @@ export default function NewBetPage() {
           </div>
 
           <div className="sm:col-span-2">
-            <label className="label">Notes</label>
+            <label className="label" htmlFor="tracker-notes">Notes</label>
             <textarea
+              id="tracker-notes"
               className="input w-full resize-none" rows={2} placeholder="Optional..."
               value={notes}
               onChange={e => { setNotes(e.target.value); markManualEdit('notes') }}

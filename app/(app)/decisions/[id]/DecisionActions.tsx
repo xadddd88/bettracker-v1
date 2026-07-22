@@ -142,10 +142,11 @@ export default function DecisionActions({
 
       {showStake && !showRisk && (
         <BroadcastPanel className="flex flex-col gap-3 border-bn-review p-4">
-          <p className="text-sm text-bn-muted">
+          <label className="text-sm text-bn-muted" htmlFor="decision-stake">
             {labels?.stakePrompt ?? 'Enter stake amount'}{offeredOdds ? ` (odds: ${offeredOdds})` : ''}:
-          </p>
+          </label>
           <input
+            id="decision-stake"
             className="input"
             type="number"
             step="0.01"
