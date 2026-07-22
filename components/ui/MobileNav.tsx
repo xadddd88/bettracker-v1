@@ -109,7 +109,7 @@ export default function MobileNav() {
               }`}
             >
               <Icon size={18} strokeWidth={1.8} aria-hidden />
-              <span className="font-mono text-[9px] font-black uppercase tracking-[0.08em]">{label}</span>
+              <span className="font-mono text-[11px] font-black uppercase tracking-[0.06em]">{label}</span>
             </Link>
           )
         })}
@@ -128,7 +128,7 @@ export default function MobileNav() {
           }`}
         >
           <MoreHorizontal size={18} strokeWidth={1.8} aria-hidden />
-          <span className="font-mono text-[9px] font-black uppercase tracking-[0.08em]">More</span>
+          <span className="font-mono text-[11px] font-black uppercase tracking-[0.06em]">More</span>
         </button>
       </nav>
 
@@ -171,7 +171,7 @@ export default function MobileNav() {
                       : 'bg-[var(--field)] text-[var(--text-primary)] hover:bg-[var(--field-raised)]'
                   }`}
                 >
-                  <span className="font-mono text-[9px] opacity-60">{String(index + 5).padStart(2, '0')}</span>
+                  <span className="font-mono text-[11px] opacity-70">{String(index + 5).padStart(2, '0')}</span>
                   {label}
                   <Icon size={15} strokeWidth={1.8} aria-hidden />
                 </Link>

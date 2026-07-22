@@ -88,16 +88,16 @@ export default function AppHeader({ user }: { user: User }) {
 
         <details ref={accountMenuRef} className="group relative ml-auto">
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--field)] px-2.5 text-[var(--text-muted)] marker:content-none hover:border-[var(--signal)] hover:text-[var(--text-primary)]">
-            <span className="grid h-7 w-7 place-items-center rounded-full border border-[var(--border-strong)] font-mono text-[10px] font-black text-[var(--text-primary)]">
+            <span className="grid h-8 w-8 place-items-center rounded-full border border-[var(--border-strong)] font-mono text-[11px] font-black text-[var(--text-primary)]">
               {initials}
             </span>
-            <span className="hidden text-[10px] font-extrabold uppercase tracking-[0.08em] sm:inline">Account</span>
+            <span className="hidden text-[11px] font-extrabold uppercase tracking-[0.08em] sm:inline">Account</span>
             <ChevronDown className="transition-transform group-open:rotate-180" size={14} aria-hidden />
           </summary>
 
           <div className="absolute right-0 top-[calc(100%+8px)] w-64 overflow-hidden rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--field)] shadow-2xl shadow-black/35">
             <div className="border-b border-[var(--border-subtle)] px-4 py-3">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-quiet)]">Signed in</p>
+              <p className="font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-quiet)]">Signed in</p>
               <p className="mt-1 truncate text-xs text-[var(--text-muted)]">{user.email}</p>
             </div>
 

@@ -447,7 +447,7 @@ export default function NewBetPage() {
               <div className="sm:col-span-2">
                 <label className="label">Event *</label>
                 <input
-                  className={`input w-full ${errors[`legs.${index}.event_name`] ? 'border-red-600' : ''}`}
+                  className={`input w-full ${errors[`legs.${index}.event_name`] ? 'border-[var(--negative)]' : ''}`}
                   placeholder="Germany vs Netherlands"
                   value={leg.event_name}
                   onChange={e => updateLeg(index, 'event_name', e.target.value)}
@@ -460,7 +460,7 @@ export default function NewBetPage() {
               <div>
                 <label className="label">Market *</label>
                 <input
-                  className={`input w-full ${errors[`legs.${index}.market_type`] ? 'border-red-600' : ''}`}
+                  className={`input w-full ${errors[`legs.${index}.market_type`] ? 'border-[var(--negative)]' : ''}`}
                   placeholder="П1 / т2.5 / Ф1 +1"
                   value={leg.market_type}
                   onChange={e => updateLeg(index, 'market_type', e.target.value)}
@@ -483,7 +483,7 @@ export default function NewBetPage() {
               <div>
                 <label className="label">Odds *</label>
                 <input
-                  className={`input w-full ${errors[`legs.${index}.odds`] ? 'border-red-600' : ''}`}
+                  className={`input w-full ${errors[`legs.${index}.odds`] ? 'border-[var(--negative)]' : ''}`}
                   type="number" step="0.0001" min="1.01" inputMode="decimal" placeholder="1.85"
                   value={leg.odds}
                   onChange={e => updateLeg(index, 'odds', e.target.value)}
@@ -525,7 +525,7 @@ export default function NewBetPage() {
           <div>
             <label className="label">Total odds (express) *</label>
             <input
-              className={`input w-full ${errors.total_odds ? 'border-red-600' : ''}`}
+              className={`input w-full ${errors.total_odds ? 'border-[var(--negative)]' : ''}`}
               type="number" step="0.0001" min="1.01" inputMode="decimal" placeholder="7.25"
               value={totalOdds}
               onChange={e => { setTotalOdds(e.target.value); markManualEdit('total_odds') }}
@@ -544,7 +544,7 @@ export default function NewBetPage() {
           <div>
             <label className="label">Stake *</label>
             <input
-              className={`input w-full ${errors.stake ? 'border-red-600' : ''}`}
+              className={`input w-full ${errors.stake ? 'border-[var(--negative)]' : ''}`}
               type="number" step="0.01" min="0.01" inputMode="decimal" placeholder="50"
               value={stake}
               onChange={e => { setStake(e.target.value); markManualEdit('stake') }}

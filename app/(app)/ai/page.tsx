@@ -8,7 +8,7 @@ import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
 import { bucketOdds, bucketStake } from '@/lib/analytics/buckets'
 import RiskEvaluator from '@/components/risk/RiskEvaluator'
-import { Camera, Loader2, Eye, X, CheckCircle, Search } from 'lucide-react'
+import { Camera, Loader2, Eye, X, CheckCircle, Search, FileDown, Share2 } from 'lucide-react'
 import {
   buildAnalystTrustView,
   localizeAnalystTrustSport,
@@ -174,31 +174,30 @@ const LOCALES: { value: Locale; label: string }[] = [
 ]
 
 const REC_CONFIG: Record<Recommendation, { label: string; color: string; bg: string }> = {
-  bet:      { label: 'BET',      color: 'text-green-400',  bg: 'bg-green-950/50 border-green-800' },
-  watch:    { label: 'WATCH',    color: 'text-yellow-400', bg: 'bg-yellow-950/50 border-yellow-800' },
-  skip:     { label: 'SKIP',     color: 'text-gray-400',   bg: 'bg-gray-800/50 border-gray-700' },
-  no_value: { label: 'NO VALUE', color: 'text-red-400',    bg: 'bg-red-950/50 border-red-800' },
+  bet:      { label: 'BET',      color: 'text-[var(--data-value)]', bg: 'border-[var(--border-strong)]' },
+  watch:    { label: 'WATCH',    color: 'text-[var(--review)]', bg: 'border-[var(--review)]' },
+  skip:     { label: 'SKIP',     color: 'text-[var(--text-muted)]', bg: 'border-[var(--border-strong)]' },
+  no_value: { label: 'NO VALUE', color: 'text-[var(--negative)]', bg: 'border-[var(--negative)]' },
 }
 
 const RISK_CONFIG: Record<RiskLevel, { label: string; color: string }> = {
-  low:    { label: 'Low Risk',    color: 'text-green-400' },
-  medium: { label: 'Medium Risk', color: 'text-yellow-400' },
-  high:   { label: 'High Risk',   color: 'text-red-400' },
+  low:    { label: 'Low Risk',    color: 'text-[var(--text-muted)]' },
+  medium: { label: 'Medium Risk', color: 'text-[var(--review)]' },
+  high:   { label: 'High Risk',   color: 'text-[var(--negative)]' },
 }
 
 // ─── Score bar ────────────────────────────────────────────────
 function ScoreBar({ score }: { score: number }) {
-  const color = score > 0 ? 'bg-green-500' : score < 0 ? 'bg-red-500' : 'bg-gray-500'
   return (
     <div className="flex items-center gap-2 mt-0.5">
-      <div className="flex-1 bg-gray-800 rounded-full h-1.5 relative">
-        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-600" />
+      <div className="relative h-1.5 flex-1 bg-[var(--field-raised)]">
+        <div className="absolute bottom-0 left-1/2 top-0 w-px bg-[var(--border-strong)]" />
         <div
-          className={`h-1.5 rounded-full ${color} transition-all`}
+          className="h-1.5 bg-[var(--data-value)] transition-all"
           style={{ width: `${Math.abs(score) / 3 * 50}%`, marginLeft: score >= 0 ? '50%' : `${50 - Math.abs(score) / 3 * 50}%` }}
         />
       </div>
-      <span className={`text-xs font-mono w-6 text-right ${score > 0 ? 'text-green-400' : score < 0 ? 'text-red-400' : 'text-gray-500'}`}>
+      <span className="bn-data-value w-6 text-right font-mono text-xs">
         {score > 0 ? `+${score}` : score}
       </span>
     </div>
@@ -749,7 +748,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
       {/* ── Scout pre-fill indicator ───────────────────────── */}
       {scoutId && !analysis && (
-        <div className="text-xs text-indigo-400 bg-indigo-950/30 border border-indigo-900 rounded-lg px-3 py-2 flex items-center gap-2">
+        <div className="flex items-center gap-2 border border-[var(--signal)] bg-[var(--field-raised)] px-3 py-3 text-xs text-[var(--signal)]">
           <Search size={12} strokeWidth={2} />
           Pre-filled from Scout — enter current odds to analyze
         </div>
@@ -764,10 +763,10 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
             <button
               key={s.value}
               onClick={() => setSport(s.value)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+              className={`bn-button ${
                 sport === s.value
-                  ? 'bg-indigo-600 border-indigo-500 text-white'
-                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
+                  ? 'bn-button-primary'
+                  : 'bn-button-secondary'
               }`}
             >
               {s.label}
@@ -777,28 +776,28 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
       </div>
 
       {/* ── Form ────────────────────────────────────────────── */}
-      <div className="card flex flex-col gap-4">
+      <div className="bn-panel flex flex-col gap-4 p-4 sm:p-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
             <label className="label">Event *</label>
             <input
-              className={`input ${errors.event_name ? 'border-red-600' : ''}`}
+              className={`input ${errors.event_name ? 'border-[var(--negative)]' : ''}`}
               placeholder="Germany vs Netherlands"
               value={form.event_name}
               onChange={e => setField('event_name', e.target.value)}
             />
-            {errors.event_name && <p className="text-xs text-red-400 mt-1">{errors.event_name}</p>}
+            {errors.event_name && <p className="mt-1 text-xs text-[var(--negative)]" role="alert">{errors.event_name}</p>}
           </div>
 
           <div>
             <label className="label">Market *</label>
             <input
-              className={`input ${errors.market_type ? 'border-red-600' : ''}`}
+              className={`input ${errors.market_type ? 'border-[var(--negative)]' : ''}`}
               placeholder="Match Winner / Total / Handicap"
               value={form.market_type}
               onChange={e => setField('market_type', e.target.value)}
             />
-            {errors.market_type && <p className="text-xs text-red-400 mt-1">{errors.market_type}</p>}
+            {errors.market_type && <p className="mt-1 text-xs text-[var(--negative)]" role="alert">{errors.market_type}</p>}
           </div>
 
           <div>
@@ -814,12 +813,12 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           <div>
             <label className="label">Odds *</label>
             <input
-              className={`input ${errors.odds ? 'border-red-600' : ''}`}
+              className={`input ${errors.odds ? 'border-[var(--negative)]' : ''}`}
               type="number" step="0.01" min="1.01" placeholder={scoutId ? 'Enter current odds' : '1.85'}
               value={form.odds}
               onChange={e => setField('odds', e.target.value)}
             />
-            {errors.odds && <p className="text-xs text-red-400 mt-1">{errors.odds}</p>}
+            {errors.odds && <p className="mt-1 text-xs text-[var(--negative)]" role="alert">{errors.odds}</p>}
           </div>
 
           <div>
@@ -857,7 +856,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               value={form.event_time}
               onChange={e => setField('event_time', e.target.value)}
             />
-            <p className="mt-1 text-[11px] text-gray-500">Keep the exact text from the coupon so the Analyst can identify the fixture.</p>
+            <p className="mt-1 text-[11px] text-[var(--text-muted)]">Keep the exact text from the coupon so the Analyst can identify the fixture.</p>
           </div>
 
           <div className="sm:col-span-2">
@@ -1088,25 +1087,25 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               ? 'Якісний розбір наведено вище; точну ймовірність та EV приховано.'
               : 'Qualitative research is shown above; probability and EV remain withheld.'
             return (
-              <div className={`card border ${rec.bg} flex flex-col gap-3`}>
+              <div className={`bn-panel flex flex-col gap-3 p-4 sm:p-5 ${rec.bg}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <span className={`text-lg font-bold ${showPricing ? rec.color : 'text-amber-300'}`}>
+                    <span className={`text-lg font-bold ${showPricing ? rec.color : 'text-[var(--review)]'}`}>
                       {showPricing ? rec.label : a.research_brief ? researchedNoPriceLabel : trust?.label ?? gate?.label ?? 'INSUFFICIENT DATA'}
                     </span>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="mt-0.5 text-xs text-[var(--text-muted)]">
                       {showPricing ? recDetail[a.recommendation] : a.research_brief ? researchedNoPriceSupport : trust?.supportLabel ?? gate?.supportLabel ?? 'Unsupported / partially supported bet'}
                     </p>
                   </div>
                   {showPricing ? (
                   <div className="text-right shrink-0">
                     <span className={`text-xs font-medium ${risk.color}`}>{risk.label}</span>
-                    <p className="text-[11px] text-gray-600 mt-0.5">edge · confidence · market</p>
+                    <p className="mt-0.5 text-[11px] text-[var(--text-quiet)]">edge · confidence · market</p>
                   </div>
                   ) : (
                     <div className="text-right shrink-0">
                       <span className={`text-xs font-medium ${risk.color}`}>{localizedRiskLabel(a.risk_level, risk.label, trust)}</span>
-                      <p className="text-[11px] text-gray-600 mt-0.5">{trust ? `${trust.riskWarningLabel} / ${trust.dataCoverageLabel}` : 'risk warning / data coverage'}</p>
+                      <p className="mt-0.5 text-[11px] text-[var(--text-quiet)]">{trust ? `${trust.riskWarningLabel} / ${trust.dataCoverageLabel}` : 'risk warning / data coverage'}</p>
                     </div>
                   )}
                 </div>
@@ -1115,58 +1114,58 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 {showPricing ? (
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div>
-                    <div className="text-xs text-gray-500 mb-0.5">Model prob.</div>
+                    <div className="mb-0.5 text-xs text-[var(--text-muted)]">Model prob.</div>
                     <div className="bn-data-value text-xl font-bold">{a.model_probability?.toFixed(1)}%</div>
-                    <div className="text-[11px] text-gray-600 mt-0.5">AI win estimate</div>
+                    <div className="mt-0.5 text-[11px] text-[var(--text-quiet)]">AI win estimate</div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 mb-0.5">Implied</div>
-                    <div className="text-xl font-bold text-gray-300">{a.implied_probability?.toFixed(1)}%</div>
-                    <div className="text-[11px] text-gray-600 mt-0.5">From your odds</div>
+                    <div className="mb-0.5 text-xs text-[var(--text-muted)]">Implied</div>
+                    <div className="bn-data-value text-xl font-bold">{a.implied_probability?.toFixed(1)}%</div>
+                    <div className="mt-0.5 text-[11px] text-[var(--text-quiet)]">From your odds</div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 mb-0.5">Edge</div>
-                    <div className={`text-xl font-bold ${(a.edge_percent ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    <div className="mb-0.5 text-xs text-[var(--text-muted)]">Edge</div>
+                    <div className="bn-data-value text-xl font-bold">
                       {(a.edge_percent ?? 0) >= 0 ? '+' : ''}{a.edge_percent?.toFixed(1)}%
                     </div>
-                    <div className="text-[11px] text-gray-600 mt-0.5">Model minus implied</div>
+                    <div className="mt-0.5 text-[11px] text-[var(--text-quiet)]">Model minus implied</div>
                   </div>
                 </div>
                 ) : gate && (
-                  <div className="rounded-lg border border-amber-900/70 bg-amber-950/25 px-3 py-3">
+                  <div className="border border-[var(--review)] bg-[var(--field-raised)] px-3 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="text-xs font-semibold uppercase tracking-wide text-amber-300">{trust?.riskWarningLabel ?? 'Risk warning'}</div>
-                        <div className="text-sm text-amber-100 mt-0.5">{trust?.supportLabel ?? gate.supportLabel}</div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-[var(--review)]">{trust?.riskWarningLabel ?? 'Risk warning'}</div>
+                        <div className="mt-0.5 text-sm text-[var(--text-primary)]">{trust?.supportLabel ?? gate.supportLabel}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xs text-amber-400">{trust?.dataCoverageLabel ?? 'Data coverage'}</div>
-                        <div className="text-lg font-bold text-amber-100">{gate.dataCoverageScore}/100</div>
+                        <div className="text-xs text-[var(--review)]">{trust?.dataCoverageLabel ?? 'Data coverage'}</div>
+                        <div className="bn-data-value text-lg font-bold">{gate.dataCoverageScore}/100</div>
                       </div>
                     </div>
                     {trust?.safeExplanation && (
-                      <p className="text-xs text-amber-100/90 mt-3">{trust.safeExplanation}</p>
+                      <p className="mt-3 text-xs text-[var(--text-primary)]">{trust.safeExplanation}</p>
                     )}
                     {trust && trust.legs.length > 0 ? (
                       <div className="mt-3">
-                        <div className="text-xs font-medium text-amber-300 mb-1">{trust.missingDataChecklistLabel}</div>
+                        <div className="mb-1 text-xs font-medium text-[var(--review)]">{trust.missingDataChecklistLabel}</div>
                         <div className="flex flex-col gap-2">
                           {trust.legs.map(leg => (
-                            <div key={`${leg.legLabel}-${leg.sport}-${leg.legNumber}`} className="text-xs text-amber-100/90 rounded border border-amber-900/40 px-2 py-2">
+                            <div key={`${leg.legLabel}-${leg.sport}-${leg.legNumber}`} className="border border-[var(--border-strong)] px-2 py-2 text-xs text-[var(--text-primary)]">
                               <div className="font-medium">{leg.legLabel} / {leg.sportLabel}</div>
-                              <div className="text-amber-100/75 mt-0.5">{leg.eventName}</div>
-                              <div className="text-amber-100/75">{leg.marketType}{leg.selection ? ` / ${leg.selection}` : ''}</div>
+                              <div className="mt-0.5 text-[var(--text-muted)]">{leg.eventName}</div>
+                              <div className="text-[var(--text-muted)]">{leg.marketType}{leg.selection ? ` / ${leg.selection}` : ''}</div>
                               {leg.periodOrPhase && (
-                                <div className="text-amber-100/75">{trust.locale === 'uk' ? 'Період / фаза' : 'Period / phase'}: {leg.periodOrPhase}</div>
+                                <div className="text-[var(--text-muted)]">{trust.locale === 'uk' ? 'Період / фаза' : 'Period / phase'}: {leg.periodOrPhase}</div>
                               )}
                               {leg.statusSourceLabel && (
-                                <div className="text-amber-100/75">{trust.locale === 'uk' ? 'Джерело статусу' : 'Status source'}: {leg.statusSourceLabel}</div>
+                                <div className="text-[var(--text-muted)]">{trust.locale === 'uk' ? 'Джерело статусу' : 'Status source'}: {leg.statusSourceLabel}</div>
                               )}
                               {leg.odds != null && (
-                                <div className="text-amber-100/75">{trust.locale === 'uk' ? 'Коефіцієнт' : 'Odds'}: {leg.odds}</div>
+                                <div className="text-[var(--text-muted)]">{trust.locale === 'uk' ? 'Коефіцієнт' : 'Odds'}: <span className="bn-data-value">{leg.odds}</span></div>
                               )}
-                              <div className="mt-1 text-amber-200/80">{leg.fixtureStatusLabel} · {leg.supportLabel} · {leg.actionabilityLabel}</div>
-                              <ul className="list-disc pl-4 mt-0.5 text-amber-200/80">
+                              <div className="mt-1 text-[var(--review)]">{leg.fixtureStatusLabel} · {leg.supportLabel} · {leg.actionabilityLabel}</div>
+                              <ul className="mt-0.5 list-disc pl-4 text-[var(--text-muted)]">
                                 {leg.missingData.map(item => <li key={item}>{item}</li>)}
                               </ul>
                             </div>
@@ -1180,16 +1179,16 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 {/* Confidence */}
                 <div>
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-500">{trust?.confidenceLabel ?? 'Confidence'}</span>
-                    <span className="text-gray-300">{a.confidence_score}/100</span>
+                    <span className="text-[var(--text-muted)]">{trust?.confidenceLabel ?? 'Confidence'}</span>
+                    <span className="bn-data-value">{a.confidence_score}/100</span>
                   </div>
-                  <div className="bg-gray-800 rounded-full h-1.5">
+                  <div className="h-1.5 bg-[var(--field-raised)]">
                     <div
-                      className="h-1.5 rounded-full bg-indigo-500 transition-all"
+                      className="h-1.5 bg-[var(--data-value)] transition-all"
                       style={{ width: `${a.confidence_score}%` }}
                     />
                   </div>
-                  <div className="text-[11px] text-gray-600 mt-1">
+                  <div className="mt-1 text-[11px] text-[var(--text-quiet)]">
                     {trust?.locale === 'uk'
                       ? 'Обережна впевненість без розрахунку ціни'
                       : 'How certain the model is in its estimate'}
@@ -1197,55 +1196,54 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 </div>
 
                 {/* Reasoning */}
-                <p className="text-sm text-gray-300 leading-relaxed">{trust && !showPricing ? trust.displayReasoning : a.reasoning}</p>
+                <p className="text-sm leading-relaxed text-[var(--text-primary)]">{trust && !showPricing ? trust.displayReasoning : a.reasoning}</p>
 
                 {/* Disclaimer */}
                 {disclaimerText && (
-                  <p className="text-xs text-gray-500 border-t border-gray-700 pt-2 mt-1">{disclaimerText}</p>
+                  <p className="mt-1 border-t border-[var(--border-subtle)] pt-2 text-xs text-[var(--text-muted)]">{disclaimerText}</p>
                 )}
               </div>
             )
           })()}
 
           {/* Factors */}
-          <div className="card flex flex-col gap-2">
-            <h3 className="text-sm font-semibold text-gray-300 mb-1">
+          <div className="bn-panel flex flex-col gap-2 p-4 sm:p-5">
+            <h3 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">
               {a.research_brief && !pricingVisible
                 ? (trustView?.locale === 'uk' ? 'Перевірка ціни' : 'Pricing verification')
                 : trustView?.factorAnalysisLabel ?? 'Factor Analysis'}
             </h3>
             {(trustView && !pricingVisible ? trustView.displayFactors : a.factors).map((f, i) => (
-              <div key={i} className="py-1.5 border-b border-gray-800 last:border-0">
+              <div key={i} className="border-b border-[var(--border-subtle)] py-2 last:border-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-200">{f.name}</span>
+                  <span className="text-sm text-[var(--text-primary)]">{f.name}</span>
                 </div>
                 <ScoreBar score={f.score} />
-                <p className="text-xs text-gray-500 mt-1">{f.detail}</p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">{f.detail}</p>
               </div>
             ))}
           </div>
 
           {/* PDF + Share */}
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <button
               onClick={downloadPDF}
-              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 flex items-center justify-center gap-1.5"
+              className="bn-button bn-button-secondary w-full sm:flex-1"
             >
-              \uD83D\uDCC4 {trustView?.downloadPdfLabel ?? 'Download PDF'}
+              <FileDown aria-hidden="true" className="h-4 w-4" /> {trustView?.downloadPdfLabel ?? 'Download PDF'}
             </button>
             <button
               onClick={handleShare}
-              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm font-medium transition-colors border border-gray-700 flex items-center justify-center gap-1.5"
-              style={{ color: copied ? '#4ade80' : '#9ca3af' }}
+              className={`bn-button bn-button-secondary w-full sm:flex-1 ${copied ? 'text-[var(--success)]' : ''}`}
             >
-              {copied ? `\u2705 ${trustView?.copiedLabel ?? 'Copied!'}` : `\uD83D\uDD17 ${trustView?.copyToShareLabel ?? 'Copy to share'}`}
+              {copied ? <><CheckCircle aria-hidden="true" className="h-4 w-4" /> {trustView?.copiedLabel ?? 'Copied!'}</> : <><Share2 aria-hidden="true" className="h-4 w-4" /> {trustView?.copyToShareLabel ?? 'Copy to share'}</>}
             </button>
           </div>
 
           {/* Actions */}
           {rootErr && (
-            <div className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
-              {rootErr}
+            <div className="bn-status bn-status-negative w-full justify-start" role="alert">
+              <span className="bn-status-icon" aria-hidden>×</span><span>{rootErr}</span>
             </div>
           )}
 
@@ -1262,7 +1260,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
           {/* Stake input — shown when Place Bet is clicked */}
           {showStake && !showRisk && (
-            <div className="flex gap-2 items-center">
+            <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
               <input
                 type="number"
                 step="0.01"
@@ -1274,7 +1272,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 autoFocus
               />
               <button
-                className="btn-primary px-5"
+                className="bn-button bn-button-primary w-full px-5 sm:w-auto"
                 onClick={() => {
                   const s = parseFloat(stakeStr)
                   if (!stakeStr || isNaN(s) || s <= 0) { setRootErr('Enter a valid stake amount'); return }
@@ -1286,18 +1284,19 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 Check Risk
               </button>
               <button
-                className="px-3 py-2 rounded-lg bg-gray-800 text-gray-500 text-sm border border-gray-700 flex items-center justify-center"
+                className="bn-button bn-button-secondary min-w-11 px-3"
                 onClick={() => { setShowStake(false); setShowRisk(false); setStakeStr(''); setRootErr('') }}
+                aria-label="Cancel stake entry"
               >
                 <X size={14} strokeWidth={2} />
               </button>
             </div>
           )}
 
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row">
             {pricingVisible && (trustView?.showPlaceBet ?? true) && !showStake && (
               <button
-                className="btn-primary flex-1 flex items-center justify-center gap-1.5"
+                className="bn-button bn-button-primary w-full sm:flex-1"
                 onClick={() => {
                   if (analysis?.decision_id) {
                     trackClientEvent(EVENTS.DECISION_ACTION_PLACE_CLICKED, {
@@ -1317,7 +1316,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
             )}
             {trustView?.showWatch !== false && (
               <button
-                className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                className="bn-button bn-button-secondary w-full sm:flex-1"
                 onClick={() => handleAction('watchlisted')}
                 disabled={saving}
               >
@@ -1325,14 +1324,14 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               </button>
             )}
             <button
-              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
+              className="bn-button bn-button-secondary w-full sm:flex-1"
               onClick={() => handleAction('skipped')}
               disabled={saving}
             >
               <X size={14} strokeWidth={2} /> {trustView?.skipLabel ?? 'Skip'}
             </button>
           </div>
-          <p className="text-xs text-gray-600 text-center">
+          <p className="text-center text-xs text-[var(--text-quiet)]">
             {trustView?.locale === 'uk'
               ? 'Пропуск або спостереження буде збережено в історії рішень.'
               : 'Skipping or watching is a valid decision — it will be saved to your history.'}
