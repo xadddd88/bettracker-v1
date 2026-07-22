@@ -130,9 +130,9 @@ test('legacy editorial motion remains isolated from the migrated Home', () => {
   assert.match(ticket, /EXPRESS/);
   assert.match(ticket, /totalOdds\?\.toFixed\(2\)/);
   assert.doesNotMatch(source('src/app/(app)/home.tsx'), /(?:EditorialBackdrop|TimeWarpBackdrop|KineticType)/);
+  assert.doesNotMatch(source('src/app/(app)/ai/index.tsx'), /(?:EditorialBackdrop|TimeWarpBackdrop|KineticType)/);
 
   for (const path of [
-    'src/app/(app)/ai/index.tsx',
     'src/app/(app)/bets/index.tsx',
     'src/app/(app)/bets/new.tsx',
     'src/app/(app)/bets/[id].tsx',

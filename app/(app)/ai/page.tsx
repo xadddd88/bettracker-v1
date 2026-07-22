@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { trackClientEvent } from '@/lib/analytics/client'
@@ -46,6 +47,7 @@ function fileToBase64(file: File): Promise<{ data: string; media_type: string }>
 // ─── Types ────────────────────────────────────────────────────
 type Sport = 'tennis' | 'soccer' | 'cs2' | 'basketball' | 'ice_hockey' | 'mma' | 'other'
 type Locale = 'auto' | 'uk' | 'ru' | 'en' | 'es' | 'fr' | 'de' | 'ar'
+type CaptureMode = 'coupon' | 'event'
 type Recommendation = 'bet' | 'skip' | 'watch' | 'no_value'
 type RiskLevel = 'low' | 'medium' | 'high'
 
@@ -172,31 +174,31 @@ const LOCALES: { value: Locale; label: string }[] = [
 ]
 
 const REC_CONFIG: Record<Recommendation, { label: string; color: string; bg: string }> = {
-  bet:      { label: 'BET',      color: 'text-green-400',  bg: 'bg-green-950/50 border-green-800' },
-  watch:    { label: 'WATCH',    color: 'text-yellow-400', bg: 'bg-yellow-950/50 border-yellow-800' },
-  skip:     { label: 'SKIP',     color: 'text-gray-400',   bg: 'bg-gray-800/50 border-gray-700' },
-  no_value: { label: 'NO VALUE', color: 'text-red-400',    bg: 'bg-red-950/50 border-red-800' },
+  bet:      { label: 'BET',      color: 'text-bn-signal',   bg: 'bg-bn-field border-bn-signal' },
+  watch:    { label: 'WATCH',    color: 'text-bn-review',   bg: 'bg-bn-field border-bn-review' },
+  skip:     { label: 'SKIP',     color: 'text-bn-muted',    bg: 'bg-bn-field border-bn-border-strong' },
+  no_value: { label: 'NO VALUE', color: 'text-bn-negative', bg: 'bg-bn-field border-bn-negative' },
 }
 
 const RISK_CONFIG: Record<RiskLevel, { label: string; color: string }> = {
-  low:    { label: 'Low Risk',    color: 'text-green-400' },
-  medium: { label: 'Medium Risk', color: 'text-yellow-400' },
-  high:   { label: 'High Risk',   color: 'text-red-400' },
+  low:    { label: 'Low Risk',    color: 'text-bn-muted' },
+  medium: { label: 'Medium Risk', color: 'text-bn-review' },
+  high:   { label: 'High Risk',   color: 'text-bn-negative' },
 }
 
 // ─── Score bar ────────────────────────────────────────────────
 function ScoreBar({ score }: { score: number }) {
-  const color = score > 0 ? 'bg-green-500' : score < 0 ? 'bg-red-500' : 'bg-gray-500'
+  const color = score < 0 ? 'bg-bn-negative' : 'bg-bn-data'
   return (
     <div className="flex items-center gap-2 mt-0.5">
-      <div className="flex-1 bg-gray-800 rounded-full h-1.5 relative">
-        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-600" />
+      <div className="relative h-1.5 flex-1 rounded-control bg-bn-raised">
+        <div className="absolute bottom-0 left-1/2 top-0 w-px bg-bn-border-strong" />
         <div
-          className={`h-1.5 rounded-full ${color} transition-all`}
+          className={`h-1.5 rounded-control ${color} transition-all`}
           style={{ width: `${Math.abs(score) / 3 * 50}%`, marginLeft: score >= 0 ? '50%' : `${50 - Math.abs(score) / 3 * 50}%` }}
         />
       </div>
-      <span className={`text-xs font-mono w-6 text-right ${score > 0 ? 'text-green-400' : score < 0 ? 'text-red-400' : 'text-gray-500'}`}>
+      <span className={`w-6 text-right font-mono text-xs ${score < 0 ? 'text-bn-negative' : 'text-bn-data'}`}>
         {score > 0 ? `+${score}` : score}
       </span>
     </div>
@@ -209,6 +211,7 @@ export default function AIAnalystPage() {
   const supabase = createClient()
 
   const fileRef = useRef<HTMLInputElement>(null)
+  const selectedFileRef = useRef<File | null>(null)
   const scanGenerationGateRef = useRef(createAnalystScanGenerationGate())
 
   useEffect(() => { trackClientEvent(EVENTS.AI_PAGE_VIEWED) }, [])
@@ -246,6 +249,8 @@ export default function AIAnalystPage() {
   const [rootErr,    setRootErr]    = useState('')
   const [scanning,   setScanning]   = useState(false)
   const [scanMsg,    setScanMsg]    = useState('')
+  const [captureMode, setCaptureMode] = useState<CaptureMode>('coupon')
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [stakeStr,   setStakeStr]   = useState('')
   const [showStake,  setShowStake]  = useState(false)
   const [showRisk,   setShowRisk]   = useState(false)
@@ -257,6 +262,10 @@ export default function AIAnalystPage() {
     couponStatusText: scannedLiveEnvelope?.statusText,
     legs: couponLegs,
   })
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+  }, [previewUrl])
 
   function setField(k: string, v: string) {
     setForm(f => ({ ...f, [k]: v }))
@@ -310,14 +319,51 @@ export default function AIAnalystPage() {
     }
   }, [])
 
+  const selectCapture = useCallback((file: File) => {
+    selectedFileRef.current = file
+    setPreviewUrl(current => {
+      if (current) URL.revokeObjectURL(current)
+      return URL.createObjectURL(file)
+    })
+    setAnalysis(null)
+    setRootErr('')
+    if (captureMode === 'event') {
+      setScanMsg('Event capture is not connected yet — image kept for review.')
+      return
+    }
+    void runScanner(file)
+  }, [captureMode, runScanner])
+
+  const removeCapture = useCallback(() => {
+    selectedFileRef.current = null
+    setPreviewUrl(current => {
+      if (current) URL.revokeObjectURL(current)
+      return null
+    })
+    setScanMsg('')
+    setScannedCoupon(null)
+  }, [])
+
+  const changeCaptureMode = useCallback((mode: CaptureMode) => {
+    if (scanning || mode === captureMode) return
+    setCaptureMode(mode)
+    setAnalysis(null)
+    if (mode === 'event') {
+      setScanMsg(selectedFileRef.current ? 'Event capture is not connected yet — image kept for review.' : '')
+      return
+    }
+    if (selectedFileRef.current) void runScanner(selectedFileRef.current)
+    else setScanMsg('')
+  }, [captureMode, runScanner, scanning])
+
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const imageItem = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'))
-    if (imageItem) { const f = imageItem.getAsFile(); if (f) runScanner(f) }
-  }, [runScanner])
+    if (imageItem) { const f = imageItem.getAsFile(); if (f) selectCapture(f) }
+  }, [selectCapture])
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (f) runScanner(f); e.target.value = ''
-  }, [runScanner])
+    const f = e.target.files?.[0]; if (f) selectCapture(f); e.target.value = ''
+  }, [selectCapture])
 
   // ── Analyze ────────────────────────────────────────────────
   const handleAnalyze = useCallback(async () => {
@@ -524,7 +570,7 @@ export default function AIAnalystPage() {
       ? `<div class="grid">
   <div class="stat"><div class="stat-label">Model probability</div><div class="stat-value">${a.model_probability?.toFixed(1)}%</div></div>
   <div class="stat"><div class="stat-label">Implied probability</div><div class="stat-value">${a.implied_probability?.toFixed(1)}%</div></div>
-  <div class="stat"><div class="stat-label">Edge</div><div class="stat-value" style="color:${(a.edge_percent ?? 0)>=0?'#16a34a':'#dc2626'}">${(a.edge_percent ?? 0)>=0?'+':''}${a.edge_percent?.toFixed(1)}%</div></div>
+  <div class="stat"><div class="stat-label">Edge</div><div class="stat-value" style="color:${(a.edge_percent ?? 0)>=0?'#C7D0C8':'#FF7474'}">${(a.edge_percent ?? 0)>=0?'+':''}${a.edge_percent?.toFixed(1)}%</div></div>
 </div>`
       : `<div class="quality-gate">
   <div class="gate-kicker">${escapeHtml(trustView?.riskWarningLabel ?? 'Risk warning')}</div>
@@ -536,7 +582,7 @@ export default function AIAnalystPage() {
 </div>`
     const displayFactors = trustView && !showPricing ? trustView.displayFactors : a.factors
     const factorsHtml = displayFactors.map(f =>
-      `<tr><td>${escapeHtml(f.name)}</td><td style="text-align:center;font-weight:bold;color:${f.score>0?'#22c55e':f.score<0?'#ef4444':'#9ca3af'}">${f.score>0?'+':''}${f.score}</td><td style="color:#9ca3af;font-size:12px">${escapeHtml(f.detail)}</td></tr>`
+      `<tr><td>${escapeHtml(f.name)}</td><td style="text-align:center;font-weight:bold;color:${f.score<0?'#FF7474':'#C7D0C8'}">${f.score>0?'+':''}${f.score}</td><td style="color:#59685E;font-size:12px">${escapeHtml(f.detail)}</td></tr>`
     ).join('')
     const blockedTrustView = trustView && !showPricing ? trustView : null
     const localizedPdf = blockedTrustView?.locale === 'uk'
@@ -561,7 +607,7 @@ export default function AIAnalystPage() {
   .research{border:1px solid #111;padding:16px;margin:16px 0}
   .research h2{font-size:20px;margin:8px 0}
   .research-kicker{font-size:10px;font-weight:800;letter-spacing:.08em}
-  .builder{background:#e8ff00;border:1px solid #111;padding:10px;margin:12px 0}
+  .builder{background:#BFFF3B;border:1px solid #334036;color:#061008;padding:10px;margin:12px 0}
   .research-leg{border-top:1px solid #111;padding:12px 0}
   .research-leg p,.research-leg li,.sources li{font-size:12px;line-height:1.5}
   .verdict{border-top:1px solid #111;padding-top:12px}
@@ -656,56 +702,80 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
   }) : false
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6" onPaste={handlePaste}>
-      <section className="editorial-dark relative min-h-[340px] overflow-hidden border border-black p-5 md:p-8">
-        <div className="pointer-events-none absolute -right-4 top-2 select-none font-display text-[clamp(7rem,20vw,13rem)] font-black leading-none tracking-[-0.1em] text-white/[0.055]" aria-hidden>
-          SCAN
-        </div>
-        <div className="relative z-10 flex min-h-[290px] flex-col">
-          <div className="flex justify-between font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-white">
-            <span>AI / Scanner</span>
-            <span>Image to decision</span>
-          </div>
-          <div className="my-auto py-8">
-            <p className="font-mono text-[9px] font-black uppercase tracking-[0.2em] text-[#e8ff00]">Capture stage</p>
-            <h1 className="mt-4 max-w-3xl font-display text-[clamp(3rem,8vw,6.8rem)] font-black uppercase leading-[0.8] tracking-[-0.075em] text-white">
-              Analyze from<br />a screenshot
-            </h1>
-            <p className="mt-6 max-w-xl text-sm leading-6 text-white/60">Upload or paste a coupon, verify every extracted field, then run the supported analysis.</p>
-          </div>
-        </div>
+    <main className="bn-page mx-auto flex w-full max-w-5xl flex-col gap-4 pb-8" onPaste={handlePaste}>
+      <section className="bn-panel relative overflow-hidden p-5 sm:p-7 lg:p-9">
+        <div aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-bn-signal" />
+        <p className="editorial-kicker">AI Scanner · explicit review</p>
+        <h1 className="mt-4 max-w-3xl font-display text-[clamp(2.4rem,7vw,5.5rem)] font-black leading-[0.92] tracking-[-0.055em] text-bn-text">
+          Capture. Extract. Review.
+        </h1>
+        <p className="mt-5 max-w-2xl text-sm leading-6 text-bn-muted sm:text-base">
+          Add a screenshot, verify every extracted field, then choose whether to continue. Analyze never saves a bet automatically.
+        </p>
       </section>
 
       {/* ── Scout pre-fill indicator ───────────────────────── */}
       {scoutId && !analysis && (
-        <div className="text-xs text-indigo-400 bg-indigo-950/30 border border-indigo-900 rounded-lg px-3 py-2 flex items-center gap-2">
+        <div className="flex min-h-11 items-center gap-2 rounded-control border border-bn-signal bg-bn-field px-3 py-2 text-xs text-bn-signal">
           <Search size={12} strokeWidth={2} />
           Pre-filled from Scout — enter current odds to analyse
         </div>
       )}
 
       {/* ── Scanner zone ────────────────────────────────────── */}
-      <div
-        className={`group cursor-pointer border border-black px-5 py-8 text-center transition-colors ${
-          scanning ? 'bg-[#e8ff00]' : 'bg-white hover:bg-[#e8ff00]'
-        }`}
-        onClick={() => !scanning && fileRef.current?.click()}
-      >
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-        {scanning ? (
-          <div className="flex items-center justify-center gap-2 text-sm font-bold text-black">
-            <Loader2 size={14} className="animate-spin" /> {scanMsg}
+      <section className="bn-panel overflow-hidden" aria-labelledby="capture-heading">
+        <div className="grid grid-cols-2 border-b border-bn-border-strong" role="radiogroup" aria-label="Capture type">
+          {(['coupon', 'event'] as const).map((mode, index) => (
+            <button
+              aria-checked={captureMode === mode}
+              className={`min-h-12 border-r border-bn-border-strong px-4 text-left text-xs font-black uppercase tracking-[0.1em] last:border-r-0 ${captureMode === mode ? 'bg-bn-signal text-bn-on-signal' : 'bg-bn-field text-bn-muted hover:bg-bn-raised'}`}
+              disabled={scanning}
+              key={mode}
+              onClick={() => changeCaptureMode(mode)}
+              role="radio"
+              type="button"
+            >
+              <span className="mr-2 font-mono">0{index + 1}</span>{mode}
+            </button>
+          ))}
+        </div>
+
+        <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={handleFileChange} />
+        {previewUrl ? (
+          <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <div className="relative min-h-80 bg-bn-night">
+              <Image alt={`Selected ${captureMode} screenshot preview`} className="h-full w-full object-contain" fill sizes="(max-width: 1024px) 100vw, 70vw" src={previewUrl} unoptimized />
+              {scanning ? <div aria-hidden="true" className="bn-operation-sweep absolute inset-x-0 top-0 h-1 bg-bn-signal" /> : null}
+            </div>
+            <div className="flex flex-col gap-3 border-t border-bn-border-strong p-5 lg:border-l lg:border-t-0">
+              <p id="capture-heading" className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-text">Preview ready</p>
+              <p className="text-sm leading-6 text-bn-muted">Replace or remove the image before continuing. Coupon extraction remains editable below.</p>
+              {scanMsg ? (
+                <div aria-live="polite" className={`rounded-control border p-3 text-sm ${scanning ? 'border-bn-signal text-bn-text' : scanMsg.startsWith('✅') ? 'border-bn-success text-bn-success' : captureMode === 'event' ? 'border-bn-review text-bn-review' : 'border-bn-negative text-bn-negative'}`}>
+                  {scanning ? <Loader2 aria-hidden="true" className="mr-2 inline animate-spin" size={14} /> : null}{scanMsg.replace('✅ ', '')}
+                </div>
+              ) : null}
+              <div className="mt-auto grid gap-2">
+                <button className="bn-button bn-button-secondary" disabled={scanning} onClick={() => fileRef.current?.click()} type="button">Replace image</button>
+                <button className="bn-button bn-button-destructive" disabled={scanning} onClick={removeCapture} type="button">Remove image</button>
+              </div>
+            </div>
           </div>
-        ) : scanMsg ? (
-          <div className="text-sm font-bold text-black">{scanMsg}</div>
         ) : (
-          <div>
-            <div className="mb-3 flex justify-center"><Camera size={28} strokeWidth={1.5} /></div>
-            <p className="font-display text-xl font-black uppercase tracking-[-0.04em]">Choose screenshot</p>
-            <p className="mt-2 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-black/50">Paste, camera export or photo library</p>
-          </div>
+          <button
+            className="group grid min-h-80 w-full place-items-center px-5 py-10 text-center hover:bg-bn-raised"
+            disabled={scanning}
+            onClick={() => fileRef.current?.click()}
+            type="button"
+          >
+            <span>
+              <Camera aria-hidden="true" className="mx-auto text-bn-data" size={34} strokeWidth={1.5} />
+              <span id="capture-heading" className="mt-5 block font-display text-2xl font-black tracking-[-0.04em] text-bn-text">Choose screenshot</span>
+              <span className="mt-2 block text-sm text-bn-muted">Paste, camera export or photo library</span>
+            </span>
+          </button>
         )}
-      </div>
+      </section>
 
       {/* ── Sport selector ──────────────────────────────────── */}
       <div>
@@ -715,10 +785,10 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
             <button
               key={s.value}
               onClick={() => setSport(s.value)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+              className={`min-h-11 rounded-control border px-3 py-2 text-sm font-bold transition-colors ${
                 sport === s.value
-                  ? 'bg-indigo-600 border-indigo-500 text-white'
-                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
+                  ? 'border-bn-signal bg-bn-signal text-bn-on-signal'
+                  : 'border-bn-border-strong bg-bn-field text-bn-muted hover:border-bn-signal'
               }`}
             >
               {s.label}
@@ -728,7 +798,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
       </div>
 
       {/* ── Form ────────────────────────────────────────────── */}
-      <div className="card flex flex-col gap-4">
+      <div className="bn-panel flex flex-col gap-4 p-4 sm:p-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
             <label className="label">Event *</label>
@@ -738,7 +808,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               value={form.event_name}
               onChange={e => setField('event_name', e.target.value)}
             />
-            {errors.event_name && <p className="text-xs text-red-400 mt-1">{errors.event_name}</p>}
+            {errors.event_name && <p className="mt-1 text-xs text-bn-negative">{errors.event_name}</p>}
           </div>
 
           <div>
@@ -749,7 +819,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               value={form.market_type}
               onChange={e => setField('market_type', e.target.value)}
             />
-            {errors.market_type && <p className="text-xs text-red-400 mt-1">{errors.market_type}</p>}
+            {errors.market_type && <p className="mt-1 text-xs text-bn-negative">{errors.market_type}</p>}
           </div>
 
           <div>
@@ -770,7 +840,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               value={form.odds}
               onChange={e => setField('odds', e.target.value)}
             />
-            {errors.odds && <p className="text-xs text-red-400 mt-1">{errors.odds}</p>}
+            {errors.odds && <p className="mt-1 text-xs text-bn-negative">{errors.odds}</p>}
           </div>
 
           <div>
@@ -808,7 +878,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               value={form.event_time}
               onChange={e => setField('event_time', e.target.value)}
             />
-            <p className="mt-1 text-[10px] text-gray-500">Keep the exact text from the coupon so the Analyst can identify the fixture.</p>
+            <p className="mt-1 text-[11px] text-bn-muted">Keep the exact text from the coupon so the Analyst can identify the fixture.</p>
           </div>
 
           <div className="sm:col-span-2">
@@ -823,26 +893,26 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
         </div>
 
         {couponLegs && couponLegs.length > 0 && (
-          <section className="border border-black bg-[#f4f3ed]" aria-labelledby="coupon-legs-heading">
-            <div className="flex items-center justify-between border-b border-black px-4 py-3">
-              <h2 id="coupon-legs-heading" className="font-mono text-[10px] font-black uppercase tracking-[0.16em] text-black">
+          <section className="rounded-control border border-bn-border-strong bg-bn-night" aria-labelledby="coupon-legs-heading">
+            <div className="flex items-center justify-between border-b border-bn-border-strong px-4 py-3">
+              <h2 id="coupon-legs-heading" className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-text">
                 Extracted coupon legs
               </h2>
-              <span className="bg-black px-2 py-1 font-mono text-[9px] font-black text-white">{couponLegs.length}</span>
+              <span className="rounded-control border border-bn-border-strong bg-bn-field px-2 py-1 font-mono text-[11px] font-black text-bn-data">{couponLegs.length}</span>
             </div>
-            <div className="divide-y divide-black/25">
+            <div className="divide-y divide-bn-border-subtle">
               {couponLegs.map((leg, index) => (
                 <article key={`${leg.eventName ?? 'leg'}-${index}`} className="grid gap-2 px-4 py-4 sm:grid-cols-[44px_1fr_auto]">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full border border-black font-mono text-xs font-black text-black">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-control border border-bn-border-strong font-mono text-xs font-black text-bn-muted">
                     {String(index + 1).padStart(2, '0')}
                   </div>
                   <div className="min-w-0">
-                    <p className="font-display text-base font-black text-black">{leg.eventName || form.event_name}</p>
-                    <p className="mt-1 text-sm text-black/65">
+                    <p className="font-display text-base font-black text-bn-text">{leg.eventName || form.event_name}</p>
+                    <p className="mt-1 text-sm text-bn-muted">
                       {leg.marketType || form.market_type}{leg.selection ? ` · ${leg.selection}` : ''}
                     </p>
                   </div>
-                  <div className="font-mono text-sm font-black text-black">
+                  <div className="font-mono text-sm font-black text-bn-data">
                     {leg.odds != null ? Number(leg.odds).toFixed(2) : '—'}
                   </div>
                 </article>
@@ -852,7 +922,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
         )}
 
         {liveCouponBlocked && (
-          <div className="border border-black bg-[#e8ff00] px-4 py-3 text-sm font-bold leading-5 text-black" role="alert">
+          <div className="rounded-control border border-bn-review bg-bn-field px-4 py-3 text-sm font-bold leading-5 text-bn-review" role="alert">
             {locale === 'uk'
               ? 'LIVE ЗАБЛОКОВАНО: для чесного аналізу потрібні поточний рахунок, фаза, ігровий час та актуальна live-лінія. Цей модуль працює лише з pre-match купонами.'
               : 'LIVE BLOCKED: a trustworthy analysis needs the current score, phase, game clock, and current live odds. This module supports pre-match coupons only.'}
@@ -860,7 +930,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
         )}
 
         {rootErr && !analysis && (
-          <div className="border border-black bg-white px-4 py-3 text-sm font-bold text-red-700" role="alert">
+          <div className="rounded-control border border-bn-negative bg-bn-field px-4 py-3 text-sm font-bold text-bn-negative" role="alert">
             {rootErr}
           </div>
         )}
@@ -885,8 +955,8 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
       {/* ── Analysis result ─────────────────────────────────── */}
       {a && (
         <div className="flex flex-col gap-4">
-          <section className={`border border-black px-5 py-4 text-black ${a.web_search_used ? 'bg-[#e8ff00]' : 'bg-white'}`} aria-label="Web research status">
-            <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em]">
+          <section className={`rounded-control border px-5 py-4 ${a.web_search_used ? 'border-bn-signal bg-bn-field text-bn-signal' : 'border-bn-border-strong bg-bn-field text-bn-text'}`} aria-label="Web research status">
+            <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em]">
               {a.web_search_used
                 ? 'Current research verified'
                 : a.web_search_attempted
@@ -901,52 +971,52 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                   : 'This run contains conditional market logic only; no current fact is presented as verified.'}
             </p>
             {a.web_search_failure_reason && (
-              <p className="mt-2 font-mono text-[9px] font-bold uppercase tracking-[0.08em] opacity-60">
+              <p className="mt-2 font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-muted">
                 {a.web_search_failure_reason.replaceAll('_', ' ')}
               </p>
             )}
           </section>
 
           {a.research_brief && (
-            <section className="border border-black bg-white text-black" aria-labelledby="research-brief-heading">
-              <div className="border-b border-black bg-black px-5 py-4 text-white">
+            <section className="overflow-hidden rounded-control border border-bn-border-strong bg-bn-field text-bn-text" aria-labelledby="research-brief-heading">
+              <div className="border-b border-bn-border-strong bg-bn-night px-5 py-4 text-bn-text">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="font-mono text-[9px] font-black uppercase tracking-[0.18em] text-[#e8ff00]">
+                  <p className="font-mono text-[11px] font-black uppercase tracking-[0.14em] text-bn-signal">
                     Conditional market review
                   </p>
-                  <span className="border border-white/40 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-white">
+                  <span className="rounded-control border border-bn-border-strong px-2 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-bn-data">
                     {a.research_brief.legs.length} {a.research_brief.legs.length === 1 ? 'leg' : 'legs'}
                   </span>
                 </div>
-                <h2 id="research-brief-heading" className="mt-4 max-w-3xl font-display text-3xl font-black leading-[0.95] tracking-[-0.045em] text-white md:text-5xl">
+                <h2 id="research-brief-heading" className="mt-4 max-w-3xl font-display text-3xl font-black leading-[0.95] tracking-[-0.045em] text-bn-text md:text-5xl">
                   {a.research_brief.headline}
                 </h2>
-                <p className="mt-4 max-w-3xl text-sm leading-6 text-white/75">{a.research_brief.summary}</p>
-                <p className="mt-3 max-w-3xl border-l-2 border-[#e8ff00] pl-3 font-mono text-[9px] font-bold uppercase leading-4 tracking-[0.08em] text-white/70">
+                <p className="mt-4 max-w-3xl text-sm leading-6 text-bn-muted">{a.research_brief.summary}</p>
+                <p className="mt-3 max-w-3xl border-l-2 border-bn-signal pl-3 font-mono text-[11px] font-bold uppercase leading-4 tracking-[0.08em] text-bn-muted">
                   Narrative analysis is conditional. Only verbatim excerpts under Cited claims are bound to current sources.
                 </p>
               </div>
 
               {a.research_brief.builderRisk && (
-                <div className="border-b border-black bg-[#e8ff00] px-5 py-4">
-                  <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em] text-black">Bet Builder correlation</p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-black">{a.research_brief.builderRisk}</p>
+                <div className="border-b border-bn-border-strong bg-bn-raised px-5 py-4">
+                  <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-review">Bet Builder correlation</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-bn-text">{a.research_brief.builderRisk}</p>
                 </div>
               )}
 
-              <div className="divide-y divide-black">
+              <div className="divide-y divide-bn-border-strong">
                 {a.research_brief.legs.map(leg => (
                   <article key={`${leg.legNumber}-${leg.eventName}-${leg.marketType}`} className="grid gap-4 px-5 py-5 md:grid-cols-[54px_1fr]">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full border border-black font-mono text-xs font-black">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-control border border-bn-border-strong font-mono text-xs font-black text-bn-data">
                       {String(leg.legNumber).padStart(2, '0')}
                     </div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <h3 className="font-display text-xl font-black tracking-[-0.025em]">{leg.eventName}</h3>
-                          <p className="mt-1 text-sm text-black/60">{leg.marketType}{leg.selection ? ` · ${leg.selection}` : ''}</p>
+                          <p className="mt-1 text-sm text-bn-muted">{leg.marketType}{leg.selection ? ` · ${leg.selection}` : ''}</p>
                         </div>
-                        <span className="border border-black px-2 py-1 font-mono text-[9px] font-black uppercase tracking-[0.1em]">
+                        <span className="rounded-control border border-bn-border-strong px-2 py-1 font-mono text-[11px] font-black uppercase tracking-[0.1em] text-bn-muted">
                           {leg.fixtureStatus.replaceAll('_', ' ')}
                         </span>
                       </div>
@@ -954,16 +1024,16 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
                       <div className="mt-4 grid gap-4 md:grid-cols-2">
                         <div>
-                          <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/50">Conditional logic</p>
-                          <ul className="mt-2 space-y-1.5 text-sm leading-5 text-black/75">
+                          <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-muted">Conditional logic</p>
+                          <ul className="mt-2 space-y-1.5 text-sm leading-5 text-bn-muted">
                             {leg.evidence.length > 0
                               ? leg.evidence.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>+ {item}</li>)
                               : <li>+ No additional conditional note.</li>}
                           </ul>
                         </div>
                         <div>
-                          <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/50">Failure modes</p>
-                          <ul className="mt-2 space-y-1.5 text-sm leading-5 text-black/75">
+                          <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-muted">Failure modes</p>
+                          <ul className="mt-2 space-y-1.5 text-sm leading-5 text-bn-muted">
                             {leg.risks.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>− {item}</li>)}
                           </ul>
                         </div>
@@ -973,13 +1043,13 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 ))}
               </div>
 
-              <div className="border-t border-black px-5 py-5">
-                <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em] text-black/50">Analyst verdict</p>
+              <div className="border-t border-bn-border-strong px-5 py-5">
+                <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-muted">Analyst verdict</p>
                 <p className="mt-2 text-base font-bold leading-6">{a.research_brief.verdict}</p>
                 {a.research_brief.dataGaps.length > 0 && (
-                  <div className="mt-4 border-l-4 border-black pl-4">
-                    <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/50">Still unverified</p>
-                    <ul className="mt-2 space-y-1 text-sm text-black/70">
+                  <div className="mt-4 border-l-4 border-bn-review pl-4">
+                    <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-review">Still unverified</p>
+                    <ul className="mt-2 space-y-1 text-sm text-bn-muted">
                       {a.research_brief.dataGaps.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>— {item}</li>)}
                     </ul>
                   </div>
@@ -987,8 +1057,8 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               </div>
 
               {a.research_brief.sourcedClaims.length > 0 && a.research_sources && a.research_sources.length > 0 && (
-                <div className="border-t border-black bg-[#f4f3ed] px-5 py-5">
-                  <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em] text-black/50">Cited claims — verbatim source excerpts</p>
+                <div className="border-t border-bn-border-strong bg-bn-night px-5 py-5">
+                  <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-muted">Cited claims — verbatim source excerpts</p>
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
                     {a.research_brief.sourcedClaims.map((claim, claimIndex) => {
                       const source = a.research_sources?.find(item => item.url === claim.sourceUrl)
@@ -999,11 +1069,11 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                         href={source.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="border border-black bg-white px-3 py-3 text-sm font-bold text-black underline decoration-1 underline-offset-4 hover:bg-[#e8ff00]"
+                        className="rounded-control border border-bn-border-strong bg-bn-field px-3 py-3 text-sm font-bold text-bn-text underline decoration-1 underline-offset-4 hover:border-bn-signal"
                       >
                         <span className="block no-underline">“{claim.text}”</span>
                         <span className="mt-2 block">{source.title}</span>
-                        <span className="mt-1 block font-mono text-[9px] font-black uppercase tracking-[0.08em] no-underline opacity-50">
+                        <span className="mt-1 block font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-muted no-underline">
                           {new URL(source.url).hostname}
                         </span>
                       </a>
@@ -1039,25 +1109,25 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               ? 'Якісний розбір наведено вище; точну ймовірність та EV приховано.'
               : 'Qualitative research is shown above; probability and EV remain withheld.'
             return (
-              <div className={`card border ${rec.bg} flex flex-col gap-3`}>
+              <div className={`rounded-control border p-4 ${rec.bg} flex flex-col gap-3`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <span className={`text-lg font-bold ${showPricing ? rec.color : 'text-amber-300'}`}>
+                    <span className={`text-lg font-bold ${showPricing ? rec.color : 'text-bn-review'}`}>
                       {showPricing ? rec.label : a.research_brief ? researchedNoPriceLabel : trust?.label ?? gate?.label ?? 'INSUFFICIENT DATA'}
                     </span>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="mt-1 text-xs text-bn-muted">
                       {showPricing ? recDetail[a.recommendation] : a.research_brief ? researchedNoPriceSupport : trust?.supportLabel ?? gate?.supportLabel ?? 'Unsupported / partially supported bet'}
                     </p>
                   </div>
                   {showPricing ? (
                   <div className="text-right shrink-0">
                     <span className={`text-xs font-medium ${risk.color}`}>{risk.label}</span>
-                    <p className="text-[10px] text-gray-600 mt-0.5">edge · confidence · market</p>
+                    <p className="mt-1 text-[11px] text-bn-muted">edge · confidence · market</p>
                   </div>
                   ) : (
                     <div className="text-right shrink-0">
                       <span className={`text-xs font-medium ${risk.color}`}>{localizedRiskLabel(a.risk_level, risk.label, trust)}</span>
-                      <p className="text-[10px] text-gray-600 mt-0.5">{trust ? `${trust.riskWarningLabel} / ${trust.dataCoverageLabel}` : 'risk warning / data coverage'}</p>
+                      <p className="mt-1 text-[11px] text-bn-muted">{trust ? `${trust.riskWarningLabel} / ${trust.dataCoverageLabel}` : 'risk warning / data coverage'}</p>
                     </div>
                   )}
                 </div>
@@ -1066,58 +1136,58 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 {showPricing ? (
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div>
-                    <div className="text-xs text-gray-500 mb-0.5">Model prob.</div>
-                    <div className="text-xl font-bold text-white">{a.model_probability?.toFixed(1)}%</div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">AI win estimate</div>
+                    <div className="mb-1 text-xs text-bn-muted">Model prob.</div>
+                    <div className="text-xl font-bold text-bn-data">{a.model_probability?.toFixed(1)}%</div>
+                    <div className="mt-1 text-[11px] text-bn-muted">AI win estimate</div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 mb-0.5">Implied</div>
-                    <div className="text-xl font-bold text-gray-300">{a.implied_probability?.toFixed(1)}%</div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">From your odds</div>
+                    <div className="mb-1 text-xs text-bn-muted">Implied</div>
+                    <div className="text-xl font-bold text-bn-data">{a.implied_probability?.toFixed(1)}%</div>
+                    <div className="mt-1 text-[11px] text-bn-muted">From your odds</div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 mb-0.5">Edge</div>
-                    <div className={`text-xl font-bold ${(a.edge_percent ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    <div className="mb-1 text-xs text-bn-muted">Edge</div>
+                    <div className={`text-xl font-bold ${(a.edge_percent ?? 0) >= 0 ? 'text-bn-data' : 'text-bn-negative'}`}>
                       {(a.edge_percent ?? 0) >= 0 ? '+' : ''}{a.edge_percent?.toFixed(1)}%
                     </div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">Model minus implied</div>
+                    <div className="mt-1 text-[11px] text-bn-muted">Model minus implied</div>
                   </div>
                 </div>
                 ) : gate && (
-                  <div className="rounded-lg border border-amber-900/70 bg-amber-950/25 px-3 py-3">
+                  <div className="rounded-control border border-bn-review bg-bn-night px-3 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="text-xs font-semibold uppercase tracking-wide text-amber-300">{trust?.riskWarningLabel ?? 'Risk warning'}</div>
-                        <div className="text-sm text-amber-100 mt-0.5">{trust?.supportLabel ?? gate.supportLabel}</div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-bn-review">{trust?.riskWarningLabel ?? 'Risk warning'}</div>
+                        <div className="mt-1 text-sm text-bn-text">{trust?.supportLabel ?? gate.supportLabel}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xs text-amber-400">{trust?.dataCoverageLabel ?? 'Data coverage'}</div>
-                        <div className="text-lg font-bold text-amber-100">{gate.dataCoverageScore}/100</div>
+                        <div className="text-xs text-bn-review">{trust?.dataCoverageLabel ?? 'Data coverage'}</div>
+                        <div className="text-lg font-bold text-bn-data">{gate.dataCoverageScore}/100</div>
                       </div>
                     </div>
                     {trust?.safeExplanation && (
-                      <p className="text-xs text-amber-100/90 mt-3">{trust.safeExplanation}</p>
+                      <p className="mt-3 text-xs text-bn-muted">{trust.safeExplanation}</p>
                     )}
                     {trust && trust.legs.length > 0 ? (
                       <div className="mt-3">
-                        <div className="text-xs font-medium text-amber-300 mb-1">{trust.missingDataChecklistLabel}</div>
+                        <div className="mb-1 text-xs font-medium text-bn-review">{trust.missingDataChecklistLabel}</div>
                         <div className="flex flex-col gap-2">
                           {trust.legs.map(leg => (
-                            <div key={`${leg.legLabel}-${leg.sport}-${leg.legNumber}`} className="text-xs text-amber-100/90 rounded border border-amber-900/40 px-2 py-2">
+                            <div key={`${leg.legLabel}-${leg.sport}-${leg.legNumber}`} className="rounded-control border border-bn-border-strong px-2 py-2 text-xs text-bn-text">
                               <div className="font-medium">{leg.legLabel} / {leg.sportLabel}</div>
-                              <div className="text-amber-100/75 mt-0.5">{leg.eventName}</div>
-                              <div className="text-amber-100/75">{leg.marketType}{leg.selection ? ` / ${leg.selection}` : ''}</div>
+                              <div className="mt-1 text-bn-muted">{leg.eventName}</div>
+                              <div className="text-bn-muted">{leg.marketType}{leg.selection ? ` / ${leg.selection}` : ''}</div>
                               {leg.periodOrPhase && (
-                                <div className="text-amber-100/75">{trust.locale === 'uk' ? 'Період / фаза' : 'Period / phase'}: {leg.periodOrPhase}</div>
+                                <div className="text-bn-muted">{trust.locale === 'uk' ? 'Період / фаза' : 'Period / phase'}: {leg.periodOrPhase}</div>
                               )}
                               {leg.statusSourceLabel && (
-                                <div className="text-amber-100/75">{trust.locale === 'uk' ? 'Джерело статусу' : 'Status source'}: {leg.statusSourceLabel}</div>
+                                <div className="text-bn-muted">{trust.locale === 'uk' ? 'Джерело статусу' : 'Status source'}: {leg.statusSourceLabel}</div>
                               )}
                               {leg.odds != null && (
-                                <div className="text-amber-100/75">{trust.locale === 'uk' ? 'Коефіцієнт' : 'Odds'}: {leg.odds}</div>
+                                <div className="text-bn-data">{trust.locale === 'uk' ? 'Коефіцієнт' : 'Odds'}: {leg.odds}</div>
                               )}
-                              <div className="mt-1 text-amber-200/80">{leg.fixtureStatusLabel} · {leg.supportLabel} · {leg.actionabilityLabel}</div>
-                              <ul className="list-disc pl-4 mt-0.5 text-amber-200/80">
+                              <div className="mt-1 text-bn-review">{leg.fixtureStatusLabel} · {leg.supportLabel} · {leg.actionabilityLabel}</div>
+                              <ul className="mt-1 list-disc pl-4 text-bn-muted">
                                 {leg.missingData.map(item => <li key={item}>{item}</li>)}
                               </ul>
                             </div>
@@ -1131,16 +1201,16 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 {/* Confidence */}
                 <div>
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-500">{trust?.confidenceLabel ?? 'Confidence'}</span>
-                    <span className="text-gray-300">{a.confidence_score}/100</span>
+                    <span className="text-bn-muted">{trust?.confidenceLabel ?? 'Confidence'}</span>
+                    <span className="text-bn-data">{a.confidence_score}/100</span>
                   </div>
-                  <div className="bg-gray-800 rounded-full h-1.5">
+                  <div className="h-1.5 rounded-control bg-bn-raised">
                     <div
-                      className="h-1.5 rounded-full bg-indigo-500 transition-all"
+                      className="h-1.5 rounded-control bg-bn-data transition-all"
                       style={{ width: `${a.confidence_score}%` }}
                     />
                   </div>
-                  <div className="text-[10px] text-gray-600 mt-1">
+                  <div className="mt-1 text-[11px] text-bn-muted">
                     {trust?.locale === 'uk'
                       ? 'Обережна впевненість без розрахунку ціни'
                       : 'How certain the model is in its estimate'}
@@ -1148,46 +1218,45 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 </div>
 
                 {/* Reasoning */}
-                <p className="text-sm text-gray-300 leading-relaxed">{trust && !showPricing ? trust.displayReasoning : a.reasoning}</p>
+                <p className="text-sm leading-relaxed text-bn-text">{trust && !showPricing ? trust.displayReasoning : a.reasoning}</p>
 
                 {/* Disclaimer */}
                 {disclaimerText && (
-                  <p className="text-xs text-gray-500 border-t border-gray-700 pt-2 mt-1">{disclaimerText}</p>
+                  <p className="mt-1 border-t border-bn-border-strong pt-2 text-xs text-bn-muted">{disclaimerText}</p>
                 )}
               </div>
             )
           })()}
 
           {/* Factors */}
-          <div className="card flex flex-col gap-2">
-            <h3 className="text-sm font-semibold text-gray-300 mb-1">
+          <div className="bn-panel flex flex-col gap-2 p-4">
+            <h3 className="mb-1 text-sm font-semibold text-bn-text">
               {a.research_brief && !pricingVisible
                 ? (trustView?.locale === 'uk' ? 'Перевірка ціни' : 'Pricing verification')
                 : trustView?.factorAnalysisLabel ?? 'Factor Analysis'}
             </h3>
             {(trustView && !pricingVisible ? trustView.displayFactors : a.factors).map((f, i) => (
-              <div key={i} className="py-1.5 border-b border-gray-800 last:border-0">
+              <div key={i} className="border-b border-bn-border-strong py-2 last:border-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-200">{f.name}</span>
+                  <span className="text-sm text-bn-text">{f.name}</span>
                 </div>
                 <ScoreBar score={f.score} />
-                <p className="text-xs text-gray-500 mt-1">{f.detail}</p>
+                <p className="mt-1 text-xs text-bn-muted">{f.detail}</p>
               </div>
             ))}
           </div>
 
           {/* PDF + Share */}
-          <div className="flex gap-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             <button
               onClick={downloadPDF}
-              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 flex items-center justify-center gap-1.5"
+              className="bn-button bn-button-secondary"
             >
               \uD83D\uDCC4 {trustView?.downloadPdfLabel ?? 'Download PDF'}
             </button>
             <button
               onClick={handleShare}
-              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm font-medium transition-colors border border-gray-700 flex items-center justify-center gap-1.5"
-              style={{ color: copied ? '#4ade80' : '#9ca3af' }}
+              className={`bn-button ${copied ? 'border-bn-success text-bn-success' : 'bn-button-secondary'}`}
             >
               {copied ? `\u2705 ${trustView?.copiedLabel ?? 'Copied!'}` : `\uD83D\uDD17 ${trustView?.copyToShareLabel ?? 'Copy to share'}`}
             </button>
@@ -1195,7 +1264,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
           {/* Actions */}
           {rootErr && (
-            <div className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
+            <div className="rounded-control border border-bn-negative bg-bn-field px-3 py-2 text-xs text-bn-negative" role="alert">
               {rootErr}
             </div>
           )}
@@ -1213,7 +1282,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
           {/* Stake input — shown when Place Bet is clicked */}
           {showStake && !showRisk && (
-            <div className="flex gap-2 items-center">
+            <div className="grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
               <input
                 type="number"
                 step="0.01"
@@ -1237,7 +1306,8 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 Check Risk
               </button>
               <button
-                className="px-3 py-2 rounded-lg bg-gray-800 text-gray-500 text-sm border border-gray-700 flex items-center justify-center"
+                aria-label="Close stake input"
+                className="bn-button bn-button-secondary px-3"
                 onClick={() => { setShowStake(false); setShowRisk(false); setStakeStr(''); setRootErr('') }}
               >
                 <X size={14} strokeWidth={2} />
@@ -1245,10 +1315,10 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
             </div>
           )}
 
-          <div className="flex gap-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             {pricingVisible && (trustView?.showPlaceBet ?? true) && !showStake && (
               <button
-                className="btn-primary flex-1 flex items-center justify-center gap-1.5"
+                className="bn-button bn-button-primary"
                 onClick={() => {
                   if (analysis?.decision_id) {
                     trackClientEvent(EVENTS.DECISION_ACTION_PLACE_CLICKED, {
@@ -1268,7 +1338,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
             )}
             {trustView?.showWatch !== false && (
               <button
-                className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                className="bn-button bn-button-secondary"
                 onClick={() => handleAction('watchlisted')}
                 disabled={saving}
               >
@@ -1276,20 +1346,20 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               </button>
             )}
             <button
-              className="flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
+              className="bn-button bn-button-secondary"
               onClick={() => handleAction('skipped')}
               disabled={saving}
             >
               <X size={14} strokeWidth={2} /> {trustView?.skipLabel ?? 'Skip'}
             </button>
           </div>
-          <p className="text-xs text-gray-600 text-center">
+          <p className="text-center text-xs text-bn-muted">
             {trustView?.locale === 'uk'
               ? 'Пропуск або спостереження буде збережено в історії рішень.'
               : 'Skipping or watching is a valid decision — it will be saved to your history.'}
           </p>
         </div>
       )}
-    </div>
+    </main>
   )
 }
