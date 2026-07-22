@@ -91,21 +91,25 @@ test('support routes remain available outside the focused tab bar', () => {
   }
 });
 
-test('daily Home uses the read model and exposes the editorial workflow', () => {
+test('daily Home uses the read model and exposes the adaptive action workflow', () => {
   const home = source('src/app/(app)/home.tsx');
   const data = source('src/bets/data.ts');
 
   assert.match(home, /fetchBets\(userId\)/);
   assert.match(home, /fetchBankroll\(userId\)/);
-  assert.match(home, /BETTING[\s\S]*?DECISIONS[\s\S]*?IN FOCUS/);
-  assert.match(home, /RECENT BETS/);
-  assert.doesNotMatch(home, /Founder build|CORE WORKFLOW|LOCAL REVIEW|READY|NEXT|LATER/);
+  assert.match(home, /resolveHomeAction/);
+  assert.match(home, /ADAPTIVE ACTION/);
+  assert.match(home, /RECENT RECORDS/);
+  assert.match(home, /BroadcastButton/);
+  assert.doesNotMatch(home, /(?:EditorialBackdrop|TimeWarpBackdrop|withRepeat)/);
+  assert.doesNotMatch(home, /Founder build|CORE WORKFLOW|LOCAL REVIEW|LATER/);
   assert.match(data, /select\(['"]balance, currency['"]\)/);
   assert.doesNotMatch(data, /select\s*\(\s*['"`]\s*\*/);
 });
 
-test('editorial motion system is shared by daily mobile surfaces', () => {
+test('motion system keeps reduced-motion controls without requiring infinite Home decoration', () => {
   const backdrop = source('src/ui/time-warp.tsx');
+  const home = source('src/app/(app)/home.tsx');
   const motion = source('src/ui/motion.tsx');
   const ticket = source('src/ui/bet-ticket.tsx');
   const tabs = source('src/app/(app)/_layout.tsx');
@@ -124,14 +128,6 @@ test('editorial motion system is shared by daily mobile surfaces', () => {
   assert.match(trackerStack, /animation:\s*['"]slide_from_right['"]/);
   assert.match(ticket, /EXPRESS/);
   assert.match(ticket, /totalOdds\?\.toFixed\(2\)/);
-
-  for (const path of [
-    'src/app/(app)/home.tsx',
-    'src/app/(app)/ai/index.tsx',
-    'src/app/(app)/bets/index.tsx',
-    'src/app/(app)/bets/new.tsx',
-    'src/app/(app)/bets/[id].tsx',
-  ]) {
-    assert.match(source(path), /(?:EditorialBackdrop|TimeWarpBackdrop)/);
-  }
+  assert.match(home, /MotionPressable/);
+  assert.doesNotMatch(home, /(?:EditorialBackdrop|TimeWarpBackdrop|withRepeat)/);
 });
