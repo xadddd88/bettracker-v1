@@ -23,7 +23,8 @@
     "test:design-shell": "node scripts/test-broadcast-noir-shell.mjs",
     "test:design-home": "node scripts/test-broadcast-noir-home.mjs",
     "test:design-scanner": "node scripts/test-broadcast-noir-scanner.mjs",
-    "test:design-tracker": "node scripts/test-broadcast-noir-tracker.mjs"
+    "test:design-tracker": "node scripts/test-broadcast-noir-tracker.mjs",
+    "test:design-stats": "node scripts/test-broadcast-noir-stats-decisions.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

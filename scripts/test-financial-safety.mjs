@@ -730,6 +730,8 @@ await withCompiledAlias(async () => {
     assert.equal(p.voidCount, m.voidCount);
     assert.equal(p.pendingCount, m.pendingCount);
     assert.equal(p.avgOdds, m.avgOdds);
+    assert.equal(p.unsupportedCount, m.unsupportedCount);
+    assert.equal(p.unknownCount, m.unknownCount);
   });
 });
 

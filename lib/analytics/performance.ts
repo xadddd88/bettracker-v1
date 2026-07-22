@@ -7,6 +7,8 @@ export interface PerformanceMetrics {
   winRate: number | null
   settledCount: number
   pendingStake: number
+  unsupportedCount: number
+  unknownCount: number
   totalDecisions: number
   conversionRate: number | null
   avgOdds: number | null
@@ -41,6 +43,7 @@ export interface SourcePerf {
   total: number
   won: number
   lost: number
+  void: number
   winRate: number | null
   roi: number | null
   netProfit: number
@@ -115,6 +118,7 @@ export function calcPerformance(
         total: sb.length,
         won: sm.wonCount,
         lost: sm.lostCount,
+        void: sm.voidCount,
         winRate: sm.winRate,
         roi: sm.roi,
         netProfit: sm.netProfit,
@@ -140,6 +144,8 @@ export function calcPerformance(
     winRate: m.winRate,
     settledCount: m.settledCount,
     pendingStake: m.pendingStake,
+    unsupportedCount: m.unsupportedCount,
+    unknownCount: m.unknownCount,
     totalDecisions: decisions.length,
     conversionRate,
     avgOdds: m.avgOdds,

@@ -1,79 +1,74 @@
-import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { PageView } from '@/lib/analytics/PageView'
+
+import {
+  BroadcastDataValue,
+  BroadcastPanel,
+  BroadcastStatus,
+} from '@/components/ui/BroadcastNoir'
 import { EVENTS } from '@/lib/analytics/events'
+import { PageView } from '@/lib/analytics/PageView'
 import {
   buildAnalystDecisionSurfaceView,
   type AnalysisQualityGateResult,
   type AnalystTrustView,
 } from '@/lib/ai/analysis-quality-gate'
+import { createClient } from '@/lib/supabase/server'
+import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
 
 type Filter = 'all' | 'watchlisted' | 'pending' | 'placed' | 'skipped'
 
 interface AnalysisRunRow {
   output_json: {
+    edge_bucket?: string | null
     quality_gate?: AnalysisQualityGateResult | null
     trust_view?: AnalystTrustView | null
-    edge_bucket?: string | null
   } | null
 }
 
 interface DecisionListRow {
-  id: string
-  sport: string | null
-  event_name: string
-  market_type: string | null
-  selection: string | null
-  offered_odds: number | null
-  recommendation: string | null
-  final_action: string
-  confidence_score: number | null
-  model_probability: number | null
-  implied_probability: number | null
-  edge_percent: number | null
-  output_language: string | null
-  created_at: string
   ai_analysis_runs: AnalysisRunRow[] | null
+  confidence_score: number | null
+  created_at: string
+  edge_percent: number | null
+  event_name: string
+  final_action: string
+  id: string
+  implied_probability: number | null
+  market_type: string | null
+  model_probability: number | null
+  offered_odds: number | null
+  output_language: string | null
+  recommendation: string | null
+  selection: string | null
+  sport: string | null
 }
 
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: 'all',         label: 'All' },
-  { value: 'watchlisted', label: 'Watchlisted' },
-  { value: 'pending',     label: 'Pending' },
-  { value: 'placed',      label: 'Placed' },
-  { value: 'skipped',     label: 'Skipped' },
+const FILTERS: Array<{ label: string; value: Filter }> = [
+  { label: 'All', value: 'all' },
+  { label: 'Watchlisted', value: 'watchlisted' },
+  { label: 'Pending', value: 'pending' },
+  { label: 'Placed', value: 'placed' },
+  { label: 'Skipped', value: 'skipped' },
 ]
 
-const REC_CONFIG: Record<string, { label: string; color: string }> = {
-  bet:      { label: 'BET',      color: 'text-green-400'  },
-  watch:    { label: 'WATCH',    color: 'text-yellow-400' },
-  skip:     { label: 'SKIP',     color: 'text-gray-400'   },
-  no_value: { label: 'NO VALUE', color: 'text-red-400'    },
+const ACTION_LABEL: Record<string, string> = {
+  ignored: 'Ignored',
+  pending: 'Pending',
+  placed: 'Placed',
+  skipped: 'Skipped',
+  watchlisted: 'Watchlisted',
 }
 
-const ACTION_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  pending:     { label: 'Pending',     color: 'text-gray-400',   bg: 'bg-gray-800 border-gray-700'     },
-  placed:      { label: 'Placed',      color: 'text-green-400',  bg: 'bg-green-950 border-green-900'   },
-  skipped:     { label: 'Skipped',     color: 'text-gray-500',   bg: 'bg-gray-900 border-gray-700'     },
-  watchlisted: { label: 'Watchlisted', color: 'text-yellow-400', bg: 'bg-yellow-950 border-yellow-900' },
-  ignored:     { label: 'Ignored',     color: 'text-gray-600',   bg: 'bg-gray-900 border-gray-800'     },
+const RECOMMENDATION_LABEL: Record<string, string> = {
+  bet: 'BET',
+  no_value: 'NO VALUE',
+  skip: 'SKIP',
+  watch: 'WATCH',
 }
 
-const SPORT_ICONS: Record<string, string> = {
-  soccer: '⚽', football: '⚽', tennis: '🎾', basketball: '🏀',
-  ice_hockey: '🏒', hockey: '🏒', cs2: '🎯', mma: '🥊', other: '🏅',
-}
-
-const VALID_FILTERS = new Set<string>(['all', 'watchlisted', 'pending', 'placed', 'skipped'])
-
-export default async function DecisionsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ filter?: string }>
-}) {
+export default async function DecisionsPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const { filter: raw } = await searchParams
-  const filter: Filter  = VALID_FILTERS.has(raw ?? '') ? (raw as Filter) : 'all'
-
+  const filter: Filter = FILTERS.some(({ value }) => value === raw) ? raw as Filter : 'all'
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -90,146 +85,118 @@ export default async function DecisionsPage({
     .order('created_at', { ascending: false })
 
   if (filter !== 'all') query = query.eq('final_action', filter)
-
   const { data } = await query
   const decisions = (data ?? []) as unknown as DecisionListRow[]
 
   return (
-    <div className="flex flex-col gap-5">
+    <main className="bn-page mx-auto flex w-full max-w-5xl flex-col gap-4 pb-8">
       <PageView event={EVENTS.DECISIONS_LIST_VIEWED} props={{ filter, count: decisions.length }} />
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <BroadcastPanel className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div>
-          <h1 className="text-2xl font-bold text-white font-display">Decisions</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Every AI analysis saved here — {decisions.length} {filter === 'all' ? 'total' : filter}
-          </p>
+          <p className="editorial-kicker">Decision archive · persisted analyses</p>
+          <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Decisions</h1>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-bn-muted">{decisions.length} {filter === 'all' ? 'records' : filter} in the current view.</p>
         </div>
-        <Link href="/ai" className="btn-primary text-sm">+ Analyze</Link>
-      </div>
+        <Link className="bn-button bn-button-primary" href="/ai">Analyze</Link>
+      </BroadcastPanel>
 
-      {/* Workflow note */}
-      {filter === 'all' && decisions.length > 0 && (
-        <p className="text-xs text-gray-600 px-0.5">Workflow: Analyze a match → place, watch, or skip → placed bets are tracked in Bets.</p>
-      )}
-
-      {/* Filter tabs */}
-      <div className="flex gap-1 bg-gray-900 rounded-lg p-1 w-fit flex-wrap">
-        {FILTERS.map(({ value, label }) => (
+      <nav aria-label="Decision filters" className="flex max-w-full gap-1 overflow-x-auto rounded-control border border-bn-border-strong bg-bn-field p-1">
+        {FILTERS.map(({ label, value }) => (
           <Link
-            key={value}
+            aria-current={filter === value ? 'page' : undefined}
+            className={`bn-button shrink-0 ${filter === value ? 'bn-button-primary' : 'bn-button-secondary'}`}
             href={value === 'all' ? '/decisions' : `/decisions?filter=${value}`}
-            className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
-              filter === value
-                ? 'bg-amber-600/20 text-amber-400'
-                : 'text-slate-400 hover:text-white hover:bg-gray-800'
-            }`}
+            key={value}
           >
             {label}
           </Link>
         ))}
-      </div>
+      </nav>
 
-      {/* List */}
       {decisions.length === 0 ? (
-        <div className="card text-center py-14">
-          <div className="text-4xl mb-3">📋</div>
-          {filter === 'all' ? (
-            <>
-              <p className="font-medium text-white mb-1">No decisions yet</p>
-              <p className="text-slate-400 text-sm mb-5">
-                Every AI analysis you run is saved here. Place, watch, or skip — all actions are tracked.
-              </p>
-              <Link href="/ai" className="btn-primary inline-flex text-sm">Analyze a match</Link>
-            </>
-          ) : (
-            <p className="text-slate-400 text-sm">No {filter} decisions.</p>
-          )}
-        </div>
+        <BroadcastPanel className="grid min-h-72 place-items-center p-6 text-center">
+          <div className="max-w-md">
+            <BroadcastStatus status="neutral">Empty · no {filter === 'all' ? '' : `${filter} `}decisions</BroadcastStatus>
+            <h2 className="mt-5 font-display text-3xl font-black tracking-[-0.04em] text-bn-text">No records in this view</h2>
+            <p className="mt-3 text-sm leading-6 text-bn-muted">An analysis is saved here only through the existing decision contract.</p>
+            {filter === 'all' ? <Link className="bn-button bn-button-primary mt-6" href="/ai">Analyze a match</Link> : null}
+          </div>
+        </BroadcastPanel>
       ) : (
-        <div className="card p-0 divide-y divide-gray-800">
-          {decisions.map((d) => {
-            const rec    = d.recommendation ? REC_CONFIG[d.recommendation] : null
-            const action = ACTION_CONFIG[d.final_action] ?? ACTION_CONFIG.pending
-            const icon   = SPORT_ICONS[d.sport ?? ''] ?? '🏅'
-            const analysisOutput = d.ai_analysis_runs?.[0]?.output_json ?? null
-            const qualityGate = analysisOutput?.quality_gate ?? null
-            const trustView = analysisOutput?.trust_view ?? null
+        <ol aria-label="Saved decisions" className="space-y-3">
+          {decisions.map((decision) => {
+            const analysisOutput = decision.ai_analysis_runs?.[0]?.output_json ?? null
             const surface = buildAnalystDecisionSurfaceView({
-              qualityGate,
-              trustView,
-              locale:             d.output_language,
-              sport:              d.sport,
-              eventName:          d.event_name,
-              marketType:         d.market_type ?? '',
-              selection:          d.selection,
-              offeredOdds:        d.offered_odds,
-              recommendation:     d.recommendation,
-              finalAction:        d.final_action,
-              confidenceScore:    d.confidence_score,
-              modelProbability:   d.model_probability,
-              impliedProbability: d.implied_probability,
-              edgePercent:        d.edge_percent,
-              edgeBucket:         analysisOutput?.edge_bucket,
+              confidenceScore: decision.confidence_score,
+              edgeBucket: analysisOutput?.edge_bucket,
+              edgePercent: decision.edge_percent,
+              eventName: decision.event_name,
+              finalAction: decision.final_action,
+              impliedProbability: decision.implied_probability,
+              locale: decision.output_language,
+              marketType: decision.market_type ?? '',
+              modelProbability: decision.model_probability,
+              offeredOdds: decision.offered_odds,
+              qualityGate: analysisOutput?.quality_gate ?? null,
+              recommendation: decision.recommendation,
+              selection: decision.selection,
+              sport: decision.sport,
+              trustView: analysisOutput?.trust_view ?? null,
             })
-            const recommendationLabel = surface.isTrustBlocked ? surface.listRecommendationLabel : rec?.label
-            const recommendationColor = surface.isTrustBlocked ? 'text-amber-300' : rec?.color
-            const actionLabel = surface.isTrustBlocked ? surface.actionLabel : action.label
-            const date   = new Date(d.created_at).toLocaleDateString('en-GB', {
-              day: '2-digit', month: 'short',
-            })
-            const market = [d.market_type, d.selection].filter(Boolean).join(' · ') || '—'
+            const recommendation = surface.isTrustBlocked
+              ? surface.listRecommendationLabel
+              : decision.recommendation
+                ? RECOMMENDATION_LABEL[decision.recommendation]
+                : null
+            const actionLabel = surface.isTrustBlocked
+              ? surface.actionLabel
+              : ACTION_LABEL[decision.final_action] ?? 'Pending'
 
             return (
-              <Link
-                key={d.id}
-                href={`/decisions/${d.id}`}
-                className="flex items-center gap-4 px-4 py-3.5 hover:bg-gray-800/30 transition-colors"
-              >
-                {/* Sport icon */}
-                <span className="shrink-0 w-12 text-center">
-                  <span className="block text-xl">{icon}</span>
-                  <span className="block text-[10px] text-slate-600 truncate">{surface.sportLabel}</span>
-                </span>
+              <li key={decision.id}>
+                <Link className="block" href={`/decisions/${decision.id}`}>
+                  <BroadcastPanel className="grid gap-4 p-5 transition-colors hover:bg-bn-raised sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-muted">{surface.sportLabel}</span>
+                        <BroadcastStatus status={actionTone(decision.final_action)}>{actionLabel}</BroadcastStatus>
+                      </div>
+                      <h2 className="mt-4 break-words font-display text-xl font-black tracking-[-0.035em] text-bn-text">{decision.event_name}</h2>
+                      <p className="mt-2 break-words text-sm leading-6 text-bn-muted">
+                        {[decision.market_type, decision.selection].filter(Boolean).join(' · ') || 'Market not recorded'}
+                      </p>
+                      {recommendation ? (
+                        <p className={`mt-3 text-xs font-black uppercase tracking-[0.08em] ${surface.isTrustBlocked ? 'text-bn-review' : 'text-bn-text'}`}>
+                          {recommendation}
+                        </p>
+                      ) : null}
+                    </div>
 
-                {/* Event + market */}
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-white truncate">{d.event_name}</div>
-                  <div className="text-xs text-slate-500 mt-0.5 truncate">
-                    {market}
-                    {d.offered_odds ? ` · @${d.offered_odds}` : ''}
-                  </div>
-                </div>
-
-                {/* AI recommendation */}
-                {recommendationLabel && (
-                  <span className={`text-xs font-semibold shrink-0 hidden sm:block ${recommendationColor ?? 'text-slate-400'}`}>
-                    {recommendationLabel}
-                  </span>
-                )}
-
-                {/* Confidence */}
-                <div className="shrink-0 hidden md:block w-10 text-right">
-                  {d.confidence_score != null ? (
-                    <span className="text-xs text-slate-400 font-mono">{d.confidence_score}%</span>
-                  ) : (
-                    <span className="text-xs text-slate-700">—</span>
-                  )}
-                </div>
-
-                {/* Date */}
-                <span className="text-xs text-slate-600 shrink-0 hidden sm:block">{date}</span>
-
-                {/* Action badge */}
-                <span className={`text-xs px-2.5 py-1 rounded-full font-medium border shrink-0 ${action.bg} ${action.color}`}>
-                  {actionLabel}
-                </span>
-              </Link>
+                    <dl className="grid grid-cols-3 gap-4 border-t border-bn-border-subtle pt-4 lg:min-w-64 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+                      <DataPoint label="Odds" value={decision.offered_odds?.toFixed(2) ?? '—'} />
+                      <DataPoint label="Confidence" value={decision.confidence_score == null ? '—' : `${decision.confidence_score}/100`} />
+                      <DataPoint label="Saved" value={formatDate(decision.created_at)} />
+                    </dl>
+                  </BroadcastPanel>
+                </Link>
+              </li>
             )
           })}
-        </div>
+        </ol>
       )}
-    </div>
+    </main>
   )
+}
+
+function DataPoint({ label, value }: { label: string; value: string }) {
+  return <div className="min-w-0"><dt className="font-mono text-[11px] font-bold uppercase tracking-[0.05em] text-bn-quiet">{label}</dt><dd><BroadcastDataValue className="mt-1 block break-words text-sm font-black">{value}</BroadcastDataValue></dd></div>
+}
+
+function actionTone(action: string): BroadcastNoirStatus {
+  return action === 'pending' || action === 'watchlisted' ? 'review' : 'neutral'
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value))
 }

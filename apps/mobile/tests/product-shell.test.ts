@@ -98,6 +98,10 @@ test('support routes remain available outside the focused tab bar', () => {
   ]) {
     assert.equal(existsSync(join(root, path)), true, `${path} should exist`);
   }
+
+  const more = source('src/app/(app)/more.tsx');
+  assert.match(more, /label=["']Stats["']/);
+  assert.match(more, /router\.push\('\/\(app\)\/stats'\)/);
 });
 
 test('daily Home uses the read model and exposes trusted Adaptive Action', () => {
