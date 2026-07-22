@@ -6,24 +6,24 @@ import { EVENTS } from '@/lib/analytics/events'
 
 const STEPS = [
   {
-    icon:  '🤖',
-    title: 'AI-powered analysis',
-    body:  'The AI Analyst evaluates edge, confidence, and risk for any market. Paste a match description and get a structured recommendation in seconds.',
+    index: '01',
+    title: 'Capture the coupon',
+    body: 'Scan a screenshot into a reviewable draft. Scanner output never saves a bet automatically.',
   },
   {
-    icon:  '🔍',
-    title: 'Scout for value bets',
-    body:  "Scout searches for opportunities across sports and leagues. Save promising finds to your watchlist and convert them to decisions when you're ready.",
+    index: '02',
+    title: 'Verify every field',
+    body: 'Check the event, market, selection, odds and stake against the original coupon before saving.',
   },
   {
-    icon:  '🎯',
-    title: 'Track every bet',
-    body:  "Log bets manually, scan coupons from screenshots, or place directly from the AI's recommendation. Risk Manager checks your bankroll before each bet.",
+    index: '03',
+    title: 'Track the record',
+    body: 'Single and Express records stay editable until you choose to save them to the Tracker.',
   },
   {
-    icon:  '📈',
-    title: 'Improve with data',
-    body:  'Analytics shows your win rate, ROI, and trends over time. The Coach Agent reads your history and gives personalised advice to sharpen your edge.',
+    index: '04',
+    title: 'Record known outcomes',
+    body: 'Portfolio statistics use only saved stakes and recorded settlement outcomes. Missing data remains visibly unresolved.',
   },
 ]
 
@@ -63,19 +63,19 @@ export default function OnboardingCard() {
   const isLast  = step === STEPS.length - 1
 
   return (
-    <div className="card border border-amber-800/40 bg-amber-950/10">
+    <aside className="bn-panel p-4 sm:p-5" aria-label="BetTracker orientation">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="text-2xl shrink-0">{current.icon}</span>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center border border-[var(--border-strong)] bg-[var(--field-raised)] font-mono text-xs font-black text-[var(--signal)]">{current.index}</span>
           <div className="min-w-0">
-            <p className="text-xs font-medium text-amber-500/80 uppercase tracking-wider">
-              Welcome to BetTracker AI &middot; {step + 1} of {STEPS.length}
+            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-quiet)]">
+              Founder orientation / {step + 1} of {STEPS.length}
             </p>
-            <h2 className="text-base font-semibold text-white mt-0.5">{current.title}</h2>
+            <h2 className="mt-1 text-base font-black text-[var(--text-primary)]">{current.title}</h2>
           </div>
         </div>
         <button
-          className="text-slate-500 hover:text-slate-300 transition-colors text-xs shrink-0 pt-0.5"
+          className="flex min-h-11 min-w-11 shrink-0 items-center justify-center border border-transparent text-sm font-bold text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
           onClick={() => markComplete(step + 1)}
           disabled={closing}
           aria-label="Dismiss onboarding"
@@ -84,43 +84,42 @@ export default function OnboardingCard() {
         </button>
       </div>
 
-      <p className="text-sm text-slate-400 mt-3 leading-relaxed">{current.body}</p>
+      <p className="mt-4 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">{current.body}</p>
 
-      <div className="flex items-center gap-4 mt-4">
-        {/* Step dots */}
+      <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-1.5 flex-1">
           {STEPS.map((_, i) => (
             <div
               key={i}
-              className={`h-1 rounded-full transition-all duration-200 ${
+              className={`h-1 transition-all duration-200 ${
                 i === step
-                  ? 'w-5 bg-amber-400'
+                  ? 'w-6 bg-[var(--signal)]'
                   : i < step
-                  ? 'w-2 bg-amber-700/60'
-                  : 'w-2 bg-gray-700'
+                  ? 'w-3 bg-[var(--text-muted)]'
+                  : 'w-3 bg-[var(--border-subtle)]'
               }`}
             />
           ))}
         </div>
 
-        <div className="flex gap-2 shrink-0">
+        <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
           {step > 0 && (
             <button
-              className="btn-ghost text-xs py-1.5 px-3"
+              className="btn-ghost w-full sm:w-auto"
               onClick={() => setStep(s => s - 1)}
             >
-              &larr; Back
+              Back
             </button>
           )}
           <button
-            className="btn-primary text-sm px-4 py-1.5"
+            className="btn-primary w-full sm:w-auto"
             onClick={handleNext}
             disabled={closing}
           >
-            {isLast ? '✓ Got it' : 'Next →'}
+            {isLast ? 'Finish' : 'Next'}
           </button>
         </div>
       </div>
-    </div>
+    </aside>
   )
 }
