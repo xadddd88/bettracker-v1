@@ -1,7 +1,7 @@
 # Decision #065 — Broadcast Noir Cross-Platform Rollout
 
 Date: 2026-07-21
-Status: ACTIVE / DRAFT PR A + STACKED DRAFT PR B
+Status: ACTIVE / INTEGRATION DRAFT PR #202
 Approved by: Founder
 
 ## Decision
@@ -88,16 +88,33 @@ explicit label and symbol. Odds and non-status numbers use `dataValue`.
 
 ## Rollout sequence
 
-1. PR A — semantic tokens, primitives, contrast/parity and CI gate.
-2. PR B — brand shell/navigation/platform assets and native system behavior.
-3. PR C — Adaptive Action Home; no Event First.
-4. PR D — Scanner/AI cinematic treatment without network/auth/payload changes.
-5. PR E — operational Tracker list/detail without financial logic changes.
-6. PR F — statistics and Decision surfaces without new analytical claims.
-7. PR G — cross-platform screenshot, accessibility, performance, and polish QA.
+1. PR A / #187 — semantic tokens, primitives, contrast/parity and CI gate.
+2. PR B / #188 — brand shell/navigation/platform assets and native system behavior.
+3. PR C / #190 — Adaptive Action Home; no Event First.
+4. PR D / #194 — Scanner/AI cinematic treatment without network/auth/payload changes.
+5. PR E / #195 — operational Tracker list/detail without financial logic changes.
+6. PR F / #196 — statistics and Decision surfaces without new analytical claims.
+7. PR G / #197 — complete cross-platform rollout and polish QA.
+8. PR H / #199 — Scanner → editable Tracker draft, SafeArea, sport grouping, and P&L display corrections.
+9. PR I / #200 — Web accessibility and hermetic acceptance coverage.
+10. PR J / #201 — preblocked external WebSockets in the Web acceptance harness.
 
 Each PR remains independently reviewable. A later PR may not silently absorb a
 database, provider, financial, route, or Event First change.
+
+## Integration checkpoint
+
+The verified chain is #187 → #188 → #190 → #194 → #195 → #196 → #197 →
+#199 → #200 → #201. Stages PR A–J, including the full Web rollout, are present
+in Integration Draft PR #202. Decision #065 remains ACTIVE: the integration PR
+is not Ready, not merged, and not production-deployed.
+
+Web is prepared first. The integration diff also contains the reviewed mobile
+source, but it authorizes no mobile release. Scanner hands only a reviewed,
+editable draft to Tracker; the sole write action is an explicit manual Save
+after Review through the existing authenticated `POST /api/bets/tracked`.
+Auto-save does not exist. The server route, RPC, schema, migrations, settlement
+behavior, and financial formulas were not changed by this rollout.
 
 ## Event First gate
 
@@ -110,23 +127,23 @@ validated end to end.
 
 ## Explicit non-authorization
 
-Decision #065 PR A authorizes no Supabase operation, migration 025 apply,
-application caller, provider call, result write, grading/settlement caller,
-payout/refund/bankroll change, route change, Event First activation, production
-smoke, Ready transition, merge, deployment, EAS Build, or EAS Update.
+Decision #065 and Integration Draft PR #202 authorize no Supabase/DB write,
+migration apply, new server route/RPC/schema, provider/AI runtime call, result
+write, grading/settlement caller, payout/refund/bankroll change, Event First
+activation, production smoke or deployment, Ready transition, merge, EAS Build
+or Update, Android/iPhone build, beta distribution, or app publication.
 
 FP-001, Decision #057, Decision #064, and all existing auth, rate-limit,
 idempotency, scanner no-auto-save, and financial boundaries remain active.
 
-PR B additionally authorizes only the shell/navigation/native-brand boundary
-listed above. It authorizes no new route, data read/write, provider call,
-financial behavior, Event First state, EAS Build, EAS Update, Ready transition,
-merge, production deployment, or production smoke. Predictive Back cannot be
-marked complete until the documented device matrix is recorded.
+The presence of mobile source authorizes only the reviewed source boundary
+listed above. It does not authorize EAS, device builds, beta, publication, or a
+production mobile smoke. Predictive Back cannot be marked device-verified until
+the documented device matrix is recorded under separate authority.
 
 ## Acceptance evidence
 
-PR A is acceptable only when:
+The Integration Draft is acceptable only when:
 
 - canonical, CSS, Web, and mobile semantic values remain in parity;
 - the pinned contrast matrix passes;
@@ -134,10 +151,17 @@ PR A is acceptable only when:
 - action/success/review/negative forms remain distinguishable without hue;
 - Web TypeScript, mobile TypeScript, root safety suites, mobile regression tests,
   preview smoke, and Vercel Preview are successful on the exact PR head;
-- the diff contains no screen, route, Supabase, migration, provider, financial,
-  Event First, production, or deployment change.
+- the verified source preserves authentication, idempotency, manual Save,
+  no-auto-save, provider, financial, settlement, and Event First boundaries;
+- the integration remains Draft and neither Web nor mobile is production-released.
+
+## Non-blocking P3 follow-up
+
+1. Rerun axe and overflow checks after interactive states.
+2. Cover overflow of the internal shell scroll container.
+3. Normalize IPv6 loopback `[::1]` in the test harness.
 
 ## Numbering
 
-Decision #065 is occupied and ACTIVE as Draft PR A plus stacked Draft PR B.
+Decision #065 is occupied and ACTIVE in Integration Draft PR #202.
 Decision #066 is the next unreserved number.

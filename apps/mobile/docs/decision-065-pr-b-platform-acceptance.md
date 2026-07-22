@@ -1,6 +1,6 @@
 # Decision #065 PR B — Native Platform Acceptance
 
-Date: 2026-07-21  
+Date: 2026-07-21
 Status: DRAFT / STATIC GATES PASSED / DEVICE EVIDENCE REQUIRED
 
 ## Scope
