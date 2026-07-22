@@ -35,11 +35,12 @@ export default async function BankrollPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="bn-page flex flex-col gap-6">
       <PageView event={EVENTS.BANKROLL_PAGE_VIEWED} />
       <div>
-        <h1 className="text-2xl font-bold text-white">Bankroll</h1>
-        <p className="text-sm text-gray-500 mt-1">Your dedicated betting fund — track deposits, stake usage, and net results from settled bets.</p>
+        <p className="editorial-kicker">Capital desk</p>
+        <h1 className="mt-2 font-display text-3xl font-black text-[var(--text-primary)]">Bankroll</h1>
+        <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">Your dedicated betting fund — track deposits, stake usage, and net results from settled bets.</p>
       </div>
       {bankroll ? (
         <BankrollView
@@ -49,9 +50,9 @@ export default async function BankrollPage() {
           stats={{ totalDeposited, totalWithdrawn, netFromBets }}
         />
       ) : (
-        <div className="card text-center py-12">
-          <p className="text-red-400 text-sm font-medium mb-1">Bankroll not set up</p>
-          <p className="text-gray-500 text-xs">Your default bankroll could not be loaded. Try refreshing — if this persists, contact support.</p>
+        <div className="bn-panel border-[var(--negative)] px-5 py-12 text-center">
+          <p className="text-sm font-bold text-[var(--negative)]">× Bankroll not set up</p>
+          <p className="mt-2 text-xs text-[var(--text-muted)]">Your default bankroll could not be loaded. Try refreshing — if this persists, contact support.</p>
         </div>
       )}
     </div>

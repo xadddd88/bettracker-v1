@@ -66,10 +66,10 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
   }, [displayName, currency, defaultStake, kellyFraction, webSearchEnabled, timezone])
 
   return (
-    <div className="flex flex-col gap-6 max-w-lg">
+    <div className="bn-page flex max-w-2xl flex-col gap-5">
       {/* Profile */}
-      <div className="card flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Profile</h2>
+      <div className="bn-panel flex flex-col gap-4 p-4 sm:p-5">
+        <h2 className="editorial-kicker">Profile</h2>
         <div>
           <label className="label">Display name</label>
           <input
@@ -84,8 +84,8 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
       </div>
 
       {/* Currency & Bankroll */}
-      <div className="card flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Currency & Bankroll</h2>
+      <div className="bn-panel flex flex-col gap-4 p-4 sm:p-5">
+        <h2 className="editorial-kicker">Currency & Bankroll</h2>
         <div>
           <label className="label">Currency</label>
           <div className="flex gap-2 flex-wrap mt-1">
@@ -94,24 +94,24 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
                 key={c}
                 type="button"
                 onClick={() => setCurrency(c)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                className={`bn-button min-w-20 ${
                   currency === c
-                    ? 'bg-indigo-600 border-indigo-500 text-white'
-                    : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
+                    ? 'bn-button-primary'
+                    : 'bn-button-secondary'
                 }`}
               >
                 {CURRENCY_SYMBOLS[c]} {c}
               </button>
             ))}
           </div>
-          <p className="text-[11px] text-amber-500 mt-1.5">
-            ⚠ Changing currency does not convert your balance.
+          <p className="mt-2 border-l-2 border-[var(--review)] pl-3 text-xs text-[var(--review)]">
+            ! Changing currency does not convert your balance.
           </p>
         </div>
         <div>
           <label className="label">Default stake</label>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-gray-500 text-sm">{CURRENCY_SYMBOLS[currency]}</span>
+            <span className="text-sm text-[var(--text-muted)]">{CURRENCY_SYMBOLS[currency]}</span>
             <input
               className="input flex-1"
               type="number"
@@ -126,14 +126,14 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
       </div>
 
       {/* AI & Analysis */}
-      <div className="card flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">AI & Analysis</h2>
+      <div className="bn-panel flex flex-col gap-4 p-4 sm:p-5">
+        <h2 className="editorial-kicker">AI & Analysis</h2>
         <div>
           <label className="label">
-            Kelly fraction — <span className="text-indigo-400 font-mono">{kellyFraction.toFixed(2)}×</span>
+            Kelly fraction — <span className="bn-data-value font-mono">{kellyFraction.toFixed(2)}×</span>
           </label>
           <input
-            className="w-full mt-2 accent-indigo-500"
+            className="mt-2 w-full accent-[var(--signal)]"
             type="range"
             min={0.1}
             max={1.0}
@@ -141,7 +141,7 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
             value={kellyFraction}
             onChange={e => setKellyFraction(parseFloat(e.target.value))}
           />
-          <div className="flex justify-between text-[10px] text-gray-600 mt-0.5">
+          <div className="mt-1 flex justify-between text-xs text-[var(--text-muted)]">
             <span>0.10× (cautious)</span>
             <span>1.00× (full Kelly)</span>
           </div>
@@ -149,7 +149,7 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <label className="label">Web search in Scout & Analyst</label>
-            <p className="text-[11px] text-gray-600 mt-0.5">
+            <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
               Allows Scout and Analyst to consult current sources. Exact pricing still requires verified model inputs. Requires server-side activation.
             </p>
           </div>
@@ -158,20 +158,21 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
             role="switch"
             aria-checked={webSearchEnabled}
             onClick={() => setWebSearchEnabled(v => !v)}
-            className={`relative shrink-0 mt-0.5 w-10 h-5 rounded-full transition-colors ${
-              webSearchEnabled ? 'bg-indigo-600' : 'bg-gray-700'
+            className={`relative mt-0.5 h-7 w-12 shrink-0 rounded-full border transition-colors ${
+              webSearchEnabled ? 'border-[var(--signal)] bg-[var(--signal)]' : 'border-[var(--border-strong)] bg-[var(--field-raised)]'
             }`}
+            aria-label="Web search in Scout and Analyst"
           >
-            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-              webSearchEnabled ? 'translate-x-5' : 'translate-x-0.5'
+            <span className={`absolute top-1 h-[18px] w-[18px] rounded-full bg-[var(--text-primary)] transition-transform ${
+              webSearchEnabled ? 'translate-x-6' : 'translate-x-1'
             }`} />
           </button>
         </div>
       </div>
 
       {/* Account */}
-      <div className="card flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Account</h2>
+      <div className="bn-panel flex flex-col gap-4 p-4 sm:p-5">
+        <h2 className="editorial-kicker">Account</h2>
         <div>
           <label className="label">Email</label>
           <input
@@ -191,23 +192,23 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
             value={timezone}
             onChange={e => setTimezone(e.target.value)}
           />
-          <p className="text-[11px] text-gray-600 mt-0.5">e.g. Europe/Kyiv, America/New_York</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">e.g. Europe/Kyiv, America/New_York</p>
         </div>
       </div>
 
       {errorMsg && (
-        <div className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
-          {errorMsg}
+        <div className="bn-status bn-status-negative w-full justify-start" role="alert">
+          <span className="bn-status-icon" aria-hidden>×</span><span>{errorMsg}</span>
         </div>
       )}
       {successMsg && (
-        <div className="text-xs text-green-400 bg-green-950/40 border border-green-900 rounded-lg px-3 py-2">
-          ✓ {successMsg}
+        <div className="bn-status bn-status-success w-full justify-start" role="status">
+          <span className="bn-status-icon" aria-hidden>✓</span><span>{successMsg}</span>
         </div>
       )}
 
       <button
-        className="btn-primary max-w-lg"
+        className="bn-button bn-button-primary w-full sm:w-auto sm:self-start"
         onClick={handleSave}
         disabled={saving}
       >

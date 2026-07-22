@@ -7,6 +7,7 @@ import {
   type AnalysisQualityGateResult,
   type AnalystTrustView,
 } from '@/lib/ai/analysis-quality-gate'
+import { BroadcastDataValue } from '@/components/ui/BroadcastNoir'
 
 type Filter = 'all' | 'watchlisted' | 'pending' | 'placed' | 'skipped'
 
@@ -45,18 +46,18 @@ const FILTERS: { value: Filter; label: string }[] = [
 ]
 
 const REC_CONFIG: Record<string, { label: string; color: string }> = {
-  bet:      { label: 'BET',      color: 'text-green-400'  },
-  watch:    { label: 'WATCH',    color: 'text-yellow-400' },
-  skip:     { label: 'SKIP',     color: 'text-gray-400'   },
-  no_value: { label: 'NO VALUE', color: 'text-red-400'    },
+  bet:      { label: 'BET',      color: 'text-[var(--text-primary)]' },
+  watch:    { label: 'WATCH',    color: 'text-[var(--review)]' },
+  skip:     { label: 'SKIP',     color: 'text-[var(--text-muted)]' },
+  no_value: { label: 'NO VALUE', color: 'text-[var(--negative)]' },
 }
 
-const ACTION_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  pending:     { label: 'Pending',     color: 'text-gray-400',   bg: 'bg-gray-800 border-gray-700'     },
-  placed:      { label: 'Placed',      color: 'text-green-400',  bg: 'bg-green-950 border-green-900'   },
-  skipped:     { label: 'Skipped',     color: 'text-gray-500',   bg: 'bg-gray-900 border-gray-700'     },
-  watchlisted: { label: 'Watchlisted', color: 'text-yellow-400', bg: 'bg-yellow-950 border-yellow-900' },
-  ignored:     { label: 'Ignored',     color: 'text-gray-600',   bg: 'bg-gray-900 border-gray-800'     },
+const ACTION_CONFIG: Record<string, { label: string; style: string; symbol: string }> = {
+  pending:     { label: 'Pending',     style: 'bn-status-neutral', symbol: '•' },
+  placed:      { label: 'Placed',      style: 'bn-status-success', symbol: '✓' },
+  skipped:     { label: 'Skipped',     style: 'bn-status-neutral', symbol: '—' },
+  watchlisted: { label: 'Watchlisted', style: 'bn-status-review', symbol: '!' },
+  ignored:     { label: 'Ignored',     style: 'bn-status-neutral', symbol: '•' },
 }
 
 const SPORT_ICONS: Record<string, string> = {
@@ -95,35 +96,36 @@ export default async function DecisionsPage({
   const decisions = (data ?? []) as unknown as DecisionListRow[]
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="bn-page flex flex-col gap-5">
       <PageView event={EVENTS.DECISIONS_LIST_VIEWED} props={{ filter, count: decisions.length }} />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white font-display">Decisions</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="editorial-kicker">Decision log</p>
+          <h1 className="mt-2 font-display text-3xl font-black text-[var(--text-primary)]">Decisions</h1>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
             Every AI analysis saved here — {decisions.length} {filter === 'all' ? 'total' : filter}
           </p>
         </div>
-        <Link href="/ai" className="btn-primary text-sm">+ Analyze</Link>
+        <Link href="/ai" className="bn-button bn-button-primary w-full sm:w-auto">Analyze</Link>
       </div>
 
       {/* Workflow note */}
       {filter === 'all' && decisions.length > 0 && (
-        <p className="text-xs text-gray-600 px-0.5">Workflow: Analyze a match → place, watch, or skip → placed bets are tracked in Bets.</p>
+        <p className="border-l-2 border-[var(--border-strong)] px-3 text-xs text-[var(--text-muted)]">Workflow: Analyze a match → place, watch, or skip → placed bets are tracked in Bets.</p>
       )}
 
       {/* Filter tabs */}
-      <div className="flex gap-1 bg-gray-900 rounded-lg p-1 w-fit flex-wrap">
+      <div className="flex w-full flex-wrap gap-1 border border-[var(--border-strong)] bg-[var(--field)] p-1 sm:w-fit">
         {FILTERS.map(({ value, label }) => (
           <Link
             key={value}
             href={value === 'all' ? '/decisions' : `/decisions?filter=${value}`}
-            className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
+            className={`inline-flex min-h-11 flex-1 items-center justify-center px-3 text-xs font-extrabold uppercase tracking-[0.06em] transition-colors sm:flex-none ${
               filter === value
-                ? 'bg-amber-600/20 text-amber-400'
-                : 'text-slate-400 hover:text-white hover:bg-gray-800'
+                ? 'bg-[var(--signal)] text-[var(--on-signal)]'
+                : 'text-[var(--text-muted)] hover:bg-[var(--field-raised)] hover:text-[var(--text-primary)]'
             }`}
           >
             {label}
@@ -133,22 +135,22 @@ export default async function DecisionsPage({
 
       {/* List */}
       {decisions.length === 0 ? (
-        <div className="card text-center py-14">
-          <div className="text-4xl mb-3">📋</div>
+        <div className="bn-panel px-5 py-14 text-center">
+          <p className="editorial-kicker mb-2">No records</p>
           {filter === 'all' ? (
             <>
-              <p className="font-medium text-white mb-1">No decisions yet</p>
-              <p className="text-slate-400 text-sm mb-5">
+              <p className="mb-1 font-medium text-[var(--text-primary)]">No decisions yet</p>
+              <p className="mb-5 text-sm text-[var(--text-muted)]">
                 Every AI analysis you run is saved here. Place, watch, or skip — all actions are tracked.
               </p>
-              <Link href="/ai" className="btn-primary inline-flex text-sm">Analyze a match</Link>
+              <Link href="/ai" className="bn-button bn-button-primary">Analyze a match</Link>
             </>
           ) : (
-            <p className="text-slate-400 text-sm">No {filter} decisions.</p>
+            <p className="text-sm text-[var(--text-muted)]">No {filter} decisions.</p>
           )}
         </div>
       ) : (
-        <div className="card p-0 divide-y divide-gray-800">
+        <div className="bn-panel divide-y divide-[var(--border-subtle)] overflow-hidden">
           {decisions.map((d) => {
             const rec    = d.recommendation ? REC_CONFIG[d.recommendation] : null
             const action = ACTION_CONFIG[d.final_action] ?? ACTION_CONFIG.pending
@@ -174,7 +176,7 @@ export default async function DecisionsPage({
               edgeBucket:         analysisOutput?.edge_bucket,
             })
             const recommendationLabel = surface.isTrustBlocked ? surface.listRecommendationLabel : rec?.label
-            const recommendationColor = surface.isTrustBlocked ? 'text-amber-300' : rec?.color
+            const recommendationColor = surface.isTrustBlocked ? 'text-[var(--review)]' : rec?.color
             const actionLabel = surface.isTrustBlocked ? surface.actionLabel : action.label
             const date   = new Date(d.created_at).toLocaleDateString('en-GB', {
               day: '2-digit', month: 'short',
@@ -185,45 +187,44 @@ export default async function DecisionsPage({
               <Link
                 key={d.id}
                 href={`/decisions/${d.id}`}
-                className="flex items-center gap-4 px-4 py-3.5 hover:bg-gray-800/30 transition-colors"
+                className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 px-4 py-4 transition-colors hover:bg-[var(--field-raised)] sm:grid-cols-[auto_minmax(0,1fr)_auto_auto] sm:items-center"
               >
                 {/* Sport icon */}
-                <span className="shrink-0 w-12 text-center">
+                <span className="w-12 shrink-0 text-center">
                   <span className="block text-xl">{icon}</span>
-                  <span className="block text-[10px] text-slate-600 truncate">{surface.sportLabel}</span>
+                  <span className="block truncate text-[11px] text-[var(--text-muted)]">{surface.sportLabel}</span>
                 </span>
 
                 {/* Event + market */}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-white truncate">{d.event_name}</div>
-                  <div className="text-xs text-slate-500 mt-0.5 truncate">
-                    {market}
-                    {d.offered_odds ? ` · @${d.offered_odds}` : ''}
+                  <div className="break-words text-sm font-bold text-[var(--text-primary)]">{d.event_name}</div>
+                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-[var(--text-muted)]">
+                    <span>{market}</span>
+                    {d.offered_odds ? <span>Odds <BroadcastDataValue>{d.offered_odds}</BroadcastDataValue></span> : null}
+                    <span className="sm:hidden">{date}</span>
                   </div>
                 </div>
 
                 {/* AI recommendation */}
                 {recommendationLabel && (
-                  <span className={`text-xs font-semibold shrink-0 hidden sm:block ${recommendationColor ?? 'text-slate-400'}`}>
+                  <span className={`hidden shrink-0 text-xs font-semibold sm:block ${recommendationColor ?? 'text-[var(--text-muted)]'}`}>
                     {recommendationLabel}
                   </span>
                 )}
 
                 {/* Confidence */}
-                <div className="shrink-0 hidden md:block w-10 text-right">
+                <div className="hidden w-12 shrink-0 text-right md:block">
                   {d.confidence_score != null ? (
-                    <span className="text-xs text-slate-400 font-mono">{d.confidence_score}%</span>
+                    <span className="font-mono text-xs text-[var(--data-value)]">{d.confidence_score}%</span>
                   ) : (
-                    <span className="text-xs text-slate-700">—</span>
+                    <span className="text-xs text-[var(--text-muted)]">—</span>
                   )}
                 </div>
 
                 {/* Date */}
-                <span className="text-xs text-slate-600 shrink-0 hidden sm:block">{date}</span>
-
                 {/* Action badge */}
-                <span className={`text-xs px-2.5 py-1 rounded-full font-medium border shrink-0 ${action.bg} ${action.color}`}>
-                  {actionLabel}
+                <span className={`bn-status col-start-2 row-start-2 w-fit shrink-0 sm:col-start-auto sm:row-start-auto ${action.style}`}>
+                  <span className="bn-status-icon" aria-hidden>{action.symbol}</span><span>{actionLabel}</span>
                 </span>
               </Link>
             )
