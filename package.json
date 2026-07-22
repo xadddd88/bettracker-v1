@@ -21,7 +21,8 @@
     "test:csp-security": "npm run build:provider-scripts && node scripts/test-csp-security.mjs",
     "test:design-system": "node scripts/test-broadcast-noir-design-system.mjs",
     "test:design-shell": "node scripts/test-broadcast-noir-shell.mjs",
-    "test:design-home": "node scripts/test-broadcast-noir-home.mjs"
+    "test:design-home": "node scripts/test-broadcast-noir-home.mjs",
+    "test:design-ai": "node scripts/test-broadcast-noir-ai.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

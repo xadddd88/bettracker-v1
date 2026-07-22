@@ -543,7 +543,8 @@ test('AI capture screen exposes secure scanner and responsive states', () => {
   const source = readFileSync(path, 'utf8');
 
   for (const label of [
-    'Scan screenshot',
+    'SCAN',
+    'SCREENSHOT',
     'Coupon',
     'Event',
     'Take photo',

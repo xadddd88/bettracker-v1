@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { consumeScannerDraft } from '@/ai/scanner-draft';
 import {
   computeDraftExpressOdds,
   emptyTrackerLeg,
@@ -39,14 +40,14 @@ const SPORT_LABELS: Record<TrackerSport, string> = {
 
 export default function NewBetScreen() {
   const router = useRouter();
-  const nextLegId = useRef(2);
-  const [draft, setDraft] = useState<TrackerDraft>({
+  const [draft, setDraft] = useState<TrackerDraft>(() => consumeScannerDraft() ?? ({
     bookmaker: '',
     legs: [emptyTrackerLeg('leg-1')],
     notes: '',
     stake: '',
     totalOdds: '',
-  });
+  }));
+  const nextLegId = useRef(draft.legs.length + 1);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const express = draft.legs.length > 1;
   const previewOdds = computeDraftExpressOdds(draft.legs);
