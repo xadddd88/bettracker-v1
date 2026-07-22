@@ -1,4 +1,5 @@
 import { SymbolView } from 'expo-symbols';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +9,7 @@ import { ActionCard, ScreenHeader, SectionTitle } from '@/ui/product-shell';
 import { colors } from '@/ui/theme';
 
 export default function MoreScreen() {
+  const router = useRouter();
   const { session, signOut } = useAuth();
   const email = session?.user.email ?? 'Founder account';
   const [notice, setNotice] = useState<string | null>(null);
@@ -37,6 +39,16 @@ export default function MoreScreen() {
           <View style={styles.secureBadge}>
             <Text style={styles.secureBadgeText}>ACTIVE</Text>
           </View>
+        </View>
+
+        <SectionTitle title="Performance" />
+        <View style={styles.actions}>
+          <ActionCard
+            description="Open exact metrics calculated from saved Tracker records."
+            icon={{ android: 'bar_chart', ios: 'chart.bar.fill', web: 'bar_chart' }}
+            label="Stats"
+            onPress={() => router.push('/(app)/stats')}
+          />
         </View>
 
         <SectionTitle title="Preferences" />
