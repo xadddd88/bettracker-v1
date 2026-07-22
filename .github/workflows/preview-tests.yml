@@ -75,6 +75,8 @@ jobs:
         run: npm run test:csp-security
       - name: "Broadcast Noir parity and contrast gate (Decision #065)"
         run: npm run test:design-system
+      - name: "Corrective PR H gate"
+        run: npm run test:corrective-pr-h
 
   # ── Job: Cross-platform design-system compile gate ─────────────────────────
   design-system:

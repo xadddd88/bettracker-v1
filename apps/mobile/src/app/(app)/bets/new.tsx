@@ -1,6 +1,6 @@
 import { randomUUID } from 'expo-crypto';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   computeDraftExpressOdds,
+  emptyTrackerDraft,
   emptyTrackerLeg,
   MAX_DRAFT_LEGS,
   TRACKER_SPORTS,
@@ -24,6 +25,7 @@ import {
   type TrackerSport,
   validateTrackerDraft,
 } from '@/bets/draft';
+import { clearScannerDraftHandoff, peekScannerDraftHandoff } from '@/bets/scanner-draft-handoff';
 import { saveTrackedBet } from '@/bets/save';
 import {
   beginSubmit,
@@ -49,21 +51,27 @@ const SPORT_LABELS: Record<TrackerSport, string> = {
 
 export default function NewBetScreen() {
   const router = useRouter();
-  const nextLegId = useRef(2);
+  const [initialHandoff] = useState(() => peekScannerDraftHandoff());
+  const nextLegId = useRef((initialHandoff?.draft.legs.length ?? 1) + 1);
   const intentRef = useRef<SubmitIntent>(createSubmitIntent());
   const savingRef = useRef(false);
-  const [draft, setDraft] = useState<TrackerDraft>({
-    bookmaker: '',
-    legs: [emptyTrackerLeg('leg-1')],
-    notes: '',
-    stake: '',
-    totalOdds: '',
-  });
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [draft, setDraft] = useState<TrackerDraft>(() => initialHandoff?.draft ?? emptyTrackerDraft());
+  const [feedback, setFeedback] = useState<Feedback | null>(() => initialHandoff
+    ? {
+        message: initialHandoff.needsReview
+          ? 'Needs review: scanner fields are incomplete. Fill the missing values before Review.'
+          : 'Scanner draft imported. Review every editable field before saving.',
+        tone: 'review',
+      }
+    : null);
   const [reviewedPayload, setReviewedPayload] = useState<TrackerDraftPayload | null>(null);
   const [saving, setSaving] = useState(false);
   const express = draft.legs.length > 1;
   const previewOdds = computeDraftExpressOdds(draft.legs);
+
+  useEffect(() => {
+    if (initialHandoff) clearScannerDraftHandoff(initialHandoff);
+  }, [initialHandoff]);
 
   function markEdited() {
     setFeedback(null);

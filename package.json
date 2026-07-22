@@ -25,7 +25,8 @@
     "test:design-scanner": "node scripts/test-broadcast-noir-scanner.mjs",
     "test:design-tracker": "node scripts/test-broadcast-noir-tracker.mjs",
     "test:design-stats": "node scripts/test-broadcast-noir-stats-decisions.mjs",
-    "test:design-rollout": "node scripts/test-broadcast-noir-rollout.mjs"
+    "test:design-rollout": "node scripts/test-broadcast-noir-rollout.mjs",
+    "test:corrective-pr-h": "npm run build:provider-scripts && node scripts/test-corrective-pr-h.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

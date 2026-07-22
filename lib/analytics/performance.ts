@@ -58,6 +58,19 @@ export interface AIPerf {
   netProfit: number
 }
 
+const KNOWN_SPORTS = new Set(['basketball', 'cs2', 'ice_hockey', 'mma', 'other', 'soccer', 'tennis'])
+
+function normalizedSport(sport: string | undefined): string {
+  const normalized = sport?.trim().toLowerCase() ?? ''
+  return KNOWN_SPORTS.has(normalized) ? normalized : 'other'
+}
+
+export function betSportBucket(bet: Pick<Bet, 'legs'>): string {
+  const sports = (bet.legs ?? []).map((leg) => normalizedSport(leg.sport))
+  if (sports.length === 0) return 'other'
+  return new Set(sports).size === 1 ? sports[0]! : 'mixed'
+}
+
 export function calcPerformance(
   bets: Bet[],
   decisions: Array<{ final_action: string }>,
@@ -78,10 +91,10 @@ export function calcPerformance(
     ? (decisionsByAction.placed / decisions.length) * 100
     : null
 
-  // Group by sport from first leg
+  // A same-sport Express belongs to that sport; a cross-sport Express is Mixed.
   const sportMap = new Map<string, Bet[]>()
   for (const bet of bets) {
-    const sport = bet.legs?.[0]?.sport ?? 'other'
+    const sport = betSportBucket(bet)
     if (!sportMap.has(sport)) sportMap.set(sport, [])
     sportMap.get(sport)!.push(bet)
   }
