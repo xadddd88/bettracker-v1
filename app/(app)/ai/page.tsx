@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { trackClientEvent } from '@/lib/analytics/client'
@@ -46,6 +47,7 @@ function fileToBase64(file: File): Promise<{ data: string; media_type: string }>
 // ─── Types ────────────────────────────────────────────────────
 type Sport = 'tennis' | 'soccer' | 'cs2' | 'basketball' | 'ice_hockey' | 'mma' | 'other'
 type Locale = 'auto' | 'uk' | 'ru' | 'en' | 'es' | 'fr' | 'de' | 'ar'
+type CaptureMode = 'coupon' | 'event'
 type Recommendation = 'bet' | 'skip' | 'watch' | 'no_value'
 type RiskLevel = 'low' | 'medium' | 'high'
 
@@ -209,6 +211,7 @@ export default function AIAnalystPage() {
   const supabase = createClient()
 
   const fileRef = useRef<HTMLInputElement>(null)
+  const capturePreviewUrlRef = useRef<string | null>(null)
   const scanGenerationGateRef = useRef(createAnalystScanGenerationGate())
 
   useEffect(() => { trackClientEvent(EVENTS.AI_PAGE_VIEWED) }, [])
@@ -246,6 +249,8 @@ export default function AIAnalystPage() {
   const [rootErr,    setRootErr]    = useState('')
   const [scanning,   setScanning]   = useState(false)
   const [scanMsg,    setScanMsg]    = useState('')
+  const [captureMode, setCaptureMode] = useState<CaptureMode>('coupon')
+  const [capturePreview, setCapturePreview] = useState<string | null>(null)
   const [stakeStr,   setStakeStr]   = useState('')
   const [showStake,  setShowStake]  = useState(false)
   const [showRisk,   setShowRisk]   = useState(false)
@@ -258,6 +263,17 @@ export default function AIAnalystPage() {
     legs: couponLegs,
   })
 
+  const setCaptureFile = useCallback((file: File | null) => {
+    if (capturePreviewUrlRef.current) URL.revokeObjectURL(capturePreviewUrlRef.current)
+    const nextUrl = file ? URL.createObjectURL(file) : null
+    capturePreviewUrlRef.current = nextUrl
+    setCapturePreview(nextUrl)
+  }, [])
+
+  useEffect(() => () => {
+    if (capturePreviewUrlRef.current) URL.revokeObjectURL(capturePreviewUrlRef.current)
+  }, [])
+
   function setField(k: string, v: string) {
     setForm(f => ({ ...f, [k]: v }))
     setErrors(e => ({ ...e, [k]: '' }))
@@ -268,6 +284,7 @@ export default function AIAnalystPage() {
 
   // ── Scanner ────────────────────────────────────────────────
   const runScanner = useCallback(async (file: File) => {
+    setCaptureFile(file)
     const scanGeneration = scanGenerationGateRef.current.begin()
     setScanning(true)
     setScanMsg('Scanning coupon...')
@@ -308,7 +325,7 @@ export default function AIAnalystPage() {
     } finally {
       if (scanGenerationGateRef.current.finish(scanGeneration)) setScanning(false)
     }
-  }, [])
+  }, [setCaptureFile])
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const imageItem = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'))
@@ -561,7 +578,7 @@ export default function AIAnalystPage() {
   .research{border:1px solid #111;padding:16px;margin:16px 0}
   .research h2{font-size:20px;margin:8px 0}
   .research-kicker{font-size:10px;font-weight:800;letter-spacing:.08em}
-  .builder{background:#e8ff00;border:1px solid #111;padding:10px;margin:12px 0}
+  .builder{background:#BFFF3B;color:#061008;border:1px solid #59685E;padding:10px;margin:12px 0}
   .research-leg{border-top:1px solid #111;padding:12px 0}
   .research-leg p,.research-leg li,.sources li{font-size:12px;line-height:1.5}
   .verdict{border-top:1px solid #111;padding-top:12px}
@@ -656,57 +673,89 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
   }) : false
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6" onPaste={handlePaste}>
-      <section className="editorial-dark relative min-h-[340px] overflow-hidden border border-black p-5 md:p-8">
-        <div className="pointer-events-none absolute -right-4 top-2 select-none font-display text-[clamp(7rem,20vw,13rem)] font-black leading-none tracking-[-0.1em] text-white/[0.055]" aria-hidden>
-          SCAN
-        </div>
-        <div className="relative z-10 flex min-h-[290px] flex-col">
-          <div className="flex justify-between font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-white">
-            <span>AI / Scanner</span>
-            <span>Image to decision</span>
-          </div>
-          <div className="my-auto py-8">
-            <p className="font-mono text-[9px] font-black uppercase tracking-[0.2em] text-[#e8ff00]">Capture stage</p>
-            <h1 className="mt-4 max-w-3xl font-display text-[clamp(3rem,8vw,6.8rem)] font-black uppercase leading-[0.8] tracking-[-0.075em] text-white">
-              Analyze from<br />a screenshot
+    <div className="bn-ai mx-auto flex w-full max-w-5xl flex-col gap-6" onPaste={handlePaste}>
+      <section className="bn-panel overflow-hidden" aria-labelledby="ai-capture-heading">
+        <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-[var(--border-strong)] px-4 py-3 sm:px-5">
+          <div>
+            <p className="editorial-kicker">AI / Capture board</p>
+            <h1 id="ai-capture-heading" className="mt-1 font-display text-2xl font-black uppercase tracking-[0] text-[var(--text-primary)] sm:text-3xl">
+              Prepare screenshot
             </h1>
-            <p className="mt-6 max-w-xl text-sm leading-6 text-white/60">Upload or paste a coupon, verify every extracted field, then run the supported analysis.</p>
           </div>
+          <span className={`bn-status ${scanning || analyzing ? 'bn-status-review' : 'bn-status-neutral'}`}>
+            <span className="bn-status-icon" aria-hidden>{scanning || analyzing ? '!' : '•'}</span>
+            {scanning ? 'Scanning' : analyzing ? 'Analyzing' : 'Ready'}
+          </span>
+        </header>
+
+        <div className="grid border-b border-[var(--border-strong)] sm:grid-cols-2" aria-label="Capture type">
+          {(['coupon', 'event'] as CaptureMode[]).map((mode, index) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={captureMode === mode}
+              disabled={scanning || analyzing}
+              onClick={() => setCaptureMode(mode)}
+              className={`flex min-h-11 items-center justify-between border-[var(--border-strong)] px-4 py-3 text-left font-mono text-xs font-black uppercase tracking-[0.08em] transition-colors sm:min-h-12 ${
+                index === 0 ? 'border-b sm:border-b-0 sm:border-r' : ''
+              } ${captureMode === mode ? 'bg-[var(--signal)] text-[var(--on-signal)]' : 'bg-[var(--field)] text-[var(--text-muted)] hover:bg-[var(--field-raised)]'}`}
+            >
+              <span>0{index + 1} / {mode}</span>
+              <span aria-hidden>{captureMode === mode ? '●' : '○'}</span>
+            </button>
+          ))}
         </div>
+
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+        {capturePreview ? (
+          <div className="grid bg-[var(--night)] lg:grid-cols-[minmax(0,1fr)_260px]">
+            <div className="relative min-h-[300px] overflow-hidden border-b border-[var(--border-strong)] lg:border-b-0 lg:border-r">
+              <Image src={capturePreview} alt={`Selected ${captureMode} screenshot`} fill unoptimized sizes="(min-width: 1024px) 700px, 100vw" className="object-contain" />
+              <span className="absolute bottom-3 left-3 border border-[var(--border-strong)] bg-[var(--field-raised)] px-2 py-1 font-mono text-[11px] font-black uppercase tracking-[0.08em] text-[var(--text-primary)]">
+                {captureMode} / selected
+              </span>
+            </div>
+            <div className="flex flex-col justify-between gap-5 p-4 sm:p-5">
+              <div>
+                <p className="editorial-kicker">Image state</p>
+                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{scanMsg || 'Ready to scan'}</p>
+              </div>
+              <div className="grid gap-2">
+                <button type="button" className="bn-button bn-button-secondary w-full" disabled={scanning || analyzing} onClick={() => fileRef.current?.click()}>
+                  <Camera size={16} aria-hidden /><span>Replace</span>
+                </button>
+                <button type="button" className="bn-button bn-button-destructive w-full" disabled={scanning || analyzing} onClick={() => { setCaptureFile(null); setScanMsg('') }}>
+                  <X size={16} aria-hidden /><span>Remove</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="flex min-h-[280px] w-full flex-col items-center justify-center gap-4 bg-[var(--night)] px-5 py-10 text-center text-[var(--text-primary)] transition-colors hover:bg-[var(--field-raised)] disabled:cursor-wait disabled:opacity-60"
+            onClick={() => !scanning && fileRef.current?.click()}
+            disabled={scanning || analyzing}
+          >
+            <span className="flex h-12 w-12 items-center justify-center border border-[var(--border-strong)] bg-[var(--field)]" aria-hidden>
+              {scanning ? <Loader2 size={22} className="animate-spin motion-reduce:animate-none" /> : <Camera size={22} strokeWidth={1.8} />}
+            </span>
+            <span className="font-display text-xl font-black uppercase tracking-[0]">Choose {captureMode} screenshot</span>
+            <span className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--text-quiet)]">Paste or select image</span>
+          </button>
+        )}
+        {(scanning || analyzing) && <div className="signal-sweep-active h-1 origin-left bg-[var(--signal)]" aria-hidden />}
       </section>
 
       {/* ── Scout pre-fill indicator ───────────────────────── */}
       {scoutId && !analysis && (
         <div className="text-xs text-indigo-400 bg-indigo-950/30 border border-indigo-900 rounded-lg px-3 py-2 flex items-center gap-2">
           <Search size={12} strokeWidth={2} />
-          Pre-filled from Scout — enter current odds to analyse
+          Pre-filled from Scout — enter current odds to analyze
         </div>
       )}
 
       {/* ── Scanner zone ────────────────────────────────────── */}
-      <div
-        className={`group cursor-pointer border border-black px-5 py-8 text-center transition-colors ${
-          scanning ? 'bg-[#e8ff00]' : 'bg-white hover:bg-[#e8ff00]'
-        }`}
-        onClick={() => !scanning && fileRef.current?.click()}
-      >
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-        {scanning ? (
-          <div className="flex items-center justify-center gap-2 text-sm font-bold text-black">
-            <Loader2 size={14} className="animate-spin" /> {scanMsg}
-          </div>
-        ) : scanMsg ? (
-          <div className="text-sm font-bold text-black">{scanMsg}</div>
-        ) : (
-          <div>
-            <div className="mb-3 flex justify-center"><Camera size={28} strokeWidth={1.5} /></div>
-            <p className="font-display text-xl font-black uppercase tracking-[-0.04em]">Choose screenshot</p>
-            <p className="mt-2 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-black/50">Paste, camera export or photo library</p>
-          </div>
-        )}
-      </div>
-
       {/* ── Sport selector ──────────────────────────────────── */}
       <div>
         <label className="label mb-2">Sport</label>
@@ -808,7 +857,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               value={form.event_time}
               onChange={e => setField('event_time', e.target.value)}
             />
-            <p className="mt-1 text-[10px] text-gray-500">Keep the exact text from the coupon so the Analyst can identify the fixture.</p>
+            <p className="mt-1 text-[11px] text-gray-500">Keep the exact text from the coupon so the Analyst can identify the fixture.</p>
           </div>
 
           <div className="sm:col-span-2">
@@ -823,26 +872,26 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
         </div>
 
         {couponLegs && couponLegs.length > 0 && (
-          <section className="border border-black bg-[#f4f3ed]" aria-labelledby="coupon-legs-heading">
-            <div className="flex items-center justify-between border-b border-black px-4 py-3">
-              <h2 id="coupon-legs-heading" className="font-mono text-[10px] font-black uppercase tracking-[0.16em] text-black">
+          <section className="border border-[var(--border-strong)] bg-[var(--field-raised)]" aria-labelledby="coupon-legs-heading">
+            <div className="flex items-center justify-between border-b border-[var(--border-strong)] px-4 py-3">
+              <h2 id="coupon-legs-heading" className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-[var(--text-primary)]">
                 Extracted coupon legs
               </h2>
-              <span className="bg-black px-2 py-1 font-mono text-[9px] font-black text-white">{couponLegs.length}</span>
+              <span className="border border-[var(--border-strong)] bg-[var(--field)] px-2 py-1 font-mono text-[11px] font-black text-[var(--text-primary)]">{couponLegs.length}</span>
             </div>
-            <div className="divide-y divide-black/25">
+            <div className="divide-y divide-[var(--border-subtle)]">
               {couponLegs.map((leg, index) => (
                 <article key={`${leg.eventName ?? 'leg'}-${index}`} className="grid gap-2 px-4 py-4 sm:grid-cols-[44px_1fr_auto]">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full border border-black font-mono text-xs font-black text-black">
+                  <div className="flex h-9 w-9 items-center justify-center border border-[var(--border-strong)] font-mono text-xs font-black text-[var(--text-muted)]">
                     {String(index + 1).padStart(2, '0')}
                   </div>
                   <div className="min-w-0">
-                    <p className="font-display text-base font-black text-black">{leg.eventName || form.event_name}</p>
-                    <p className="mt-1 text-sm text-black/65">
+                    <p className="break-words font-display text-base font-black text-[var(--text-primary)]">{leg.eventName || form.event_name}</p>
+                    <p className="mt-1 break-words text-sm text-[var(--text-muted)]">
                       {leg.marketType || form.market_type}{leg.selection ? ` · ${leg.selection}` : ''}
                     </p>
                   </div>
-                  <div className="font-mono text-sm font-black text-black">
+                  <div className="bn-data-value font-mono text-sm font-black">
                     {leg.odds != null ? Number(leg.odds).toFixed(2) : '—'}
                   </div>
                 </article>
@@ -852,7 +901,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
         )}
 
         {liveCouponBlocked && (
-          <div className="border border-black bg-[#e8ff00] px-4 py-3 text-sm font-bold leading-5 text-black" role="alert">
+          <div className="border border-[var(--review)] bg-[var(--field-raised)] px-4 py-3 text-sm font-bold leading-5 text-[var(--text-primary)]" role="alert">
             {locale === 'uk'
               ? 'LIVE ЗАБЛОКОВАНО: для чесного аналізу потрібні поточний рахунок, фаза, ігровий час та актуальна live-лінія. Цей модуль працює лише з pre-match купонами.'
               : 'LIVE BLOCKED: a trustworthy analysis needs the current score, phase, game clock, and current live odds. This module supports pre-match coupons only.'}
@@ -860,7 +909,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
         )}
 
         {rootErr && !analysis && (
-          <div className="border border-black bg-white px-4 py-3 text-sm font-bold text-red-700" role="alert">
+          <div className="border border-[var(--negative)] bg-[var(--field)] px-4 py-3 text-sm font-bold text-[var(--negative)]" role="alert">
             {rootErr}
           </div>
         )}
@@ -885,8 +934,8 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
       {/* ── Analysis result ─────────────────────────────────── */}
       {a && (
         <div className="flex flex-col gap-4">
-          <section className={`border border-black px-5 py-4 text-black ${a.web_search_used ? 'bg-[#e8ff00]' : 'bg-white'}`} aria-label="Web research status">
-            <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em]">
+          <section className={`border bg-[var(--field)] px-5 py-4 text-[var(--text-primary)] ${a.web_search_used ? 'border-[var(--success)]' : 'border-[var(--border-strong)]'}`} aria-label="Web research status">
+            <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em]">
               {a.web_search_used
                 ? 'Current research verified'
                 : a.web_search_attempted
@@ -901,52 +950,52 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                   : 'This run contains conditional market logic only; no current fact is presented as verified.'}
             </p>
             {a.web_search_failure_reason && (
-              <p className="mt-2 font-mono text-[9px] font-bold uppercase tracking-[0.08em] opacity-60">
+              <p className="mt-2 font-mono text-[11px] font-bold uppercase tracking-[0.08em] opacity-60">
                 {a.web_search_failure_reason.replaceAll('_', ' ')}
               </p>
             )}
           </section>
 
           {a.research_brief && (
-            <section className="border border-black bg-white text-black" aria-labelledby="research-brief-heading">
-              <div className="border-b border-black bg-black px-5 py-4 text-white">
+            <section className="border border-[var(--border-strong)] bg-[var(--field)] text-[var(--text-primary)]" aria-labelledby="research-brief-heading">
+              <div className="border-b border-[var(--border-strong)] bg-[var(--field-raised)] px-5 py-4 text-[var(--text-primary)]">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="font-mono text-[9px] font-black uppercase tracking-[0.18em] text-[#e8ff00]">
+                  <p className="font-mono text-[11px] font-black uppercase tracking-[0.18em] text-[var(--review)]">
                     Conditional market review
                   </p>
-                  <span className="border border-white/40 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-white">
+                  <span className="border border-[var(--border-strong)] px-2 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]">
                     {a.research_brief.legs.length} {a.research_brief.legs.length === 1 ? 'leg' : 'legs'}
                   </span>
                 </div>
-                <h2 id="research-brief-heading" className="mt-4 max-w-3xl font-display text-3xl font-black leading-[0.95] tracking-[-0.045em] text-white md:text-5xl">
+                <h2 id="research-brief-heading" className="mt-4 max-w-3xl font-display text-3xl font-black leading-[0.95] tracking-[0] text-[var(--text-primary)] md:text-5xl">
                   {a.research_brief.headline}
                 </h2>
-                <p className="mt-4 max-w-3xl text-sm leading-6 text-white/75">{a.research_brief.summary}</p>
-                <p className="mt-3 max-w-3xl border-l-2 border-[#e8ff00] pl-3 font-mono text-[9px] font-bold uppercase leading-4 tracking-[0.08em] text-white/70">
+                <p className="mt-4 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{a.research_brief.summary}</p>
+                <p className="mt-3 max-w-3xl border-l-2 border-[var(--review)] pl-3 font-mono text-[11px] font-bold uppercase leading-4 tracking-[0.08em] text-[var(--text-muted)]">
                   Narrative analysis is conditional. Only verbatim excerpts under Cited claims are bound to current sources.
                 </p>
               </div>
 
               {a.research_brief.builderRisk && (
-                <div className="border-b border-black bg-[#e8ff00] px-5 py-4">
-                  <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em] text-black">Bet Builder correlation</p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-black">{a.research_brief.builderRisk}</p>
+                <div className="border-b border-[var(--review)] bg-[var(--field-raised)] px-5 py-4">
+                  <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-[var(--review)]">Bet Builder correlation</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-primary)]">{a.research_brief.builderRisk}</p>
                 </div>
               )}
 
-              <div className="divide-y divide-black">
+              <div className="divide-y divide-[var(--border-subtle)]">
                 {a.research_brief.legs.map(leg => (
                   <article key={`${leg.legNumber}-${leg.eventName}-${leg.marketType}`} className="grid gap-4 px-5 py-5 md:grid-cols-[54px_1fr]">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full border border-black font-mono text-xs font-black">
+                    <div className="flex h-11 w-11 items-center justify-center border border-[var(--border-strong)] font-mono text-xs font-black text-[var(--text-muted)]">
                       {String(leg.legNumber).padStart(2, '0')}
                     </div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <h3 className="font-display text-xl font-black tracking-[-0.025em]">{leg.eventName}</h3>
-                          <p className="mt-1 text-sm text-black/60">{leg.marketType}{leg.selection ? ` · ${leg.selection}` : ''}</p>
+                          <h3 className="font-display text-xl font-black tracking-[0]">{leg.eventName}</h3>
+                          <p className="mt-1 text-sm text-[var(--text-muted)]">{leg.marketType}{leg.selection ? ` · ${leg.selection}` : ''}</p>
                         </div>
-                        <span className="border border-black px-2 py-1 font-mono text-[9px] font-black uppercase tracking-[0.1em]">
+                        <span className="border border-[var(--border-strong)] px-2 py-1 font-mono text-[11px] font-black uppercase tracking-[0.1em] text-[var(--text-muted)]">
                           {leg.fixtureStatus.replaceAll('_', ' ')}
                         </span>
                       </div>
@@ -954,16 +1003,16 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
                       <div className="mt-4 grid gap-4 md:grid-cols-2">
                         <div>
-                          <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/50">Conditional logic</p>
-                          <ul className="mt-2 space-y-1.5 text-sm leading-5 text-black/75">
+                          <p className="font-mono text-[11px] font-black uppercase tracking-[0.14em] text-[var(--text-quiet)]">Conditional logic</p>
+                          <ul className="mt-2 space-y-1.5 text-sm leading-5 text-[var(--text-muted)]">
                             {leg.evidence.length > 0
                               ? leg.evidence.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>+ {item}</li>)
                               : <li>+ No additional conditional note.</li>}
                           </ul>
                         </div>
                         <div>
-                          <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/50">Failure modes</p>
-                          <ul className="mt-2 space-y-1.5 text-sm leading-5 text-black/75">
+                          <p className="font-mono text-[11px] font-black uppercase tracking-[0.14em] text-[var(--text-quiet)]">Failure modes</p>
+                          <ul className="mt-2 space-y-1.5 text-sm leading-5 text-[var(--text-muted)]">
                             {leg.risks.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>− {item}</li>)}
                           </ul>
                         </div>
@@ -973,13 +1022,13 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 ))}
               </div>
 
-              <div className="border-t border-black px-5 py-5">
-                <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em] text-black/50">Analyst verdict</p>
+              <div className="border-t border-[var(--border-strong)] px-5 py-5">
+                <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-[var(--text-quiet)]">Analyst verdict</p>
                 <p className="mt-2 text-base font-bold leading-6">{a.research_brief.verdict}</p>
                 {a.research_brief.dataGaps.length > 0 && (
-                  <div className="mt-4 border-l-4 border-black pl-4">
-                    <p className="font-mono text-[9px] font-black uppercase tracking-[0.14em] text-black/50">Still unverified</p>
-                    <ul className="mt-2 space-y-1 text-sm text-black/70">
+                  <div className="mt-4 border-l-4 border-[var(--review)] pl-4">
+                    <p className="font-mono text-[11px] font-black uppercase tracking-[0.14em] text-[var(--text-quiet)]">Still unverified</p>
+                    <ul className="mt-2 space-y-1 text-sm text-[var(--text-muted)]">
                       {a.research_brief.dataGaps.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>— {item}</li>)}
                     </ul>
                   </div>
@@ -987,8 +1036,8 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               </div>
 
               {a.research_brief.sourcedClaims.length > 0 && a.research_sources && a.research_sources.length > 0 && (
-                <div className="border-t border-black bg-[#f4f3ed] px-5 py-5">
-                  <p className="font-mono text-[9px] font-black uppercase tracking-[0.16em] text-black/50">Cited claims — verbatim source excerpts</p>
+                <div className="border-t border-[var(--border-strong)] bg-[var(--field-raised)] px-5 py-5">
+                  <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-[var(--text-quiet-raised)]">Cited claims — verbatim source excerpts</p>
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
                     {a.research_brief.sourcedClaims.map((claim, claimIndex) => {
                       const source = a.research_sources?.find(item => item.url === claim.sourceUrl)
@@ -999,11 +1048,11 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                         href={source.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="border border-black bg-white px-3 py-3 text-sm font-bold text-black underline decoration-1 underline-offset-4 hover:bg-[#e8ff00]"
+                        className="border border-[var(--border-strong)] bg-[var(--field)] px-3 py-3 text-sm font-bold text-[var(--text-primary)] underline decoration-1 underline-offset-4 hover:border-[var(--signal)] hover:bg-[var(--field-raised)]"
                       >
                         <span className="block no-underline">“{claim.text}”</span>
                         <span className="mt-2 block">{source.title}</span>
-                        <span className="mt-1 block font-mono text-[9px] font-black uppercase tracking-[0.08em] no-underline opacity-50">
+                        <span className="mt-1 block font-mono text-[11px] font-black uppercase tracking-[0.08em] no-underline opacity-50">
                           {new URL(source.url).hostname}
                         </span>
                       </a>
@@ -1052,12 +1101,12 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                   {showPricing ? (
                   <div className="text-right shrink-0">
                     <span className={`text-xs font-medium ${risk.color}`}>{risk.label}</span>
-                    <p className="text-[10px] text-gray-600 mt-0.5">edge · confidence · market</p>
+                    <p className="text-[11px] text-gray-600 mt-0.5">edge · confidence · market</p>
                   </div>
                   ) : (
                     <div className="text-right shrink-0">
                       <span className={`text-xs font-medium ${risk.color}`}>{localizedRiskLabel(a.risk_level, risk.label, trust)}</span>
-                      <p className="text-[10px] text-gray-600 mt-0.5">{trust ? `${trust.riskWarningLabel} / ${trust.dataCoverageLabel}` : 'risk warning / data coverage'}</p>
+                      <p className="text-[11px] text-gray-600 mt-0.5">{trust ? `${trust.riskWarningLabel} / ${trust.dataCoverageLabel}` : 'risk warning / data coverage'}</p>
                     </div>
                   )}
                 </div>
@@ -1067,20 +1116,20 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div>
                     <div className="text-xs text-gray-500 mb-0.5">Model prob.</div>
-                    <div className="text-xl font-bold text-white">{a.model_probability?.toFixed(1)}%</div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">AI win estimate</div>
+                    <div className="bn-data-value text-xl font-bold">{a.model_probability?.toFixed(1)}%</div>
+                    <div className="text-[11px] text-gray-600 mt-0.5">AI win estimate</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500 mb-0.5">Implied</div>
                     <div className="text-xl font-bold text-gray-300">{a.implied_probability?.toFixed(1)}%</div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">From your odds</div>
+                    <div className="text-[11px] text-gray-600 mt-0.5">From your odds</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500 mb-0.5">Edge</div>
                     <div className={`text-xl font-bold ${(a.edge_percent ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                       {(a.edge_percent ?? 0) >= 0 ? '+' : ''}{a.edge_percent?.toFixed(1)}%
                     </div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">Model minus implied</div>
+                    <div className="text-[11px] text-gray-600 mt-0.5">Model minus implied</div>
                   </div>
                 </div>
                 ) : gate && (
@@ -1140,7 +1189,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                       style={{ width: `${a.confidence_score}%` }}
                     />
                   </div>
-                  <div className="text-[10px] text-gray-600 mt-1">
+                  <div className="text-[11px] text-gray-600 mt-1">
                     {trust?.locale === 'uk'
                       ? 'Обережна впевненість без розрахунку ціни'
                       : 'How certain the model is in its estimate'}

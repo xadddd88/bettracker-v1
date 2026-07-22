@@ -101,6 +101,11 @@
     transform-origin: left;
   }
 
+  .signal-sweep-active {
+    animation: signal-sweep 320ms ease-out both;
+    transform-origin: left;
+  }
+
   .editorial-dark {
     background: var(--field);
     color: var(--text-primary);

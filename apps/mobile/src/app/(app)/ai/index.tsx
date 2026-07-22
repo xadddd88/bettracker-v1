@@ -1,21 +1,22 @@
 import { Image } from 'expo-image';
 import { useNetworkState } from 'expo-network';
+import { useRouter } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, ReduceMotion } from 'react-native-reanimated';
+import Animated, { FadeInDown, ReduceMotion, StretchInX } from 'react-native-reanimated';
 
 import { runWithCaptureLock } from '@/ai/capture-lock';
 import { PreparedImageCacheLifecycle } from '@/ai/image-cache-lifecycle';
 import { deleteGeneratedImage } from '@/ai/image-cache';
 import { captureFromCamera, captureFromLibrary, type CaptureOutcome, type CaptureSource, type PreparedCapture } from '@/ai/image-capture';
 import { analysisBodyByteLength, MAX_ANALYZE_JSON_BYTES, type CaptureMode } from '@/ai/image-policy';
+import { scannerAnalysisToTrackerDraft, stageScannerDraft } from '@/ai/scanner-draft';
 import { scanPreparedCoupon } from '@/ai/scanner-client';
 import type { ScannerAnalysis } from '@/ai/scanner-model';
 import { MotionPressable } from '@/ui/motion';
-import { colors } from '@/ui/theme';
-import { EditorialBackdrop, EditorialRule, KineticType } from '@/ui/time-warp';
+import { semanticColors } from '@/ui/theme';
 
 const MESSAGES = {
   cameraDenied: 'Camera access is off. Allow it in device settings to take a photo.',
@@ -38,6 +39,7 @@ type ActionButtonProps = { disabled?: boolean; icon: SymbolViewProps['name']; la
 
 export default function AiCaptureScreen() {
   const networkState = useNetworkState();
+  const router = useRouter();
   const safeAreaInsets = useSafeAreaInsets();
   const operationLockRef = useRef(false);
   const cacheLifecycleRef = useRef<PreparedImageCacheLifecycle | null>(null);
@@ -153,6 +155,16 @@ export default function AiCaptureScreen() {
       setFeedback({ message: result.message, tone: 'error' });
     }
   }
+  function reviewInTracker() {
+    if (!analysis) return;
+    const draft = scannerAnalysisToTrackerDraft(analysis);
+    if (!draft) {
+      setFeedback({ message: 'Coupon could not be prepared as an editable draft.', tone: 'error' });
+      return;
+    }
+    stageScannerDraft(draft);
+    router.push('/(app)/bets/new');
+  }
   async function openSettings() {
     try { await Linking.openSettings(); }
     catch { setFeedback({ message: 'Settings could not be opened. Open device settings manually.', tone: 'error' }); }
@@ -160,19 +172,17 @@ export default function AiCaptureScreen() {
 
   return (
     <ScrollView contentContainerStyle={[styles.content, androidTopInset]} contentInsetAdjustmentBehavior="automatic" style={styles.screen}>
-      <Animated.View entering={FadeInDown.duration(380).reduceMotion(ReduceMotion.System)} style={styles.masthead}>
+      <View style={styles.masthead}>
         <Text style={styles.wordmark}>BETTRACKER</Text><Text style={styles.mastheadMeta}>AI CAPTURE / 02</Text>
-      </Animated.View>
+      </View>
 
-      <Animated.View entering={FadeIn.duration(420).reduceMotion(ReduceMotion.System)} style={styles.hero}>
-        <EditorialBackdrop dark />
-        <KineticType label="SCAN" reverse />
-        <View style={styles.heroTopline}><Text style={styles.heroMeta}>LOCAL PREPARATION</Text><Text style={styles.heroMeta}>{offline ? 'OFFLINE' : 'READY'}</Text></View>
+      <View style={styles.hero}>
+        <View style={styles.heroTopline}><Text style={styles.heroMeta}>AI / CAPTURE</Text><Text style={styles.heroMeta}>{offline ? 'OFFLINE' : 'READY'}</Text></View>
         <View style={styles.heroCopy}>
           <Text style={styles.title}>SCAN{`\n`}SCREENSHOT</Text>
-          <Text style={styles.subtitle}>Scan screenshot. Prepare evidence for a coupon or an event before analysis.</Text>
+          <Text style={styles.subtitle}>Prepare a coupon or event image, inspect the extracted fields, then choose whether to continue.</Text>
         </View>
-      </Animated.View>
+      </View>
 
       <View accessibilityLabel="Capture type" style={styles.modeControl}>
         {MODE_OPTIONS.map((option, index) => (
@@ -192,7 +202,7 @@ export default function AiCaptureScreen() {
 
       {offline ? <View accessibilityLiveRegion="polite" style={styles.offlineNotice}><Text style={styles.offlineLabel}>NO CONNECTION</Text><Text style={styles.offlineText}>{MESSAGES.offline}</Text></View> : null}
 
-      <Animated.View entering={FadeInDown.delay(80).duration(420).reduceMotion(ReduceMotion.System)} style={styles.captureTool}>
+      <View style={styles.captureTool}>
         {prepared ? (
           <>
             <View style={styles.previewFrame}>
@@ -221,9 +231,10 @@ export default function AiCaptureScreen() {
             </View>
           </View>
         )}
-      </Animated.View>
+      </View>
 
-      {busy ? <View accessibilityLabel={operation === 'analyze' ? 'Analyzing coupon' : 'Preparing image'} style={styles.processing}><ActivityIndicator color={colors.text} /><Text style={styles.processingText}>{operation === 'analyze' ? 'ANALYZING COUPON' : 'PREPARING JPEG'}</Text></View> : null}
+      {busy ? <Animated.View entering={StretchInX.duration(320).reduceMotion(ReduceMotion.System)} style={styles.signalSweep} /> : null}
+      {busy ? <View accessibilityLabel={operation === 'analyze' ? 'Analyzing coupon' : 'Preparing image'} style={styles.processing}><ActivityIndicator color={semanticColors.signal} /><Text style={styles.processingText}>{operation === 'analyze' ? 'ANALYZING COUPON' : 'PREPARING JPEG'}</Text></View> : null}
       {feedback ? (
         <View accessibilityLiveRegion="polite" role={feedback.tone === 'error' ? 'alert' : undefined} style={[styles.feedback, feedback.tone === 'error' && styles.feedbackError, feedback.tone === 'success' && styles.feedbackSuccess]}>
           <Text style={styles.feedbackLabel}>{feedback.tone.toUpperCase()}</Text>
@@ -231,14 +242,14 @@ export default function AiCaptureScreen() {
           {feedback.canOpenSettings ? <ActionButton icon={{ android: 'settings', ios: 'gearshape', web: 'settings' }} label="Open settings" onPress={() => void openSettings()} /> : null}
         </View>
       ) : null}
-      {analysis ? <AnalysisResultPanel analysis={analysis} /> : null}
-      <EditorialRule label="NO FINANCIAL RECORD IS SAVED AUTOMATICALLY" />
+      {analysis ? <AnalysisResultPanel analysis={analysis} onReview={reviewInTracker} /> : null}
+      <View style={styles.safetyRule}><Text style={styles.safetyRuleText}>NO FINANCIAL RECORD IS SAVED AUTOMATICALLY</Text></View>
       <ActionButton disabled={!prepared || busy || offline} icon={{ android: 'auto_awesome', ios: 'sparkles', web: 'auto_awesome' }} label="Analyze" onPress={() => void analyze()} tone="primary" />
     </ScrollView>
   );
 }
 
-function AnalysisResultPanel({ analysis }: { analysis: ScannerAnalysis }) {
+function AnalysisResultPanel({ analysis, onReview }: { analysis: ScannerAnalysis; onReview: () => void }) {
   const legs = analysis.legs.length > 0
     ? analysis.legs
     : [{ eventName: analysis.eventName, marketType: analysis.marketType, odds: analysis.totalOdds, selection: analysis.selection, sport: analysis.sport }];
@@ -264,6 +275,9 @@ function AnalysisResultPanel({ analysis }: { analysis: ScannerAnalysis }) {
         <AnalysisMetric label="STAKE" value={analysis.stake != null ? String(analysis.stake) : '—'} />
         <AnalysisMetric label="BOOKMAKER" value={analysis.bookmaker ?? '—'} />
       </View>
+      <MotionPressable accessibilityLabel="Review coupon in Tracker" accessibilityRole="button" onPress={onReview} style={styles.reviewButton}>
+        <Text style={styles.reviewButtonText}>REVIEW IN TRACKER</Text><Text style={styles.reviewButtonText}>→</Text>
+      </MotionPressable>
     </Animated.View>
   );
 }
@@ -276,75 +290,80 @@ function ActionButton({ disabled = false, icon, label, onPress, tone = 'secondar
   const primary = tone === 'primary';
   return (
     <MotionPressable accessibilityLabel={label} accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[styles.actionButton, primary && styles.actionButtonPrimary, tone === 'danger' && styles.actionButtonDanger, disabled && styles.disabled]}>
-      <SymbolView fallback={<Text style={[styles.actionFallback, primary && styles.actionTextPrimary]}>+</Text>} name={icon} size={17} tintColor={primary ? '#FFFFFF' : colors.text} />
+      <SymbolView fallback={<Text style={[styles.actionFallback, primary && styles.actionTextPrimary]}>+</Text>} name={icon} size={17} tintColor={primary ? semanticColors.onSignal : semanticColors.textPrimary} />
       <Text style={[styles.actionLabel, primary && styles.actionTextPrimary]}>{label.toUpperCase()}</Text><Text style={[styles.actionArrow, primary && styles.actionTextPrimary]}>→</Text>
     </MotionPressable>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: colors.background },
-  content: { flexGrow: 1, paddingBottom: 24, paddingHorizontal: 14, paddingTop: 6 },
-  masthead: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', minHeight: 42 },
-  wordmark: { color: colors.text, fontSize: 15, fontWeight: '900' },
-  mastheadMeta: { color: colors.muted, fontSize: 8, fontWeight: '700', letterSpacing: 1, marginLeft: 'auto' },
-  hero: { backgroundColor: '#050505', height: 330, marginHorizontal: -14, overflow: 'hidden', padding: 16 },
-  heroTopline: { flexDirection: 'row', justifyContent: 'space-between', zIndex: 2 },
-  heroMeta: { color: '#FFFFFF', fontSize: 8, fontWeight: '700', letterSpacing: 1.1 },
-  heroCopy: { flex: 1, justifyContent: 'flex-end', paddingBottom: 14, zIndex: 2 },
-  title: { color: '#FFFFFF', fontSize: 47, fontWeight: '900', letterSpacing: -2.7, lineHeight: 43 },
-  subtitle: { color: '#C9C9C4', fontSize: 11, lineHeight: 16, marginTop: 14, maxWidth: 270 },
-  modeControl: { borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', marginHorizontal: -14 },
-  modeOption: { backgroundColor: colors.surface, flex: 1, minHeight: 72, padding: 12 },
-  modeOptionSelected: { backgroundColor: colors.accentMuted },
-  modeIndex: { color: colors.muted, fontSize: 8 },
-  modeLabel: { color: colors.muted, fontSize: 13, fontWeight: '900', marginTop: 'auto' },
-  modeLabelSelected: { color: colors.text },
-  offlineNotice: { backgroundColor: colors.warning, marginHorizontal: -14, padding: 13 },
-  offlineLabel: { color: '#FFFFFF', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-  offlineText: { color: '#FFFFFF', fontSize: 11, lineHeight: 16, marginTop: 5 },
-  captureTool: { marginHorizontal: -14 },
-  emptyState: { backgroundColor: colors.background, minHeight: 330, padding: 16 },
+  screen: { backgroundColor: semanticColors.night },
+  content: { flexGrow: 1, paddingBottom: 28, paddingHorizontal: 16, paddingTop: 6 },
+  masthead: { alignItems: 'center', borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, flexDirection: 'row', minHeight: 64 },
+  wordmark: { color: semanticColors.textPrimary, fontSize: 17, fontWeight: '900' },
+  mastheadMeta: { color: semanticColors.textQuiet, fontSize: 11, fontWeight: '700', letterSpacing: 1, marginLeft: 'auto' },
+  hero: { backgroundColor: semanticColors.field, borderColor: semanticColors.borderStrong, borderWidth: 1, minHeight: 280, overflow: 'hidden', padding: 20 },
+  heroTopline: { flexDirection: 'row', justifyContent: 'space-between' },
+  heroMeta: { color: semanticColors.textQuietRaised, fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
+  heroCopy: { flex: 1, justifyContent: 'flex-end', paddingBottom: 8 },
+  title: { color: semanticColors.textPrimary, fontSize: 42, fontWeight: '900', lineHeight: 40 },
+  subtitle: { color: semanticColors.textMuted, fontSize: 14, lineHeight: 21, marginTop: 16, maxWidth: 300 },
+  modeControl: { borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, borderLeftColor: semanticColors.borderStrong, borderLeftWidth: 1, borderRightColor: semanticColors.borderStrong, borderRightWidth: 1, flexDirection: 'row' },
+  modeOption: { backgroundColor: semanticColors.field, flex: 1, minHeight: 64, padding: 12 },
+  modeOptionSelected: { backgroundColor: semanticColors.signal },
+  modeIndex: { color: semanticColors.textQuietRaised, fontSize: 11, fontWeight: '700' },
+  modeLabel: { color: semanticColors.textMuted, fontSize: 13, fontWeight: '900', marginTop: 'auto' },
+  modeLabelSelected: { color: semanticColors.onSignal },
+  offlineNotice: { backgroundColor: semanticColors.fieldRaised, borderColor: semanticColors.review, borderWidth: 1, padding: 14 },
+  offlineLabel: { color: semanticColors.review, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  offlineText: { color: semanticColors.textPrimary, fontSize: 12, lineHeight: 18, marginTop: 6 },
+  captureTool: { borderColor: semanticColors.borderStrong, borderTopWidth: 0, borderWidth: 1 },
+  emptyState: { backgroundColor: semanticColors.night, minHeight: 340, padding: 18 },
   emptyTopline: { flexDirection: 'row', justifyContent: 'space-between' },
-  emptyIndex: { color: colors.muted, fontSize: 8, fontWeight: '700', letterSpacing: 0.8 },
-  emptyPlus: { color: colors.text, fontSize: 92, fontWeight: '200', lineHeight: 100, marginTop: 24 },
-  emptyTitle: { color: colors.text, fontSize: 25, fontWeight: '900', letterSpacing: -1 },
-  emptyText: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 8 },
-  sourceActions: { flexDirection: 'row', gap: 8, marginTop: 22 },
-  previewFrame: { aspectRatio: 0.78, backgroundColor: '#050505', maxHeight: 520, minHeight: 300, overflow: 'hidden', width: '100%' },
-  previewStamp: { backgroundColor: '#FFFFFF', bottom: 10, left: 10, paddingHorizontal: 9, paddingVertical: 6, position: 'absolute' },
-  previewStampText: { color: '#050505', fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
-  preparedMeta: { alignItems: 'baseline', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', gap: 12, padding: 12 },
-  metaPrimary: { color: colors.text, flex: 1, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
-  metaSecondary: { color: colors.muted, fontSize: 9 },
+  emptyIndex: { color: semanticColors.textQuiet, fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
+  emptyPlus: { color: semanticColors.signal, fontSize: 76, fontWeight: '300', lineHeight: 82, marginTop: 24 },
+  emptyTitle: { color: semanticColors.textPrimary, fontSize: 25, fontWeight: '900' },
+  emptyText: { color: semanticColors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 10 },
+  sourceActions: { gap: 8, marginTop: 24 },
+  previewFrame: { aspectRatio: 0.78, backgroundColor: semanticColors.night, maxHeight: 520, minHeight: 300, overflow: 'hidden', width: '100%' },
+  previewStamp: { backgroundColor: semanticColors.fieldRaised, borderColor: semanticColors.borderStrong, borderWidth: 1, bottom: 10, left: 10, paddingHorizontal: 9, paddingVertical: 6, position: 'absolute' },
+  previewStampText: { color: semanticColors.textPrimary, fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  preparedMeta: { alignItems: 'baseline', backgroundColor: semanticColors.field, borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 14 },
+  metaPrimary: { color: semanticColors.textPrimary, flex: 1, fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  metaSecondary: { color: semanticColors.textMuted, fontSize: 11 },
   actionRow: { flexDirection: 'row' },
-  actionButton: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: colors.border, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'flex-start', minHeight: 52, paddingHorizontal: 13 },
-  actionButtonPrimary: { backgroundColor: '#050505' },
-  actionButtonDanger: { borderColor: colors.danger },
-  actionLabel: { color: colors.text, fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
-  actionTextPrimary: { color: '#FFFFFF' },
-  actionArrow: { color: colors.text, fontSize: 16, marginLeft: 'auto' },
-  actionFallback: { color: colors.text, fontWeight: '900' },
+  actionButton: { alignItems: 'center', backgroundColor: semanticColors.field, borderColor: semanticColors.borderStrong, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'flex-start', minHeight: 52, paddingHorizontal: 13 },
+  actionButtonPrimary: { backgroundColor: semanticColors.signal, borderColor: semanticColors.signal },
+  actionButtonDanger: { borderColor: semanticColors.negative },
+  actionLabel: { color: semanticColors.textPrimary, fontSize: 11, fontWeight: '900', letterSpacing: 0.7 },
+  actionTextPrimary: { color: semanticColors.onSignal },
+  actionArrow: { color: semanticColors.textPrimary, fontSize: 16, marginLeft: 'auto' },
+  actionFallback: { color: semanticColors.textPrimary, fontWeight: '900' },
   disabled: { opacity: 0.35 },
-  processing: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', gap: 9, justifyContent: 'center', minHeight: 52 },
-  processingText: { color: colors.text, fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
-  feedback: { borderBottomColor: colors.border, borderBottomWidth: 1, gap: 6, paddingVertical: 14 },
-  feedbackError: { borderLeftColor: colors.danger, borderLeftWidth: 5, paddingLeft: 10 },
-  feedbackSuccess: { borderLeftColor: colors.success, borderLeftWidth: 5, paddingLeft: 10 },
-  feedbackLabel: { color: colors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
-  feedbackText: { color: colors.secondaryText, fontSize: 12, lineHeight: 18 },
-  analysisPanel: { backgroundColor: '#050505', marginHorizontal: -14 },
-  analysisHeading: { alignItems: 'center', borderBottomColor: '#3B3B38', borderBottomWidth: 1, flexDirection: 'row', minHeight: 56, paddingHorizontal: 14 },
-  analysisEyebrow: { color: '#FFFFFF', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
-  analysisCount: { color: colors.accentMuted, fontSize: 9, fontWeight: '900', marginLeft: 'auto' },
-  analysisLeg: { alignItems: 'center', borderBottomColor: '#292927', borderBottomWidth: 1, flexDirection: 'row', minHeight: 82, paddingHorizontal: 14, paddingVertical: 12 },
-  analysisLegIndex: { color: '#858580', fontSize: 9, width: 28 },
+  signalSweep: { backgroundColor: semanticColors.signal, height: 3, transformOrigin: 'left' },
+  processing: { alignItems: 'center', backgroundColor: semanticColors.field, borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, flexDirection: 'row', gap: 9, justifyContent: 'center', minHeight: 52 },
+  processingText: { color: semanticColors.textPrimary, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
+  feedback: { backgroundColor: semanticColors.field, borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, gap: 6, padding: 14 },
+  feedbackError: { borderLeftColor: semanticColors.negative, borderLeftWidth: 5 },
+  feedbackSuccess: { borderLeftColor: semanticColors.success, borderLeftWidth: 5 },
+  feedbackLabel: { color: semanticColors.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  feedbackText: { color: semanticColors.textPrimary, fontSize: 12, lineHeight: 18 },
+  safetyRule: { borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, borderTopColor: semanticColors.borderStrong, borderTopWidth: 1, paddingVertical: 14 },
+  safetyRuleText: { color: semanticColors.textQuiet, fontSize: 11, fontWeight: '800', letterSpacing: 0.7, textAlign: 'center' },
+  analysisPanel: { backgroundColor: semanticColors.field, borderColor: semanticColors.borderStrong, borderWidth: 1 },
+  analysisHeading: { alignItems: 'center', borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, flexDirection: 'row', minHeight: 56, paddingHorizontal: 14 },
+  analysisEyebrow: { color: semanticColors.review, fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  analysisCount: { color: semanticColors.textMuted, fontSize: 11, fontWeight: '900', marginLeft: 'auto' },
+  analysisLeg: { alignItems: 'center', borderBottomColor: semanticColors.borderSubtle, borderBottomWidth: 1, flexDirection: 'row', minHeight: 82, paddingHorizontal: 14, paddingVertical: 12 },
+  analysisLegIndex: { color: semanticColors.textQuiet, fontSize: 11, width: 28 },
   analysisLegCopy: { flex: 1, minWidth: 0, paddingRight: 12 },
-  analysisEvent: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', lineHeight: 17 },
-  analysisSelection: { color: '#A9A9A4', fontSize: 10, lineHeight: 15, marginTop: 5 },
-  analysisOdds: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
-  analysisSummary: { flexDirection: 'row', padding: 14 },
-  analysisMetric: { flex: 1, minWidth: 0 },
-  analysisMetricLabel: { color: '#777772', fontSize: 7, fontWeight: '800', letterSpacing: 0.7 },
-  analysisMetricValue: { color: '#FFFFFF', fontSize: 11, fontWeight: '800', marginTop: 5 },
+  analysisEvent: { color: semanticColors.textPrimary, fontSize: 13, fontWeight: '900', lineHeight: 18 },
+  analysisSelection: { color: semanticColors.textMuted, fontSize: 12, lineHeight: 17, marginTop: 5 },
+  analysisOdds: { color: semanticColors.dataValue, fontSize: 18, fontWeight: '900' },
+  analysisSummary: { flexDirection: 'row', flexWrap: 'wrap', padding: 14 },
+  analysisMetric: { flex: 1, minWidth: 84 },
+  analysisMetricLabel: { color: semanticColors.textQuietRaised, fontSize: 11, fontWeight: '800', letterSpacing: 0.7 },
+  analysisMetricValue: { color: semanticColors.dataValue, fontSize: 12, fontWeight: '800', marginTop: 5 },
+  reviewButton: { alignItems: 'center', backgroundColor: semanticColors.signal, flexDirection: 'row', justifyContent: 'space-between', minHeight: 52, paddingHorizontal: 14 },
+  reviewButtonText: { color: semanticColors.onSignal, fontSize: 12, fontWeight: '900' },
 });
