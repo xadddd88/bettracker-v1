@@ -12,6 +12,9 @@ const NEXT_BIN = fileURLToPath(new URL('../node_modules/next/dist/bin/next', imp
 const NETWORK_GUARD = fileURLToPath(new URL('./web-acceptance-network-guard.cjs', import.meta.url))
 const FONT_MOCKS = fileURLToPath(new URL('./web-acceptance-font-mocks.cjs', import.meta.url))
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost'])
+const SYNTHETIC_EXTERNAL_WEBSOCKET = 'wss://web-acceptance.invalid/blocked-before-handshake'
+const BLOCKED_WEBSOCKET_CODE = 1008
+const BLOCKED_WEBSOCKET_REASON = 'External WebSocket blocked by Web acceptance'
 const TEST_USER_ID = '00000000-0000-4000-8000-000000000001'
 const TEST_USER = {
   id: TEST_USER_ID,
@@ -261,6 +264,54 @@ async function assertSourceOnlyControls() {
   assert.match(decisions, /<label[^>]+htmlFor="decision-stake"[\s\S]*?<input[\s\S]*?id="decision-stake"/, 'Decision stake must have a bound label')
 }
 
+async function assertExternalWebSocketPreblocked(context, forbiddenWebSocketAttempts) {
+  const page = await context.newPage()
+  const cdp = await context.newCDPSession(page)
+  const networkEvents = {
+    handshakeRequests: [],
+    handshakeResponses: [],
+    framesSent: [],
+    framesReceived: [],
+  }
+
+  await cdp.send('Network.enable')
+  cdp.on('Network.webSocketWillSendHandshakeRequest', event => networkEvents.handshakeRequests.push(event.requestId))
+  cdp.on('Network.webSocketHandshakeResponseReceived', event => networkEvents.handshakeResponses.push(event.requestId))
+  cdp.on('Network.webSocketFrameSent', event => networkEvents.framesSent.push(event.requestId))
+  cdp.on('Network.webSocketFrameReceived', event => networkEvents.framesReceived.push(event.requestId))
+  const closeResult = await page.evaluate(url => new Promise((resolve, reject) => {
+    const socket = new WebSocket(url)
+    const timeout = setTimeout(() => reject(new Error('Synthetic external WebSocket was not closed locally')), 5_000)
+    let messages = 0
+    socket.addEventListener('message', () => { messages += 1 })
+    socket.addEventListener('close', event => {
+      clearTimeout(timeout)
+      resolve({ code: event.code, messages, reason: event.reason })
+    }, { once: true })
+  }), SYNTHETIC_EXTERNAL_WEBSOCKET)
+  await page.waitForTimeout(100)
+
+  assert.deepEqual(
+    closeResult,
+    { code: BLOCKED_WEBSOCKET_CODE, messages: 0, reason: BLOCKED_WEBSOCKET_REASON },
+    'Synthetic external WebSocket must be closed locally without message exchange',
+  )
+  assert.deepEqual(
+    forbiddenWebSocketAttempts,
+    [SYNTHETIC_EXTERNAL_WEBSOCKET],
+    'Synthetic external WebSocket must be intercepted by context.routeWebSocket',
+  )
+  assert.deepEqual(networkEvents, {
+    handshakeRequests: [],
+    handshakeResponses: [],
+    framesSent: [],
+    framesReceived: [],
+  }, 'Synthetic external WebSocket must not perform a handshake or exchange frames with a server')
+
+  await cdp.detach()
+  await page.close()
+}
+
 await assertSourceOnlyControls()
 
 const forbiddenStubRequests = []
@@ -321,6 +372,8 @@ for (const stream of [nextServer.stdout, nextServer.stderr]) {
 
 let browser
 const externalRequests = []
+const forbiddenWebSocketAttempts = []
+const observedExternalWebSockets = []
 const browserErrors = []
 const feedbackStubs = { count: 0 }
 
@@ -330,6 +383,15 @@ try {
 
   for (const viewport of VIEWPORTS) {
     const context = await browser.newContext({ serviceWorkers: 'block', viewport })
+    await context.routeWebSocket(/.*/, async webSocketRoute => {
+      const url = webSocketRoute.url()
+      if (isLoopback(url)) {
+        webSocketRoute.connectToServer()
+        return
+      }
+      forbiddenWebSocketAttempts.push(url)
+      await webSocketRoute.close({ code: BLOCKED_WEBSOCKET_CODE, reason: BLOCKED_WEBSOCKET_REASON })
+    })
     await context.addCookies([{
       name: 'sb-127-auth-token',
       value: sessionCookieValue(),
@@ -359,12 +421,16 @@ try {
       await route.continue()
     })
 
+    if (viewport === VIEWPORTS[0]) {
+      await assertExternalWebSocketPreblocked(context, forbiddenWebSocketAttempts)
+    }
+
     for (const route of ROUTES) {
       const page = await context.newPage()
       await page.addInitScript({ content: axe.source })
       page.on('pageerror', error => browserErrors.push(`${route} at ${viewport.width}px: ${error.message}`))
       page.on('websocket', socket => {
-        if (!isLoopback(socket.url())) externalRequests.push(`WEBSOCKET ${socket.url()}`)
+        if (!isLoopback(socket.url())) observedExternalWebSockets.push(socket.url())
       })
       const response = await page.goto(`${nextOrigin}${route}`, { waitUntil: 'networkidle', timeout: 120_000 })
       assert.equal(response?.status(), 200, `${route} must return 200 from the local app`)
@@ -378,6 +444,16 @@ try {
   }
 
   assert.deepEqual(externalRequests, [], 'Browser must not attempt production/provider/AI/external requests')
+  assert.deepEqual(
+    forbiddenWebSocketAttempts,
+    [SYNTHETIC_EXTERNAL_WEBSOCKET],
+    'Every external WebSocket attempt must be preblocked; only the synthetic regression attempt is expected',
+  )
+  assert.deepEqual(
+    observedExternalWebSockets,
+    [],
+    'WebSocket observation must see no unexpected external attempt after routeWebSocket preblocking',
+  )
   assert.deepEqual(forbiddenStubRequests, [], 'Hermetic Supabase stub must receive zero writes')
   assert.deepEqual(unexpectedStubRequests, [], 'Hermetic Supabase stub must receive only allowlisted auth/data reads')
   assert.deepEqual(browserErrors, [], 'Authenticated acceptance pages must have no uncaught browser errors')
