@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { BroadcastButton, BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
 
 // Decision #050 — invite completion. Reached only via the emailed invite
 // link (which established an authenticated session in /auth/callback). The
@@ -58,28 +59,29 @@ export default function SetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4">
+    <main className="flex min-h-screen items-center justify-center bg-bn-night px-4 text-bn-text">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="text-3xl font-bold text-white mb-1">BetTracker</div>
-          <div className="text-sm text-gray-500">Set your password</div>
+          <div className="mb-1 font-display text-3xl font-black">BetTracker</div>
+          <div className="text-sm text-bn-muted">Set your password</div>
         </div>
 
-        <div className="card">
+        <BroadcastPanel className="p-4 sm:p-5">
           {!ready ? (
-            <div className="text-center text-sm text-gray-400 py-4">Loading…</div>
+            <div aria-live="polite" className="py-4 text-center"><BroadcastStatus status="neutral">Loading</BroadcastStatus></div>
           ) : !hasSession ? (
             <div className="text-center py-4">
-              <div className="text-sm text-gray-300 mb-3">
+              <div className="mb-3 text-sm text-bn-muted">
                 This page can only be opened from your invite email link.
               </div>
-              <a href="/login" className="text-xs text-indigo-400 hover:text-indigo-300">Go to sign in</a>
+              <a href="/login" className="min-h-11 text-xs font-bold text-bn-text underline underline-offset-4">Go to sign in</a>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="label">New password</label>
+                <label className="label" htmlFor="new-password">New password</label>
                 <input
+                  id="new-password"
                   className="input"
                   type="password"
                   placeholder="••••••••"
@@ -90,8 +92,9 @@ export default function SetPasswordPage() {
                 />
               </div>
               <div>
-                <label className="label">Confirm password</label>
+                <label className="label" htmlFor="confirm-password">Confirm password</label>
                 <input
+                  id="confirm-password"
                   className="input"
                   type="password"
                   placeholder="••••••••"
@@ -103,18 +106,16 @@ export default function SetPasswordPage() {
               </div>
 
               {error && (
-                <div className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
-                  {error}
-                </div>
+                <BroadcastStatus className="w-full" role="alert" status="negative">{error}</BroadcastStatus>
               )}
 
-              <button type="submit" className="btn-primary w-full mt-1" disabled={submitting}>
+              <BroadcastButton type="submit" className="mt-1 w-full" disabled={submitting}>
                 {submitting ? 'Saving…' : 'Set password & continue'}
-              </button>
+              </BroadcastButton>
             </form>
           )}
-        </div>
+        </BroadcastPanel>
       </div>
-    </div>
+    </main>
   )
 }

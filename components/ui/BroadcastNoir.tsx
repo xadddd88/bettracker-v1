@@ -44,6 +44,7 @@ const statusSymbol: Record<BroadcastNoirStatus, string> = {
 }
 
 export function BroadcastStatus({
+  'aria-label': ariaLabel,
   children,
   className,
   status,
@@ -53,6 +54,7 @@ export function BroadcastStatus({
     <span
       className={classes('bn-status', `bn-status-${status}`, className)}
       data-status={status}
+      aria-label={ariaLabel ?? (typeof children === 'string' ? `${status}: ${children}` : status)}
       {...props}
     >
       <span aria-hidden="true" className="bn-status-icon">{statusSymbol[status]}</span>

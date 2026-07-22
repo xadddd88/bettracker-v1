@@ -6,8 +6,10 @@ import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
 import { bucketScoutScore } from '@/lib/analytics/buckets'
 import type { MarketOpportunity, OpportunityStatus } from '@/types'
-import { Search, Eye, X, Loader2, AlertTriangle } from 'lucide-react'
+import { Search, Eye, X, AlertTriangle } from 'lucide-react'
 import BetaNote from '@/components/ui/BetaNote'
+import { BroadcastButton, BroadcastDataValue, BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
+import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
 
 type Sport     = 'soccer' | 'tennis' | 'cs2' | 'basketball' | 'ice_hockey' | 'mma' | 'other'
 type Locale    = 'auto' | 'uk' | 'ru' | 'en' | 'es' | 'fr' | 'de' | 'ar'
@@ -50,26 +52,13 @@ const TIMEFRAMES: { value: Timeframe; label: string }[] = [
   { value: 'this_week', label: 'This week' },
 ]
 
-const TYPE_STYLE: Record<string, string> = {
-  value:      'text-green-400',
-  contrarian: 'text-blue-400',
-  pattern:    'text-purple-400',
-  general:    'text-gray-400',
-}
-
-const STATUS_BADGE: Record<OpportunityStatus, { label: string; style: string } | null> = {
+const STATUS_BADGE: Record<OpportunityStatus, { label: string; status: BroadcastNoirStatus } | null> = {
   discovered:            null,
-  research_needed:       { label: 'In Analysis', style: 'text-yellow-400 bg-yellow-950/40 border-yellow-800' },
-  watchlisted:           { label: 'Watching',    style: 'text-blue-400 bg-blue-950/40 border-blue-800' },
-  converted_to_decision: { label: 'Converted',   style: 'text-green-400 bg-green-950/40 border-green-800' },
+  research_needed:       { label: 'In Analysis', status: 'review' },
+  watchlisted:           { label: 'Watching', status: 'review' },
+  converted_to_decision: { label: 'Converted', status: 'success' },
   dismissed:             null,
   expired:               null,
-}
-
-function scoreStyle(score: number): string {
-  if (score >= 70) return 'text-green-400 bg-green-950/40 border-green-800'
-  if (score >= 40) return 'text-yellow-400 bg-yellow-950/40 border-yellow-800'
-  return 'text-gray-400 bg-gray-800/40 border-gray-700'
 }
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -91,57 +80,49 @@ interface CardProps {
 
 function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWatch, onDismiss }: CardProps) {
   const sportAbbr = SPORT_ABBR[opp.sport_code as Sport] ?? 'OTH'
-  const typeColor = TYPE_STYLE[opp.opportunity_type] ?? 'text-gray-400'
   const statusBadge = STATUS_BADGE[opp.status]
   const score = opp.scout_score ?? 0
   const REASONING_LIMIT = 140
 
   return (
-    <div className="card flex flex-col gap-3">
+    <BroadcastPanel className="flex flex-col gap-3 p-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-mono font-bold text-slate-500 bg-night-800 border border-night-700 px-1.5 py-0.5 rounded">{sportAbbr}</span>
-            <span className="text-sm font-semibold text-white truncate">{opp.event_name}</span>
+            <span className="rounded-control border border-bn-border-subtle bg-bn-raised px-1.5 py-0.5 font-mono text-[10px] font-bold text-bn-muted">{sportAbbr}</span>
+            <span className="truncate text-sm font-semibold text-bn-text">{opp.event_name}</span>
           </div>
-          <div className="text-xs text-gray-400 mt-0.5">
+          <div className="mt-0.5 text-xs text-bn-muted">
             {opp.market_type}{opp.selection ? ` · ${opp.selection}` : ''}
           </div>
         </div>
         {statusBadge && (
-          <span className={`text-[10px] font-medium border rounded-full px-2 py-0.5 shrink-0 ${statusBadge.style}`}>
-            {statusBadge.label}
-          </span>
+          <BroadcastStatus className="shrink-0" status={statusBadge.status}>{statusBadge.label}</BroadcastStatus>
         )}
       </div>
 
       {/* Tags row */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={`text-[11px] font-semibold uppercase tracking-wide ${typeColor}`}>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-bn-muted">
           {opp.opportunity_type}
         </span>
-        <span className="text-gray-700">·</span>
-        <span className={`text-[11px] font-medium border rounded-full px-2 py-0.5 ${scoreStyle(score)}`}>
-          Score {score}
-        </span>
+        <span className="text-bn-quiet">·</span>
+        <BroadcastDataValue className="text-[11px] font-medium">Score {score}</BroadcastDataValue>
         {opp.risk_level && (
           <>
-            <span className="text-gray-700">·</span>
-            <span className={`text-[11px] font-medium ${
-              opp.risk_level === 'low' ? 'text-green-500' :
-              opp.risk_level === 'medium' ? 'text-yellow-500' : 'text-red-500'
-            }`}>
+            <span className="text-bn-quiet">·</span>
+            <BroadcastStatus status={opp.risk_level === 'high' ? 'negative' : opp.risk_level === 'medium' ? 'review' : 'neutral'}>
               {opp.risk_level.charAt(0).toUpperCase() + opp.risk_level.slice(1)} risk
-            </span>
+            </BroadcastStatus>
           </>
         )}
         {/* FP-001: model_probability is never displayed — Scout candidates are
             research leads without a verified data basis, not priced signals. */}
         {opp.match_date && (
           <>
-            <span className="text-gray-700">·</span>
-            <span className="text-[11px] text-gray-500">
+            <span className="text-bn-quiet">·</span>
+            <span className="text-[11px] text-bn-muted">
               {fmtMatchDate(opp.match_date)}
             </span>
           </>
@@ -150,7 +131,7 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
 
       {/* Reasoning */}
       <div>
-        <p className="text-sm text-gray-300 leading-relaxed">
+        <p className="text-sm leading-relaxed text-bn-text">
           {expanded || opp.reasoning.length <= REASONING_LIMIT
             ? opp.reasoning
             : `${opp.reasoning.slice(0, REASONING_LIMIT)}…`}
@@ -158,7 +139,7 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
         {opp.reasoning.length > REASONING_LIMIT && (
           <button
             onClick={onToggle}
-            className="text-xs text-indigo-400 hover:text-indigo-300 mt-1 transition-colors"
+            className="mt-1 min-h-11 text-xs font-bold text-bn-text underline underline-offset-4"
           >
             {expanded ? 'Show less' : 'Show more'}
           </button>
@@ -168,13 +149,13 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
       {/* Required checks */}
       {opp.required_checks && opp.required_checks.length > 0 && (
         <div>
-          <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-1">
+          <p className="mb-1 font-mono text-[11px] font-medium uppercase tracking-wide text-bn-quiet">
             Required checks
           </p>
           <ul className="flex flex-col gap-0.5">
             {opp.required_checks.map((check, i) => (
-              <li key={i} className="text-xs text-gray-400 flex items-start gap-1.5">
-                <span className="text-gray-600 mt-0.5 shrink-0">•</span>
+              <li key={i} className="flex items-start gap-1.5 text-xs text-bn-muted">
+                <span className="mt-0.5 shrink-0 text-bn-quiet" aria-hidden>•</span>
                 {check}
               </li>
             ))}
@@ -184,34 +165,36 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
 
       {/* Actions */}
       {opp.status !== 'converted_to_decision' && (
-        <div className="flex gap-2 pt-1 border-t border-gray-800">
-          <button
-            className="btn-primary flex-1 text-sm py-1.5 flex items-center justify-center gap-1.5"
+        <div className="flex gap-2 border-t border-bn-border-subtle pt-2">
+          <BroadcastButton
+            className="flex flex-1 items-center justify-center gap-1.5"
             onClick={onAnalyse}
             disabled={actionBusy}
           >
             <Search size={13} strokeWidth={2} />
             Analyze
-          </button>
-          <button
-            className="flex-1 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-blue-400 text-sm font-medium border border-gray-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+          </BroadcastButton>
+          <BroadcastButton
+            tone="secondary"
+            className="flex flex-1 items-center justify-center gap-1.5"
             onClick={onWatch}
             disabled={actionBusy || opp.status === 'watchlisted'}
           >
             <Eye size={13} strokeWidth={2} />
             {opp.status === 'watchlisted' ? 'Watching' : 'Watchlist'}
-          </button>
-          <button
-            className="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-500 text-sm border border-gray-700 transition-colors disabled:opacity-50"
+          </BroadcastButton>
+          <BroadcastButton
+            tone="secondary"
+            aria-label={`Dismiss ${opp.event_name}`}
             onClick={onDismiss}
             disabled={actionBusy}
             title="Dismiss"
           >
             <X size={13} strokeWidth={2} />
-          </button>
+          </BroadcastButton>
         </div>
       )}
-    </div>
+    </BroadcastPanel>
   )
 }
 
@@ -349,24 +332,24 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
   return (
     <div className="flex flex-col gap-6">
       {/* ── Scout form ─────────────────────────────────────── */}
-      <div className="card flex flex-col gap-4">
+      <BroadcastPanel className="flex flex-col gap-4 p-4 sm:p-5">
         {/* Event Pulse quick picks */}
         {pulsePresets && pulsePresets.length > 0 && (
           <div>
             <p className="label mb-2">Quick picks</p>
             <div className="flex flex-wrap gap-2">
               {pulsePresets.map(preset => (
-                <button
+                <BroadcastButton
                   key={preset.id}
                   onClick={() => {
                     setSport(preset.sport as Sport)
                     setContext(preset.context)
                     setError('')
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-night-700 bg-night-800 text-xs text-slate-300 hover:border-amber-700/40 hover:text-white transition-colors"
+                  tone="secondary"
                 >
                   <span>{preset.label}</span>
-                </button>
+                </BroadcastButton>
               ))}
             </div>
           </div>
@@ -377,17 +360,14 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
           <label className="label mb-2">Sport</label>
           <div className="flex flex-wrap gap-2">
             {SPORTS.map(s => (
-              <button
+              <BroadcastButton
                 key={s.value}
                 onClick={() => setSport(s.value)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                  sport === s.value
-                    ? 'bg-indigo-600 border-indigo-500 text-white'
-                    : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
-                }`}
+                aria-pressed={sport === s.value}
+                tone={sport === s.value ? 'primary' : 'secondary'}
               >
                 {s.label}
-              </button>
+              </BroadcastButton>
             ))}
           </div>
         </div>
@@ -409,17 +389,15 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
           <label className="label mb-2">Timeframe</label>
           <div className="flex gap-2">
             {TIMEFRAMES.map(t => (
-              <button
+              <BroadcastButton
                 key={t.value}
                 onClick={() => setTimeframe(t.value)}
-                className={`flex-1 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                  timeframe === t.value
-                    ? 'bg-indigo-600 border-indigo-500 text-white'
-                    : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
-                }`}
+                aria-pressed={timeframe === t.value}
+                className="flex-1"
+                tone={timeframe === t.value ? 'primary' : 'secondary'}
               >
                 {t.label}
-              </button>
+              </BroadcastButton>
             ))}
           </div>
         </div>
@@ -434,20 +412,17 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
 
         {/* Error */}
         {error && (
-          <div className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
-            {error}
-          </div>
+          <BroadcastStatus className="w-full" status="negative">{error}</BroadcastStatus>
         )}
 
         {/* Submit */}
-        <button
-          className="btn-primary flex items-center justify-center gap-2"
+        <BroadcastButton
+          className="flex items-center justify-center gap-2"
           onClick={handleScout}
           disabled={loading}
         >
           {loading ? (
             <>
-              <Loader2 size={14} className="animate-spin" />
               Scouting…
             </>
           ) : (
@@ -456,26 +431,21 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
               Run Scout
             </>
           )}
-        </button>
-      </div>
+        </BroadcastButton>
+      </BroadcastPanel>
 
       {/* ── Disclaimer ─────────────────────────────────────── */}
       {disclaimer && (
-        <p className="text-xs text-gray-500 border border-gray-800 rounded-lg px-3 py-2 leading-relaxed flex items-start gap-2">
-          <AlertTriangle size={12} className="shrink-0 mt-0.5 text-amber-500/60" />
-          {disclaimer}
-        </p>
+        <BroadcastPanel className="flex items-start gap-2 p-3 text-xs leading-relaxed text-bn-muted"><AlertTriangle aria-hidden size={12} className="mt-0.5 shrink-0 text-bn-review" />{disclaimer}</BroadcastPanel>
       )}
 
       {/* ── Opportunities list ─────────────────────────────── */}
       {opportunities.length > 0 ? (
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <p className="text-xs text-gray-600">{opportunities.length} opportunit{opportunities.length === 1 ? 'y' : 'ies'} · sorted by most recent</p>
-            <p className="text-[10px] text-gray-700">
-              <span className="text-green-500">value</span> = candidate to investigate ·{' '}
-              <span className="text-blue-500">contrarian</span> = alternative angle ·{' '}
-              <span className="text-purple-500">pattern</span> = contextual pattern ·{' '}
+            <p className="text-xs text-bn-muted">{opportunities.length} opportunit{opportunities.length === 1 ? 'y' : 'ies'} · sorted by most recent</p>
+            <p className="text-[10px] text-bn-quiet">
+              value = candidate to investigate · contrarian = alternative angle · pattern = contextual pattern ·{' '}
               score 0–100 = research relevance, not probability or price edge · Analyze → AI Analyst
             </p>
           </div>
@@ -496,11 +466,7 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
           ))}
         </div>
       ) : !loading && (
-        <div className="card flex flex-col items-center gap-3 py-10 text-center">
-          <Search size={28} strokeWidth={1.25} className="text-slate-600" />
-          <p className="text-sm font-medium text-gray-400">No scouted opportunities yet</p>
-          <p className="text-xs text-gray-600">Run Scout to find markets worth analyzing.</p>
-        </div>
+        <BroadcastPanel className="flex flex-col items-center gap-3 py-10 text-center"><BroadcastStatus status="neutral">Empty</BroadcastStatus><p className="text-sm font-medium text-bn-text">No scouted opportunities yet</p><p className="text-xs text-bn-muted">Run Scout to find markets worth analyzing.</p></BroadcastPanel>
       )}
     </div>
   )

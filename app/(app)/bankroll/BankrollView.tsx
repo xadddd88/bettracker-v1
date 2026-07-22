@@ -3,18 +3,19 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Bankroll, BankrollTransaction, TxnType } from '@/types'
+import { BroadcastButton, BroadcastDataValue, BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: '$', EUR: '€', UAH: '₴', GBP: '£', CAD: 'CA$', AUD: 'A$',
 }
 
-const TX_CONFIG: Record<TxnType, { icon: string; colorClass: string; label: string }> = {
-  deposit:    { icon: '↑', colorClass: 'text-green-400',  label: 'Deposit' },
-  withdrawal: { icon: '↓', colorClass: 'text-red-400',    label: 'Withdrawal' },
-  stake:      { icon: '●', colorClass: 'text-gray-400',   label: 'Stake' },
-  payout:     { icon: '✓', colorClass: 'text-green-400',  label: 'Payout' },
-  adjustment: { icon: '±', colorClass: 'text-gray-400',   label: 'Adjustment' },
-  bonus:      { icon: '★', colorClass: 'text-indigo-400', label: 'Bonus' },
+const TX_CONFIG: Record<TxnType, { icon: string; label: string }> = {
+  deposit:    { icon: '↑', label: 'Deposit' },
+  withdrawal: { icon: '↓', label: 'Withdrawal' },
+  stake:      { icon: '●', label: 'Stake' },
+  payout:     { icon: '✓', label: 'Payout' },
+  adjustment: { icon: '±', label: 'Adjustment' },
+  bonus:      { icon: '★', label: 'Bonus' },
 }
 
 function fmtBalance(amount: number, symbol: string): string {
@@ -141,68 +142,62 @@ export default function BankrollView({
   return (
     <div className="flex flex-col gap-6">
       {/* Balance */}
-      <div className="card text-center py-8">
-        <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Current Balance</p>
-        <p className="text-4xl font-bold text-white">
+      <BroadcastPanel className="p-6 text-center sm:p-8">
+        <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-quiet">Current Balance</p>
+        <BroadcastDataValue className="block font-display text-4xl font-black">
           {symbol}{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </p>
-        <p className="text-[11px] text-gray-600 mt-2">Deposits + payouts − stakes − withdrawals</p>
-      </div>
+        </BroadcastDataValue>
+        <p className="mt-2 text-[11px] text-bn-muted">Deposits + payouts − stakes − withdrawals</p>
+      </BroadcastPanel>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <div className="stat-card">
           <p className="stat-label">Deposited</p>
-          <p className="stat-value text-green-400">{fmtBalance(stats.totalDeposited, symbol)}</p>
-          <p className="text-[10px] text-gray-700 mt-0.5">total added</p>
+          <BroadcastDataValue className="stat-value">{fmtBalance(stats.totalDeposited, symbol)}</BroadcastDataValue>
+          <p className="mt-0.5 text-[10px] text-bn-quiet">total added</p>
         </div>
         <div className="stat-card">
           <p className="stat-label">Withdrawn</p>
-          <p className="stat-value text-red-400">{fmtBalance(stats.totalWithdrawn, symbol)}</p>
-          <p className="text-[10px] text-gray-700 mt-0.5">total removed</p>
+          <BroadcastDataValue className="stat-value">{fmtBalance(stats.totalWithdrawn, symbol)}</BroadcastDataValue>
+          <p className="mt-0.5 text-[10px] text-bn-quiet">total removed</p>
         </div>
         <div className="stat-card">
           <p className="stat-label">Net from bets</p>
-          <p className={`stat-value ${stats.netFromBets >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+          <BroadcastDataValue className="stat-value">
             {stats.netFromBets >= 0 ? '+' : '−'}{symbol}{Math.abs(stats.netFromBets).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-          <p className="text-[10px] text-gray-700 mt-0.5">payouts minus stakes</p>
+          </BroadcastDataValue>
+          <p className="mt-0.5 text-[10px] text-bn-quiet">payouts minus stakes</p>
         </div>
       </div>
-      <p className="text-[10px] text-gray-600 -mt-2 text-center">Pending bet stakes are not automatically deducted from your balance.</p>
+      <p className="-mt-2 text-center text-[10px] text-bn-muted">Pending bet stakes are not automatically deducted from your balance.</p>
 
       {/* Action buttons */}
       <div className="flex gap-3">
-        <button
-          className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-            form === 'deposit'
-              ? 'bg-green-700 border-green-600 text-white'
-              : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-500'
-          }`}
+        <BroadcastButton
+          className="flex-1"
+          tone={form === 'deposit' ? 'primary' : 'secondary'}
           onClick={() => form === 'deposit' ? closeForm() : openForm('deposit')}
         >
           + Deposit
-        </button>
-        <button
-          className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-            form === 'withdrawal'
-              ? 'bg-red-800 border-red-700 text-white'
-              : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-500'
-          }`}
+        </BroadcastButton>
+        <BroadcastButton
+          className="flex-1"
+          tone={form === 'withdrawal' ? 'destructive' : 'secondary'}
           onClick={() => form === 'withdrawal' ? closeForm() : openForm('withdrawal')}
         >
           − Withdraw
-        </button>
+        </BroadcastButton>
       </div>
 
       {/* Inline form */}
       {form && (
-        <div className="card flex flex-col gap-3">
-          <p className="text-sm font-medium text-white capitalize">{form}</p>
+        <BroadcastPanel className="flex flex-col gap-3 p-4">
+          <p className="text-sm font-medium capitalize text-bn-text">{form}</p>
           <div>
             <label className="label">Amount</label>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-gray-500 text-sm">{symbol}</span>
+              <span className="text-sm text-bn-muted">{symbol}</span>
               <input
                 className="input flex-1"
                 type="number"
@@ -217,7 +212,7 @@ export default function BankrollView({
           </div>
           <div>
             <label className="label">
-              Note <span className="text-gray-600 font-normal">(optional)</span>
+              Note <span className="font-normal text-bn-quiet">(optional)</span>
             </label>
             <input
               className="input mt-1"
@@ -229,70 +224,69 @@ export default function BankrollView({
             />
           </div>
           {formError && (
-            <p className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
-              {formError}
-            </p>
+            <BroadcastStatus className="w-full" status="negative">{formError}</BroadcastStatus>
           )}
           <div className="flex gap-2">
-            <button
-              className="btn-primary flex-1"
+            <BroadcastButton
+              className="flex-1"
               onClick={handleSubmit}
               disabled={submitting}
             >
               {submitting ? 'Processing…' : `Confirm ${form}`}
-            </button>
-            <button
-              className="flex-1 py-2 rounded-lg text-sm font-medium border border-gray-700 text-gray-400 hover:border-gray-500 transition-colors"
+            </BroadcastButton>
+            <BroadcastButton
+              className="flex-1"
+              tone="secondary"
               onClick={closeForm}
               disabled={submitting}
             >
               Cancel
-            </button>
+            </BroadcastButton>
           </div>
-        </div>
+        </BroadcastPanel>
       )}
 
       {/* Transaction history */}
       <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
+        <p className="mb-3 font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-quiet">
           Transaction history
         </p>
         {transactions.length === 0 ? (
-          <div className="card flex flex-col items-center gap-3 py-10 text-center">
-            <span className="text-3xl text-slate-600">—</span>
-            <p className="text-sm font-medium text-gray-400">No transactions yet</p>
-            <p className="text-xs text-gray-600">Make your first deposit to get started.</p>
-            <button className="btn-primary mt-1" onClick={() => openForm('deposit')}>
+          <BroadcastPanel className="flex flex-col items-center gap-3 py-10 text-center">
+            <BroadcastStatus status="neutral">Empty</BroadcastStatus>
+            <p className="text-sm font-medium text-bn-text">No transactions yet</p>
+            <p className="text-xs text-bn-muted">Make your first deposit to get started.</p>
+            <BroadcastButton className="mt-1" onClick={() => openForm('deposit')}>
               + Deposit
-            </button>
-          </div>
+            </BroadcastButton>
+          </BroadcastPanel>
         ) : (
           <div className="flex flex-col gap-2">
             {transactions.map(tx => {
-              const cfg = TX_CONFIG[tx.type] ?? { icon: '?', colorClass: 'text-gray-400', label: tx.type }
+              const cfg = TX_CONFIG[tx.type] ?? { icon: '?', label: tx.type }
               const noteStr = tx.metadata && typeof tx.metadata === 'object' && 'note' in tx.metadata
                 ? String((tx.metadata as Record<string, unknown>).note)
                 : null
               return (
-                <div key={tx.id} className="card flex items-center gap-3">
-                  <span className={`text-base w-5 text-center shrink-0 ${cfg.colorClass}`}>
+                <BroadcastPanel key={tx.id} className="flex items-center gap-3 p-4">
+                  <span aria-hidden className="w-5 shrink-0 text-center text-base text-bn-muted">
                     {cfg.icon}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white">{cfg.label}</p>
+                    <p className="text-sm text-bn-text">{cfg.label}</p>
                     {noteStr && (
-                      <p className="text-[11px] text-gray-600 truncate">{noteStr}</p>
+                      <p className="truncate text-[11px] text-bn-muted">{noteStr}</p>
                     )}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className={`text-sm font-medium ${tx.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    <BroadcastDataValue className="block text-sm font-medium">
                       {fmtDelta(tx.amount, symbol)}
-                    </p>
-                    <p className="text-[11px] text-gray-600">
+                    </BroadcastDataValue>
+                    <p className="text-[11px] text-bn-muted">
                       {fmtBalance(tx.balance_after, symbol)} · {fmtDate(tx.created_at)}
                     </p>
                   </div>
-                </div>
+                </BroadcastPanel>
               )
             })}
           </div>

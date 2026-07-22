@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -12,7 +10,8 @@ import {
 } from 'react-native';
 
 import { useAuth } from '@/auth/auth-context';
-import { colors } from '@/ui/theme';
+import { BroadcastButton, BroadcastPanel, BroadcastStatus } from '@/ui/broadcast-noir-primitives';
+import { geometry, semanticColors } from '@/ui/theme';
 
 export default function SignInScreen() {
   const { signIn } = useAuth();
@@ -46,7 +45,7 @@ export default function SignInScreen() {
           <Text style={styles.title}>FOUNDER{`\n`}ACCESS</Text>
           <Text style={styles.heroFoot}>ANALYZE / VERIFY / TRACK</Text>
         </View>
-        <View style={styles.card}>
+        <BroadcastPanel style={styles.card}>
           <Text style={styles.eyebrow}>SECURE SIGN IN</Text>
           <Text style={styles.subtitle}>Use the same account as the web tracker.</Text>
 
@@ -60,7 +59,7 @@ export default function SignInScreen() {
               keyboardType="email-address"
               onChangeText={setEmail}
               placeholder="you@example.com"
-              placeholderTextColor={colors.placeholder}
+              placeholderTextColor={semanticColors.textQuiet}
               returnKeyType="next"
               style={styles.input}
               value={email}
@@ -77,7 +76,7 @@ export default function SignInScreen() {
               onChangeText={setPassword}
               onSubmitEditing={handleSignIn}
               placeholder="Your password"
-              placeholderTextColor={colors.placeholder}
+              placeholderTextColor={semanticColors.textQuiet}
               returnKeyType="go"
               secureTextEntry
               style={styles.input}
@@ -86,56 +85,45 @@ export default function SignInScreen() {
           </View>
 
           {error ? (
-            <Text accessibilityLiveRegion="polite" role="alert" style={styles.error}>
-              {error}
-            </Text>
+            <BroadcastStatus label={error} status="negative" />
           ) : null}
 
-          <Pressable
+          <BroadcastButton
             accessibilityLabel="Sign in"
-            accessibilityRole="button"
             disabled={busy}
+            label={busy ? 'Signing in…' : 'Sign in →'}
             onPress={handleSignIn}
-            style={({ pressed }) => [styles.button, (busy || pressed) && styles.buttonMuted]}
-          >
-            {busy ? <ActivityIndicator color={colors.background} /> : <Text style={styles.buttonText}>SIGN IN →</Text>}
-          </Pressable>
-        </View>
+            style={busy ? styles.buttonMuted : undefined}
+          />
+        </BroadcastPanel>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: colors.background, flex: 1 },
+  safeArea: { backgroundColor: semanticColors.night, flex: 1 },
   keyboard: { flex: 1 },
-  hero: { backgroundColor: colors.background, flex: 0.85, justifyContent: 'center', minHeight: 280, padding: 18 },
+  hero: { backgroundColor: semanticColors.night, flex: 0.85, justifyContent: 'center', minHeight: 280, padding: 18 },
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', left: 18, position: 'absolute', right: 18, top: 18 },
-  heroBrand: { color: colors.text, fontSize: 15, fontWeight: '900' },
-  heroIndex: { color: colors.muted, fontSize: 8, fontWeight: '700', letterSpacing: 1 },
-  heroFoot: { bottom: 18, color: colors.muted, fontSize: 8, fontWeight: '700', letterSpacing: 1.3, position: 'absolute', right: 18 },
+  heroBrand: { color: semanticColors.textPrimary, fontSize: 15, fontWeight: '900' },
+  heroIndex: { color: semanticColors.textMuted, fontSize: 8, fontWeight: '700', letterSpacing: 1 },
+  heroFoot: { bottom: 18, color: semanticColors.textMuted, fontSize: 8, fontWeight: '700', letterSpacing: 1.3, position: 'absolute', right: 18 },
   card: { alignSelf: 'center', gap: 18, maxWidth: 440, padding: 18, width: '100%' },
-  eyebrow: { color: colors.text, fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
-  title: { color: colors.text, fontSize: 50, fontWeight: '900', letterSpacing: -3, lineHeight: 45 },
-  subtitle: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: -9 },
+  eyebrow: { color: semanticColors.textQuietRaised, fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
+  title: { color: semanticColors.textPrimary, fontSize: 50, fontWeight: '900', letterSpacing: -3, lineHeight: 45 },
+  subtitle: { color: semanticColors.textMuted, fontSize: 12, lineHeight: 18, marginTop: -9 },
   field: { gap: 7 },
-  label: { color: colors.muted, fontSize: 8, fontWeight: '800', letterSpacing: 1 },
+  label: { color: semanticColors.textMuted, fontSize: 8, fontWeight: '800', letterSpacing: 1 },
   input: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderBottomWidth: 1,
-    color: colors.text,
+    backgroundColor: semanticColors.field,
+    borderColor: semanticColors.borderStrong,
+    borderRadius: geometry.radiusControl,
+    borderWidth: 1,
+    color: semanticColors.textPrimary,
     fontSize: 16,
     minHeight: 52,
-    paddingHorizontal: 0,
-  },
-  error: { color: colors.danger, fontSize: 14, lineHeight: 20 },
-  button: {
-    alignItems: 'center',
-    backgroundColor: colors.accent,
-    justifyContent: 'center',
-    minHeight: 56,
+    paddingHorizontal: 12,
   },
   buttonMuted: { opacity: 0.65 },
-  buttonText: { color: colors.background, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
 });

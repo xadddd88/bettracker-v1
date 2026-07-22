@@ -138,7 +138,7 @@ export default function MobileNav() {
       >
         <button
           type="button"
-          className="absolute inset-0 bg-black/65"
+          className="absolute inset-0 bg-bn-night/90"
           onClick={() => setOpen(false)}
           aria-label="Close navigation"
           tabIndex={open ? 0 : -1}
@@ -154,7 +154,7 @@ export default function MobileNav() {
         >
           <div className="flex items-center justify-between border-b border-[var(--border-strong)] px-4 py-3">
             <span className="font-display text-xl font-black tracking-[-0.045em]">MORE / BETTRACKER</span>
-            <span className="h-2.5 w-2.5 rounded-full bg-[var(--signal)]" aria-hidden />
+            <span className="h-2.5 w-2.5 rounded-control bg-[var(--signal)]" aria-hidden />
           </div>
           <div className="flex flex-col">
             {MORE_LINKS.map(({ href, Icon, label }, index) => {

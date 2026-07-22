@@ -52,25 +52,3 @@ export const motion = {
   successMaximumMs: 800,
   infiniteDecorativeLoops: false,
 } as const;
-
-// Transitional aliases keep current screens compiling while PRs B-F migrate
-// them to semanticColors and the new primitives. Every value is derived from
-// Broadcast Noir; there is no second theme or independent palette.
-export const colors = {
-  accent: semanticColors.fieldRaised,
-  accentMuted: semanticColors.fieldRaised,
-  background: semanticColors.night,
-  border: semanticColors.borderStrong,
-  danger: semanticColors.negative,
-  magenta: semanticColors.signal,
-  muted: semanticColors.textQuiet,
-  placeholder: semanticColors.textQuiet,
-  secondaryText: semanticColors.textMuted,
-  success: semanticColors.success,
-  surface: semanticColors.field,
-  surfaceMuted: semanticColors.fieldRaised,
-  surfaceRaised: semanticColors.fieldRaised,
-  text: semanticColors.textPrimary,
-  ultraviolet: semanticColors.signal,
-  warning: semanticColors.review,
-} as const;

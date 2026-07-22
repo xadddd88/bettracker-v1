@@ -122,20 +122,13 @@ test('daily Home uses the read model and exposes trusted Adaptive Action', () =>
   assert.doesNotMatch(data, /select\s*\(\s*['"`]\s*\*/);
 });
 
-test('legacy editorial motion remains isolated from migrated Home, Scanner and Tracker', () => {
-  const backdrop = source('src/ui/time-warp.tsx');
+test('legacy editorial motion is removed from the complete Broadcast Noir mobile shell', () => {
   const motion = source('src/ui/motion.tsx');
   const ticket = source('src/ui/bet-ticket.tsx');
   const tabs = source('src/app/(app)/_layout.tsx');
   const trackerStack = source('src/app/(app)/bets/_layout.tsx');
 
-  assert.match(backdrop, /EditorialBackdrop/);
-  assert.match(backdrop, /KineticType/);
-  assert.match(backdrop, /EditorialRule/);
-  assert.match(backdrop, /#E8FF00/);
-  assert.match(backdrop, /withRepeat/);
-  assert.match(backdrop, /useReducedMotion/);
-  assert.match(backdrop, /cancelAnimation/);
+  assert.equal(existsSync(join(root, 'src/ui/time-warp.tsx')), false);
   assert.match(motion, /withSpring/);
   assert.match(motion, /useReducedMotion/);
   assert.match(tabs, /animation:\s*['"]shift['"]/);
@@ -144,6 +137,15 @@ test('legacy editorial motion remains isolated from migrated Home, Scanner and T
   assert.match(ticket, /totalOdds\?\.toFixed\(2\)/);
   assert.doesNotMatch(source('src/app/(app)/home.tsx'), /(?:EditorialBackdrop|TimeWarpBackdrop|KineticType)/);
   assert.doesNotMatch(source('src/app/(app)/ai/index.tsx'), /(?:EditorialBackdrop|TimeWarpBackdrop|KineticType)/);
+
+  for (const path of [
+    'src/app/(app)/more.tsx',
+    'src/app/(app)/stats.tsx',
+    'src/app/sign-in.tsx',
+    'src/ui/product-shell.tsx',
+  ]) {
+    assert.doesNotMatch(source(path), /(?:EditorialBackdrop|TimeWarpBackdrop|KineticType|WarpRail|\bcolors\.)/);
+  }
 
   for (const path of [
     'src/app/(app)/bets/index.tsx',

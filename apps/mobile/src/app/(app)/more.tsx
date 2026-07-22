@@ -6,7 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/auth/auth-context';
 import { ActionCard, ScreenHeader, SectionTitle } from '@/ui/product-shell';
-import { colors } from '@/ui/theme';
+import { BroadcastPanel, BroadcastStatus } from '@/ui/broadcast-noir-primitives';
+import { semanticColors } from '@/ui/theme';
 
 export default function MoreScreen() {
   const router = useRouter();
@@ -23,23 +24,21 @@ export default function MoreScreen() {
           title="Account"
         />
 
-        <View style={styles.profileCard}>
+        <BroadcastPanel style={styles.profileCard}>
           <View style={styles.avatar}>
             <SymbolView
               fallback={<Text style={styles.avatarFallback}>F</Text>}
               name={{ android: 'person', ios: 'person.fill', web: 'person' }}
               size={25}
-              tintColor="#FFFFFF"
+              tintColor={semanticColors.textPrimary}
             />
           </View>
           <View style={styles.profileCopy}>
             <Text style={styles.profileTitle}>Signed in</Text>
             <Text numberOfLines={1} style={styles.profileEmail}>{email}</Text>
           </View>
-          <View style={styles.secureBadge}>
-            <Text style={styles.secureBadgeText}>ACTIVE</Text>
-          </View>
-        </View>
+          <BroadcastStatus label="Active session" status="success" />
+        </BroadcastPanel>
 
         <SectionTitle title="Performance" />
         <View style={styles.actions}>
@@ -75,9 +74,7 @@ export default function MoreScreen() {
         </View>
 
         {notice ? (
-          <View accessibilityLiveRegion="polite" style={styles.notice}>
-            <Text style={styles.noticeText}>{notice}</Text>
-          </View>
+          <BroadcastStatus label={notice} status="review" />
         ) : null}
 
         <Text style={styles.version}>BetTracker mobile</Text>
@@ -96,36 +93,31 @@ function SettingRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: colors.background, flex: 1 },
+  safeArea: { backgroundColor: semanticColors.night, flex: 1 },
   content: { gap: 18, padding: 14, paddingBottom: 32 },
   profileCard: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
     padding: 14,
   },
   avatar: {
     alignItems: 'center',
-    backgroundColor: colors.surfaceRaised,
-    borderColor: colors.border,
+    backgroundColor: semanticColors.fieldRaised,
+    borderColor: semanticColors.borderStrong,
     borderWidth: 1,
     height: 48,
     justifyContent: 'center',
     width: 48,
   },
-  avatarFallback: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
+  avatarFallback: { color: semanticColors.textPrimary, fontSize: 18, fontWeight: '900' },
   profileCopy: { flex: 1, gap: 3, minWidth: 0 },
-  profileTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
-  profileEmail: { color: colors.muted, fontSize: 12 },
-  secureBadge: { backgroundColor: colors.accentMuted, paddingHorizontal: 8, paddingVertical: 5 },
-  secureBadgeText: { color: colors.success, fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
-  rows: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
+  profileTitle: { color: semanticColors.textPrimary, fontSize: 16, fontWeight: '800' },
+  profileEmail: { color: semanticColors.textMuted, fontSize: 12 },
+  rows: { backgroundColor: semanticColors.field, borderColor: semanticColors.borderStrong, borderWidth: 1 },
   settingRow: {
     alignItems: 'center',
-    borderBottomColor: colors.border,
+    borderBottomColor: semanticColors.borderSubtle,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     gap: 12,
@@ -133,10 +125,8 @@ const styles = StyleSheet.create({
     minHeight: 52,
     paddingHorizontal: 14,
   },
-  settingLabel: { color: colors.secondaryText, fontSize: 14, fontWeight: '700' },
-  settingValue: { color: colors.muted, fontSize: 12, textAlign: 'right' },
+  settingLabel: { color: semanticColors.textPrimary, fontSize: 14, fontWeight: '700' },
+  settingValue: { color: semanticColors.textMuted, fontSize: 12, textAlign: 'right' },
   actions: { gap: 10 },
-  notice: { backgroundColor: colors.accentMuted, borderColor: colors.border, borderWidth: 1, padding: 12 },
-  noticeText: { color: colors.text, fontSize: 12, lineHeight: 18 },
-  version: { color: colors.placeholder, fontSize: 11, textAlign: 'center' },
+  version: { color: semanticColors.textQuiet, fontSize: 11, textAlign: 'center' },
 });

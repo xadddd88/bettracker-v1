@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
+import { BroadcastButton, BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
 
 type Category = 'bug' | 'suggestion' | 'general' | 'praise'
 
@@ -14,6 +15,8 @@ const CATEGORIES: { value: Category; label: string }[] = [
 ]
 
 export default function FeedbackWidget() {
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const closeRef = useRef<HTMLButtonElement>(null)
   const [open,     setOpen]     = useState(false)
   const [rating,   setRating]   = useState(0)
   const [hovered,  setHovered]  = useState(0)
@@ -37,7 +40,18 @@ export default function FeedbackWidget() {
     setCategory('general')
     setMessage('')
     setError('')
+    requestAnimationFrame(() => triggerRef.current?.focus())
   }
+
+  useEffect(() => {
+    if (!open) return
+    closeRef.current?.focus()
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') closeModal()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [open])
 
   async function submit() {
     if (rating === 0) {
@@ -71,8 +85,9 @@ export default function FeedbackWidget() {
     <>
       {/* Floating trigger — clears mobile bottom nav on small screens */}
       <button
+        ref={triggerRef}
         onClick={openModal}
-        className="editorial-dark fixed bottom-20 right-0 z-40 flex min-h-11 items-center gap-2 border border-black bg-[#050505] px-4 font-mono text-[9px] font-black uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#e8ff00] hover:text-black md:bottom-6"
+        className="fixed bottom-20 right-0 z-40 flex min-h-11 items-center gap-2 rounded-l-control border border-bn-border-strong bg-bn-field px-4 font-mono text-[9px] font-black uppercase tracking-[0.12em] text-bn-text transition-colors hover:border-bn-signal hover:bg-bn-raised md:bottom-6"
         aria-label="Open feedback form"
       >
         <span aria-hidden>+</span>
@@ -82,16 +97,17 @@ export default function FeedbackWidget() {
       {/* Backdrop + dialog */}
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-bn-night/90 p-4 sm:items-center"
           onClick={e => { if (e.target === e.currentTarget) closeModal() }}
         >
-          <div className="w-full max-w-sm overflow-hidden border border-black bg-[#f5f5f0]">
+          <BroadcastPanel aria-labelledby="feedback-title" aria-modal="true" className="w-full max-w-sm overflow-hidden" role="dialog">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-black px-5 py-4">
-              <h2 className="font-display text-lg font-black uppercase tracking-[-0.04em]">Beta feedback</h2>
+            <div className="flex items-center justify-between border-b border-bn-border-strong px-5 py-4">
+              <h2 id="feedback-title" className="font-display text-lg font-black uppercase tracking-[-0.04em] text-bn-text">Beta feedback</h2>
               <button
+                ref={closeRef}
                 onClick={closeModal}
-                className="min-h-11 min-w-11 text-xs transition-colors hover:bg-black hover:text-white"
+                className="min-h-11 min-w-11 rounded-control text-xs text-bn-text transition-colors hover:bg-bn-raised"
                 aria-label="Close"
               >
                 &#x2715;
@@ -100,12 +116,12 @@ export default function FeedbackWidget() {
 
             {done ? (
               <div className="px-5 py-10 text-center">
-                <div className="text-4xl mb-3">🙏</div>
-                <p className="text-sm font-semibold text-black">Thank you!</p>
-                <p className="text-xs text-slate-400 mt-1">Your feedback helps us build a better product.</p>
-                <button className="mt-5 btn-primary w-full text-sm" onClick={closeModal}>
+                <BroadcastStatus status="success">Feedback sent</BroadcastStatus>
+                <p className="mt-3 text-sm font-semibold text-bn-text">Thank you!</p>
+                <p className="mt-1 text-xs text-bn-muted">Your feedback helps us build a better product.</p>
+                <BroadcastButton className="mt-5 w-full" onClick={closeModal}>
                   Close
-                </button>
+                </BroadcastButton>
               </div>
             ) : (
               <div className="px-5 py-4 flex flex-col gap-4">
@@ -121,9 +137,8 @@ export default function FeedbackWidget() {
                         key={n}
                         onClick={() => setRating(n)}
                         onMouseEnter={() => setHovered(n)}
-                        className={`text-2xl transition-all hover:scale-110 ${
-                          n <= activeRating ? 'opacity-100' : 'opacity-25'
-                        }`}
+                        aria-pressed={rating === n}
+                        className={`min-h-11 min-w-11 rounded-control border text-xl transition-colors ${n <= activeRating ? 'border-bn-signal bg-bn-raised opacity-100' : 'border-bn-border-subtle opacity-60'}`}
                         aria-label={`${n} star${n === 1 ? '' : 's'}`}
                       >
                         ⭐
@@ -137,17 +152,14 @@ export default function FeedbackWidget() {
                   <p className="label mb-2">Type</p>
                   <div className="flex flex-wrap gap-2">
                     {CATEGORIES.map(c => (
-                      <button
+                      <BroadcastButton
                         key={c.value}
                         onClick={() => setCategory(c.value)}
-                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                          category === c.value
-                            ? 'border-amber-600 bg-amber-600/10 text-amber-400'
-                            : 'border-gray-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
-                        }`}
+                        aria-pressed={category === c.value}
+                        tone={category === c.value ? 'primary' : 'secondary'}
                       >
                         {c.label}
-                      </button>
+                      </BroadcastButton>
                     ))}
                   </div>
                 </div>
@@ -156,7 +168,7 @@ export default function FeedbackWidget() {
                 <div>
                   <p className="label mb-2">
                     Message{' '}
-                    <span className="text-slate-600 font-normal">(optional)</span>
+                    <span className="font-normal text-bn-quiet">(optional)</span>
                   </p>
                   <textarea
                     className="input resize-none text-sm"
@@ -168,18 +180,18 @@ export default function FeedbackWidget() {
                   />
                 </div>
 
-                {error && <p className="text-xs text-red-400">{error}</p>}
+                {error && <BroadcastStatus className="w-full" status="negative">{error}</BroadcastStatus>}
 
-                <button
-                  className="btn-primary w-full"
+                <BroadcastButton
+                  className="w-full"
                   onClick={submit}
                   disabled={loading}
                 >
                   {loading ? 'Sending…' : 'Send feedback'}
-                </button>
+                </BroadcastButton>
               </div>
             )}
-          </div>
+          </BroadcastPanel>
         </div>
       )}
     </>
