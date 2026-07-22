@@ -2,6 +2,8 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { Check, RotateCcw, Trash2, X } from 'lucide-react'
+
 import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
 
@@ -64,37 +66,37 @@ export default function QuickSettle({ betId }: Props) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 bg-gray-900/60 border-t border-gray-800/60">
-      <span className="text-[11px] text-gray-600 shrink-0 basis-full sm:basis-auto">Settle:</span>
+    <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] bg-[var(--field)] px-4 py-3">
+      <span className="basis-full shrink-0 font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--text-quiet)] sm:basis-auto">Settle</span>
       <button
-        className="px-3 py-1 rounded-md text-xs font-medium bg-green-950 border border-green-900 text-green-400 hover:bg-green-900 transition-colors disabled:opacity-40"
+        className="bn-button bn-button-secondary min-h-11 text-[var(--success)]"
         onClick={() => settle('won')}
         disabled={busy !== null}
       >
-        {busy === 'won' ? '…' : 'Won'}
+        <Check aria-hidden="true" className="h-4 w-4" /> {busy === 'won' ? '…' : 'Won'}
       </button>
       <button
-        className="px-3 py-1 rounded-md text-xs font-medium bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition-colors disabled:opacity-40"
+        className="bn-button bn-button-secondary min-h-11 text-[var(--negative)]"
         onClick={() => settle('lost')}
         disabled={busy !== null}
       >
-        {busy === 'lost' ? '…' : 'Lost'}
+        <X aria-hidden="true" className="h-4 w-4" /> {busy === 'lost' ? '…' : 'Lost'}
       </button>
       <button
-        className="px-3 py-1 rounded-md text-xs font-medium bg-gray-800 border border-gray-700 text-gray-500 hover:bg-gray-700 transition-colors disabled:opacity-40"
+        className="bn-button bn-button-secondary min-h-11 text-[var(--text-muted)]"
         onClick={() => settle('void')}
         disabled={busy !== null}
       >
-        {busy === 'void' ? '…' : 'Void'}
+        <RotateCcw aria-hidden="true" className="h-4 w-4" /> {busy === 'void' ? '…' : 'Void'}
       </button>
       <button
-        className="min-h-11 px-3 py-1 text-xs font-medium text-red-300 underline decoration-red-900 underline-offset-4 transition-colors hover:text-red-200 disabled:opacity-40 sm:ml-auto"
+        className="bn-button bn-button-destructive min-h-11 sm:ml-auto"
         onClick={cancelBet}
         disabled={busy !== null}
       >
-        {busy === 'delete' ? 'Deleting…' : 'Delete'}
+        <Trash2 aria-hidden="true" className="h-4 w-4" /> {busy === 'delete' ? 'Deleting…' : 'Delete'}
       </button>
-      {error && <span className="text-[10px] text-red-400 basis-full sm:basis-auto sm:ml-1">{error}</span>}
+      {error && <span className="basis-full text-[11px] text-[var(--negative)] sm:ml-1" role="alert">{error}</span>}
     </div>
   )
 }

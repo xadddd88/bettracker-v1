@@ -22,9 +22,8 @@ import {
   type TrackerSport,
   validateTrackerDraft,
 } from '@/bets/draft';
-import { colors } from '@/ui/theme';
 import { MotionPressable } from '@/ui/motion';
-import { TimeWarpBackdrop, WarpRail } from '@/ui/time-warp';
+import { semanticColors } from '@/ui/theme';
 
 type Feedback = { message: string; tone: 'error' | 'success' };
 
@@ -110,7 +109,6 @@ export default function NewBetScreen() {
 
   return (
     <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
-      <TimeWarpBackdrop />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={88}
@@ -121,9 +119,8 @@ export default function NewBetScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.intro}>
-            <WarpRail />
-            <Text style={styles.eyebrow}>TRACKER</Text>
-            <Text style={styles.title}>Add bet</Text>
+            <Text style={styles.eyebrow}>TRACKER / NEW RECORD</Text>
+            <Text style={styles.title}>ADD BET</Text>
             <Text style={styles.subtitle}>Enter the coupon exactly as it appears.</Text>
           </View>
 
@@ -142,7 +139,7 @@ export default function NewBetScreen() {
               accessibilityRole="button"
               accessibilityState={{ disabled: draft.legs.length >= MAX_DRAFT_LEGS }}
               disabled={draft.legs.length >= MAX_DRAFT_LEGS}
-              glow="magenta"
+              glow="none"
               onPress={addLeg}
               style={[
                 styles.addButton,
@@ -336,7 +333,7 @@ function DraftInput({
         multiline={multiline}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colors.placeholder}
+        placeholderTextColor={semanticColors.textQuiet}
         style={[styles.input, multiline ? styles.multilineInput : null]}
         value={value}
       />
@@ -349,7 +346,7 @@ function SegmentButton({ label, onPress, selected }: { label: string; onPress: (
     <MotionPressable
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      glow={selected ? 'cyan' : 'none'}
+      glow="none"
       onPress={onPress}
       style={[
         styles.segmentButton,
@@ -363,60 +360,59 @@ function SegmentButton({ label, onPress, selected }: { label: string; onPress: (
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  safeArea: { backgroundColor: colors.background, flex: 1 },
+  safeArea: { backgroundColor: semanticColors.night, flex: 1 },
   content: { gap: 0, paddingBottom: 32 },
-  intro: { borderBottomColor: colors.border, borderBottomWidth: 1, gap: 7, minHeight: 175, padding: 14, paddingTop: 24 },
-  eyebrow: { color: colors.muted, fontSize: 8, fontWeight: '800', letterSpacing: 1.5 },
-  title: { color: colors.text, fontSize: 45, fontWeight: '900', letterSpacing: -2.3, lineHeight: 47 },
-  subtitle: { color: colors.muted, fontSize: 13, lineHeight: 19 },
+  intro: { borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, gap: 8, minHeight: 155, padding: 16, paddingTop: 24 },
+  eyebrow: { color: semanticColors.textQuiet, fontSize: 11, fontWeight: '800' },
+  title: { color: semanticColors.textPrimary, fontSize: 42, fontWeight: '900', lineHeight: 46 },
+  subtitle: { color: semanticColors.textMuted, fontSize: 14, lineHeight: 21 },
   segmented: {
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
+    backgroundColor: semanticColors.field,
+    borderBottomColor: semanticColors.borderStrong,
     borderBottomWidth: 1,
     flexDirection: 'row',
     gap: 0,
   },
-  segmentButton: { alignItems: 'center', borderRightColor: colors.border, borderRightWidth: 1, flex: 1, justifyContent: 'center', minHeight: 58 },
-  segmentButtonSelected: { backgroundColor: colors.accentMuted },
-  segmentText: { color: colors.muted, fontSize: 14, fontWeight: '800' },
-  segmentTextSelected: { color: colors.text },
-  legsHeader: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', padding: 14 },
-  sectionTitle: { color: colors.secondaryText, fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  sectionHint: { color: colors.placeholder, fontSize: 11, marginTop: 2 },
-  addButton: { alignItems: 'center', backgroundColor: colors.text, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
-  addButtonText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', letterSpacing: 0.7 },
-  card: { backgroundColor: colors.surface, borderBottomColor: colors.border, borderBottomWidth: 1, gap: 14, padding: 15 },
-  legCard: { backgroundColor: colors.surface, borderBottomColor: colors.border, borderBottomWidth: 1, gap: 13, padding: 15 },
+  segmentButton: { alignItems: 'center', borderRightColor: semanticColors.borderStrong, borderRightWidth: 1, flex: 1, justifyContent: 'center', minHeight: 48 },
+  segmentButtonSelected: { backgroundColor: semanticColors.signal },
+  segmentText: { color: semanticColors.textMuted, fontSize: 14, fontWeight: '800' },
+  segmentTextSelected: { color: semanticColors.onSignal },
+  legsHeader: { alignItems: 'center', borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', padding: 16 },
+  sectionTitle: { color: semanticColors.textMuted, fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
+  sectionHint: { color: semanticColors.textQuiet, fontSize: 11, marginTop: 2 },
+  addButton: { alignItems: 'center', backgroundColor: semanticColors.signal, justifyContent: 'center', minHeight: 48, paddingHorizontal: 14 },
+  addButtonText: { color: semanticColors.onSignal, fontSize: 12, fontWeight: '900' },
+  card: { backgroundColor: semanticColors.field, borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, gap: 14, padding: 16 },
+  legCard: { backgroundColor: semanticColors.field, borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, gap: 13, padding: 16 },
   legHeading: { alignItems: 'center', flexDirection: 'row', gap: 10 },
-  legNumber: { alignItems: 'center', backgroundColor: colors.accentMuted, borderColor: colors.border, borderWidth: 1, height: 32, justifyContent: 'center', width: 32 },
-  legNumberText: { color: colors.text, fontSize: 11, fontWeight: '900' },
-  legTitle: { color: colors.text, flex: 1, fontSize: 16, fontWeight: '800' },
-  removeButton: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 5 },
-  removeButtonText: { color: colors.danger, fontSize: 12, fontWeight: '800' },
+  legNumber: { alignItems: 'center', backgroundColor: semanticColors.fieldRaised, borderColor: semanticColors.borderStrong, borderWidth: 1, height: 32, justifyContent: 'center', width: 32 },
+  legNumberText: { color: semanticColors.dataValue, fontSize: 11, fontWeight: '900' },
+  legTitle: { color: semanticColors.textPrimary, flex: 1, fontSize: 16, fontWeight: '800' },
+  removeButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingHorizontal: 8 },
+  removeButtonText: { color: semanticColors.negative, fontSize: 12, fontWeight: '800' },
   sports: { gap: 7, paddingRight: 4 },
-  sportChip: { borderColor: colors.border, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 10 },
-  sportChipSelected: { backgroundColor: colors.accentMuted, borderColor: colors.border },
-  sportText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
-  sportTextSelected: { color: colors.text },
+  sportChip: { borderColor: semanticColors.borderStrong, borderWidth: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 10 },
+  sportChipSelected: { backgroundColor: semanticColors.signal, borderColor: semanticColors.signal },
+  sportText: { color: semanticColors.textMuted, fontSize: 11, fontWeight: '700' },
+  sportTextSelected: { color: semanticColors.onSignal },
   field: { gap: 6 },
-  fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '700' },
-  input: { backgroundColor: colors.background, borderBottomColor: colors.border, borderBottomWidth: 1, color: colors.text, fontSize: 14, minHeight: 46, paddingHorizontal: 0, paddingVertical: 10 },
+  fieldLabel: { color: semanticColors.textMuted, fontSize: 11, fontWeight: '700' },
+  input: { backgroundColor: semanticColors.night, borderColor: semanticColors.borderStrong, borderWidth: 1, color: semanticColors.textPrimary, fontSize: 14, minHeight: 48, paddingHorizontal: 12, paddingVertical: 10 },
   multilineInput: { minHeight: 92, textAlignVertical: 'top' },
-  expressCard: { backgroundColor: colors.accentMuted, borderBottomColor: colors.border, borderBottomWidth: 1, gap: 12, padding: 15 },
+  expressCard: { backgroundColor: semanticColors.fieldRaised, borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, gap: 12, padding: 16 },
   previewRow: { alignItems: 'baseline', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
-  previewLabel: { color: colors.muted, fontSize: 12 },
-  previewValue: { color: colors.text, fontSize: 20, fontWeight: '900' },
-  previewHint: { color: colors.placeholder, fontSize: 10, lineHeight: 15 },
+  previewLabel: { color: semanticColors.textQuietRaised, fontSize: 12 },
+  previewValue: { color: semanticColors.dataValue, fontSize: 20, fontWeight: '900' },
+  previewHint: { color: semanticColors.textQuietRaised, fontSize: 11, lineHeight: 16 },
   feedback: { borderBottomWidth: 1, borderTopWidth: 1, marginTop: 12, padding: 13 },
-  feedbackError: { backgroundColor: colors.surface, borderColor: colors.danger },
-  feedbackSuccess: { backgroundColor: colors.surface, borderColor: colors.success },
-  feedbackErrorText: { color: colors.danger, fontSize: 13, lineHeight: 19 },
-  feedbackSuccessText: { color: colors.success, fontSize: 13, lineHeight: 19 },
+  feedbackError: { backgroundColor: semanticColors.field, borderColor: semanticColors.negative },
+  feedbackSuccess: { backgroundColor: semanticColors.field, borderColor: semanticColors.success },
+  feedbackErrorText: { color: semanticColors.negative, fontSize: 13, lineHeight: 19 },
+  feedbackSuccessText: { color: semanticColors.success, fontSize: 13, lineHeight: 19 },
   actions: { flexDirection: 'row', flexWrap: 'wrap' },
-  primaryButton: { alignItems: 'center', backgroundColor: colors.accent, borderColor: colors.accent, borderWidth: 1, flexBasis: 140, flexGrow: 1, justifyContent: 'center', minHeight: 56, paddingHorizontal: 16 },
-  primaryButtonText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
-  secondaryButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, flexBasis: 110, flexGrow: 1, justifyContent: 'center', minHeight: 56, paddingHorizontal: 16 },
-  secondaryButtonText: { color: colors.secondaryText, fontSize: 14, fontWeight: '800' },
+  primaryButton: { alignItems: 'center', backgroundColor: semanticColors.signal, borderColor: semanticColors.signal, borderWidth: 1, flexBasis: 140, flexGrow: 1, justifyContent: 'center', minHeight: 56, paddingHorizontal: 16 },
+  primaryButtonText: { color: semanticColors.onSignal, fontSize: 12, fontWeight: '900' },
+  secondaryButton: { alignItems: 'center', backgroundColor: semanticColors.field, borderColor: semanticColors.borderStrong, borderWidth: 1, flexBasis: 110, flexGrow: 1, justifyContent: 'center', minHeight: 56, paddingHorizontal: 16 },
+  secondaryButtonText: { color: semanticColors.textMuted, fontSize: 14, fontWeight: '800' },
   disabled: { opacity: 0.45 },
-  pressed: { opacity: 0.7 },
 });
