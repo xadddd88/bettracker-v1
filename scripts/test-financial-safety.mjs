@@ -1834,10 +1834,10 @@ test('page: Single / Express controls are real accessible buttons, not passive i
 
 test('dashboard: an Express summary renders every event, market, selection and individual odds', () => {
   const dashboard = readFileSync(path.join(repoRoot, 'app/(app)/dashboard/page.tsx'), 'utf8');
-  assert.ok(dashboard.includes('bet.legs!.map((item, legIndex) => ('), 'dashboard must map all Express legs');
-  assert.ok(dashboard.includes('{item.event_name}'), 'each Express event must be visible');
-  assert.ok(dashboard.includes('[item.market_type, item.selection]'), 'each leg market and selection must be visible');
-  assert.ok(dashboard.includes('Number(item.odds).toFixed(2)'), 'each leg coefficient must be visible');
+  assert.ok(dashboard.includes('legs.map((leg, legIndex) => ('), 'dashboard must map all Express legs');
+  assert.ok(dashboard.includes('{leg.event_name}'), 'each Express event must be visible');
+  assert.ok(dashboard.includes('[leg.market_type, leg.selection]'), 'each leg market and selection must be visible');
+  assert.ok(dashboard.includes('Number(leg.odds).toFixed(2)'), 'each leg coefficient must be visible');
 });
 
 test('page: overflow branch runs BEFORE any state write, with the fixed non-echoing message', () => {

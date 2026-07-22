@@ -31,7 +31,7 @@ test('home summary uses only recorded P&L and counts pending bets', () => {
 
 test('home summary does not invent settlement values', () => {
   assert.deepEqual(
-    summarizeBets([bet('pending', null), bet('unknown', null)]),
-    { netPnl: 0, openCount: 1, settledCount: 0 },
+    summarizeBets([bet('pending', null), bet('unknown', null), bet('won', null), bet('push', 25)]),
+    { netPnl: 0, openCount: 1, settledCount: 1 },
   );
 });

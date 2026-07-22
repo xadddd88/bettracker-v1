@@ -91,20 +91,25 @@ test('support routes remain available outside the focused tab bar', () => {
   }
 });
 
-test('daily Home uses the read model and exposes the editorial workflow', () => {
+test('daily Home uses the read model and exposes trusted Adaptive Action', () => {
   const home = source('src/app/(app)/home.tsx');
   const data = source('src/bets/data.ts');
 
   assert.match(home, /fetchBets\(userId\)/);
   assert.match(home, /fetchBankroll\(userId\)/);
-  assert.match(home, /BETTING[\s\S]*?DECISIONS[\s\S]*?IN FOCUS/);
+  assert.match(home, /ONE USEFUL ACTION/);
+  assert.match(home, /ADAPTIVE ACTION/);
+  assert.match(home, /Review pending bets/);
+  assert.match(home, /Scan coupon/);
   assert.match(home, /RECENT BETS/);
-  assert.doesNotMatch(home, /Founder build|CORE WORKFLOW|LOCAL REVIEW|READY|NEXT|LATER/);
+  assert.doesNotMatch(home, /LIVE DATA|EventPulse|watchlist|Scout for new value/);
+  assert.match(home, /semanticColors\.signal/);
+  assert.match(home, /ReduceMotion\.System/);
   assert.match(data, /select\(['"]balance, currency['"]\)/);
   assert.doesNotMatch(data, /select\s*\(\s*['"`]\s*\*/);
 });
 
-test('editorial motion system is shared by daily mobile surfaces', () => {
+test('legacy editorial motion remains isolated from the migrated Home', () => {
   const backdrop = source('src/ui/time-warp.tsx');
   const motion = source('src/ui/motion.tsx');
   const ticket = source('src/ui/bet-ticket.tsx');
@@ -124,9 +129,9 @@ test('editorial motion system is shared by daily mobile surfaces', () => {
   assert.match(trackerStack, /animation:\s*['"]slide_from_right['"]/);
   assert.match(ticket, /EXPRESS/);
   assert.match(ticket, /totalOdds\?\.toFixed\(2\)/);
+  assert.doesNotMatch(source('src/app/(app)/home.tsx'), /(?:EditorialBackdrop|TimeWarpBackdrop|KineticType)/);
 
   for (const path of [
-    'src/app/(app)/home.tsx',
     'src/app/(app)/ai/index.tsx',
     'src/app/(app)/bets/index.tsx',
     'src/app/(app)/bets/new.tsx',
