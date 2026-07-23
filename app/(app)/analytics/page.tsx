@@ -9,7 +9,7 @@ import {
 import { calcPerformance } from '@/lib/analytics/performance'
 import { EVENTS } from '@/lib/analytics/events'
 import { PageView } from '@/lib/analytics/PageView'
-import { currencySymbol, fmtPct, fmtPnl } from '@/lib/money'
+import { fmtPct, formatMoney } from '@/lib/money'
 import { createClient } from '@/lib/supabase/server'
 import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
 import type { Bet } from '@/types'
@@ -65,7 +65,7 @@ export default async function AnalyticsPage() {
 
   const bets = (betsRes.data || []) as Bet[]
   const decisions = decisionsRes.data || []
-  const sym = currencySymbol(bankrollRes.data?.currency || 'USD')
+  const currency = bankrollRes.data?.currency || 'USD'
   const metrics = calcPerformance(bets, decisions)
   const pendingBets = bets.filter((bet) => bet.status === 'pending')
 
@@ -108,11 +108,11 @@ export default async function AnalyticsPage() {
           ) : null}
 
           <section aria-label="Performance metrics" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Metric label="Net P&L" note="Settled only" value={metrics.settledCount ? fmtPnl(metrics.netProfit, sym) : '—'} />
+            <Metric label="Net P&L" note="Settled only" value={metrics.settledCount ? formatMoney(metrics.netProfit, currency, true) : '—'} />
             <Metric label="ROI" note="Void excluded" value={metrics.roi == null ? '—' : fmtPct(metrics.roi)} />
             <Metric label="Win rate" note="Won / won + lost" value={metrics.winRate == null ? '—' : `${metrics.winRate.toFixed(1)}%`} />
             <Metric label="Settled" note={`${metrics.wonCount}W · ${metrics.lostCount}L · ${metrics.voidCount}V`} value={String(metrics.settledCount)} />
-            <Metric label="Pending stake" note={`${metrics.pendingCount} open`} value={metrics.pendingCount ? `${sym}${metrics.pendingStake.toFixed(2)}` : '—'} />
+            <Metric label="Pending stake" note={`${metrics.pendingCount} open`} value={metrics.pendingCount ? formatMoney(metrics.pendingStake, currency) : '—'} />
             <Metric label="Decisions" note="Persisted records" value={String(metrics.totalDecisions)} />
             <Metric label="Decision → bet" note={`${metrics.decisionsByAction.placed} placed`} value={metrics.conversionRate == null ? '—' : `${metrics.conversionRate.toFixed(1)}%`} />
             <Metric label="Average odds" note="Won/lost only" value={metrics.avgOdds == null ? '—' : metrics.avgOdds.toFixed(2)} />
@@ -121,10 +121,10 @@ export default async function AnalyticsPage() {
           <BroadcastPanel className="p-5 sm:p-7">
             <SectionHeader detail={`${bets.length} total`} title="Outcomes" />
             <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Outcome count={metrics.wonCount} label="Won" stake={stakeFor(bets, 'won')} status="success" sym={sym} />
-              <Outcome count={metrics.lostCount} label="Lost" stake={stakeFor(bets, 'lost')} status="negative" sym={sym} />
-              <Outcome count={metrics.voidCount} label="Void" stake={stakeFor(bets, 'void')} status="neutral" sym={sym} />
-              <Outcome count={metrics.pendingCount} label="Pending" stake={metrics.pendingStake} status="review" sym={sym} />
+              <Outcome count={metrics.wonCount} currency={currency} label="Won" stake={stakeFor(bets, 'won')} status="success" />
+              <Outcome count={metrics.lostCount} currency={currency} label="Lost" stake={stakeFor(bets, 'lost')} status="negative" />
+              <Outcome count={metrics.voidCount} currency={currency} label="Void" stake={stakeFor(bets, 'void')} status="neutral" />
+              <Outcome count={metrics.pendingCount} currency={currency} label="Pending" stake={metrics.pendingStake} status="review" />
             </div>
           </BroadcastPanel>
 
@@ -149,8 +149,8 @@ export default async function AnalyticsPage() {
             )}
           </BroadcastPanel>
 
-          <PerformanceTable rows={metrics.bySport.map((row) => ({ ...row, label: SPORT_LABEL[row.sport] ?? row.sport }))} title="By sport" sym={sym} />
-          <PerformanceTable rows={metrics.bySource.map((row) => ({ ...row, label: SOURCE_LABEL[row.source] ?? row.source }))} title="By source" sym={sym} />
+          <PerformanceTable currency={currency} rows={metrics.bySport.map((row) => ({ ...row, label: SPORT_LABEL[row.sport] ?? row.sport }))} title="By sport" />
+          <PerformanceTable currency={currency} rows={metrics.bySource.map((row) => ({ ...row, label: SOURCE_LABEL[row.source] ?? row.source }))} title="By source" />
 
           <BroadcastPanel className="p-5 sm:p-7">
             <SectionHeader detail="Source = AI Analyst" title="AI Analyst records" />
@@ -161,13 +161,13 @@ export default async function AnalyticsPage() {
                 <SmallMetric label="Bets" value={String(metrics.aiAnalyst.total)} />
                 <SmallMetric label="Win rate" value={metrics.aiAnalyst.winRate == null ? '—' : `${metrics.aiAnalyst.winRate.toFixed(1)}%`} />
                 <SmallMetric label="ROI" value={metrics.aiAnalyst.roi == null ? '—' : fmtPct(metrics.aiAnalyst.roi)} />
-                <SmallMetric label="Net P&L" value={metrics.aiAnalyst.won + metrics.aiAnalyst.lost ? fmtPnl(metrics.aiAnalyst.netProfit, sym) : '—'} />
+                <SmallMetric label="Net P&L" value={metrics.aiAnalyst.won + metrics.aiAnalyst.lost ? formatMoney(metrics.aiAnalyst.netProfit, currency, true) : '—'} />
               </dl>
             )}
           </BroadcastPanel>
 
           <BroadcastPanel className="overflow-hidden p-0">
-            <div className="px-5 py-4 sm:px-7"><SectionHeader detail={`${sym}${metrics.pendingStake.toFixed(2)} at risk`} title="Pending risk" /></div>
+            <div className="px-5 py-4 sm:px-7"><SectionHeader detail={`${formatMoney(metrics.pendingStake, currency)} at risk`} title="Pending risk" /></div>
             {pendingBets.length === 0 ? <EmptyLine>No open bets.</EmptyLine> : (
               <ol className="divide-y divide-bn-border-strong">
                 {pendingBets.map((bet) => (
@@ -177,7 +177,7 @@ export default async function AnalyticsPage() {
                         <div className="break-words text-sm font-bold text-bn-text">{bet.legs?.[0]?.event_name || 'Tracked bet'}</div>
                         <div className="mt-1 text-xs text-bn-muted">{bet.legs?.length || 0} leg{bet.legs?.length === 1 ? '' : 's'} · saved {formatDate(bet.placed_at)}</div>
                       </div>
-                      <BroadcastDataValue className="text-sm font-black">{sym}{bet.stake.toFixed(2)} · {bet.total_odds?.toFixed(2) ?? '—'}</BroadcastDataValue>
+                      <BroadcastDataValue className="text-sm font-black">{formatMoney(bet.stake, currency)} · {bet.total_odds?.toFixed(2) ?? '—'}</BroadcastDataValue>
                     </Link>
                   </li>
                 ))}
@@ -200,19 +200,19 @@ function Metric({ label, note, value }: { label: string; note: string; value: st
   )
 }
 
-function Outcome({ count, label, stake, status, sym }: { count: number; label: string; stake: number; status: BroadcastNoirStatus; sym: string }) {
+function Outcome({ count, currency, label, stake, status }: { count: number; currency: string; label: string; stake: number; status: BroadcastNoirStatus }) {
   return (
     <div className="rounded-control border border-bn-border-subtle p-3">
       <BroadcastStatus status={status}>{label}</BroadcastStatus>
       <BroadcastDataValue className="mt-3 block text-2xl font-black">{count}</BroadcastDataValue>
-      <div className="mt-1 text-xs text-bn-muted">{sym}{stake.toFixed(2)} staked</div>
+      <div className="mt-1 text-xs text-bn-muted">{formatMoney(stake, currency)} staked</div>
     </div>
   )
 }
 
-function PerformanceTable({ rows, sym, title }: {
+function PerformanceTable({ currency, rows, title }: {
+  currency: string
   rows: Array<{ label: string; lost: number; netProfit: number; roi: number | null; total: number; void: number; winRate: number | null; won: number }>
-  sym: string
   title: string
 }) {
   return (
@@ -237,7 +237,7 @@ function PerformanceTable({ rows, sym, title }: {
                   <Cell value={`${row.won} / ${row.lost} / ${row.void}`} />
                   <Cell value={row.winRate == null ? '—' : `${row.winRate.toFixed(1)}%`} />
                   <Cell value={row.roi == null ? '—' : fmtPct(row.roi)} />
-                  <Cell value={row.won + row.lost + row.void ? fmtPnl(row.netProfit, sym) : '—'} />
+                  <Cell value={row.won + row.lost + row.void ? formatMoney(row.netProfit, currency, true) : '—'} />
                 </tr>
               ))}
             </tbody>

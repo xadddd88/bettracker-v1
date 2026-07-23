@@ -4,10 +4,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Bankroll, BankrollTransaction, TxnType } from '@/types'
 import { BroadcastButton, BroadcastDataValue, BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
-
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: '$', EUR: '€', UAH: '₴', GBP: '£', CAD: 'CA$', AUD: 'A$',
-}
+import { currencySymbol, formatMoney } from '@/lib/money'
 
 const TX_CONFIG: Record<TxnType, { icon: string; label: string }> = {
   deposit:    { icon: '↑', label: 'Deposit' },
@@ -16,15 +13,6 @@ const TX_CONFIG: Record<TxnType, { icon: string; label: string }> = {
   payout:     { icon: '✓', label: 'Payout' },
   adjustment: { icon: '±', label: 'Adjustment' },
   bonus:      { icon: '★', label: 'Bonus' },
-}
-
-function fmtBalance(amount: number, symbol: string): string {
-  return `${symbol}${Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
-
-function fmtDelta(amount: number, symbol: string): string {
-  const sign = amount >= 0 ? '+' : '−'
-  return `${sign}${symbol}${Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function fmtDate(dateStr: string): string {
@@ -48,7 +36,7 @@ export default function BankrollView({
   bankroll, transactions: initialTxs, currency, stats: initialStats,
 }: BankrollViewProps) {
   const router = useRouter()
-  const symbol = CURRENCY_SYMBOLS[currency] ?? currency
+  const symbol = currencySymbol(currency)
 
   const [balance,      setBalance]      = useState(bankroll.balance)
   const [transactions, setTransactions] = useState<BankrollTransaction[]>(initialTxs)
@@ -145,7 +133,7 @@ export default function BankrollView({
       <BroadcastPanel className="p-6 text-center sm:p-8">
         <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-quiet">Current Balance</p>
         <BroadcastDataValue className="block font-display text-4xl font-black">
-          {symbol}{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {formatMoney(balance, currency)}
         </BroadcastDataValue>
         <p className="mt-2 text-[11px] text-bn-muted">Deposits + payouts − stakes − withdrawals</p>
       </BroadcastPanel>
@@ -154,18 +142,18 @@ export default function BankrollView({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="stat-card">
           <p className="stat-label">Deposited</p>
-          <BroadcastDataValue className="stat-value">{fmtBalance(stats.totalDeposited, symbol)}</BroadcastDataValue>
+          <BroadcastDataValue className="stat-value">{formatMoney(stats.totalDeposited, currency)}</BroadcastDataValue>
           <p className="mt-0.5 text-[10px] text-bn-quiet">total added</p>
         </div>
         <div className="stat-card">
           <p className="stat-label">Withdrawn</p>
-          <BroadcastDataValue className="stat-value">{fmtBalance(stats.totalWithdrawn, symbol)}</BroadcastDataValue>
+          <BroadcastDataValue className="stat-value">{formatMoney(stats.totalWithdrawn, currency)}</BroadcastDataValue>
           <p className="mt-0.5 text-[10px] text-bn-quiet">total removed</p>
         </div>
         <div className="stat-card">
           <p className="stat-label">Net from bets</p>
           <BroadcastDataValue className="stat-value">
-            {stats.netFromBets >= 0 ? '+' : '−'}{symbol}{Math.abs(stats.netFromBets).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatMoney(stats.netFromBets, currency, true)}
           </BroadcastDataValue>
           <p className="mt-0.5 text-[10px] text-bn-quiet">payouts minus stakes</p>
         </div>
@@ -280,10 +268,10 @@ export default function BankrollView({
                   </div>
                   <div className="text-right shrink-0">
                     <BroadcastDataValue className="block text-sm font-medium">
-                      {fmtDelta(tx.amount, symbol)}
+                      {formatMoney(tx.amount, currency, true)}
                     </BroadcastDataValue>
                     <p className="text-[11px] text-bn-muted">
-                      {fmtBalance(tx.balance_after, symbol)} · {fmtDate(tx.created_at)}
+                      {formatMoney(tx.balance_after, currency)} · {fmtDate(tx.created_at)}
                     </p>
                   </div>
                 </BroadcastPanel>

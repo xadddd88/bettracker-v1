@@ -1,13 +1,11 @@
+import { formatMoney } from './money'
+
 export function cn(...classes: (string | undefined | false | null)[]) {
   return classes.filter(Boolean).join(' ')
 }
 
 export function formatCurrency(amount: number, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-  }).format(amount)
+  return formatMoney(amount, currency)
 }
 
 export function formatOdds(odds: number) {

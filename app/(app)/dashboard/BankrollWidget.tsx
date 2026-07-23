@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { formatMoney } from '@/lib/money'
 
 interface Props {
   balance: number
@@ -134,14 +135,4 @@ export default function BankrollWidget({ balance, currency }: Props) {
       )}
     </div>
   )
-}
-
-function formatMoney(value: number, currency: string) {
-  return new Intl.NumberFormat('en', {
-    currency,
-    currencyDisplay: 'narrowSymbol',
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-    style: 'currency',
-  }).format(value)
 }

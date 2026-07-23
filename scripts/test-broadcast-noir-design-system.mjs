@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const root = process.cwd()
@@ -99,5 +99,23 @@ for (const source of [webPrimitives, mobilePrimitives]) {
 assert.match(webPrimitives, /data-status=\{status\}/)
 assert.match(mobilePrimitives, /accessibilityLabel=\{`\$\{status\}: \$\{label\}`\}/)
 assert.match(mobilePrimitives, /Platform\.select/)
+
+function tsxFilesUnder(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) return tsxFilesUnder(path)
+    return entry.isFile() && entry.name.endsWith('.tsx') ? [path] : []
+  })
+}
+
+const hardcodedHex = /(?:["'`:]\s*)#[0-9A-Fa-f]{3,8}\b/g
+for (const path of tsxFilesUnder(join(root, 'app'))) {
+  const source = readFileSync(path, 'utf8')
+  assert.doesNotMatch(source, hardcodedHex, `${path} must consume semantic design tokens instead of hardcoded hex colors`)
+}
+
+const aiPage = readFileSync(join(root, 'app/(app)/ai/page.tsx'), 'utf8')
+assert.match(aiPage, /broadcastNoirColors/, 'standalone Analyst report must source colors from the Broadcast Noir adapter')
+assert.match(aiPage, /var\(--bn-data-value\)/, 'standalone Analyst report must expose semantic CSS variables')
 
 console.log(`Broadcast Noir v${tokens.version}: parity, contrast and semantic-form gates passed`)

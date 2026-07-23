@@ -29,7 +29,7 @@ import {
   type AnalystWebSearchFailureReason,
 } from '@/lib/ai/analyst-research'
 import { BroadcastStatus } from '@/components/ui/BroadcastNoir'
-import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
+import { broadcastNoirColors, type BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
 
 // ─── Image helper ─────────────────────────────────────────────
 function fileToBase64(file: File): Promise<{ data: string; media_type: string }> {
@@ -579,7 +579,7 @@ export default function AIAnalystPage() {
       ? `<div class="grid">
   <div class="stat"><div class="stat-label">Model probability</div><div class="stat-value">${a.model_probability?.toFixed(1)}%</div></div>
   <div class="stat"><div class="stat-label">Implied probability</div><div class="stat-value">${a.implied_probability?.toFixed(1)}%</div></div>
-  <div class="stat"><div class="stat-label">Edge</div><div class="stat-value" style="color:${(a.edge_percent ?? 0)>=0?'#C7D0C8':'#FF7474'}">${(a.edge_percent ?? 0)>=0?'+':''}${a.edge_percent?.toFixed(1)}%</div></div>
+  <div class="stat"><div class="stat-label">Edge</div><div class="stat-value" style="color:${(a.edge_percent ?? 0)>=0?'var(--bn-data-value)':'var(--bn-negative)'}">${(a.edge_percent ?? 0)>=0?'+':''}${a.edge_percent?.toFixed(1)}%</div></div>
 </div>`
       : `<div class="quality-gate">
   <div class="gate-kicker">${escapeHtml(trustView?.riskWarningLabel ?? 'Risk warning')}</div>
@@ -591,7 +591,7 @@ export default function AIAnalystPage() {
 </div>`
     const displayFactors = trustView && !showPricing ? trustView.displayFactors : a.factors
     const factorsHtml = displayFactors.map(f =>
-      `<tr><td>${escapeHtml(f.name)}</td><td style="text-align:center;font-weight:bold;color:${f.score<0?'#FF7474':'#C7D0C8'}">${f.score>0?'+':''}${f.score}</td><td style="color:#59685E;font-size:12px">${escapeHtml(f.detail)}</td></tr>`
+      `<tr><td>${escapeHtml(f.name)}</td><td style="text-align:center;font-weight:bold;color:${f.score<0?'var(--bn-negative)':'var(--bn-data-value)'}">${f.score>0?'+':''}${f.score}</td><td style="color:var(--bn-border-strong);font-size:12px">${escapeHtml(f.detail)}</td></tr>`
     ).join('')
     const blockedTrustView = trustView && !showPricing ? trustView : null
     const localizedPdf = blockedTrustView?.locale === 'uk'
@@ -605,33 +605,49 @@ export default function AIAnalystPage() {
     const disclaimerText = blockedTrustView ? blockedTrustView.uiDisclaimer : a.disclaimer
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(pdfTitle)} \u2014 ${escapeHtml(a.event_name)}</title>
 <style>
-  body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:20px;color:#111;background:#fff}
+  :root{
+    color-scheme:dark;
+    --bn-night:${broadcastNoirColors.night};
+    --bn-field:${broadcastNoirColors.field};
+    --bn-raised:${broadcastNoirColors.fieldRaised};
+    --bn-border-subtle:${broadcastNoirColors.borderSubtle};
+    --bn-border-strong:${broadcastNoirColors.borderStrong};
+    --bn-text:${broadcastNoirColors.textPrimary};
+    --bn-muted:${broadcastNoirColors.textMuted};
+    --bn-quiet:${broadcastNoirColors.textQuiet};
+    --bn-data-value:${broadcastNoirColors.dataValue};
+    --bn-signal:${broadcastNoirColors.signal};
+    --bn-on-signal:${broadcastNoirColors.onSignal};
+    --bn-negative:${broadcastNoirColors.negative};
+    --bn-review:${broadcastNoirColors.review};
+  }
+  body{font-family:system-ui,sans-serif;max-width:700px;margin:40px auto;padding:20px;color:var(--bn-text);background:var(--bn-night)}
   h1{font-size:22px;margin-bottom:4px}
-  .meta{color:#666;font-size:13px;margin-bottom:20px}
+  .meta{color:var(--bn-muted);font-size:13px;margin-bottom:20px}
   .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
-  .stat{background:#f8f8f8;padding:12px;border-radius:8px;text-align:center}
-  .stat-label{font-size:11px;color:#888;margin-bottom:4px}
+  .stat{background:var(--bn-raised);padding:12px;border-radius:8px;text-align:center}
+  .stat-label{font-size:11px;color:var(--bn-quiet);margin-bottom:4px}
   .stat-value{font-size:22px;font-weight:700}
-  .quality-gate{background:#fff7ed;border:1px solid #fed7aa;padding:14px;border-radius:8px;margin:16px 0}
-  .research{border:1px solid #111;padding:16px;margin:16px 0}
+  .quality-gate{background:var(--bn-raised);border:1px solid var(--bn-review);padding:14px;border-radius:8px;margin:16px 0}
+  .research{border:1px solid var(--bn-border-strong);padding:16px;margin:16px 0}
   .research h2{font-size:20px;margin:8px 0}
   .research-kicker{font-size:10px;font-weight:800;letter-spacing:.08em}
-  .builder{background:#BFFF3B;border:1px solid #334036;color:#061008;padding:10px;margin:12px 0}
-  .research-leg{border-top:1px solid #111;padding:12px 0}
+  .builder{background:var(--bn-signal);border:1px solid var(--bn-border-subtle);color:var(--bn-on-signal);padding:10px;margin:12px 0}
+  .research-leg{border-top:1px solid var(--bn-border-strong);padding:12px 0}
   .research-leg p,.research-leg li,.sources li{font-size:12px;line-height:1.5}
-  .verdict{border-top:1px solid #111;padding-top:12px}
-  .gate-kicker{font-size:11px;color:#9a3412;text-transform:uppercase;font-weight:700;letter-spacing:.04em}
-  .gate-label{font-size:18px;font-weight:800;color:#9a3412;margin-top:4px}
-  .gate-support,.gate-score{font-size:12px;color:#7c2d12;margin-top:4px}
-  .gate-missing-title{font-size:12px;font-weight:700;color:#7c2d12;margin-top:10px}
-  .gate-missing{font-size:12px;color:#7c2d12;margin-top:4px;padding-left:18px}
-  .rec{display:inline-block;padding:4px 12px;border-radius:6px;font-weight:700;font-size:14px;background:#f0f0f0;margin-bottom:12px}
-  .reasoning{background:#f8f8f8;padding:14px;border-radius:8px;margin:12px 0;line-height:1.6}
+  .verdict{border-top:1px solid var(--bn-border-strong);padding-top:12px}
+  .gate-kicker{font-size:11px;color:var(--bn-review);text-transform:uppercase;font-weight:700;letter-spacing:.04em}
+  .gate-label{font-size:18px;font-weight:800;color:var(--bn-review);margin-top:4px}
+  .gate-support,.gate-score{font-size:12px;color:var(--bn-muted);margin-top:4px}
+  .gate-missing-title{font-size:12px;font-weight:700;color:var(--bn-review);margin-top:10px}
+  .gate-missing{font-size:12px;color:var(--bn-muted);margin-top:4px;padding-left:18px}
+  .rec{display:inline-block;padding:4px 12px;border-radius:6px;font-weight:700;font-size:14px;background:var(--bn-raised);margin-bottom:12px}
+  .reasoning{background:var(--bn-raised);padding:14px;border-radius:8px;margin:12px 0;line-height:1.6}
   table{width:100%;border-collapse:collapse;margin-top:12px}
-  th{text-align:left;font-size:12px;color:#888;padding:6px 8px;border-bottom:1px solid #eee}
-  td{padding:7px 8px;border-bottom:1px solid #f0f0f0;font-size:13px;vertical-align:top}
-  .disclaimer{font-size:11px;color:#999;margin-top:16px;padding-top:12px;border-top:1px solid #eee}
-  .footer{margin-top:24px;font-size:11px;color:#bbb;text-align:center}
+  th{text-align:left;font-size:12px;color:var(--bn-quiet);padding:6px 8px;border-bottom:1px solid var(--bn-border-subtle)}
+  td{padding:7px 8px;border-bottom:1px solid var(--bn-border-subtle);font-size:13px;vertical-align:top}
+  .disclaimer{font-size:11px;color:var(--bn-quiet);margin-top:16px;padding-top:12px;border-top:1px solid var(--bn-border-subtle)}
+  .footer{margin-top:24px;font-size:11px;color:var(--bn-quiet);text-align:center}
   @media print{body{margin:20px}}
 </style></head><body>
 <h1>${escapeHtml(a.event_name)}</h1>

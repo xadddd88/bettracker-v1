@@ -370,6 +370,15 @@ await testAsync('money: negative P&L keeps its minus sign; symbols resolve per c
     assert.equal(money.currencySymbol('GBP'), '£');
     assert.equal(money.currencySymbol('XYZ'), 'XYZ');
     assert.equal(money.currencySymbol(null), '$');
+    assert.equal(money.MONEY_LOCALE, 'en-US');
+    assert.equal(money.formatMoneyAmount(1234.5), '1,234.50');
+    assert.equal(money.formatMoney(1234.5, 'USD'), '$1,234.50');
+    assert.equal(money.formatMoney(1234.5, 'EUR'), '€1,234.50');
+    assert.equal(money.formatMoney(1234.5, 'UAH'), '₴1,234.50');
+    assert.equal(money.formatMoney(1234.5, 'CAD'), 'CA$1,234.50');
+    assert.equal(money.formatMoney(1234.5, 'AUD'), 'A$1,234.50');
+    assert.equal(money.formatMoney(-50, 'GBP'), '-£50.00');
+    assert.equal(money.formatMoney(50, 'GBP', true), '+£50.00');
   });
 });
 
