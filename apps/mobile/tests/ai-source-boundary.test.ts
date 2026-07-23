@@ -453,9 +453,11 @@ test('Expo Tabs owns the bottom safe area without an overlaid custom bar', () =>
 
   assert.match(source, /import \{ Tabs \} from 'expo-router'/);
   assert.match(source, /tabBarStyle/);
-  assert.match(source, /useSafeAreaInsets\(\)/);
-  assert.match(source, /height:\s*58\s*\+\s*insets\.bottom/);
-  assert.match(source, /paddingBottom:\s*Math\.max\(insets\.bottom,\s*6\)/);
+  assert.doesNotMatch(source, /useSafeAreaInsets\(\)/);
+  assert.doesNotMatch(source, /height:\s*\d+\s*\+\s*insets\.bottom/);
+  assert.doesNotMatch(source, /paddingBottom:\s*Math\.max\(insets\.bottom/);
+  assert.match(source, /tabBarActiveBackgroundColor:\s*semanticColors\.signal/);
+  assert.match(source, /tabBarActiveTintColor:\s*semanticColors\.onSignal/);
   assert.doesNotMatch(source, /position:\s*['"]absolute['"]/);
   assert.equal(existsSync(join(root, 'src/ui/bottom-navigation.tsx')), false);
 });
@@ -524,7 +526,8 @@ test('authenticated layout exposes three focused tabs and keeps Tracker detail i
   for (const route of ['stats', 'more']) {
     assert.match(layout, new RegExp(`name=["']${route}["'][\\s\\S]*?href:\\s*null`));
   }
-  assert.match(layout, /tabBarItemStyle:\s*\{\s*minHeight:\s*52/);
+  assert.match(layout, /minHeight:\s*Platform\.OS === 'android' \? 48 : 44/);
+  assert.match(layout, /backBehavior="history"/);
   assert.match(layout, /name="index" options=\{\{ href: null \}\}/);
 
   assert.match(trackerLayout, /<Stack/);
@@ -540,7 +543,7 @@ test('AI capture screen exposes secure scanner and responsive states', () => {
   const source = readFileSync(path, 'utf8');
 
   for (const label of [
-    'Scan screenshot',
+    'CAPTURE.',
     'Coupon',
     'Event',
     'Take photo',
@@ -548,6 +551,7 @@ test('AI capture screen exposes secure scanner and responsive states', () => {
     'Replace',
     'Remove',
     'Analyze',
+    'Continue to Tracker',
   ]) {
     assert.match(source, new RegExp(label));
   }
@@ -571,9 +575,37 @@ test('AI capture screen exposes secure scanner and responsive states', () => {
   assert.match(source, /runWithCaptureLock\s*\(\s*operationLockRef/);
   assert.match(source, /accessibilityLabel="Coupon analysis result"/);
   assert.match(source, /NO FINANCIAL RECORD IS SAVED AUTOMATICALLY/);
+  assert.match(source, /setScannerDraftHandoff\(analysis\)/);
+  assert.match(source, /router\.push\('\/\(app\)\/bets\/new'\)/);
+  assert.doesNotMatch(source, /saveTrackedBet|\/api\/bets\/tracked|params:\s*\{[^}]*analysis/);
   assert.match(source, /contentInsetAdjustmentBehavior="automatic"/);
   assert.match(source, /contentFit="contain"/);
   assert.match(source, /Linking\.openSettings\(\)/);
   assert.match(source, /accessibilityState=\{\{\s*selected:\s*mode === option\.value\s*\}\}/);
-  assert.match(source, /minHeight:\s*(?:44|5[2-9]|[6-9]\d)/);
+  assert.match(source, /const touchMinimum = Platform\.OS === 'android' \? geometry\.androidTouchMinimum : geometry\.iosTouchMinimum/);
+  assert.match(source, /minHeight:\s*touchMinimum/);
+  assert.match(source, /BroadcastStatus label="Needs review" status="review"/);
+  assert.match(source, /withTiming\(1, \{ duration: reduceMotion \? 0 : 320 \}\)/);
+  assert.doesNotMatch(source, /withRepeat|EditorialBackdrop|KineticType/);
+});
+
+test('sign-in uses safe-area-context without changing the auth seam', () => {
+  const source = readFileSync(join(root, 'src/app/sign-in.tsx'), 'utf8');
+  assert.match(source, /import \{ SafeAreaView \} from 'react-native-safe-area-context'/);
+  assert.match(source, /<SafeAreaView edges=\{\['top', 'left', 'right'\]\}/);
+  assert.match(source, /const \{ signIn \} = useAuth\(\)/);
+  assert.doesNotMatch(source, /SafeAreaView[\s\S]*from 'react-native'/);
+});
+
+test('scanner handoff reaches only the editable Tracker draft and never auto-saves', () => {
+  const tracker = readFileSync(join(root, 'src/app/(app)/bets/new.tsx'), 'utf8');
+  const handoff = readFileSync(join(root, 'src/bets/scanner-draft-handoff.ts'), 'utf8');
+
+  assert.match(tracker, /peekScannerDraftHandoff\(\)/);
+  assert.match(tracker, /clearScannerDraftHandoff\(initialHandoff\)/);
+  assert.match(tracker, /initialHandoff\?\.draft \?\? emptyTrackerDraft\(\)/);
+  assert.match(tracker, /saveTrackedBet\(reviewedPayload, begin\.key\)/);
+  assert.match(handoff, /let pendingHandoff:/);
+  assert.match(handoff, /pendingHandoff = null/);
+  assert.doesNotMatch(handoff, /router|params|rawText|fetch|saveTrackedBet|\/api\//);
 });

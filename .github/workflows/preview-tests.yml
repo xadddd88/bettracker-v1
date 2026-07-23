@@ -39,6 +39,25 @@ jobs:
       - name: Lint
         run: npm run lint
 
+  # Hermetic authenticated Web acceptance: local Auth/data stub, browser-level
+  # network denylist and no production credentials or DB/provider/AI writes.
+  web-acceptance:
+    name: Hermetic Web acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run authenticated Web acceptance
+        run: npm run test:web-acceptance
+
   # ── Job 2: Provider safety + FP-001 quality gate regression suites ─────────
   # Stubbed-network suites: no provider calls, no Supabase. These are the
   # trust-layer regression guards (FP-001) — a PR that reintroduces pricing in
@@ -73,6 +92,39 @@ jobs:
         run: npm run test:rate-limit
       - name: "CSP security suite (Decision #054)"
         run: npm run test:csp-security
+      - name: "Broadcast Noir parity and contrast gate (Decision #065)"
+        run: npm run test:design-system
+      - name: "Corrective PR H gate"
+        run: npm run test:corrective-pr-h
+
+  # ── Job: Cross-platform design-system compile gate ─────────────────────────
+  design-system:
+    name: Broadcast Noir Web & mobile primitives
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install Web dependencies
+        run: npm ci
+      - name: Verify semantic parity and contrast
+        run: npm run test:design-system
+      - name: Verify shell, routes, brand assets and native config
+        run: npm run test:design-shell
+      - name: Typecheck Web primitives
+        run: npx tsc --noEmit
+      - name: Install mobile dependencies
+        working-directory: apps/mobile
+        run: npm ci
+      - name: Typecheck mobile primitives
+        working-directory: apps/mobile
+        run: npm run typecheck
+      - name: Run mobile regression suite
+        working-directory: apps/mobile
+        run: npm test
 
   # ── Job 3: Smoke tests against Vercel preview deployment ───────────────────
   smoke:

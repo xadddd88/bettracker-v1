@@ -4,6 +4,7 @@ import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
 import type { MarketOpportunity } from '@/types'
 import { getActiveScoutPresets } from '@/lib/events/pulse'
+import { BroadcastPanel } from '@/components/ui/BroadcastNoir'
 
 export default async function ScoutPage() {
   const supabase = await createClient()
@@ -22,15 +23,16 @@ export default async function ScoutPage() {
   const pulsePresets   = getActiveScoutPresets(today)
 
   return (
-    <div className="max-w-2xl flex flex-col gap-6">
+    <main className="bn-page mx-auto flex w-full max-w-3xl flex-col gap-4 pb-8">
       <PageView event={EVENTS.SCOUT_PAGE_VIEWED} />
-      <div>
-        <h1 className="text-2xl font-bold text-white">Scout</h1>
-        <p className="text-sm text-gray-500 mt-1">
+      <BroadcastPanel className="p-5 sm:p-7">
+        <p className="editorial-kicker">Research · candidate discovery</p>
+        <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Scout</h1>
+        <p className="mt-4 text-sm leading-6 text-bn-muted">
           Research opportunity discovery — find markets that may have value, then analyse them in the AI Analyst.
         </p>
-      </div>
+      </BroadcastPanel>
       <ScoutForm initialOpportunities={opportunities} pulsePresets={pulsePresets} />
-    </div>
+    </main>
   )
 }

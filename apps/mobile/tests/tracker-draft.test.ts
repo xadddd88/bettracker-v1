@@ -23,6 +23,7 @@ function validSingle(): TrackerDraft {
       },
     ],
     notes: '',
+    source: 'manual',
     stake: '25',
     totalOdds: '',
   };

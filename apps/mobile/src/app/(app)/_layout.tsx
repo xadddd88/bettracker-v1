@@ -1,26 +1,13 @@
 import { Tabs } from 'expo-router';
-import { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
+import { Platform, StyleSheet, View } from 'react-native';
 
-import { colors } from '@/ui/theme';
+import { semanticColors } from '@/ui/theme';
 
 function TabMarker({ focused }: { focused: boolean }) {
-  const progress = useSharedValue(focused ? 1 : 0);
-  const reduceMotion = useReducedMotion();
-  useEffect(() => {
-    progress.value = reduceMotion ? (focused ? 1 : 0) : withSpring(focused ? 1 : 0, { damping: 16, stiffness: 230 });
-  }, [focused, progress, reduceMotion]);
-  const style = useAnimatedStyle(() => ({
-    opacity: 0.25 + progress.value * 0.75,
-    transform: [{ scaleX: 0.28 + progress.value * 0.72 }],
-  }));
-  return <Animated.View style={[styles.marker, style]} />;
+  return <View style={[styles.marker, focused ? styles.markerFocused : null]} />;
 }
 
 export default function AppLayout() {
-  const insets = useSafeAreaInsets();
   const screen = (title: string) => ({
     tabBarAccessibilityLabel: title,
     tabBarIcon: ({ focused }: { focused: boolean }) => <TabMarker focused={focused} />,
@@ -33,18 +20,24 @@ export default function AppLayout() {
       screenOptions={{
         animation: 'shift',
         headerShown: false,
-        sceneStyle: { backgroundColor: colors.background },
-        tabBarActiveTintColor: '#FFFFFF',
+        sceneStyle: { backgroundColor: semanticColors.night },
+        tabBarActiveBackgroundColor: semanticColors.signal,
+        tabBarActiveTintColor: semanticColors.onSignal,
         tabBarHideOnKeyboard: true,
-        tabBarInactiveTintColor: '#91918B',
-        tabBarItemStyle: { minHeight: 52, paddingTop: 6 },
+        tabBarInactiveBackgroundColor: semanticColors.field,
+        tabBarInactiveTintColor: semanticColors.textQuiet,
+        tabBarItemStyle: {
+          borderRadius: 8,
+          margin: 4,
+          minHeight: Platform.OS === 'android' ? 48 : 44,
+          paddingTop: 4,
+        },
         tabBarLabelPosition: 'below-icon',
-        tabBarLabelStyle: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+        tabBarLabelStyle: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
         tabBarStyle: {
-          backgroundColor: '#050505',
-          borderTopColor: '#050505',
-          height: 58 + insets.bottom,
-          paddingBottom: Math.max(insets.bottom, 6),
+          backgroundColor: semanticColors.night,
+          borderTopColor: semanticColors.borderStrong,
+          paddingTop: 2,
         },
       }}
     >
@@ -59,5 +52,11 @@ export default function AppLayout() {
 }
 
 const styles = StyleSheet.create({
-  marker: { backgroundColor: '#FFFFFF', height: 2, width: 28 },
+  marker: {
+    backgroundColor: semanticColors.borderStrong,
+    borderRadius: 3,
+    height: 5,
+    width: 18,
+  },
+  markerFocused: { backgroundColor: semanticColors.onSignal },
 });

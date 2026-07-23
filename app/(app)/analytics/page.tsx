@@ -1,32 +1,45 @@
-import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import type { Bet } from '@/types'
-import { calcPerformance } from '@/lib/analytics/performance'
-import BetaNote from '@/components/ui/BetaNote'
-import { PageView } from '@/lib/analytics/PageView'
-import { EVENTS } from '@/lib/analytics/events'
-import { currencySymbol, fmtPnl, fmtPct } from '@/lib/money'
 
-const SPORT_ICON: Record<string, string> = {
-  soccer: '⚽', tennis: '🎾', basketball: '🏀',
-  ice_hockey: '🏒', cs2: '🎯', mma: '🥊', other: '🏅',
-}
+import BetaNote from '@/components/ui/BetaNote'
+import {
+  BroadcastDataValue,
+  BroadcastPanel,
+  BroadcastStatus,
+} from '@/components/ui/BroadcastNoir'
+import { calcPerformance } from '@/lib/analytics/performance'
+import { EVENTS } from '@/lib/analytics/events'
+import { PageView } from '@/lib/analytics/PageView'
+import { currencySymbol, fmtPct, fmtPnl } from '@/lib/money'
+import { createClient } from '@/lib/supabase/server'
+import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
+import type { Bet } from '@/types'
+
 const SPORT_LABEL: Record<string, string> = {
-  soccer: 'Soccer', tennis: 'Tennis', basketball: 'Basketball',
-  ice_hockey: 'Ice Hockey', cs2: 'CS2', mma: 'MMA', other: 'Other',
+  basketball: 'Basketball',
+  cs2: 'CS2',
+  ice_hockey: 'Ice Hockey',
+  mma: 'MMA',
+  mixed: 'Mixed',
+  other: 'Other',
+  soccer: 'Soccer',
+  tennis: 'Tennis',
 }
+
 const SOURCE_LABEL: Record<string, string> = {
-  manual: 'Manual', scanner: 'Scanner', quick_entry: 'Quick Entry',
-  ai_analyst: 'AI Analyst', import: 'Import',
+  ai_analyst: 'AI Analyst',
+  import: 'Import',
+  manual: 'Manual',
+  quick_entry: 'Quick Entry',
+  scanner: 'Scanner',
 }
-const ACTION_LABEL: Record<string, string> = {
-  placed: 'Placed', skipped: 'Skipped', watchlisted: 'Watchlisted',
-  ignored: 'Ignored', pending: 'Pending',
-}
-const ACTION_COLOR: Record<string, string> = {
-  placed: 'text-green-400', skipped: 'text-gray-400', watchlisted: 'text-yellow-400',
-  ignored: 'text-gray-600', pending: 'text-gray-500',
-}
+
+const DECISION_ACTIONS = [
+  { key: 'placed', label: 'Placed', tone: 'success' },
+  { key: 'watchlisted', label: 'Watchlisted', tone: 'review' },
+  { key: 'pending', label: 'Pending', tone: 'review' },
+  { key: 'skipped', label: 'Skipped', tone: 'neutral' },
+  { key: 'ignored', label: 'Ignored', tone: 'neutral' },
+] as const
 
 export default async function AnalyticsPage() {
   const supabase = await createClient()
@@ -50,398 +63,211 @@ export default async function AnalyticsPage() {
       .single(),
   ])
 
-  const bets       = (betsRes.data || []) as Bet[]
-  const decisions  = decisionsRes.data || []
-  const currency   = bankrollRes.data?.currency || 'USD'
-  const sym        = currencySymbol(currency)
-
-  const m = calcPerformance(bets, decisions)
-
-  // Full empty state — nothing to show yet
-  if (bets.length === 0 && decisions.length === 0) {
-    return (
-      <div className="flex flex-col gap-6">
-        <PageView event={EVENTS.ANALYTICS_VIEWED} />
-        <div>
-          <h1 className="text-2xl font-bold text-white">Analytics</h1>
-          <p className="text-sm text-gray-500 mt-1">No data yet</p>
-        </div>
-        <div className="card text-center py-16">
-          <div className="text-4xl mb-3">📈</div>
-          <p className="text-gray-400 font-medium mb-1">Nothing to analyse yet</p>
-          <p className="text-gray-600 text-sm">Place your first bet or run an AI analysis to start tracking performance.</p>
-          <div className="flex gap-3 justify-center mt-5">
-            <Link href="/ai" className="btn-ghost text-sm">🤖 Analyse match</Link>
-            <Link href="/bets/new" className="btn-primary text-sm">+ Add Bet</Link>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  const profitColor = m.netProfit >= 0 ? 'text-green-400' : 'text-red-400'
-  const roiColor    = m.roi != null ? (m.roi >= 0 ? 'text-green-400' : 'text-red-400') : ''
-
-  const totalOutcomes = m.wonCount + m.lostCount + m.voidCount + m.pendingCount
-  const pctBar = (n: number) => totalOutcomes > 0 ? (n / totalOutcomes) * 100 : 0
-
-  const decisionTotal = decisions.length
-  const pendingBets   = bets.filter(b => b.status === 'pending')
+  const bets = (betsRes.data || []) as Bet[]
+  const decisions = decisionsRes.data || []
+  const sym = currencySymbol(bankrollRes.data?.currency || 'USD')
+  const metrics = calcPerformance(bets, decisions)
+  const pendingBets = bets.filter((bet) => bet.status === 'pending')
 
   return (
-    <div className="flex flex-col gap-6">
+    <main className="bn-page mx-auto flex w-full max-w-6xl flex-col gap-4 pb-8">
       <PageView event={EVENTS.ANALYTICS_VIEWED} />
 
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Analytics</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {bets.length} bets · {m.settledCount} settled · {decisions.length} decisions
+      <BroadcastPanel className="p-5 sm:p-7">
+        <p className="editorial-kicker">Stats · recorded outcomes</p>
+        <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Performance</h1>
+        <p className="mt-4 max-w-2xl text-sm leading-6 text-bn-muted">
+          {bets.length} saved bet{bets.length === 1 ? '' : 's'} · {metrics.settledCount} settled · {decisions.length} decision{decisions.length === 1 ? '' : 's'}
         </p>
-      </div>
+      </BroadcastPanel>
 
-      {m.settledCount > 0 && m.settledCount < 10 && (
-        <BetaNote>
-          Metrics become more reliable with more settled bets. You have {m.settledCount} settled so far — keep tracking to improve accuracy.
-        </BetaNote>
+      {bets.length === 0 && decisions.length === 0 ? (
+        <BroadcastPanel className="grid min-h-72 place-items-center p-6 text-center">
+          <div className="max-w-md">
+            <BroadcastStatus status="neutral">Empty · no recorded data</BroadcastStatus>
+            <h2 className="mt-5 font-display text-3xl font-black tracking-[-0.04em] text-bn-text">Nothing to calculate yet</h2>
+            <p className="mt-3 text-sm leading-6 text-bn-muted">Stats appear only after a bet or decision is persisted. No sample chart or estimated result is shown.</p>
+            <div className="mt-6 grid gap-2 min-[420px]:grid-cols-2">
+              <Link className="bn-button bn-button-secondary" href="/ai">Analyze</Link>
+              <Link className="bn-button bn-button-primary" href="/bets/new">Add bet</Link>
+            </div>
+          </div>
+        </BroadcastPanel>
+      ) : (
+        <>
+          {metrics.settledCount > 0 && metrics.settledCount < 10 ? (
+            <BetaNote>Metrics become more reliable with more settled bets. Current sample: {metrics.settledCount}.</BetaNote>
+          ) : null}
+
+          {metrics.unsupportedCount + metrics.unknownCount > 0 ? (
+            <BroadcastPanel className="p-4">
+              <BroadcastStatus status="review">
+                {metrics.unsupportedCount + metrics.unknownCount} unsupported or unknown status{metrics.unsupportedCount + metrics.unknownCount === 1 ? '' : 'es'} excluded from financial metrics
+              </BroadcastStatus>
+            </BroadcastPanel>
+          ) : null}
+
+          <section aria-label="Performance metrics" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Metric label="Net P&L" note="Settled only" value={metrics.settledCount ? fmtPnl(metrics.netProfit, sym) : '—'} />
+            <Metric label="ROI" note="Void excluded" value={metrics.roi == null ? '—' : fmtPct(metrics.roi)} />
+            <Metric label="Win rate" note="Won / won + lost" value={metrics.winRate == null ? '—' : `${metrics.winRate.toFixed(1)}%`} />
+            <Metric label="Settled" note={`${metrics.wonCount}W · ${metrics.lostCount}L · ${metrics.voidCount}V`} value={String(metrics.settledCount)} />
+            <Metric label="Pending stake" note={`${metrics.pendingCount} open`} value={metrics.pendingCount ? `${sym}${metrics.pendingStake.toFixed(2)}` : '—'} />
+            <Metric label="Decisions" note="Persisted records" value={String(metrics.totalDecisions)} />
+            <Metric label="Decision → bet" note={`${metrics.decisionsByAction.placed} placed`} value={metrics.conversionRate == null ? '—' : `${metrics.conversionRate.toFixed(1)}%`} />
+            <Metric label="Average odds" note="Won/lost only" value={metrics.avgOdds == null ? '—' : metrics.avgOdds.toFixed(2)} />
+          </section>
+
+          <BroadcastPanel className="p-5 sm:p-7">
+            <SectionHeader detail={`${bets.length} total`} title="Outcomes" />
+            <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Outcome count={metrics.wonCount} label="Won" stake={stakeFor(bets, 'won')} status="success" sym={sym} />
+              <Outcome count={metrics.lostCount} label="Lost" stake={stakeFor(bets, 'lost')} status="negative" sym={sym} />
+              <Outcome count={metrics.voidCount} label="Void" stake={stakeFor(bets, 'void')} status="neutral" sym={sym} />
+              <Outcome count={metrics.pendingCount} label="Pending" stake={metrics.pendingStake} status="review" sym={sym} />
+            </div>
+          </BroadcastPanel>
+
+          <BroadcastPanel className="p-5 sm:p-7">
+            <SectionHeader detail={`${decisions.length} total`} title="Decision actions" />
+            {decisions.length === 0 ? (
+              <EmptyLine><Link className="underline underline-offset-4" href="/ai">Run an analysis</Link> to create the first decision.</EmptyLine>
+            ) : (
+              <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                {DECISION_ACTIONS.map((action) => {
+                  const count = metrics.decisionsByAction[action.key] ?? 0
+                  const percent = decisions.length ? (count / decisions.length) * 100 : 0
+                  return (
+                    <div className="rounded-control border border-bn-border-subtle p-3" key={action.key}>
+                      <BroadcastStatus status={action.tone}>{action.label}</BroadcastStatus>
+                      <dd><BroadcastDataValue className="mt-3 block text-2xl font-black">{count}</BroadcastDataValue></dd>
+                      <dt className="mt-1 text-xs text-bn-muted">{percent.toFixed(0)}% of decisions</dt>
+                    </div>
+                  )
+                })}
+              </dl>
+            )}
+          </BroadcastPanel>
+
+          <PerformanceTable rows={metrics.bySport.map((row) => ({ ...row, label: SPORT_LABEL[row.sport] ?? row.sport }))} title="By sport" sym={sym} />
+          <PerformanceTable rows={metrics.bySource.map((row) => ({ ...row, label: SOURCE_LABEL[row.source] ?? row.source }))} title="By source" sym={sym} />
+
+          <BroadcastPanel className="p-5 sm:p-7">
+            <SectionHeader detail="Source = AI Analyst" title="AI Analyst records" />
+            {metrics.aiAnalyst.total === 0 ? (
+              <EmptyLine>No AI-sourced bets are saved yet.</EmptyLine>
+            ) : (
+              <dl className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <SmallMetric label="Bets" value={String(metrics.aiAnalyst.total)} />
+                <SmallMetric label="Win rate" value={metrics.aiAnalyst.winRate == null ? '—' : `${metrics.aiAnalyst.winRate.toFixed(1)}%`} />
+                <SmallMetric label="ROI" value={metrics.aiAnalyst.roi == null ? '—' : fmtPct(metrics.aiAnalyst.roi)} />
+                <SmallMetric label="Net P&L" value={metrics.aiAnalyst.won + metrics.aiAnalyst.lost ? fmtPnl(metrics.aiAnalyst.netProfit, sym) : '—'} />
+              </dl>
+            )}
+          </BroadcastPanel>
+
+          <BroadcastPanel className="overflow-hidden p-0">
+            <div className="px-5 py-4 sm:px-7"><SectionHeader detail={`${sym}${metrics.pendingStake.toFixed(2)} at risk`} title="Pending risk" /></div>
+            {pendingBets.length === 0 ? <EmptyLine>No open bets.</EmptyLine> : (
+              <ol className="divide-y divide-bn-border-strong">
+                {pendingBets.map((bet) => (
+                  <li key={bet.id}>
+                    <Link className="grid gap-2 px-5 py-4 transition-colors hover:bg-bn-raised sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-7" href={`/bets/${bet.id}`}>
+                      <div className="min-w-0">
+                        <div className="break-words text-sm font-bold text-bn-text">{bet.legs?.[0]?.event_name || 'Tracked bet'}</div>
+                        <div className="mt-1 text-xs text-bn-muted">{bet.legs?.length || 0} leg{bet.legs?.length === 1 ? '' : 's'} · saved {formatDate(bet.placed_at)}</div>
+                      </div>
+                      <BroadcastDataValue className="text-sm font-black">{sym}{bet.stake.toFixed(2)} · {bet.total_odds?.toFixed(2) ?? '—'}</BroadcastDataValue>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </BroadcastPanel>
+        </>
       )}
+    </main>
+  )
+}
 
-      {/* ── KPI Grid ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="stat-card">
-          <div className="stat-label">Net Profit</div>
-          <div className={`stat-value text-xl ${m.settledCount > 0 ? profitColor : 'text-gray-600'}`}>
-            {m.settledCount > 0 ? fmtPnl(m.netProfit, sym) : '—'}
-          </div>
-          <div className="text-xs text-gray-600">
-            {m.settledCount === 0 ? 'No settled bets' : 'Settled bets only'}
-          </div>
-        </div>
+function Metric({ label, note, value }: { label: string; note: string; value: string }) {
+  return (
+    <BroadcastPanel className="min-w-0 p-4 sm:p-5">
+      <div className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-quiet">{label}</div>
+      <BroadcastDataValue className="mt-3 block break-words font-display text-2xl font-black tracking-[-0.03em]">{value}</BroadcastDataValue>
+      <div className="mt-2 text-xs leading-5 text-bn-muted">{note}</div>
+    </BroadcastPanel>
+  )
+}
 
-        <div className="stat-card">
-          <div className="stat-label">ROI</div>
-          <div className={`stat-value text-xl ${roiColor || 'text-gray-600'}`}>
-            {m.roi != null ? fmtPct(m.roi) : '—'}
-          </div>
-          <div className="text-xs text-gray-600">Void excluded</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-label">Win Rate</div>
-          <div className={`stat-value text-xl ${m.winRate != null ? 'text-white' : 'text-gray-600'}`}>
-            {m.winRate != null ? `${m.winRate.toFixed(1)}%` : '—'}
-          </div>
-          <div className="text-xs text-gray-600">Won / (won + lost)</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-label">Settled Bets</div>
-          <div className="stat-value text-xl text-white">{m.settledCount}</div>
-          <div className="text-xs text-gray-600">{m.wonCount}W · {m.lostCount}L · {m.voidCount}V</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-label">Pending Stake</div>
-          <div className={`stat-value text-xl ${m.pendingCount > 0 ? 'text-yellow-400' : 'text-gray-600'}`}>
-            {m.pendingCount > 0 ? `${sym}${m.pendingStake.toFixed(2)}` : '—'}
-          </div>
-          <div className="text-xs text-gray-600">{m.pendingCount} open bets</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-label">Total Decisions</div>
-          <div className="stat-value text-xl text-white">{m.totalDecisions}</div>
-          <div className="text-xs text-gray-600">AI + manual analyses</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-label">Decision → Bet</div>
-          <div className={`stat-value text-xl ${m.conversionRate != null ? 'text-white' : 'text-gray-600'}`}>
-            {m.conversionRate != null ? `${m.conversionRate.toFixed(1)}%` : '—'}
-          </div>
-          <div className="text-xs text-gray-600">{m.decisionsByAction.placed} placed</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-label">Avg Odds</div>
-          <div className={`stat-value text-xl ${m.avgOdds != null ? 'text-white' : 'text-gray-600'}`}>
-            {m.avgOdds != null ? m.avgOdds.toFixed(2) : '—'}
-          </div>
-          <div className="text-xs text-gray-600">Won/lost bets only</div>
-        </div>
-      </div>
-
-      {/* ── Outcome Breakdown ────────────────────────────────── */}
-      <div className="card flex flex-col gap-4">
-        <h2 className="font-semibold text-white">Outcome Breakdown</h2>
-
-        {m.settledCount === 0 && m.pendingCount === 0 ? (
-          <p className="text-sm text-gray-600 text-center py-4">No bets recorded yet.</p>
-        ) : (
-          <>
-            {/* Stacked bar */}
-            <div className="flex rounded-full overflow-hidden h-3 gap-0.5">
-              {m.wonCount > 0     && <div className="bg-green-500"  style={{ width: `${pctBar(m.wonCount)}%` }} />}
-              {m.lostCount > 0    && <div className="bg-red-500"    style={{ width: `${pctBar(m.lostCount)}%` }} />}
-              {m.voidCount > 0    && <div className="bg-gray-600"   style={{ width: `${pctBar(m.voidCount)}%` }} />}
-              {m.pendingCount > 0 && <div className="bg-yellow-600" style={{ width: `${pctBar(m.pendingCount)}%` }} />}
-              {bets.length === 0  && <div className="bg-gray-800 w-full" />}
-            </div>
-
-            {/* Legend */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <OutcomeCell label="Won"     count={m.wonCount}     stake={bets.filter(b=>b.status==='won').reduce((s,b)=>s+b.stake,0)}     color="text-green-400"  dotColor="bg-green-500"  sym={sym} />
-              <OutcomeCell label="Lost"    count={m.lostCount}    stake={bets.filter(b=>b.status==='lost').reduce((s,b)=>s+b.stake,0)}    color="text-red-400"    dotColor="bg-red-500"    sym={sym} />
-              <OutcomeCell label="Void"    count={m.voidCount}    stake={bets.filter(b=>b.status==='void').reduce((s,b)=>s+b.stake,0)}    color="text-gray-400"   dotColor="bg-gray-600"   sym={sym} />
-              <OutcomeCell label="Pending" count={m.pendingCount} stake={m.pendingStake}                                                  color="text-yellow-400" dotColor="bg-yellow-600" sym={sym} />
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* ── Decision Action Breakdown ────────────────────────── */}
-      <div className="card flex flex-col gap-4">
-        <h2 className="font-semibold text-white">Decision Actions</h2>
-
-        {decisionTotal === 0 ? (
-          <p className="text-sm text-gray-600 text-center py-4">
-            No decisions yet. <Link href="/ai" className="text-indigo-400 hover:text-indigo-300">Run an AI analysis →</Link>
-          </p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {(['placed', 'skipped', 'watchlisted', 'ignored', 'pending'] as const).map(action => {
-              const count = m.decisionsByAction[action] ?? 0
-              const pct   = decisionTotal > 0 ? (count / decisionTotal) * 100 : 0
-              return (
-                <div key={action} className="flex items-center gap-3">
-                  <div className={`text-xs w-20 font-medium ${ACTION_COLOR[action]}`}>
-                    {ACTION_LABEL[action]}
-                  </div>
-                  <div className="flex-1 bg-gray-800 rounded-full h-1.5">
-                    <div
-                      className={`h-1.5 rounded-full ${
-                        action === 'placed'      ? 'bg-green-500'  :
-                        action === 'watchlisted' ? 'bg-yellow-500' :
-                        action === 'skipped'     ? 'bg-gray-500'   :
-                        'bg-gray-700'
-                      }`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <div className="text-xs text-gray-400 w-16 text-right">
-                    {count} <span className="text-gray-600">({pct.toFixed(0)}%)</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ── Sport Performance ────────────────────────────────── */}
-      <div className="card flex flex-col gap-4">
-        <h2 className="font-semibold text-white">By Sport</h2>
-
-        {m.bySport.length === 0 ? (
-          <p className="text-sm text-gray-600 text-center py-4">No bets recorded yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left border-b border-gray-800">
-                  <th className="pb-2 text-xs text-gray-500 font-medium">Sport</th>
-                  <th className="pb-2 text-xs text-gray-500 font-medium text-right">Bets</th>
-                  <th className="pb-2 text-xs text-gray-500 font-medium text-right">W/L</th>
-                  <th className="pb-2 text-xs text-gray-500 font-medium text-right">Win Rate</th>
-                  <th className="pb-2 text-xs text-gray-500 font-medium text-right">ROI</th>
-                  <th className="pb-2 text-xs text-gray-500 font-medium text-right">P&amp;L</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800/60">
-                {m.bySport.map(row => (
-                  <tr key={row.sport}>
-                    <td className="py-2.5 text-gray-200">
-                      <span className="mr-1.5">{SPORT_ICON[row.sport] ?? '🏅'}</span>
-                      {SPORT_LABEL[row.sport] ?? row.sport}
-                    </td>
-                    <td className="py-2.5 text-gray-300 text-right">{row.total}</td>
-                    <td className="py-2.5 text-gray-400 text-right">{row.won}/{row.lost}</td>
-                    <td className="py-2.5 text-right">
-                      {row.winRate != null
-                        ? <span className="text-white">{row.winRate.toFixed(1)}%</span>
-                        : <span className="text-gray-600">—</span>}
-                    </td>
-                    <td className="py-2.5 text-right">
-                      {row.roi != null
-                        ? <span className={row.roi >= 0 ? 'text-green-400' : 'text-red-400'}>{fmtPct(row.roi)}</span>
-                        : <span className="text-gray-600">—</span>}
-                    </td>
-                    <td className="py-2.5 text-right">
-                      {(row.won + row.lost + row.void) > 0
-                        ? <span className={row.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}>{fmtPnl(row.netProfit, sym)}</span>
-                        : <span className="text-gray-600">—</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* ── Source Performance ───────────────────────────────── */}
-      <div className="card flex flex-col gap-4">
-        <h2 className="font-semibold text-white">By Source</h2>
-
-        {m.bySource.length === 0 ? (
-          <p className="text-sm text-gray-600 text-center py-4">No bets recorded yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left border-b border-gray-800">
-                  <th className="pb-2 text-xs text-gray-500 font-medium">Source</th>
-                  <th className="pb-2 text-xs text-gray-500 font-medium text-right">Bets</th>
-                  <th className="pb-2 text-xs text-gray-500 font-medium text-right">W/L</th>
-                  <th className="pb-2 text-xs text-gray-500 font-medium text-right">Win Rate</th>
-                  <th className="pb-2 text-xs text-gray-500 font-medium text-right">ROI</th>
-                  <th className="pb-2 text-xs text-gray-500 font-medium text-right">P&amp;L</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800/60">
-                {m.bySource.map(row => (
-                  <tr key={row.source}>
-                    <td className="py-2.5 text-gray-200">
-                      {SOURCE_LABEL[row.source] ?? row.source}
-                    </td>
-                    <td className="py-2.5 text-gray-300 text-right">{row.total}</td>
-                    <td className="py-2.5 text-gray-400 text-right">{row.won}/{row.lost}</td>
-                    <td className="py-2.5 text-right">
-                      {row.winRate != null
-                        ? <span className="text-white">{row.winRate.toFixed(1)}%</span>
-                        : <span className="text-gray-600">—</span>}
-                    </td>
-                    <td className="py-2.5 text-right">
-                      {row.roi != null
-                        ? <span className={row.roi >= 0 ? 'text-green-400' : 'text-red-400'}>{fmtPct(row.roi)}</span>
-                        : <span className="text-gray-600">—</span>}
-                    </td>
-                    <td className="py-2.5 text-right">
-                      {(row.won + row.lost) > 0
-                        ? <span className={row.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}>{fmtPnl(row.netProfit, sym)}</span>
-                        : <span className="text-gray-600">—</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* ── AI Analyst Performance ───────────────────────────── */}
-      <div className="card flex flex-col gap-4">
-        <div className="flex items-center gap-2">
-          <h2 className="font-semibold text-white">AI Analyst Performance</h2>
-          <span className="text-xs text-gray-600">bets placed via AI</span>
-        </div>
-
-        {m.aiAnalyst.total === 0 ? (
-          <p className="text-sm text-gray-600 text-center py-4">
-            No AI-sourced bets yet. <Link href="/ai" className="text-indigo-400 hover:text-indigo-300">Try the AI Analyst →</Link>
-          </p>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div>
-              <div className="text-xs text-gray-500 mb-0.5">AI Bets</div>
-              <div className="text-xl font-bold text-white">{m.aiAnalyst.total}</div>
-              <div className="text-xs text-gray-600">{m.aiAnalyst.won}W · {m.aiAnalyst.lost}L</div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500 mb-0.5">Win Rate</div>
-              <div className="text-xl font-bold text-white">
-                {m.aiAnalyst.winRate != null ? `${m.aiAnalyst.winRate.toFixed(1)}%` : '—'}
-              </div>
-              <div className="text-xs text-gray-600">Void excluded</div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500 mb-0.5">ROI</div>
-              <div className={`text-xl font-bold ${m.aiAnalyst.roi != null ? (m.aiAnalyst.roi >= 0 ? 'text-green-400' : 'text-red-400') : 'text-gray-600'}`}>
-                {m.aiAnalyst.roi != null ? fmtPct(m.aiAnalyst.roi) : '—'}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500 mb-0.5">Net P&amp;L</div>
-              <div className={`text-xl font-bold ${(m.aiAnalyst.won + m.aiAnalyst.lost) > 0 ? (m.aiAnalyst.netProfit >= 0 ? 'text-green-400' : 'text-red-400') : 'text-gray-600'}`}>
-                {(m.aiAnalyst.won + m.aiAnalyst.lost) > 0 ? fmtPnl(m.aiAnalyst.netProfit, sym) : '—'}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── Pending Risk ─────────────────────────────────────── */}
-      <div className="card flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-white">Pending Risk</h2>
-          {pendingBets.length > 0 && (
-            <span className="text-xs text-yellow-400">{sym}{m.pendingStake.toFixed(2)} at risk</span>
-          )}
-        </div>
-
-        {pendingBets.length === 0 ? (
-          <p className="text-sm text-gray-600 text-center py-4">No open bets — all settled.</p>
-        ) : (
-          <div className="flex flex-col divide-y divide-gray-800">
-            {pendingBets.map(bet => {
-              const leg  = bet.legs?.[0]
-              const days = Math.floor((Date.now() - new Date(bet.placed_at).getTime()) / 86400000)
-              return (
-                <Link
-                  key={bet.id}
-                  href={`/bets/${bet.id}`}
-                  className="flex items-center gap-3 py-3 hover:opacity-80 transition-opacity"
-                >
-                  <span className="text-lg flex-shrink-0">
-                    {SPORT_ICON[leg?.sport ?? ''] ?? '🎯'}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm text-white truncate">
-                      {(bet.legs?.length ?? 0) > 1
-                        ? `Express (${bet.legs!.length} legs)`
-                        : leg?.event_name || '—'}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {days === 0 ? 'Today' : `${days}d ago`}
-                      {bet.total_odds ? ` · @${bet.total_odds.toFixed(2)}` : ''}
-                    </div>
-                  </div>
-                  <div className="text-sm font-medium text-yellow-400 flex-shrink-0">
-                    {sym}{bet.stake.toFixed(2)}
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
-        )}
-      </div>
+function Outcome({ count, label, stake, status, sym }: { count: number; label: string; stake: number; status: BroadcastNoirStatus; sym: string }) {
+  return (
+    <div className="rounded-control border border-bn-border-subtle p-3">
+      <BroadcastStatus status={status}>{label}</BroadcastStatus>
+      <BroadcastDataValue className="mt-3 block text-2xl font-black">{count}</BroadcastDataValue>
+      <div className="mt-1 text-xs text-bn-muted">{sym}{stake.toFixed(2)} staked</div>
     </div>
   )
 }
 
-function OutcomeCell({
-  label, count, stake, color, dotColor, sym,
-}: {
-  label: string; count: number; stake: number; color: string; dotColor: string; sym: string
+function PerformanceTable({ rows, sym, title }: {
+  rows: Array<{ label: string; lost: number; netProfit: number; roi: number | null; total: number; void: number; winRate: number | null; won: number }>
+  sym: string
+  title: string
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-1.5">
-        <div className={`w-2 h-2 rounded-full ${dotColor}`} />
-        <span className="text-xs text-gray-500">{label}</span>
-      </div>
-      <div className={`text-lg font-bold ${count > 0 ? color : 'text-gray-700'}`}>{count}</div>
-      {count > 0 && <div className="text-xs text-gray-600">{sym}{stake.toFixed(2)} staked</div>}
-    </div>
+    <BroadcastPanel className="overflow-hidden p-0">
+      <div className="px-5 py-4 sm:px-7"><SectionHeader detail="Exact values" title={title} /></div>
+      {rows.length === 0 ? <EmptyLine>No saved bets.</EmptyLine> : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[40rem] border-collapse text-sm">
+            <caption className="sr-only">{title} performance calculated from saved bets</caption>
+            <thead>
+              <tr className="border-y border-bn-border-strong text-left">
+                {['Group', 'Bets', 'W / L / V', 'Win rate', 'ROI', 'P&L'].map((label, index) => (
+                  <th className={`px-5 py-3 font-mono text-[11px] font-bold uppercase tracking-[0.06em] text-bn-quiet ${index ? 'text-right' : ''}`} key={label}>{label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-bn-border-subtle">
+              {rows.map((row) => (
+                <tr key={row.label}>
+                  <th className="px-5 py-3 text-left font-bold text-bn-text">{row.label}</th>
+                  <Cell value={String(row.total)} />
+                  <Cell value={`${row.won} / ${row.lost} / ${row.void}`} />
+                  <Cell value={row.winRate == null ? '—' : `${row.winRate.toFixed(1)}%`} />
+                  <Cell value={row.roi == null ? '—' : fmtPct(row.roi)} />
+                  <Cell value={row.won + row.lost + row.void ? fmtPnl(row.netProfit, sym) : '—'} />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </BroadcastPanel>
   )
+}
+
+function Cell({ value }: { value: string }) {
+  return <td className="px-5 py-3 text-right"><BroadcastDataValue>{value}</BroadcastDataValue></td>
+}
+
+function SmallMetric({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-control border border-bn-border-subtle p-3"><dt className="text-xs text-bn-muted">{label}</dt><dd><BroadcastDataValue className="mt-2 block text-lg font-black">{value}</BroadcastDataValue></dd></div>
+}
+
+function SectionHeader({ detail, title }: { detail: string; title: string }) {
+  return <div className="flex items-center justify-between gap-4"><h2 className="font-display text-xl font-black tracking-[-0.035em] text-bn-text">{title}</h2><span className="font-mono text-[11px] font-bold uppercase tracking-[0.06em] text-bn-quiet">{detail}</span></div>
+}
+
+function EmptyLine({ children }: { children: React.ReactNode }) {
+  return <p className="px-5 py-8 text-center text-sm text-bn-muted sm:px-7">{children}</p>
+}
+
+function stakeFor(bets: Bet[], status: string) {
+  return bets.filter((bet) => bet.status === status).reduce((sum, bet) => sum + bet.stake, 0)
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value))
 }

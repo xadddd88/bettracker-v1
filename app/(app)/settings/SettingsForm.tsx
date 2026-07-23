@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import type { Profile } from '@/types'
+import { BroadcastButton, BroadcastDataValue, BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
 
 const CURRENCIES = ['USD', 'EUR', 'UAH', 'GBP', 'CAD', 'AUD'] as const
 type Currency = typeof CURRENCIES[number]
@@ -66,10 +67,10 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
   }, [displayName, currency, defaultStake, kellyFraction, webSearchEnabled, timezone])
 
   return (
-    <div className="flex flex-col gap-6 max-w-lg">
+    <div className="flex max-w-lg flex-col gap-4">
       {/* Profile */}
-      <div className="card flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Profile</h2>
+      <BroadcastPanel className="flex flex-col gap-4 p-4 sm:p-5">
+        <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">Profile</h2>
         <div>
           <label className="label">Display name</label>
           <input
@@ -81,37 +82,32 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
             onChange={e => setDisplayName(e.target.value)}
           />
         </div>
-      </div>
+      </BroadcastPanel>
 
       {/* Currency & Bankroll */}
-      <div className="card flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Currency & Bankroll</h2>
+      <BroadcastPanel className="flex flex-col gap-4 p-4 sm:p-5">
+        <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">Currency & Bankroll</h2>
         <div>
           <label className="label">Currency</label>
           <div className="flex gap-2 flex-wrap mt-1">
             {CURRENCIES.map(c => (
-              <button
+              <BroadcastButton
                 key={c}
                 type="button"
                 onClick={() => setCurrency(c)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                  currency === c
-                    ? 'bg-indigo-600 border-indigo-500 text-white'
-                    : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
-                }`}
+                aria-pressed={currency === c}
+                tone={currency === c ? 'primary' : 'secondary'}
               >
                 {CURRENCY_SYMBOLS[c]} {c}
-              </button>
+              </BroadcastButton>
             ))}
           </div>
-          <p className="text-[11px] text-amber-500 mt-1.5">
-            ⚠ Changing currency does not convert your balance.
-          </p>
+          <div className="mt-2"><BroadcastStatus status="review">Changing currency does not convert your balance.</BroadcastStatus></div>
         </div>
         <div>
           <label className="label">Default stake</label>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-gray-500 text-sm">{CURRENCY_SYMBOLS[currency]}</span>
+            <span className="text-sm text-bn-muted">{CURRENCY_SYMBOLS[currency]}</span>
             <input
               className="input flex-1"
               type="number"
@@ -123,17 +119,17 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
             />
           </div>
         </div>
-      </div>
+      </BroadcastPanel>
 
       {/* AI & Analysis */}
-      <div className="card flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">AI & Analysis</h2>
+      <BroadcastPanel className="flex flex-col gap-4 p-4 sm:p-5">
+        <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">AI & Analysis</h2>
         <div>
           <label className="label">
-            Kelly fraction — <span className="text-indigo-400 font-mono">{kellyFraction.toFixed(2)}×</span>
+            Kelly fraction — <BroadcastDataValue>{kellyFraction.toFixed(2)}×</BroadcastDataValue>
           </label>
           <input
-            className="w-full mt-2 accent-indigo-500"
+            className="mt-2 w-full [accent-color:var(--signal)]"
             type="range"
             min={0.1}
             max={1.0}
@@ -141,7 +137,7 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
             value={kellyFraction}
             onChange={e => setKellyFraction(parseFloat(e.target.value))}
           />
-          <div className="flex justify-between text-[10px] text-gray-600 mt-0.5">
+          <div className="mt-0.5 flex justify-between text-[10px] text-bn-muted">
             <span>0.10× (cautious)</span>
             <span>1.00× (full Kelly)</span>
           </div>
@@ -149,7 +145,7 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <label className="label">Web search in Scout & Analyst</label>
-            <p className="text-[11px] text-gray-600 mt-0.5">
+            <p className="mt-0.5 text-[11px] text-bn-muted">
               Allows Scout and Analyst to consult current sources. Exact pricing still requires verified model inputs. Requires server-side activation.
             </p>
           </div>
@@ -157,21 +153,22 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
             type="button"
             role="switch"
             aria-checked={webSearchEnabled}
+            aria-label="Web search in Scout and Analyst"
             onClick={() => setWebSearchEnabled(v => !v)}
-            className={`relative shrink-0 mt-0.5 w-10 h-5 rounded-full transition-colors ${
-              webSearchEnabled ? 'bg-indigo-600' : 'bg-gray-700'
+            className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-control border transition-colors ${
+              webSearchEnabled ? 'border-bn-signal bg-bn-signal' : 'border-bn-border-strong bg-bn-raised'
             }`}
           >
-            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-              webSearchEnabled ? 'translate-x-5' : 'translate-x-0.5'
+            <span aria-hidden className={`absolute top-0.5 h-[18px] w-[18px] rounded-control transition-transform ${
+              webSearchEnabled ? 'translate-x-[21px] bg-bn-on-signal' : 'translate-x-0.5 bg-bn-text'
             }`} />
           </button>
         </div>
-      </div>
+      </BroadcastPanel>
 
       {/* Account */}
-      <div className="card flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Account</h2>
+      <BroadcastPanel className="flex flex-col gap-4 p-4 sm:p-5">
+        <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">Account</h2>
         <div>
           <label className="label">Email</label>
           <input
@@ -191,28 +188,24 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
             value={timezone}
             onChange={e => setTimezone(e.target.value)}
           />
-          <p className="text-[11px] text-gray-600 mt-0.5">e.g. Europe/Kyiv, America/New_York</p>
+          <p className="mt-0.5 text-[11px] text-bn-muted">e.g. Europe/Kyiv, America/New_York</p>
         </div>
-      </div>
+      </BroadcastPanel>
 
       {errorMsg && (
-        <div className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
-          {errorMsg}
-        </div>
+        <BroadcastStatus className="w-full" status="negative">{errorMsg}</BroadcastStatus>
       )}
       {successMsg && (
-        <div className="text-xs text-green-400 bg-green-950/40 border border-green-900 rounded-lg px-3 py-2">
-          ✓ {successMsg}
-        </div>
+        <BroadcastStatus className="w-full" status="success">{successMsg}</BroadcastStatus>
       )}
 
-      <button
-        className="btn-primary max-w-lg"
+      <BroadcastButton
+        className="max-w-lg"
         onClick={handleSave}
         disabled={saving}
       >
         {saving ? 'Saving…' : 'Save settings'}
-      </button>
+      </BroadcastButton>
     </div>
   )
 }

@@ -7,6 +7,8 @@ export interface PerformanceMetrics {
   winRate: number | null
   settledCount: number
   pendingStake: number
+  unsupportedCount: number
+  unknownCount: number
   totalDecisions: number
   conversionRate: number | null
   avgOdds: number | null
@@ -41,6 +43,7 @@ export interface SourcePerf {
   total: number
   won: number
   lost: number
+  void: number
   winRate: number | null
   roi: number | null
   netProfit: number
@@ -53,6 +56,19 @@ export interface AIPerf {
   winRate: number | null
   roi: number | null
   netProfit: number
+}
+
+const KNOWN_SPORTS = new Set(['basketball', 'cs2', 'ice_hockey', 'mma', 'other', 'soccer', 'tennis'])
+
+function normalizedSport(sport: string | undefined): string {
+  const normalized = sport?.trim().toLowerCase() ?? ''
+  return KNOWN_SPORTS.has(normalized) ? normalized : 'other'
+}
+
+export function betSportBucket(bet: Pick<Bet, 'legs'>): string {
+  const sports = (bet.legs ?? []).map((leg) => normalizedSport(leg.sport))
+  if (sports.length === 0) return 'other'
+  return new Set(sports).size === 1 ? sports[0]! : 'mixed'
 }
 
 export function calcPerformance(
@@ -75,10 +91,10 @@ export function calcPerformance(
     ? (decisionsByAction.placed / decisions.length) * 100
     : null
 
-  // Group by sport from first leg
+  // A same-sport Express belongs to that sport; a cross-sport Express is Mixed.
   const sportMap = new Map<string, Bet[]>()
   for (const bet of bets) {
-    const sport = bet.legs?.[0]?.sport ?? 'other'
+    const sport = betSportBucket(bet)
     if (!sportMap.has(sport)) sportMap.set(sport, [])
     sportMap.get(sport)!.push(bet)
   }
@@ -115,6 +131,7 @@ export function calcPerformance(
         total: sb.length,
         won: sm.wonCount,
         lost: sm.lostCount,
+        void: sm.voidCount,
         winRate: sm.winRate,
         roi: sm.roi,
         netProfit: sm.netProfit,
@@ -140,6 +157,8 @@ export function calcPerformance(
     winRate: m.winRate,
     settledCount: m.settledCount,
     pendingStake: m.pendingStake,
+    unsupportedCount: m.unsupportedCount,
+    unknownCount: m.unknownCount,
     totalDecisions: decisions.length,
     conversionRate,
     avgOdds: m.avgOdds,

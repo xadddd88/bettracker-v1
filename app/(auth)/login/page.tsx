@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { BroadcastButton, BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
 
 type Mode = 'login' | 'register' | 'magic'
 
@@ -74,53 +75,55 @@ export default function LoginPage() {
         : 'Enter workspace'
 
   return (
-    <main className="web-editorial grid min-h-screen bg-[#f5f5f0] lg:grid-cols-[minmax(0,1.35fr)_minmax(420px,0.65fr)]">
-      <section className="editorial-dark relative flex min-h-[44vh] flex-col overflow-hidden border-b border-black p-5 lg:min-h-screen lg:border-b-0 lg:border-r lg:p-10">
-        <div className="pointer-events-none absolute -bottom-8 -left-5 select-none font-display text-[clamp(8rem,24vw,24rem)] font-black leading-none tracking-[-0.1em] text-white/[0.055]" aria-hidden>
-          XADDD
+    <main className="web-editorial grid min-h-screen bg-[var(--night)] lg:grid-cols-[minmax(0,1.35fr)_minmax(420px,0.65fr)]">
+      <section className="relative flex min-h-[44vh] flex-col overflow-hidden border-b border-[var(--border-strong)] bg-[var(--night)] p-5 text-[var(--text-primary)] lg:min-h-screen lg:border-b-0 lg:border-r lg:p-10">
+        <div className="pointer-events-none absolute -bottom-8 -left-5 select-none font-display text-[clamp(8rem,24vw,24rem)] font-black leading-none tracking-[-0.1em] text-bn-raised/30" aria-hidden>
+          BETTRACKER
         </div>
-        <header className="relative z-10 flex min-h-12 items-center border-y border-white/35">
-          <div className="font-display text-xl font-black tracking-[-0.06em] text-white">XADDD</div>
-          <div className="ml-4 flex-1 font-mono text-[8px] font-bold tracking-[0.18em] text-white/45">FOUNDER SYSTEM / 2026</div>
-          <div className="h-3 w-3 bg-[#e8ff00]" aria-hidden />
+        <header className="relative z-10 flex min-h-12 items-center border-y border-bn-border-strong">
+          <div className="font-display text-xl font-black tracking-[-0.045em] text-[var(--text-primary)]">BETTRACKER</div>
+          <div className="ml-4 flex-1 font-mono text-[9px] font-bold tracking-[0.14em] text-[var(--text-quiet)]">SHARED VISUAL SYSTEM / V3.1</div>
+          <div className="h-2.5 w-2.5 rounded-control bg-[var(--signal)]" aria-hidden />
         </header>
         <div className="relative z-10 my-auto py-12 lg:py-20">
-          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[#e8ff00]">Private decision intelligence</p>
-          <h1 className="mt-6 max-w-4xl font-display text-[clamp(3.2rem,7vw,8rem)] font-black uppercase leading-[0.8] tracking-[-0.075em] text-white">
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--signal)]">Private decision intelligence</p>
+          <h1 className="mt-6 max-w-4xl font-display text-[clamp(3.2rem,7vw,8rem)] font-black uppercase leading-[0.8] tracking-[-0.075em] text-bn-text">
             Evidence<br />before<br />action
           </h1>
-          <p className="mt-8 max-w-md text-sm leading-6 text-white/60">
+          <p className="mt-8 max-w-md text-sm leading-6 text-bn-muted">
             Analyze the signal. Keep every coupon leg in order. Build a record you can trust.
           </p>
         </div>
-        <div className="relative z-10 grid grid-cols-3 border-y border-white/35 py-4 font-mono text-[8px] font-bold uppercase tracking-[0.15em] text-white/55">
+        <div className="relative z-10 grid grid-cols-3 border-y border-bn-border-strong py-4 font-mono text-[8px] font-bold uppercase tracking-[0.15em] text-bn-muted">
           <span>01 / Scan</span>
           <span className="text-center">02 / Verify</span>
           <span className="text-right">03 / Track</span>
         </div>
       </section>
 
-      <section className="flex items-center px-5 py-10 md:px-10 lg:px-12">
+      <section className="flex items-center bg-[var(--field)] px-5 py-10 text-[var(--text-primary)] md:px-10 lg:px-12">
         <div className="editorial-page w-full max-w-xl lg:mx-auto">
-          <div className="flex items-end justify-between border-b border-black pb-4">
-            <div>
+          <div className="flex items-end justify-between border-b border-[var(--border-strong)] pb-4">
+            <div className="min-w-0">
               <p className="editorial-kicker">Access / BetTracker</p>
-              <h2 className="mt-3 font-display text-[clamp(2.7rem,6vw,5rem)] font-black uppercase leading-[0.83] tracking-[-0.07em]">
+              <h2 className="mt-3 font-display text-[clamp(2.7rem,4.8vw,4rem)] font-black uppercase leading-[0.83] tracking-[-0.07em]">
                 Founder<br />workspace
               </h2>
             </div>
-            <span className="mb-1 h-4 w-4 bg-[#e8ff00] ring-1 ring-black" aria-hidden />
+            <span className="mb-1 h-3 w-3 rounded-control bg-[var(--signal)]" aria-hidden />
           </div>
 
-          <div className="mt-8 grid grid-cols-3 border border-black">
+          <div className="mt-8 grid grid-cols-3 overflow-hidden rounded-[var(--radius-control)] border border-[var(--border-strong)]">
             {MODES.map(item => (
               <button
                 key={item.value}
                 type="button"
                 onClick={() => selectMode(item.value)}
                 aria-pressed={mode === item.value}
-                className={`min-h-12 border-r border-black px-2 font-mono text-[9px] font-black uppercase tracking-[0.08em] transition-colors last:border-r-0 ${
-                  mode === item.value ? 'editorial-dark bg-[#050505] text-white' : 'bg-white text-black hover:bg-[#e8ff00]'
+                className={`min-h-12 border-r border-[var(--border-strong)] px-2 font-mono text-[10px] font-black uppercase tracking-[0.06em] transition-colors last:border-r-0 ${
+                  mode === item.value
+                    ? 'bg-[var(--signal)] text-[var(--on-signal)]'
+                    : 'bg-[var(--field)] text-[var(--text-muted)] hover:bg-[var(--field-raised)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 {item.label}
@@ -129,11 +132,11 @@ export default function LoginPage() {
           </div>
 
           {magicSent ? (
-            <div className="mt-8 border border-black bg-white p-6">
-              <p className="font-mono text-[9px] font-black uppercase tracking-[0.18em] text-green-700">01 / Sent</p>
+            <BroadcastPanel className="mt-8 border-bn-success p-6">
+              <BroadcastStatus status="success">Sent</BroadcastStatus>
               <p className="mt-5 font-display text-3xl font-black uppercase tracking-[-0.05em]">Check your inbox</p>
-              <p className="mt-3 text-sm text-black/55">The secure login link is waiting in your email.</p>
-            </div>
+              <p className="mt-3 text-sm text-[var(--text-muted)]">The secure login link is waiting in your email.</p>
+            </BroadcastPanel>
           ) : (
             <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
               <div>
@@ -167,31 +170,27 @@ export default function LoginPage() {
               )}
 
               {mode === 'register' && (
-                <p className="border-l-4 border-[#e8ff00] bg-white px-4 py-3 text-xs leading-5 text-black/60">
+                <p className="rounded-[var(--radius-control)] border-l-4 border-[var(--signal)] bg-[var(--field-raised)] px-4 py-3 text-xs leading-5 text-[var(--text-muted)]">
                   Beta access is invite-only. We will email a secure link so you can set your password.
                 </p>
               )}
 
               {error && (
-                <div role="alert" className="border border-red-700 bg-white px-4 py-3 text-xs font-semibold text-red-700">
-                  {error}
-                </div>
+                <BroadcastStatus className="w-full" role="alert" status="negative">{error}</BroadcastStatus>
               )}
 
               {successMsg && (
-                <div role="status" className="border border-green-700 bg-white px-4 py-3 text-xs font-semibold text-green-700">
-                  {successMsg}
-                </div>
+                <BroadcastStatus className="w-full" role="status" status="success">{successMsg}</BroadcastStatus>
               )}
 
-              <button type="submit" className="btn-primary mt-2 w-full min-h-14" disabled={loading}>
+              <BroadcastButton type="submit" className="mt-2 min-h-14 w-full" disabled={loading}>
                 {submitLabel}
                 <span aria-hidden>↗</span>
-              </button>
+              </BroadcastButton>
             </form>
           )}
 
-          <p className="mt-8 border-t border-black pt-4 font-mono text-[8px] font-bold uppercase tracking-[0.14em] text-black/45">
+          <p className="mt-8 border-t border-[var(--border-strong)] pt-4 font-mono text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--text-quiet)]">
             Secure account access / No public betting execution
           </p>
         </div>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">BetTracker signal mark</title>
+  <desc id="desc">Three concentric lime signal rings on the Broadcast Noir night field.</desc>
+  <rect width="512" height="512" fill="#070A08"/>
+  <circle cx="256" cy="256" r="132" fill="none" stroke="#BFFF3B" stroke-width="36"/>
+  <circle cx="256" cy="256" r="66" fill="none" stroke="#BFFF3B" stroke-width="22"/>
+  <circle cx="256" cy="256" r="17" fill="#BFFF3B"/>
+</svg>

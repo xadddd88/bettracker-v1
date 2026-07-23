@@ -1,13 +1,13 @@
 import type { BetStatus } from '@/bets/models';
-import { colors } from '@/ui/theme';
+import type { BroadcastStatusTone } from '@/ui/broadcast-noir-primitives';
 
-export const STATUS_PRESENTATION: Record<BetStatus, { color: string; label: string }> = {
-  cashed_out: { color: '#c084fc', label: 'Cashed out' },
-  lost: { color: colors.danger, label: 'Lost' },
-  partial: { color: colors.secondaryText, label: 'Partial' },
-  pending: { color: colors.warning, label: 'Pending' },
-  push: { color: '#60a5fa', label: 'Push' },
-  unknown: { color: colors.muted, label: 'Unknown' },
-  void: { color: colors.muted, label: 'Void' },
-  won: { color: colors.success, label: 'Won' },
+export const STATUS_PRESENTATION: Record<BetStatus, { label: string; tone: BroadcastStatusTone }> = {
+  cashed_out: { label: 'Cashed out', tone: 'neutral' },
+  lost: { label: 'Lost', tone: 'negative' },
+  partial: { label: 'Partial', tone: 'review' },
+  pending: { label: 'Pending', tone: 'review' },
+  push: { label: 'Push', tone: 'neutral' },
+  unknown: { label: 'Unknown', tone: 'neutral' },
+  void: { label: 'Void', tone: 'neutral' },
+  won: { label: 'Won', tone: 'success' },
 };

@@ -10,7 +10,7 @@ function sourceFiles(directory: string): string[] {
   });
 }
 
-test('Mobile client contains no financial writes, privileged secrets or unapproved Next APIs', () => {
+test('Mobile client has one approved tracked-bet route seam and no direct financial writes or privileged secrets', () => {
   const paths = sourceFiles(join(process.cwd(), 'src'));
   const sources = paths.map((path) => ({ path, source: readFileSync(path, 'utf8') }));
   const source = sources.map(({ source: contents }) => contents).join('\n');
@@ -23,7 +23,6 @@ test('Mobile client contains no financial writes, privileged secrets or unapprov
     /service[_-]?role/i,
     /SUPABASE_SERVICE/i,
     /ANTHROPIC_API_KEY/,
-    /\/api\/bets/,
   ]) {
     assert.doesNotMatch(source, forbidden);
   }
@@ -48,6 +47,20 @@ test('Mobile client contains no financial writes, privileged secrets or unapprov
     1,
     'the approved scanner route must appear exactly once',
   );
+
+  const trackedBetCallers = sources.filter(({ source: contents }) => /\/api\/bets\/tracked/.test(contents));
+  assert.deepEqual(
+    trackedBetCallers.map(({ path }) => path),
+    [join(process.cwd(), 'src/bets/save.ts')],
+    'only the audited tracked-bet client may name the financial API route',
+  );
+  assert.equal(
+    trackedBetCallers[0].source.match(/\/api\/bets\/tracked/g)?.length,
+    1,
+    'the approved tracked-bet route must appear exactly once',
+  );
+  assert.match(trackedBetCallers[0].source, /authenticatedJsonRequest<SavedBetResponse>/);
+  assert.match(trackedBetCallers[0].source, /idempotency_key: idempotencyKey/);
 });
 
 test('read model uses explicit columns and orders nested legs', () => {

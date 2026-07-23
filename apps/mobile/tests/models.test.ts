@@ -98,19 +98,23 @@ test('formats supported and fallback currencies', () => {
   assert.equal(currencySymbol('JPY'), 'JPY ');
 });
 
-test('financial summary never invents a zero payout', () => {
+test('financial summary shows P&L only for supported settlement statuses', () => {
   assert.deepEqual(
-    betFinancialSummary({ pnl: null, potentialPayout: null }, 'USD'),
-    { label: 'Payout', value: '—' },
+    betFinancialSummary({ pnl: null, status: 'won' }, 'USD'),
+    { label: 'P&L', value: '—' },
   );
   assert.deepEqual(
-    betFinancialSummary({ pnl: null, potentialPayout: 25 }, 'EUR'),
-    { label: 'Payout', value: '€25.00' },
-  );
-  assert.deepEqual(
-    betFinancialSummary({ pnl: -4, potentialPayout: 25 }, 'USD'),
+    betFinancialSummary({ pnl: -4, status: 'lost' }, 'USD'),
     { label: 'P&L', value: '-$4.00' },
   );
+
+  for (const status of ['pending', 'push', 'cashed_out', 'partial', 'unknown'] as const) {
+    assert.deepEqual(
+      betFinancialSummary({ pnl: 999, status }, 'EUR'),
+      { label: 'P&L', value: '—' },
+      `${status} must not expose stored P&L`,
+    );
+  }
 });
 
 test('auth and read errors are sanitized', () => {

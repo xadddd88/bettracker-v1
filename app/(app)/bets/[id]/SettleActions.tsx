@@ -6,29 +6,18 @@ import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
 import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
 import { isSupportedSettlementStatus } from '@/lib/bets/settlement-metrics'
-
-// Canonical resolver keys (Decision #058): explicit color for every status,
-// including 'partial' and 'unknown' — no raw text, no misleading fallback.
-const STATUS_TEXT: Record<BetStatusKey, string> = {
-  won:        'text-green-400',
-  lost:       'text-red-400',
-  pending:    'text-yellow-400',
-  void:       'text-gray-400',
-  push:       'text-blue-400',
-  cashed_out: 'text-purple-400',
-  partial:    'text-slate-300',
-  unknown:    'text-slate-500',
-}
+import { BroadcastButton, BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
+import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
 
 interface Props {
   betId: string
   status: string
   pnl?: number | null
   settledAt?: string
-  sym: string
+  currency: string
 }
 
-export default function SettleActions({ betId, status, pnl, settledAt, sym }: Props) {
+export default function SettleActions({ betId, status, pnl, settledAt, currency }: Props) {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError]     = useState('')
@@ -37,18 +26,18 @@ export default function SettleActions({ betId, status, pnl, settledAt, sym }: Pr
   if (status !== 'pending') {
     const resolved = resolveBetStatus(status)
     return (
-      <div className="card">
-        <div className="stat-label mb-2">Settlement</div>
-        <div className="flex items-center gap-4 flex-wrap">
-          <span className={`font-semibold ${STATUS_TEXT[resolved.key]}`}>{resolved.label}</span>
+      <BroadcastPanel className="p-5 sm:p-7">
+        <div className="editorial-kicker mb-3">Settlement</div>
+        <div className="flex flex-wrap items-center gap-4">
+          <BroadcastStatus status={statusTone(resolved.key)}>{resolved.label}</BroadcastStatus>
           {/* Settlement P&L is only defined for won/lost/void (Decision #058) */}
           {isSupportedSettlementStatus(status) && pnl != null && (
-            <span className={`text-sm font-bold ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {pnl >= 0 ? '+' : ''}{sym}{pnl.toFixed(2)}
+            <span className="bn-data-value text-sm font-black">
+              {formatMoney(pnl, currency, true)}
             </span>
           )}
           {settledAt && (
-            <span className="text-xs text-gray-600">
+            <span className="text-xs text-bn-muted">
               {new Date(settledAt).toLocaleDateString('en-GB', {
                 day: '2-digit', month: 'short', year: 'numeric',
                 hour: '2-digit', minute: '2-digit',
@@ -56,7 +45,7 @@ export default function SettleActions({ betId, status, pnl, settledAt, sym }: Pr
             </span>
           )}
         </div>
-      </div>
+      </BroadcastPanel>
     )
   }
 
@@ -120,44 +109,66 @@ export default function SettleActions({ betId, status, pnl, settledAt, sym }: Pr
   }
 
   return (
-    <div className="card">
-      <div className="stat-label mb-3">Settle bet</div>
-      <div className="flex gap-3">
-        <button
-          className="btn-primary flex-1"
+    <BroadcastPanel className="p-5 sm:p-7">
+      <div className="editorial-kicker mb-3">Settle bet</div>
+      <p className="mb-4 text-sm leading-6 text-bn-muted">Choose the recorded outcome. The existing settlement contract remains the financial authority.</p>
+      <div className="grid gap-2 min-[420px]:grid-cols-3">
+        <BroadcastButton
+          className="w-full"
           disabled={loading !== null}
           onClick={() => settle('won')}
         >
           {loading === 'won' ? '…' : 'Won'}
-        </button>
-        <button
-          className="btn-ghost flex-1"
+        </BroadcastButton>
+        <BroadcastButton
+          className="w-full"
           disabled={loading !== null}
           onClick={() => settle('lost')}
+          tone="secondary"
         >
           {loading === 'lost' ? '…' : 'Lost'}
-        </button>
-        <button
-          className="btn-ghost flex-1"
+        </BroadcastButton>
+        <BroadcastButton
+          className="w-full"
           disabled={loading !== null}
           onClick={() => settle('void')}
+          tone="secondary"
         >
           {loading === 'void' ? '…' : 'Void'}
-        </button>
+        </BroadcastButton>
       </div>
-      <div className="mt-4 border-t border-gray-800 pt-4">
-        <button
-          className="min-h-11 w-full border border-red-900 bg-red-950/40 px-4 py-2 text-sm font-medium text-red-300 transition-colors hover:bg-red-950 disabled:opacity-40"
+      <div className="mt-5 border-t border-bn-border-strong pt-5">
+        <BroadcastButton
+          className="w-full"
           disabled={loading !== null}
           onClick={cancelBet}
+          tone="destructive"
         >
           {loading === 'delete' ? 'Deleting…' : 'Delete bet and return stake'}
-        </button>
-        <p className="mt-2 text-[11px] text-gray-600">
+        </BroadcastButton>
+        <p className="mt-2 text-[11px] leading-5 text-bn-muted">
           Available only while pending. The financial audit record is retained.
         </p>
       </div>
-      {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
-    </div>
+      {error && <p aria-live="polite" className="mt-3 text-xs font-semibold text-bn-negative">{error}</p>}
+    </BroadcastPanel>
   )
+}
+
+function statusTone(status: BetStatusKey): BroadcastNoirStatus {
+  if (status === 'won') return 'success'
+  if (status === 'lost') return 'negative'
+  if (status === 'pending' || status === 'partial') return 'review'
+  return 'neutral'
+}
+
+function formatMoney(value: number, currency: string, showPositive = false) {
+  const formatted = new Intl.NumberFormat('en', {
+    currency,
+    currencyDisplay: 'narrowSymbol',
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+    style: 'currency',
+  }).format(value)
+  return showPositive && value > 0 ? `+${formatted}` : formatted
 }

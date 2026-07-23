@@ -25,6 +25,7 @@ export type TrackerDraft = {
   bookmaker: string;
   legs: TrackerLegDraft[];
   notes: string;
+  source: 'manual' | 'scanner';
   stake: string;
   totalOdds: string;
 };
@@ -39,7 +40,7 @@ export type TrackerDraftPayload = {
     sport: TrackerSport;
   }[];
   notes: string | null;
-  source: 'manual';
+  source: 'manual' | 'scanner';
   stake: number;
   total_odds: number | null;
 };
@@ -61,6 +62,17 @@ export function emptyTrackerLeg(id: string, sport: TrackerSport = 'soccer'): Tra
     odds: '',
     selection: '',
     sport,
+  };
+}
+
+export function emptyTrackerDraft(): TrackerDraft {
+  return {
+    bookmaker: '',
+    legs: [emptyTrackerLeg('leg-1')],
+    notes: '',
+    source: 'manual',
+    stake: '',
+    totalOdds: '',
   };
 }
 
@@ -167,7 +179,7 @@ export function validateTrackerDraft(draft: TrackerDraft): DraftValidation {
       bookmaker: draft.bookmaker.trim() || null,
       legs: mappedLegs,
       notes: draft.notes.trim() || null,
-      source: 'manual',
+      source: draft.source,
       stake,
       total_odds: totalOdds,
     },

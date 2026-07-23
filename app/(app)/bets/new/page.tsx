@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { BroadcastDataValue, BroadcastStatus } from '@/components/ui/BroadcastNoir'
 import {
   TRACKED_BET_SPORTS,
   MAX_TRACKED_BET_LEGS,
@@ -344,56 +345,59 @@ export default function NewBetPage() {
     Number.isFinite(stakeNum) && stakeNum > 0 && Number.isFinite(effectiveTotal) && effectiveTotal > 1
 
   return (
-    <div className="max-w-xl" onPaste={handlePaste}>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Add Bet</h1>
-        <p className="text-sm text-gray-500 mt-1">Paste a screenshot or fill in manually</p>
-      </div>
+    <main className="bn-page mx-auto w-full max-w-3xl space-y-4 pb-8" onPaste={handlePaste}>
+      <header className="bn-panel p-5 sm:p-7">
+        <p className="editorial-kicker">Tracker · editable draft</p>
+        <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,5.5rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Add bet</h1>
+        <p className="mt-4 max-w-xl text-sm leading-6 text-bn-muted">
+          Paste a screenshot or enter the coupon manually. Nothing is saved until you press Save.
+        </p>
+      </header>
 
-      {/* ── Scanner zone (locked while busy) ──────────────── */}
-      <div
+      <label
         aria-busy={busy}
-        className={`mb-4 border-2 border-dashed rounded-xl px-4 py-5 text-center transition-colors ${
+        aria-disabled={busy}
+        className={`bn-panel block border-2 border-dashed px-5 py-7 text-center transition-colors ${
           scanning
-            ? 'border-indigo-500 bg-indigo-950/30'
+            ? 'border-bn-signal bg-bn-raised'
             : busy
-              ? 'border-gray-800 opacity-60 cursor-not-allowed'
-              : 'border-gray-700 hover:border-indigo-600 hover:bg-gray-800/40 cursor-pointer'
+              ? 'cursor-not-allowed border-bn-border-subtle opacity-60'
+              : 'cursor-pointer hover:border-bn-signal hover:bg-bn-raised'
         }`}
-        onClick={() => !busy && fileRef.current?.click()}
+        htmlFor="coupon-image"
       >
         <input
           ref={fileRef}
+          id="coupon-image"
           type="file"
           accept="image/*"
-          className="hidden"
+          className="sr-only"
           disabled={busy}
           onChange={handleFileChange}
         />
         {scanning ? (
-          <div className="flex items-center justify-center gap-2 text-indigo-400 text-sm">
-            <span className="animate-spin">⏳</span> {scanMsg}
+          <div className="flex items-center justify-center gap-2 text-sm font-semibold text-bn-signal">
+            <span aria-hidden="true">•</span> {scanMsg}
           </div>
         ) : scanMsg ? (
-          <div className="text-sm text-gray-300">{scanMsg}</div>
+          <div aria-live="polite" className="text-sm text-bn-text">{scanMsg}</div>
         ) : (
           <div>
-            <div className="flex justify-center mb-1 text-gray-500 text-sm uppercase tracking-widest font-mono">SCAN</div>
-            <p className="text-sm text-gray-400 font-medium">Paste screenshot (Ctrl+V) or click to upload</p>
-            <p className="text-xs text-gray-600 mt-0.5">Single and express coupons are supported</p>
+            <div className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-quiet">Capture coupon</div>
+            <p className="mt-2 text-sm font-semibold text-bn-text">Paste screenshot (Ctrl+V) or choose an image</p>
+            <p className="mt-1 text-xs text-bn-muted">Single and Express coupons are supported</p>
           </div>
         )}
-      </div>
+      </label>
 
-      {/* ── Bet type indicator + source ───────────────────── */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="flex gap-1 bg-gray-800 rounded-lg p-1 w-fit" role="group" aria-label="Bet type">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full gap-1 rounded-control border border-bn-border-strong bg-bn-field p-1 min-[420px]:w-fit" role="group" aria-label="Bet type">
           <button
             type="button"
             aria-pressed={!isExpress}
             disabled={busy}
             onClick={() => selectBetMode('single')}
-            className={`min-h-11 px-4 py-1.5 text-sm rounded-md font-medium disabled:opacity-50 ${!isExpress ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}
+            className={`min-h-11 flex-1 rounded-control px-4 text-sm font-black disabled:opacity-50 min-[420px]:flex-none ${!isExpress ? 'bg-bn-signal text-bn-on-signal' : 'text-bn-muted'}`}
           >
             Single
           </button>
@@ -402,19 +406,15 @@ export default function NewBetPage() {
             aria-pressed={isExpress}
             disabled={busy}
             onClick={() => selectBetMode('express')}
-            className={`min-h-11 px-4 py-1.5 text-sm rounded-md font-medium disabled:opacity-50 ${isExpress ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}
+            className={`min-h-11 flex-1 rounded-control px-4 text-sm font-black disabled:opacity-50 min-[420px]:flex-none ${isExpress ? 'bg-bn-signal text-bn-on-signal' : 'text-bn-muted'}`}
           >
-            Express{isExpress ? ` · ${legs.length} legs` : ''}
+            Express{isExpress ? ` · ${legs.length}` : ''}
           </button>
         </div>
-        {source === 'scanner' && (
-          <span className="text-xs text-indigo-300 bg-indigo-950/50 border border-indigo-900 rounded-full px-2.5 py-1">
-            from scanner
-          </span>
-        )}
+        {source === 'scanner' ? <BroadcastStatus status="review">Scanner draft · review required</BroadcastStatus> : null}
       </div>
 
-      <form onSubmit={handleSubmit} className="card flex flex-col gap-4" aria-busy={busy}>
+      <form onSubmit={handleSubmit} className="bn-panel flex flex-col gap-4 p-4 sm:p-6" aria-busy={busy}>
         {/* Decision #061 Phase A1: ONE native disabled boundary. While
             a scan or a financial submit is running, every input, select,
             textarea and button inside — leg fields, Add leg, Remove leg,
@@ -424,54 +424,57 @@ export default function NewBetPage() {
         <fieldset disabled={busy} className="contents">
         {/* ── Legs (order preserved) ──────────────────────── */}
         {legs.map((leg, index) => (
-          <div key={index} className="border border-gray-800 rounded-xl p-3 sm:p-4 flex flex-col gap-3">
+          <section key={index} aria-label={isExpress ? `Leg ${index + 1}` : 'Single bet'} className="flex flex-col gap-3 rounded-control border border-bn-border-strong bg-bn-night p-3 sm:p-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <span className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-muted">
                 {isExpress ? `Leg ${index + 1}` : 'Bet'}
               </span>
               {legs.length > 1 && (
                 <button
                   type="button"
-                  className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 disabled:opacity-50"
+                  className="bn-button bn-button-destructive px-3"
                   onClick={() => removeLeg(index)}
                   aria-label={`Remove leg ${index + 1}`}
                   disabled={busy}
                 >
-                  ✕ Remove
+                  Remove
                 </button>
               )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
-                <label className="label">Event *</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-event`}>Event *</label>
                 <input
-                  className={`input w-full ${errors[`legs.${index}.event_name`] ? 'border-red-600' : ''}`}
+                  id={`tracker-leg-${index}-event`}
+                  className={`input w-full ${errors[`legs.${index}.event_name`] ? '!border-bn-negative' : ''}`}
                   placeholder="Germany vs Netherlands"
                   value={leg.event_name}
                   onChange={e => updateLeg(index, 'event_name', e.target.value)}
                 />
                 {errors[`legs.${index}.event_name`] && (
-                  <p className="text-xs text-red-400 mt-1">{errors[`legs.${index}.event_name`]}</p>
+                  <p className="mt-1 text-xs text-bn-negative">{errors[`legs.${index}.event_name`]}</p>
                 )}
               </div>
 
               <div>
-                <label className="label">Market *</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-market`}>Market *</label>
                 <input
-                  className={`input w-full ${errors[`legs.${index}.market_type`] ? 'border-red-600' : ''}`}
+                  id={`tracker-leg-${index}-market`}
+                  className={`input w-full ${errors[`legs.${index}.market_type`] ? '!border-bn-negative' : ''}`}
                   placeholder="П1 / т2.5 / Ф1 +1"
                   value={leg.market_type}
                   onChange={e => updateLeg(index, 'market_type', e.target.value)}
                 />
                 {errors[`legs.${index}.market_type`] && (
-                  <p className="text-xs text-red-400 mt-1">{errors[`legs.${index}.market_type`]}</p>
+                  <p className="mt-1 text-xs text-bn-negative">{errors[`legs.${index}.market_type`]}</p>
                 )}
               </div>
 
               <div>
-                <label className="label">Selection</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-selection`}>Selection</label>
                 <input
+                  id={`tracker-leg-${index}-selection`}
                   className="input w-full"
                   placeholder="Germany"
                   value={leg.selection}
@@ -480,21 +483,23 @@ export default function NewBetPage() {
               </div>
 
               <div>
-                <label className="label">Odds *</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-odds`}>Odds *</label>
                 <input
-                  className={`input w-full ${errors[`legs.${index}.odds`] ? 'border-red-600' : ''}`}
+                  id={`tracker-leg-${index}-odds`}
+                  className={`input w-full ${errors[`legs.${index}.odds`] ? '!border-bn-negative' : ''}`}
                   type="number" step="0.0001" min="1.01" inputMode="decimal" placeholder="1.85"
                   value={leg.odds}
                   onChange={e => updateLeg(index, 'odds', e.target.value)}
                 />
                 {errors[`legs.${index}.odds`] && (
-                  <p className="text-xs text-red-400 mt-1">{errors[`legs.${index}.odds`]}</p>
+                  <p className="mt-1 text-xs text-bn-negative">{errors[`legs.${index}.odds`]}</p>
                 )}
               </div>
 
               <div>
-                <label className="label">Sport</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-sport`}>Sport</label>
                 <select
+                  id={`tracker-leg-${index}-sport`}
                   className="input w-full"
                   value={leg.sport}
                   onChange={e => updateLeg(index, 'sport', e.target.value)}
@@ -505,10 +510,10 @@ export default function NewBetPage() {
                 </select>
               </div>
             </div>
-          </div>
+          </section>
         ))}
 
-        {errors.legs && <p className="text-xs text-red-400">{errors.legs}</p>}
+        {errors.legs && <p className="text-xs text-bn-negative">{errors.legs}</p>}
 
         <button
           type="button"
@@ -522,38 +527,41 @@ export default function NewBetPage() {
         {/* ── Express total odds (UI preview never submits) ── */}
         {isExpress && (
           <div>
-            <label className="label">Total odds (express) *</label>
+            <label className="label" htmlFor="tracker-total-odds">Total odds (express) *</label>
             <input
-              className={`input w-full ${errors.total_odds ? 'border-red-600' : ''}`}
+              id="tracker-total-odds"
+              className={`input w-full ${errors.total_odds ? '!border-bn-negative' : ''}`}
               type="number" step="0.0001" min="1.01" inputMode="decimal" placeholder="7.25"
               value={totalOdds}
               onChange={e => { setTotalOdds(e.target.value); markManualEdit('total_odds') }}
             />
             {previewTotal != null && (
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="mt-1 text-xs leading-5 text-bn-muted">
                 Calculated from legs: {previewTotal} (preview only — the saved value is what you enter here)
               </p>
             )}
-            {errors.total_odds && <p className="text-xs text-red-400 mt-1">{errors.total_odds}</p>}
+            {errors.total_odds && <p className="mt-1 text-xs text-bn-negative">{errors.total_odds}</p>}
           </div>
         )}
 
         {/* ── Money + meta ───────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="label">Stake *</label>
+            <label className="label" htmlFor="tracker-stake">Stake *</label>
             <input
-              className={`input w-full ${errors.stake ? 'border-red-600' : ''}`}
+              id="tracker-stake"
+              className={`input w-full ${errors.stake ? '!border-bn-negative' : ''}`}
               type="number" step="0.01" min="0.01" inputMode="decimal" placeholder="50"
               value={stake}
               onChange={e => { setStake(e.target.value); markManualEdit('stake') }}
             />
-            {errors.stake && <p className="text-xs text-red-400 mt-1">{errors.stake}</p>}
+            {errors.stake && <p className="mt-1 text-xs text-bn-negative">{errors.stake}</p>}
           </div>
 
           <div>
-            <label className="label">Bookmaker</label>
+            <label className="label" htmlFor="tracker-bookmaker">Bookmaker</label>
             <select
+              id="tracker-bookmaker"
               className="input w-full"
               value={bookmaker}
               onChange={e => { setBookmaker(e.target.value); markManualEdit('bookmaker') }}
@@ -564,8 +572,9 @@ export default function NewBetPage() {
           </div>
 
           <div className="sm:col-span-2">
-            <label className="label">Notes</label>
+            <label className="label" htmlFor="tracker-notes">Notes</label>
             <textarea
+              id="tracker-notes"
               className="input w-full resize-none" rows={2} placeholder="Optional..."
               value={notes}
               onChange={e => { setNotes(e.target.value); markManualEdit('notes') }}
@@ -574,25 +583,25 @@ export default function NewBetPage() {
         </div>
 
         {showPayoutPreview && (
-          <div className="bg-gray-800 rounded-lg px-4 py-3 flex justify-between text-sm">
-            <span className="text-gray-400">Potential payout (preview)</span>
-            <span className="text-white font-semibold">{(stakeNum * effectiveTotal).toFixed(2)}</span>
+          <div className="flex justify-between gap-4 rounded-control border border-bn-border-subtle bg-bn-raised px-4 py-3 text-sm">
+            <span className="text-bn-muted">Potential payout · preview only</span>
+            <BroadcastDataValue className="font-black">{(stakeNum * effectiveTotal).toFixed(2)}</BroadcastDataValue>
           </div>
         )}
 
         {errors._root && (
-          <div className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
-            {errors._root}
+          <div aria-live="polite" className="rounded-control border border-bn-negative px-3 py-3">
+            <BroadcastStatus status="negative">{errors._root}</BroadcastStatus>
           </div>
         )}
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <button type="submit" className="btn-primary w-full sm:flex-1" disabled={busy}>
+          <button type="submit" className="bn-button bn-button-primary w-full sm:flex-1" disabled={busy}>
             {loading ? 'Saving...' : isExpress ? `Save Express (${legs.length} legs)` : 'Save Bet'}
           </button>
           <button
             type="button"
-            className="btn-ghost w-full sm:w-auto"
+            className="bn-button bn-button-secondary w-full sm:w-auto"
             onClick={() => router.back()}
             disabled={busy}
           >
@@ -601,6 +610,6 @@ export default function NewBetPage() {
         </div>
         </fieldset>
       </form>
-    </div>
+    </main>
   )
 }

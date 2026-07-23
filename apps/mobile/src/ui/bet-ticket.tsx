@@ -3,8 +3,9 @@ import Animated, { FadeInDown, LinearTransition, ReduceMotion } from 'react-nati
 
 import { betFinancialSummary, couponPresentation, formatMoney, type BetDto } from '@/bets/models';
 import { STATUS_PRESENTATION } from '@/bets/presentation';
+import { BroadcastStatus } from '@/ui/broadcast-noir-primitives';
 import { MotionPressable } from '@/ui/motion';
-import { colors } from '@/ui/theme';
+import { semanticColors, typography } from '@/ui/theme';
 
 type BetTicketProps = {
   animationDelay?: number;
@@ -14,12 +15,11 @@ type BetTicketProps = {
   onPress: () => void;
 };
 
-export function BetTicket({ animationDelay = 0, bet, compact = false, currency, onPress }: BetTicketProps) {
+export function BetTicket({ animationDelay = 0, bet, currency, onPress }: BetTicketProps) {
   const coupon = couponPresentation(bet);
   const status = STATUS_PRESENTATION[bet.status];
   const financial = betFinancialSummary(bet, currency);
   const totalOdds = bet.totalOdds ?? bet.legs[0]?.odds ?? null;
-  const lead = coupon.legs[0];
 
   return (
     <Animated.View
@@ -29,16 +29,23 @@ export function BetTicket({ animationDelay = 0, bet, compact = false, currency, 
       <MotionPressable accessibilityHint="Opens bet details" accessibilityRole="button" glow="none" onPress={onPress} style={styles.ticket}>
         <View style={styles.metaRow}>
           <Text style={styles.type}>{coupon.isExpress ? `EXPRESS / ${coupon.legs.length}` : 'SINGLE'}</Text>
-          <Text style={[styles.status, { color: status.color }]}>{status.label.toUpperCase()}</Text>
+          <BroadcastStatus label={status.label} status={status.tone} />
         </View>
-        <View style={styles.mainRow}>
-          <View style={styles.mainCopy}>
-            <Text numberOfLines={1} style={styles.event}>{lead?.eventName ?? 'Event not recorded'}</Text>
-            <Text numberOfLines={compact ? 1 : 2} style={styles.selection}>
-              {coupon.isExpress ? coupon.label : lead?.selection ?? lead?.marketType ?? 'Selection not recorded'}
-            </Text>
-          </View>
-          <Text style={styles.odds}>{totalOdds?.toFixed(2) ?? '—'}</Text>
+        <View style={styles.legs}>
+          {coupon.legs.length ? coupon.legs.map((leg, index) => (
+            <View key={leg.id} style={styles.leg}>
+              <Text style={styles.legIndex}>{String(index + 1).padStart(2, '0')}</Text>
+              <View style={styles.mainCopy}>
+                <Text style={styles.event}>{leg.eventName}</Text>
+                <Text style={styles.selection}>
+                  {[leg.marketType, leg.selection].filter(Boolean).join(' · ') || 'Selection not recorded'}
+                </Text>
+              </View>
+              <Text style={styles.legOdds}>{leg.odds === null ? '—' : leg.odds.toFixed(2)}</Text>
+            </View>
+          )) : (
+            <Text style={styles.emptyLeg}>Leg details were not recorded.</Text>
+          )}
         </View>
         <View style={styles.financialRow}>
           <Metric label="STAKE" value={formatMoney(bet.stake, currency)} />
@@ -56,18 +63,20 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  ticket: { borderBottomColor: colors.border, borderBottomWidth: 1, overflow: 'hidden', paddingVertical: 15 },
+  ticket: { borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, overflow: 'hidden', paddingVertical: 16 },
   metaRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
-  type: { color: colors.muted, fontSize: 8, fontWeight: '800', letterSpacing: 1.2 },
-  status: { fontSize: 9, fontWeight: '900', letterSpacing: 0.6 },
-  mainRow: { alignItems: 'flex-end', flexDirection: 'row', gap: 12 },
+  type: { color: semanticColors.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
+  legs: { gap: 12 },
+  leg: { alignItems: 'flex-start', flexDirection: 'row', gap: 9 },
+  legIndex: { color: semanticColors.textQuietRaised, fontSize: 11, fontVariant: ['tabular-nums'], fontWeight: '700', lineHeight: 18, width: 20 },
   mainCopy: { flex: 1, gap: 5, minWidth: 0 },
-  event: { color: colors.muted, fontSize: 10, fontWeight: '600' },
-  selection: { color: colors.text, fontSize: 18, fontWeight: '900', letterSpacing: -0.4, lineHeight: 22 },
-  odds: { color: colors.text, fontSize: 27, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: -1.2 },
+  event: { color: semanticColors.textPrimary, fontSize: typography.metadataPreferred.fontSize, fontWeight: '800', lineHeight: 18 },
+  selection: { color: semanticColors.textMuted, fontSize: typography.metadataCompact.fontSize, lineHeight: 16 },
+  legOdds: { color: semanticColors.dataValue, fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 18 },
+  emptyLeg: { color: semanticColors.textMuted, fontSize: 12, lineHeight: 18 },
   financialRow: { alignItems: 'flex-end', flexDirection: 'row', gap: 17, marginTop: 16 },
   metric: { gap: 3, minWidth: 48 },
-  metricLabel: { color: colors.placeholder, fontSize: 7, fontWeight: '700', letterSpacing: 0.7 },
-  metricValue: { color: colors.secondaryText, fontSize: 10, fontVariant: ['tabular-nums'], fontWeight: '700' },
-  arrow: { color: colors.text, fontSize: 18, marginLeft: 'auto' },
+  metricLabel: { color: semanticColors.textQuietRaised, fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
+  metricValue: { color: semanticColors.dataValue, fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '800' },
+  arrow: { color: semanticColors.textPrimary, fontSize: 18, marginLeft: 'auto' },
 });

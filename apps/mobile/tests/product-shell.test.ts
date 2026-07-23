@@ -24,11 +24,32 @@ test('product shell exposes three focused sections with Tracker as a nested Stac
     assert.match(tabs, new RegExp(`name=["']${route}["'][\\s\\S]*?href:\\s*null`));
   }
   assert.match(tabs, /tabBarHideOnKeyboard:\s*true/);
-  assert.match(tabs, /useSafeAreaInsets\(\)/);
-  assert.match(tabs, /paddingBottom:\s*Math\.max\(insets\.bottom,\s*6\)/);
+  assert.match(tabs, /tabBarActiveBackgroundColor:\s*semanticColors\.signal/);
+  assert.match(tabs, /tabBarActiveTintColor:\s*semanticColors\.onSignal/);
+  assert.match(tabs, /Platform\.OS === 'android' \? 48 : 44/);
+  assert.doesNotMatch(tabs, /useSafeAreaInsets/);
   assert.match(tracker, /import \{ Stack \} from 'expo-router'/);
   assert.match(tracker, /name="\[id\]"/);
   assert.match(tracker, /name="new"/);
+});
+
+test('Broadcast Noir native shell keeps stable identity and opts into predictive Back', () => {
+  const config = JSON.parse(source('app.json')) as {
+    expo: {
+      android: { package: string; predictiveBackGestureEnabled: boolean };
+      ios: { bundleIdentifier: string };
+      name: string;
+      scheme: string;
+      slug: string;
+    };
+  };
+
+  assert.equal(config.expo.name, 'BetTracker');
+  assert.equal(config.expo.android.predictiveBackGestureEnabled, true);
+  assert.equal(config.expo.slug, 'xaddd');
+  assert.equal(config.expo.scheme, 'xaddd');
+  assert.equal(config.expo.ios.bundleIdentifier, 'com.dmitriykhodakivskyi.xaddd');
+  assert.equal(config.expo.android.package, 'com.dmitriykhodakivskyi.xaddd');
 });
 
 test('Phase 1B AI route is preserved without a colliding placeholder', () => {
@@ -36,10 +57,11 @@ test('Phase 1B AI route is preserved without a colliding placeholder', () => {
   assert.equal(existsSync(join(root, 'src/app/(app)/ai.tsx')), false);
 });
 
-test('local tracker editor cannot perform network or financial writes', () => {
+test('mobile tracker editor saves only through the audited authenticated endpoint', () => {
   const editor = source('src/app/(app)/bets/new.tsx');
   const draft = source('src/bets/draft.ts');
-  const combined = `${editor}\n${draft}`;
+  const saveClient = source('src/bets/save.ts');
+  const intent = source('src/bets/submit-intent.ts');
 
   for (const forbidden of [
     /\bfetch\s*\(/,
@@ -47,15 +69,23 @@ test('local tracker editor cannot perform network or financial writes', () => {
     /\bsupabase\b/i,
     /\.rpc\s*\(/,
     /create_tracked_bet/,
-    /idempotency/i,
     /service[_-]?role/i,
     /\/api\//,
   ]) {
-    assert.doesNotMatch(combined, forbidden);
+    assert.doesNotMatch(editor, forbidden);
   }
 
-  assert.match(editor, /Bet is valid\. Secure saving will be enabled in the next phase\./);
+  assert.match(editor, /saveTrackedBet\(reviewedPayload, begin\.key\)/);
   assert.match(editor, /Review bet/);
+  assert.match(editor, /Save bet/);
+  assert.match(editor, /router\.replace\(\{ pathname: '\/\(app\)\/bets\/\[id\]'/);
+  assert.match(saveClient, /authenticatedJsonRequest<SavedBetResponse>/);
+  assert.match(saveClient, /path: '\/api\/bets\/tracked'/);
+  assert.match(saveClient, /operation: 'tracked_bet'/);
+  assert.match(saveClient, /idempotency_key: idempotencyKey/);
+  assert.doesNotMatch(`${draft}\n${intent}\n${saveClient}`, /\.rpc\s*\(|service[_-]?role/i);
+  assert.match(intent, /status: 'in_flight'/);
+  assert.match(intent, /conflict_unchanged/);
 });
 
 test('support routes remain available outside the focused tab bar', () => {
@@ -68,49 +98,61 @@ test('support routes remain available outside the focused tab bar', () => {
   ]) {
     assert.equal(existsSync(join(root, path)), true, `${path} should exist`);
   }
+
+  const more = source('src/app/(app)/more.tsx');
+  assert.match(more, /label=["']Stats["']/);
+  assert.match(more, /router\.push\('\/\(app\)\/stats'\)/);
 });
 
-test('daily Home uses the read model and exposes the editorial workflow', () => {
+test('daily Home uses the read model and exposes trusted Adaptive Action', () => {
   const home = source('src/app/(app)/home.tsx');
   const data = source('src/bets/data.ts');
 
   assert.match(home, /fetchBets\(userId\)/);
   assert.match(home, /fetchBankroll\(userId\)/);
-  assert.match(home, /BETTING[\s\S]*?DECISIONS[\s\S]*?IN FOCUS/);
+  assert.match(home, /ONE USEFUL ACTION/);
+  assert.match(home, /ADAPTIVE ACTION/);
+  assert.match(home, /Review pending bets/);
+  assert.match(home, /Scan coupon/);
   assert.match(home, /RECENT BETS/);
-  assert.doesNotMatch(home, /Founder build|CORE WORKFLOW|LOCAL REVIEW|READY|NEXT|LATER/);
+  assert.doesNotMatch(home, /LIVE DATA|EventPulse|watchlist|Scout for new value/);
+  assert.match(home, /semanticColors\.signal/);
+  assert.match(home, /ReduceMotion\.System/);
   assert.match(data, /select\(['"]balance, currency['"]\)/);
   assert.doesNotMatch(data, /select\s*\(\s*['"`]\s*\*/);
 });
 
-test('editorial motion system is shared by daily mobile surfaces', () => {
-  const backdrop = source('src/ui/time-warp.tsx');
+test('legacy editorial motion is removed from the complete Broadcast Noir mobile shell', () => {
   const motion = source('src/ui/motion.tsx');
   const ticket = source('src/ui/bet-ticket.tsx');
   const tabs = source('src/app/(app)/_layout.tsx');
   const trackerStack = source('src/app/(app)/bets/_layout.tsx');
 
-  assert.match(backdrop, /EditorialBackdrop/);
-  assert.match(backdrop, /KineticType/);
-  assert.match(backdrop, /EditorialRule/);
-  assert.match(backdrop, /#E8FF00/);
-  assert.match(backdrop, /withRepeat/);
-  assert.match(backdrop, /useReducedMotion/);
-  assert.match(backdrop, /cancelAnimation/);
+  assert.equal(existsSync(join(root, 'src/ui/time-warp.tsx')), false);
   assert.match(motion, /withSpring/);
   assert.match(motion, /useReducedMotion/);
   assert.match(tabs, /animation:\s*['"]shift['"]/);
   assert.match(trackerStack, /animation:\s*['"]slide_from_right['"]/);
   assert.match(ticket, /EXPRESS/);
   assert.match(ticket, /totalOdds\?\.toFixed\(2\)/);
+  assert.doesNotMatch(source('src/app/(app)/home.tsx'), /(?:EditorialBackdrop|TimeWarpBackdrop|KineticType)/);
+  assert.doesNotMatch(source('src/app/(app)/ai/index.tsx'), /(?:EditorialBackdrop|TimeWarpBackdrop|KineticType)/);
 
   for (const path of [
-    'src/app/(app)/home.tsx',
-    'src/app/(app)/ai/index.tsx',
+    'src/app/(app)/more.tsx',
+    'src/app/(app)/stats.tsx',
+    'src/app/sign-in.tsx',
+    'src/ui/product-shell.tsx',
+  ]) {
+    assert.doesNotMatch(source(path), /(?:EditorialBackdrop|TimeWarpBackdrop|KineticType|WarpRail|\bcolors\.)/);
+  }
+
+  for (const path of [
     'src/app/(app)/bets/index.tsx',
     'src/app/(app)/bets/new.tsx',
     'src/app/(app)/bets/[id].tsx',
   ]) {
-    assert.match(source(path), /(?:EditorialBackdrop|TimeWarpBackdrop)/);
+    assert.doesNotMatch(source(path), /(?:EditorialBackdrop|TimeWarpBackdrop|KineticType|WarpRail)/);
+    assert.match(source(path), /Broadcast(?:Button|Panel|Status)/);
   }
 });

@@ -1,10 +1,11 @@
 import { Image } from 'expo-image';
 import { useNetworkState } from 'expo-network';
+import { useRouter } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, ReduceMotion } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { runWithCaptureLock } from '@/ai/capture-lock';
 import { PreparedImageCacheLifecycle } from '@/ai/image-cache-lifecycle';
@@ -13,9 +14,10 @@ import { captureFromCamera, captureFromLibrary, type CaptureOutcome, type Captur
 import { analysisBodyByteLength, MAX_ANALYZE_JSON_BYTES, type CaptureMode } from '@/ai/image-policy';
 import { scanPreparedCoupon } from '@/ai/scanner-client';
 import type { ScannerAnalysis } from '@/ai/scanner-model';
+import { setScannerDraftHandoff } from '@/bets/scanner-draft-handoff';
+import { BroadcastStatus } from '@/ui/broadcast-noir-primitives';
 import { MotionPressable } from '@/ui/motion';
-import { colors } from '@/ui/theme';
-import { EditorialBackdrop, EditorialRule, KineticType } from '@/ui/time-warp';
+import { geometry, semanticColors, typography } from '@/ui/theme';
 
 const MESSAGES = {
   cameraDenied: 'Camera access is off. Allow it in device settings to take a photo.',
@@ -32,11 +34,13 @@ const MODE_OPTIONS: readonly { label: string; value: CaptureMode }[] = [
   { label: 'Event', value: 'event' },
 ];
 const CONTENT_PADDING_TOP = 10;
+const touchMinimum = Platform.OS === 'android' ? geometry.androidTouchMinimum : geometry.iosTouchMinimum;
 
 type Feedback = { canOpenSettings?: boolean; message: string; tone: 'error' | 'info' | 'success' };
 type ActionButtonProps = { disabled?: boolean; icon: SymbolViewProps['name']; label: string; onPress: () => void; tone?: 'danger' | 'primary' | 'secondary' };
 
 export default function AiCaptureScreen() {
+  const router = useRouter();
   const networkState = useNetworkState();
   const safeAreaInsets = useSafeAreaInsets();
   const operationLockRef = useRef(false);
@@ -158,19 +162,24 @@ export default function AiCaptureScreen() {
     catch { setFeedback({ message: 'Settings could not be opened. Open device settings manually.', tone: 'error' }); }
   }
 
+  function continueToTracker() {
+    if (!analysis || busy) return;
+    setScannerDraftHandoff(analysis);
+    router.push('/(app)/bets/new');
+  }
+
   return (
     <ScrollView contentContainerStyle={[styles.content, androidTopInset]} contentInsetAdjustmentBehavior="automatic" style={styles.screen}>
       <Animated.View entering={FadeInDown.duration(380).reduceMotion(ReduceMotion.System)} style={styles.masthead}>
-        <Text style={styles.wordmark}>XADDD</Text><Text style={styles.mastheadMeta}>AI CAPTURE / 02</Text>
+        <Text style={styles.wordmark}>BETTRACKER</Text><Text style={styles.mastheadMeta}>AI CAPTURE / 02</Text>
       </Animated.View>
 
-      <Animated.View entering={FadeIn.duration(420).reduceMotion(ReduceMotion.System)} style={styles.hero}>
-        <EditorialBackdrop dark />
-        <KineticType label="SCAN" reverse />
-        <View style={styles.heroTopline}><Text style={styles.heroMeta}>LOCAL PREPARATION</Text><Text style={styles.heroMeta}>{offline ? 'OFFLINE' : 'READY'}</Text></View>
+      <Animated.View entering={FadeIn.duration(280).reduceMotion(ReduceMotion.System)} style={styles.hero}>
+        <View style={styles.signalRail} />
+        <View style={styles.heroTopline}><Text style={styles.heroMeta}>LOCAL PREPARATION</Text><Text style={styles.heroMeta}>NO AUTO-SAVE</Text></View>
         <View style={styles.heroCopy}>
-          <Text style={styles.title}>SCAN{`\n`}SCREENSHOT</Text>
-          <Text style={styles.subtitle}>Scan screenshot. Prepare evidence for a coupon or an event before analysis.</Text>
+          <Text style={styles.title}>CAPTURE.{`\n`}EXTRACT.{`\n`}REVIEW.</Text>
+          <Text style={styles.subtitle}>Add a screenshot, verify every extracted field, then choose whether to continue.</Text>
         </View>
       </Animated.View>
 
@@ -192,7 +201,7 @@ export default function AiCaptureScreen() {
 
       {offline ? <View accessibilityLiveRegion="polite" style={styles.offlineNotice}><Text style={styles.offlineLabel}>NO CONNECTION</Text><Text style={styles.offlineText}>{MESSAGES.offline}</Text></View> : null}
 
-      <Animated.View entering={FadeInDown.delay(80).duration(420).reduceMotion(ReduceMotion.System)} style={styles.captureTool}>
+      <Animated.View entering={FadeInDown.delay(60).duration(280).reduceMotion(ReduceMotion.System)} style={styles.captureTool}>
         {prepared ? (
           <>
             <View style={styles.previewFrame}>
@@ -223,7 +232,7 @@ export default function AiCaptureScreen() {
         )}
       </Animated.View>
 
-      {busy ? <View accessibilityLabel={operation === 'analyze' ? 'Analyzing coupon' : 'Preparing image'} style={styles.processing}><ActivityIndicator color={colors.text} /><Text style={styles.processingText}>{operation === 'analyze' ? 'ANALYZING COUPON' : 'PREPARING JPEG'}</Text></View> : null}
+      {busy ? <View accessibilityLabel={operation === 'analyze' ? 'Analyzing coupon' : 'Preparing image'} style={styles.processing}><OperationSweep /><ActivityIndicator color={semanticColors.textPrimary} /><Text style={styles.processingText}>{operation === 'analyze' ? 'ANALYZING COUPON' : 'PREPARING JPEG'}</Text></View> : null}
       {feedback ? (
         <View accessibilityLiveRegion="polite" role={feedback.tone === 'error' ? 'alert' : undefined} style={[styles.feedback, feedback.tone === 'error' && styles.feedbackError, feedback.tone === 'success' && styles.feedbackSuccess]}>
           <Text style={styles.feedbackLabel}>{feedback.tone.toUpperCase()}</Text>
@@ -231,8 +240,18 @@ export default function AiCaptureScreen() {
           {feedback.canOpenSettings ? <ActionButton icon={{ android: 'settings', ios: 'gearshape', web: 'settings' }} label="Open settings" onPress={() => void openSettings()} /> : null}
         </View>
       ) : null}
-      {analysis ? <AnalysisResultPanel analysis={analysis} /> : null}
-      <EditorialRule label="NO FINANCIAL RECORD IS SAVED AUTOMATICALLY" />
+      {analysis ? (
+        <>
+          <AnalysisResultPanel analysis={analysis} />
+          <ActionButton
+            icon={{ android: 'arrow_forward', ios: 'arrow.right', web: 'arrow_forward' }}
+            label="Continue to Tracker"
+            onPress={continueToTracker}
+            tone="primary"
+          />
+        </>
+      ) : null}
+      <View style={styles.boundary}><Text style={styles.boundaryText}>• NO FINANCIAL RECORD IS SAVED AUTOMATICALLY</Text></View>
       <ActionButton disabled={!prepared || busy || offline} icon={{ android: 'auto_awesome', ios: 'sparkles', web: 'auto_awesome' }} label="Analyze" onPress={() => void analyze()} tone="primary" />
     </ScrollView>
   );
@@ -246,7 +265,7 @@ function AnalysisResultPanel({ analysis }: { analysis: ScannerAnalysis }) {
   return (
     <Animated.View accessibilityLabel="Coupon analysis result" entering={FadeInDown.duration(360).reduceMotion(ReduceMotion.System)} style={styles.analysisPanel}>
       <View style={styles.analysisHeading}>
-        <Text style={styles.analysisEyebrow}>EXTRACTED / REVIEW REQUIRED</Text>
+        <BroadcastStatus label="Needs review" status="review" />
         <Text style={styles.analysisCount}>{String(legs.length).padStart(2, '0')} LEG{legs.length === 1 ? '' : 'S'}</Text>
       </View>
       {legs.map((leg, index) => (
@@ -272,79 +291,92 @@ function AnalysisMetric({ label, value }: { label: string; value: string }) {
   return <View style={styles.analysisMetric}><Text style={styles.analysisMetricLabel}>{label}</Text><Text numberOfLines={1} style={styles.analysisMetricValue}>{value}</Text></View>;
 }
 
+function OperationSweep() {
+  const reduceMotion = useReducedMotion();
+  const progress = useSharedValue(reduceMotion ? 1 : 0);
+  useEffect(() => {
+    progress.value = withTiming(1, { duration: reduceMotion ? 0 : 320 });
+  }, [progress, reduceMotion]);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: progress.value }] }));
+  return <Animated.View aria-hidden style={[styles.operationSweep, animatedStyle]} />;
+}
+
 function ActionButton({ disabled = false, icon, label, onPress, tone = 'secondary' }: ActionButtonProps) {
   const primary = tone === 'primary';
   return (
     <MotionPressable accessibilityLabel={label} accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[styles.actionButton, primary && styles.actionButtonPrimary, tone === 'danger' && styles.actionButtonDanger, disabled && styles.disabled]}>
-      <SymbolView fallback={<Text style={[styles.actionFallback, primary && styles.actionTextPrimary]}>+</Text>} name={icon} size={17} tintColor={primary ? '#FFFFFF' : colors.text} />
+      <SymbolView fallback={<Text style={[styles.actionFallback, primary && styles.actionTextPrimary]}>+</Text>} name={icon} size={17} tintColor={primary ? semanticColors.onSignal : semanticColors.textPrimary} />
       <Text style={[styles.actionLabel, primary && styles.actionTextPrimary]}>{label.toUpperCase()}</Text><Text style={[styles.actionArrow, primary && styles.actionTextPrimary]}>→</Text>
     </MotionPressable>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: colors.background },
-  content: { flexGrow: 1, paddingBottom: 24, paddingHorizontal: 14, paddingTop: 6 },
-  masthead: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', minHeight: 42 },
-  wordmark: { color: colors.text, fontSize: 15, fontWeight: '900' },
-  mastheadMeta: { color: colors.muted, fontSize: 8, fontWeight: '700', letterSpacing: 1, marginLeft: 'auto' },
-  hero: { backgroundColor: '#050505', height: 330, marginHorizontal: -14, overflow: 'hidden', padding: 16 },
-  heroTopline: { flexDirection: 'row', justifyContent: 'space-between', zIndex: 2 },
-  heroMeta: { color: '#FFFFFF', fontSize: 8, fontWeight: '700', letterSpacing: 1.1 },
-  heroCopy: { flex: 1, justifyContent: 'flex-end', paddingBottom: 14, zIndex: 2 },
-  title: { color: '#FFFFFF', fontSize: 47, fontWeight: '900', letterSpacing: -2.7, lineHeight: 43 },
-  subtitle: { color: '#C9C9C4', fontSize: 11, lineHeight: 16, marginTop: 14, maxWidth: 270 },
-  modeControl: { borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', marginHorizontal: -14 },
-  modeOption: { backgroundColor: colors.surface, flex: 1, minHeight: 72, padding: 12 },
-  modeOptionSelected: { backgroundColor: colors.accentMuted },
-  modeIndex: { color: colors.muted, fontSize: 8 },
-  modeLabel: { color: colors.muted, fontSize: 13, fontWeight: '900', marginTop: 'auto' },
-  modeLabelSelected: { color: colors.text },
-  offlineNotice: { backgroundColor: colors.warning, marginHorizontal: -14, padding: 13 },
-  offlineLabel: { color: '#FFFFFF', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-  offlineText: { color: '#FFFFFF', fontSize: 11, lineHeight: 16, marginTop: 5 },
-  captureTool: { marginHorizontal: -14 },
-  emptyState: { backgroundColor: colors.background, minHeight: 330, padding: 16 },
+  screen: { backgroundColor: semanticColors.night },
+  content: { flexGrow: 1, gap: 12, paddingBottom: 24, paddingHorizontal: 12, paddingTop: 6 },
+  masthead: { alignItems: 'center', flexDirection: 'row', minHeight: touchMinimum, paddingHorizontal: 4 },
+  wordmark: { color: semanticColors.textPrimary, fontSize: 17, fontWeight: '900', letterSpacing: -0.5 },
+  mastheadMeta: { color: semanticColors.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginLeft: 'auto' },
+  hero: { backgroundColor: semanticColors.field, borderColor: semanticColors.borderStrong, borderRadius: geometry.radiusControl, borderWidth: 1, minHeight: 300, overflow: 'hidden', padding: 20 },
+  signalRail: { backgroundColor: semanticColors.signal, bottom: 0, left: 0, position: 'absolute', top: 0, width: 4 },
+  heroTopline: { flexDirection: 'row', justifyContent: 'space-between' },
+  heroMeta: { color: semanticColors.textQuietRaised, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  heroCopy: { flex: 1, justifyContent: 'flex-end', paddingBottom: 10 },
+  title: { color: semanticColors.textPrimary, fontSize: 40, fontWeight: '900', letterSpacing: -2.1, lineHeight: 39 },
+  subtitle: { color: semanticColors.textMuted, fontSize: typography.bodyMobile.fontSize, lineHeight: typography.bodyMobile.lineHeight, marginTop: 16, maxWidth: 310 },
+  modeControl: { borderColor: semanticColors.borderStrong, borderRadius: geometry.radiusControl, borderWidth: 1, flexDirection: 'row', overflow: 'hidden' },
+  modeOption: { backgroundColor: semanticColors.field, flex: 1, minHeight: 68, padding: 12 },
+  modeOptionSelected: { backgroundColor: semanticColors.signal },
+  modeIndex: { color: semanticColors.textQuietRaised, fontSize: 11, fontWeight: '700' },
+  modeLabel: { color: semanticColors.textMuted, fontSize: 13, fontWeight: '900', marginTop: 'auto' },
+  modeLabelSelected: { color: semanticColors.onSignal },
+  offlineNotice: { backgroundColor: semanticColors.field, borderColor: semanticColors.review, borderRadius: geometry.radiusControl, borderWidth: 1, padding: 13 },
+  offlineLabel: { color: semanticColors.review, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  offlineText: { color: semanticColors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 5 },
+  captureTool: { backgroundColor: semanticColors.field, borderColor: semanticColors.borderStrong, borderRadius: geometry.radiusControl, borderWidth: 1, overflow: 'hidden' },
+  emptyState: { backgroundColor: semanticColors.field, minHeight: 330, padding: 16 },
   emptyTopline: { flexDirection: 'row', justifyContent: 'space-between' },
-  emptyIndex: { color: colors.muted, fontSize: 8, fontWeight: '700', letterSpacing: 0.8 },
-  emptyPlus: { color: colors.text, fontSize: 92, fontWeight: '200', lineHeight: 100, marginTop: 24 },
-  emptyTitle: { color: colors.text, fontSize: 25, fontWeight: '900', letterSpacing: -1 },
-  emptyText: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 8 },
+  emptyIndex: { color: semanticColors.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 0.7 },
+  emptyPlus: { color: semanticColors.dataValue, fontSize: 86, fontWeight: '200', lineHeight: 94, marginTop: 24 },
+  emptyTitle: { color: semanticColors.textPrimary, fontSize: 25, fontWeight: '900', letterSpacing: -1 },
+  emptyText: { color: semanticColors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 8 },
   sourceActions: { flexDirection: 'row', gap: 8, marginTop: 22 },
-  previewFrame: { aspectRatio: 0.78, backgroundColor: '#050505', maxHeight: 520, minHeight: 300, overflow: 'hidden', width: '100%' },
-  previewStamp: { backgroundColor: '#FFFFFF', bottom: 10, left: 10, paddingHorizontal: 9, paddingVertical: 6, position: 'absolute' },
-  previewStampText: { color: '#050505', fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
-  preparedMeta: { alignItems: 'baseline', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', gap: 12, padding: 12 },
-  metaPrimary: { color: colors.text, flex: 1, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
-  metaSecondary: { color: colors.muted, fontSize: 9 },
+  previewFrame: { aspectRatio: 0.78, backgroundColor: semanticColors.night, maxHeight: 520, minHeight: 300, overflow: 'hidden', width: '100%' },
+  previewStamp: { backgroundColor: semanticColors.signal, bottom: 10, left: 10, paddingHorizontal: 9, paddingVertical: 7, position: 'absolute' },
+  previewStampText: { color: semanticColors.onSignal, fontSize: 11, fontWeight: '900', letterSpacing: 0.7 },
+  preparedMeta: { alignItems: 'baseline', borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 12 },
+  metaPrimary: { color: semanticColors.textPrimary, flex: 1, fontSize: 11, fontWeight: '900', letterSpacing: 0.7 },
+  metaSecondary: { color: semanticColors.dataValue, fontSize: 11 },
   actionRow: { flexDirection: 'row' },
-  actionButton: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: colors.border, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'flex-start', minHeight: 52, paddingHorizontal: 13 },
-  actionButtonPrimary: { backgroundColor: '#050505' },
-  actionButtonDanger: { borderColor: colors.danger },
-  actionLabel: { color: colors.text, fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
-  actionTextPrimary: { color: '#FFFFFF' },
-  actionArrow: { color: colors.text, fontSize: 16, marginLeft: 'auto' },
-  actionFallback: { color: colors.text, fontWeight: '900' },
-  disabled: { opacity: 0.35 },
-  processing: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', gap: 9, justifyContent: 'center', minHeight: 52 },
-  processingText: { color: colors.text, fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
-  feedback: { borderBottomColor: colors.border, borderBottomWidth: 1, gap: 6, paddingVertical: 14 },
-  feedbackError: { borderLeftColor: colors.danger, borderLeftWidth: 5, paddingLeft: 10 },
-  feedbackSuccess: { borderLeftColor: colors.success, borderLeftWidth: 5, paddingLeft: 10 },
-  feedbackLabel: { color: colors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
-  feedbackText: { color: colors.secondaryText, fontSize: 12, lineHeight: 18 },
-  analysisPanel: { backgroundColor: '#050505', marginHorizontal: -14 },
-  analysisHeading: { alignItems: 'center', borderBottomColor: '#3B3B38', borderBottomWidth: 1, flexDirection: 'row', minHeight: 56, paddingHorizontal: 14 },
-  analysisEyebrow: { color: '#FFFFFF', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
-  analysisCount: { color: colors.accentMuted, fontSize: 9, fontWeight: '900', marginLeft: 'auto' },
-  analysisLeg: { alignItems: 'center', borderBottomColor: '#292927', borderBottomWidth: 1, flexDirection: 'row', minHeight: 82, paddingHorizontal: 14, paddingVertical: 12 },
-  analysisLegIndex: { color: '#858580', fontSize: 9, width: 28 },
+  actionButton: { alignItems: 'center', backgroundColor: semanticColors.field, borderColor: semanticColors.borderStrong, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'flex-start', minHeight: touchMinimum, paddingHorizontal: 13 },
+  actionButtonPrimary: { backgroundColor: semanticColors.signal, borderColor: semanticColors.signal },
+  actionButtonDanger: { borderColor: semanticColors.negative },
+  actionLabel: { color: semanticColors.textPrimary, fontSize: 11, fontWeight: '900', letterSpacing: 0.6 },
+  actionTextPrimary: { color: semanticColors.onSignal },
+  actionArrow: { color: semanticColors.textPrimary, fontSize: 16, marginLeft: 'auto' },
+  actionFallback: { color: semanticColors.textPrimary, fontWeight: '900' },
+  disabled: { opacity: 0.4 },
+  processing: { alignItems: 'center', borderColor: semanticColors.signal, borderRadius: geometry.radiusControl, borderWidth: 1, flexDirection: 'row', gap: 9, justifyContent: 'center', minHeight: touchMinimum, overflow: 'hidden' },
+  operationSweep: { backgroundColor: semanticColors.signal, height: 3, left: 0, position: 'absolute', right: 0, top: 0, transformOrigin: 'left' },
+  processingText: { color: semanticColors.textPrimary, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
+  feedback: { backgroundColor: semanticColors.field, borderColor: semanticColors.borderStrong, borderRadius: geometry.radiusControl, borderWidth: 1, gap: 6, padding: 14 },
+  feedbackError: { borderColor: semanticColors.negative },
+  feedbackSuccess: { borderColor: semanticColors.success },
+  feedbackLabel: { color: semanticColors.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  feedbackText: { color: semanticColors.textPrimary, fontSize: 12, lineHeight: 18 },
+  boundary: { borderColor: semanticColors.borderStrong, borderRadius: geometry.radiusControl, borderWidth: 1, minHeight: touchMinimum, padding: 12 },
+  boundaryText: { color: semanticColors.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  analysisPanel: { backgroundColor: semanticColors.field, borderColor: semanticColors.borderStrong, borderRadius: geometry.radiusControl, borderWidth: 1, overflow: 'hidden' },
+  analysisHeading: { alignItems: 'center', borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, flexDirection: 'row', minHeight: 58, paddingHorizontal: 14 },
+  analysisCount: { color: semanticColors.dataValue, fontSize: 11, fontWeight: '900', marginLeft: 'auto' },
+  analysisLeg: { alignItems: 'flex-start', borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, flexDirection: 'row', minHeight: 82, paddingHorizontal: 14, paddingVertical: 12 },
+  analysisLegIndex: { color: semanticColors.textQuietRaised, fontSize: 11, fontVariant: ['tabular-nums'], width: 28 },
   analysisLegCopy: { flex: 1, minWidth: 0, paddingRight: 12 },
-  analysisEvent: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', lineHeight: 17 },
-  analysisSelection: { color: '#A9A9A4', fontSize: 10, lineHeight: 15, marginTop: 5 },
-  analysisOdds: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
+  analysisEvent: { color: semanticColors.textPrimary, fontSize: 13, fontWeight: '900', lineHeight: 18 },
+  analysisSelection: { color: semanticColors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 5 },
+  analysisOdds: { color: semanticColors.dataValue, fontSize: 18, fontVariant: ['tabular-nums'], fontWeight: '900' },
   analysisSummary: { flexDirection: 'row', padding: 14 },
   analysisMetric: { flex: 1, minWidth: 0 },
-  analysisMetricLabel: { color: '#777772', fontSize: 7, fontWeight: '800', letterSpacing: 0.7 },
-  analysisMetricValue: { color: '#FFFFFF', fontSize: 11, fontWeight: '800', marginTop: 5 },
+  analysisMetricLabel: { color: semanticColors.textQuietRaised, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },
+  analysisMetricValue: { color: semanticColors.dataValue, fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '800', marginTop: 5 },
 });

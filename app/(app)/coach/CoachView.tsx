@@ -3,6 +3,8 @@
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import type { CoachingSession, CalibrationGrade, CoachRecommendation } from '@/types'
+import { BroadcastButton, BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
+import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
 
 type PeriodDays = 7 | 30 | 90 | 0
 
@@ -25,17 +27,15 @@ function formatDate(dateStr: string): string {
 // ─── Calibration grade badge ──────────────────────────────────
 function CalibrationBadge({ grade }: { grade?: CalibrationGrade | null }) {
   if (!grade) return null
-  const config: Record<CalibrationGrade, { label: string; emoji: string; style: string }> = {
-    excellent: { label: 'Excellent calibration', emoji: '🟢', style: 'text-green-400 bg-green-950/40 border-green-800' },
-    good:      { label: 'Good calibration',      emoji: '🟡', style: 'text-yellow-400 bg-yellow-950/40 border-yellow-800' },
-    fair:      { label: 'Fair calibration',       emoji: '🟠', style: 'text-amber-400 bg-amber-950/40 border-amber-800' },
-    poor:      { label: 'Poor calibration',       emoji: '🔴', style: 'text-red-400 bg-red-950/40 border-red-800' },
+  const config: Record<CalibrationGrade, { label: string; status: BroadcastNoirStatus }> = {
+    excellent: { label: 'Excellent calibration', status: 'success' },
+    good:      { label: 'Good calibration', status: 'success' },
+    fair:      { label: 'Fair calibration', status: 'review' },
+    poor:      { label: 'Poor calibration', status: 'negative' },
   }
   const c = config[grade]
   return (
-    <span className={`text-xs font-medium border rounded-full px-2 py-0.5 shrink-0 ${c.style}`}>
-      {c.emoji} {c.label}
-    </span>
+    <BroadcastStatus className="shrink-0" status={c.status}>{c.label}</BroadcastStatus>
   )
 }
 
@@ -48,26 +48,24 @@ function RecommendationCard({
   expanded: boolean
   onToggle: (key: string) => void
 }) {
-  const priorityStyle = {
-    high:   'text-red-400 bg-red-950/40 border-red-900',
-    medium: 'text-yellow-400 bg-yellow-950/40 border-yellow-900',
-    low:    'text-gray-400 bg-gray-800 border-gray-700',
-  }[rec.priority]
+  const priorityStatus = ({
+    high: 'negative',
+    medium: 'review',
+    low: 'neutral',
+  } satisfies Record<CoachRecommendation['priority'], BroadcastNoirStatus>)[rec.priority]
 
   return (
-    <div className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2.5 flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 rounded-control border border-bn-border-subtle bg-bn-raised px-3 py-2.5">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-sm text-white font-medium flex-1">{rec.action}</span>
-        <span className={`text-[10px] font-semibold border rounded-full px-1.5 py-0.5 shrink-0 uppercase tracking-wide ${priorityStyle}`}>
-          {rec.priority}
-        </span>
+        <span className="flex-1 text-sm font-medium text-bn-text">{rec.action}</span>
+        <BroadcastStatus className="shrink-0" status={priorityStatus}>{rec.priority}</BroadcastStatus>
       </div>
       {expanded && (
-        <p className="text-xs text-gray-400 leading-relaxed">{rec.detail}</p>
+        <p className="text-xs leading-relaxed text-bn-muted">{rec.detail}</p>
       )}
       <button
         onClick={() => onToggle(recKey)}
-        className="text-xs text-indigo-400 hover:text-indigo-300 text-left transition-colors"
+        className="min-h-11 text-left text-xs font-bold text-bn-text underline underline-offset-4"
       >
         {expanded ? 'Hide detail' : 'Show detail'}
       </button>
@@ -87,30 +85,30 @@ function SessionCard({
     <div className="flex flex-col gap-4">
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-bn-muted">
           <span>{periodLabel(session.period_days)}</span>
-          <span className="text-gray-700">·</span>
+          <span className="text-bn-quiet">·</span>
           <span>{formatDate(session.created_at)}</span>
-          <span className="text-gray-700">·</span>
+          <span className="text-bn-quiet">·</span>
           <span>{session.bets_analysed} bets analysed</span>
         </div>
         <CalibrationBadge grade={session.calibration_grade} />
       </div>
       {session.calibration_grade && (
-        <p className="text-[10px] text-gray-600 -mt-2">Calibration: how well your confidence predictions matched your actual results.</p>
+        <p className="-mt-2 text-[10px] text-bn-muted">Calibration: how well your confidence predictions matched your actual results.</p>
       )}
 
       {/* Summary */}
-      <p className="text-sm text-gray-200 leading-relaxed">{session.summary}</p>
+      <p className="text-sm leading-relaxed text-bn-text">{session.summary}</p>
 
       {/* Strengths */}
       {session.strengths.length > 0 && (
         <div>
-          <p className="text-[11px] font-medium text-green-500 uppercase tracking-wide mb-1.5">Strengths</p>
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-bn-success">Strengths</p>
           <ul className="flex flex-col gap-1.5">
             {session.strengths.map((s, i) => (
-              <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
-                <span className="text-green-500 mt-0.5 shrink-0">&#10003;</span>
+              <li key={i} className="flex items-start gap-2 text-sm text-bn-text">
+                <span className="mt-0.5 shrink-0 text-bn-success" aria-hidden>&#10003;</span>
                 {s}
               </li>
             ))}
@@ -121,11 +119,11 @@ function SessionCard({
       {/* Weaknesses */}
       {session.weaknesses.length > 0 && (
         <div>
-          <p className="text-[11px] font-medium text-amber-500 uppercase tracking-wide mb-1.5">Areas to improve</p>
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-bn-review">Areas to improve</p>
           <ul className="flex flex-col gap-1.5">
             {session.weaknesses.map((w, i) => (
-              <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
-                <span className="text-amber-400 mt-0.5 shrink-0">&#9888;</span>
+              <li key={i} className="flex items-start gap-2 text-sm text-bn-text">
+                <span className="mt-0.5 shrink-0 text-bn-review" aria-hidden>&#9888;</span>
                 {w}
               </li>
             ))}
@@ -136,7 +134,7 @@ function SessionCard({
       {/* Recommendations */}
       {session.recommendations.length > 0 && (
         <div>
-          <p className="text-[11px] font-medium text-indigo-400 uppercase tracking-wide mb-1.5">Recommendations</p>
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-bn-text">Recommendations</p>
           <div className="flex flex-col gap-2">
             {session.recommendations.map((rec, i) => (
               <RecommendationCard
@@ -152,7 +150,7 @@ function SessionCard({
       )}
 
       {/* Disclaimer */}
-      <p className="text-[11px] text-gray-600 border border-gray-800 rounded-lg px-3 py-2 leading-relaxed">
+      <p className="rounded-control border border-bn-border-subtle px-3 py-2 text-[11px] leading-relaxed text-bn-muted">
         &#9888; {session.disclaimer ?? 'Past performance does not predict future results. This analysis is retrospective and does not constitute financial advice.'}
       </p>
     </div>
@@ -224,32 +222,30 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
   return (
     <div className="flex flex-col gap-6">
       {/* ── Run Coach form ──────────────────────────────────── */}
-      <div className="card flex flex-col gap-4">
+      <BroadcastPanel className="flex flex-col gap-4 p-4 sm:p-5">
         {/* Period selector */}
         <div>
           <label className="label mb-2">Period</label>
           <div className="flex gap-2">
             {PERIODS.map(p => (
-              <button
+              <BroadcastButton
                 key={p.value}
                 onClick={() => setPeriodDays(p.value)}
                 disabled={!canRun}
-                className={`flex-1 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                  periodDays === p.value
-                    ? 'bg-indigo-600 border-indigo-500 text-white'
-                    : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed'
-                }`}
+                aria-pressed={periodDays === p.value}
+                className="flex-1"
+                tone={periodDays === p.value ? 'primary' : 'secondary'}
               >
                 {p.label}
-              </button>
+              </BroadcastButton>
             ))}
           </div>
-          <p className="text-[11px] text-gray-600 mt-1.5">Limits the AI to settled bets within this window — narrower periods show recent trends.</p>
+          <p className="mt-1.5 text-[11px] text-bn-muted">Limits the AI to settled bets within this window — narrower periods show recent trends.</p>
         </div>
 
         {/* Focus notes */}
         <div>
-          <label className="label">Focus notes <span className="text-gray-600 font-normal">(optional)</span></label>
+          <label className="label">Focus notes <span className="font-normal text-bn-quiet">(optional)</span></label>
           <textarea
             className="input resize-none mt-1"
             rows={2}
@@ -260,103 +256,98 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
             disabled={!canRun || loading}
           />
           {focusNotes.length > 400 && (
-            <p className="text-[11px] text-gray-500 mt-0.5 text-right">{focusNotes.length}/500</p>
+            <p className="mt-0.5 text-right text-[11px] text-bn-muted">{focusNotes.length}/500</p>
           )}
         </div>
 
         {/* Gate message */}
         {!canRun && (
-          <p className="text-xs text-amber-400 bg-amber-950/40 border border-amber-900 rounded-lg px-3 py-2">
-            Add at least 5 settled bets first.
-          </p>
+          <BroadcastStatus className="w-full" status="review">Add at least 5 settled bets first.</BroadcastStatus>
         )}
 
         {/* Error */}
         {error && (
-          <div className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
-            {error}
-          </div>
+          <BroadcastStatus className="w-full" status="negative">{error}</BroadcastStatus>
         )}
 
-        <button
-          className="btn-primary"
+        <BroadcastButton
           onClick={handleCoach}
           disabled={loading || !canRun}
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
-              <span className="animate-spin">&#9203;</span> Analysing…
+              Analysing…
             </span>
           ) : '🧠 Get coaching'}
-        </button>
-      </div>
+        </BroadcastButton>
+      </BroadcastPanel>
 
       {/* ── Latest session ──────────────────────────────────── */}
       {latestSession ? (
-        <div className="card">
+        <BroadcastPanel className="p-4 sm:p-5">
           <SessionCard
             session={latestSession}
             expandedRecs={expandedRecs}
             onToggleRec={toggleRec}
           />
-        </div>
+        </BroadcastPanel>
       ) : (
-        <div className="card flex flex-col items-center gap-3 py-10 text-center">
-          <span className="text-3xl text-slate-600">—</span>
-          <p className="text-sm font-medium text-gray-400">No coaching sessions yet</p>
-          <p className="text-xs text-gray-600">
+        <BroadcastPanel className="flex flex-col items-center gap-3 py-10 text-center">
+          <BroadcastStatus status="neutral">Empty</BroadcastStatus>
+          <p className="text-sm font-medium text-bn-text">No coaching sessions yet</p>
+          <p className="text-xs text-bn-muted">
             {canRun
               ? 'Run Coach to get your first performance analysis.'
               : "Run Coach after you've settled at least 5 bets."}
           </p>
-        </div>
+        </BroadcastPanel>
       )}
 
       {/* ── Next-step CTA ──────────────────────────────────── */}
       {latestSession && (
         <div className="flex items-center justify-between px-1">
-          <p className="text-xs text-gray-600">Apply these insights in your next analysis.</p>
-          <Link href="/ai" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors shrink-0">→ AI Analyst</Link>
+          <p className="text-xs text-bn-muted">Apply these insights in your next analysis.</p>
+          <Link href="/ai" className="shrink-0 text-xs font-bold text-bn-text underline underline-offset-4">→ AI Analyst</Link>
         </div>
       )}
 
       {/* ── Past sessions ───────────────────────────────────── */}
       {pastSessions.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Past sessions</p>
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-quiet">Past sessions</p>
           {pastSessions.map(s => {
             const isExpanded = expandedSessions.has(s.id)
             return (
-              <div key={s.id} className="card">
+              <BroadcastPanel key={s.id} className="p-4 sm:p-5">
                 <button
                   className="flex items-start justify-between gap-3 w-full text-left"
                   onClick={() => toggleSession(s.id)}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-bn-muted">
                       <span>{formatDate(s.created_at)}</span>
-                      <span className="text-gray-700">·</span>
+                      <span className="text-bn-quiet">·</span>
                       <span>{periodLabel(s.period_days)}</span>
-                      <span className="text-gray-700">·</span>
+                      <span className="text-bn-quiet">·</span>
                       <span>{s.bets_analysed} bets</span>
                       {s.calibration_grade && (
                         <>
-                          <span className="text-gray-700">·</span>
+                          <span className="text-bn-quiet">·</span>
                           <CalibrationBadge grade={s.calibration_grade} />
                         </>
                       )}
                     </div>
                     {!isExpanded && (
-                      <p className="text-sm text-gray-400 mt-1 line-clamp-1">{s.summary}</p>
+                      <p className="mt-1 line-clamp-1 text-sm text-bn-muted">{s.summary}</p>
                     )}
                   </div>
-                  <span className="text-gray-600 text-xs mt-0.5 shrink-0">
+                  <span className="mt-0.5 shrink-0 text-xs text-bn-muted">
                     {isExpanded ? '▲' : '▼'}
                   </span>
                 </button>
 
                 {isExpanded && (
-                  <div className="mt-4 pt-4 border-t border-gray-800">
+                  <div className="mt-4 border-t border-bn-border-subtle pt-4">
                     <SessionCard
                       session={s}
                       expandedRecs={expandedRecs}
@@ -364,7 +355,7 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
                     />
                   </div>
                 )}
-              </div>
+              </BroadcastPanel>
             )
           })}
         </div>

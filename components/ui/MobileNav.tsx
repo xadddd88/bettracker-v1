@@ -91,7 +91,7 @@ export default function MobileNav() {
   return (
     <>
       <nav
-        className="editorial-dark fixed inset-x-0 bottom-0 z-50 flex border-t border-white/30 bg-[#050505] text-white md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 flex border-t border-[var(--border-strong)] bg-[var(--night)] px-1 pt-1 text-[var(--text-primary)] md:hidden"
         aria-label="Mobile navigation"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
@@ -102,13 +102,14 @@ export default function MobileNav() {
               key={href}
               href={href}
               aria-current={active ? 'page' : undefined}
-              className={`relative flex min-h-[58px] flex-1 flex-col items-center justify-center gap-1 text-center transition-colors ${
-                active ? 'text-[#e8ff00]' : 'text-white/45 hover:text-white'
+              className={`relative mx-0.5 flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 rounded-[var(--radius-control)] border text-center transition-colors ${
+                active
+                  ? 'border-[var(--signal)] bg-[var(--signal)] text-[var(--on-signal)]'
+                  : 'border-transparent text-[var(--text-quiet)] hover:border-[var(--border-strong)] hover:bg-[var(--field)] hover:text-[var(--text-primary)]'
               }`}
             >
-              <span className={`absolute inset-x-2 top-0 h-[3px] transition-transform duration-300 ${active ? 'scale-x-100 bg-[#e8ff00]' : 'scale-x-0 bg-white'}`} />
               <Icon size={18} strokeWidth={1.8} aria-hidden />
-              <span className="font-mono text-[8px] font-bold uppercase tracking-[0.12em]">{label}</span>
+              <span className="font-mono text-[9px] font-black uppercase tracking-[0.08em]">{label}</span>
             </Link>
           )
         })}
@@ -120,13 +121,14 @@ export default function MobileNav() {
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-controls={SHEET_ID}
-          className={`relative flex min-h-[58px] flex-1 flex-col items-center justify-center gap-1 text-center transition-colors ${
-            moreActive || open ? 'text-[#e8ff00]' : 'text-white/45 hover:text-white'
+          className={`relative mx-0.5 flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 rounded-[var(--radius-control)] border text-center transition-colors ${
+            moreActive || open
+              ? 'border-[var(--signal)] bg-[var(--signal)] text-[var(--on-signal)]'
+              : 'border-transparent text-[var(--text-quiet)] hover:border-[var(--border-strong)] hover:bg-[var(--field)] hover:text-[var(--text-primary)]'
           }`}
         >
-          <span className={`absolute inset-x-2 top-0 h-[3px] transition-transform duration-300 ${moreActive || open ? 'scale-x-100 bg-[#e8ff00]' : 'scale-x-0 bg-white'}`} />
           <MoreHorizontal size={18} strokeWidth={1.8} aria-hidden />
-          <span className="font-mono text-[8px] font-bold uppercase tracking-[0.12em]">More</span>
+          <span className="font-mono text-[9px] font-black uppercase tracking-[0.08em]">More</span>
         </button>
       </nav>
 
@@ -136,7 +138,7 @@ export default function MobileNav() {
       >
         <button
           type="button"
-          className="absolute inset-0 bg-black/65"
+          className="absolute inset-0 bg-bn-night/90"
           onClick={() => setOpen(false)}
           aria-label="Close navigation"
           tabIndex={open ? 0 : -1}
@@ -148,11 +150,11 @@ export default function MobileNav() {
           aria-modal="true"
           aria-label="More navigation"
           inert={!open}
-          className={`absolute inset-x-0 bottom-0 border-t border-black bg-[#f5f5f0] transition-transform duration-300 ${open ? 'translate-y-0' : 'translate-y-full'}`}
+          className={`absolute inset-x-0 bottom-0 border-t border-[var(--border-strong)] bg-[var(--field)] text-[var(--text-primary)] transition-transform duration-300 ${open ? 'translate-y-0' : 'translate-y-full'}`}
         >
-          <div className="flex items-center justify-between border-b border-black px-4 py-3">
-            <span className="font-display text-xl font-black tracking-[-0.05em]">MORE / XADDD</span>
-            <span className="h-3 w-3 bg-[#e8ff00] ring-1 ring-black" aria-hidden />
+          <div className="flex items-center justify-between border-b border-[var(--border-strong)] px-4 py-3">
+            <span className="font-display text-xl font-black tracking-[-0.045em]">MORE / BETTRACKER</span>
+            <span className="h-2.5 w-2.5 rounded-control bg-[var(--signal)]" aria-hidden />
           </div>
           <div className="flex flex-col">
             {MORE_LINKS.map(({ href, Icon, label }, index) => {
@@ -163,9 +165,13 @@ export default function MobileNav() {
                   href={href}
                   onClick={() => setOpen(false)}
                   aria-current={active ? 'page' : undefined}
-                  className={`grid min-h-[54px] grid-cols-[30px_1fr_auto] items-center border-b border-black px-4 text-xs font-black uppercase tracking-[0.08em] ${active ? 'bg-[#e8ff00]' : 'bg-white'}`}
+                  className={`grid min-h-[52px] grid-cols-[30px_1fr_auto] items-center border-b border-[var(--border-subtle)] px-4 text-xs font-black uppercase tracking-[0.06em] ${
+                    active
+                      ? 'bg-[var(--signal)] text-[var(--on-signal)]'
+                      : 'bg-[var(--field)] text-[var(--text-primary)] hover:bg-[var(--field-raised)]'
+                  }`}
                 >
-                  <span className="font-mono text-[9px] text-black/45">{String(index + 5).padStart(2, '0')}</span>
+                  <span className="font-mono text-[9px] opacity-60">{String(index + 5).padStart(2, '0')}</span>
                   {label}
                   <Icon size={15} strokeWidth={1.8} aria-hidden />
                 </Link>
@@ -174,7 +180,7 @@ export default function MobileNav() {
             <button
               type="button"
               onClick={handleLogout}
-              className="editorial-dark flex min-h-[54px] items-center justify-between bg-[#050505] px-4 text-xs font-black uppercase tracking-[0.08em] text-white"
+              className="flex min-h-[52px] items-center justify-between bg-[var(--field)] px-4 text-xs font-black uppercase tracking-[0.06em] text-[var(--negative)]"
             >
               Sign out
               <LogOut size={15} strokeWidth={1.8} aria-hidden />

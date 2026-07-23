@@ -1,8 +1,8 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, ReduceMotion } from 'react-native-reanimated';
+import Animated, { FadeInDown, ReduceMotion } from 'react-native-reanimated';
 
 import { useAuth } from '@/auth/auth-context';
 import { fetchBankroll, fetchBets } from '@/bets/data';
@@ -10,11 +10,11 @@ import { readErrorMessage } from '@/bets/errors';
 import { formatMoney, type BetDto } from '@/bets/models';
 import { summarizeBets } from '@/bets/summary';
 import { BetTicket } from '@/ui/bet-ticket';
-import { MotionPressable } from '@/ui/motion';
-import { colors } from '@/ui/theme';
-import { EditorialBackdrop, EditorialRule, KineticType } from '@/ui/time-warp';
+import { BroadcastButton, BroadcastPanel } from '@/ui/broadcast-noir-primitives';
+import { geometry, semanticColors, typography } from '@/ui/theme';
 
-const ENTER = FadeInDown.duration(420).reduceMotion(ReduceMotion.System);
+const ENTER = FadeInDown.duration(260).reduceMotion(ReduceMotion.System);
+const touchMinimum = Platform.OS === 'android' ? geometry.androidTouchMinimum : geometry.iosTouchMinimum;
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -46,49 +46,66 @@ export default function HomeScreen() {
 
   const summary = useMemo(() => summarizeBets(bets), [bets]);
   const recent = bets.slice(0, 3);
+  const reviewPending = summary.openCount > 0;
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Animated.View entering={FadeIn.duration(300).reduceMotion(ReduceMotion.System)} style={styles.masthead}>
-          <Text style={styles.wordmark}>XADDD</Text>
-          <Text style={styles.mastheadMeta}>FOUNDER EDITION / 2026</Text>
-          <Pressable accessibilityLabel="Account and settings" accessibilityRole="button" onPress={() => router.push('/(app)/more')} style={styles.account}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.masthead}>
+          <View style={styles.mastheadCopy}>
+            <Text style={styles.wordmark}>BETTRACKER</Text>
+            <Text style={styles.mastheadMeta}>FOUNDER HOME</Text>
+          </View>
+          <Pressable
+            accessibilityLabel="Account and settings"
+            accessibilityRole="button"
+            onPress={() => router.push('/(app)/more')}
+            style={styles.account}
+          >
             <Text style={styles.accountText}>ACCOUNT</Text>
           </Pressable>
-        </Animated.View>
-
-        <Animated.View entering={ENTER} style={styles.hero}>
-          <EditorialBackdrop dark />
-          <KineticType label="DECIDE" />
-          <View style={styles.heroTopline}>
-            <Text style={styles.heroIndex}>SYSTEM 001</Text>
-            <Text style={styles.heroIndex}>LIVE DATA</Text>
-          </View>
-          <View style={styles.heroCopy}>
-            <Text style={styles.heroTitle}>BETTING{`\n`}DECISIONS{`\n`}IN FOCUS</Text>
-            <Text style={styles.heroBody}>Capture the evidence. Review the context. Track the outcome.</Text>
-          </View>
-          <View style={styles.heroActions}>
-            <EditorialAction label="SCAN NOW" onPress={() => router.push('/(app)/ai')} primary />
-            <EditorialAction label="OPEN TRACKER" onPress={() => router.push('/(app)/bets')} />
-          </View>
-        </Animated.View>
-
-        <View style={styles.signalBand}>
-          <Text numberOfLines={1} style={styles.signalText}>ANALYZE  /  VERIFY  /  TRACK  /  ANALYZE  /  VERIFY  /  TRACK</Text>
         </View>
 
-        <Animated.View entering={FadeInDown.delay(90).duration(420).reduceMotion(ReduceMotion.System)} style={styles.portfolio}>
+        <Animated.View entering={ENTER}>
+          <BroadcastPanel style={styles.hero}>
+            <View style={styles.signalRail} />
+            <Text style={styles.eyebrow}>PERSISTED ACCOUNT DATA</Text>
+            <Text style={styles.heroTitle}>ONE USEFUL ACTION.{`\n`}NO INVENTED SIGNAL.</Text>
+            <Text style={styles.heroBody}>
+              Review the account state, take one explicit action, and keep every saved result traceable.
+            </Text>
+          </BroadcastPanel>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(50).duration(260).reduceMotion(ReduceMotion.System)}>
+          <BroadcastPanel style={styles.adaptivePanel}>
+            <View style={styles.sectionTopline}>
+              <Text style={styles.signalLabel}>ADAPTIVE ACTION</Text>
+              <Text style={styles.sectionMeta}>{reviewPending ? `${summary.openCount} OPEN` : 'NO PENDING BETS'}</Text>
+            </View>
+            <Text style={styles.actionTitle}>{reviewPending ? 'Review pending bets' : 'Scan coupon'}</Text>
+            <Text style={styles.actionBody}>
+              {reviewPending
+                ? 'Open the records already stored in Tracker.'
+                : 'Capture a coupon and review the editable draft before saving.'}
+            </Text>
+            <BroadcastButton
+              label={reviewPending ? 'OPEN TRACKER' : 'SCAN COUPON'}
+              onPress={() => router.push(reviewPending ? '/(app)/bets' : '/(app)/ai')}
+              style={styles.primaryAction}
+            />
+          </BroadcastPanel>
+        </Animated.View>
+
+        <BroadcastPanel style={styles.portfolio}>
           <View style={styles.sectionTopline}>
-            <Text style={styles.sectionIndex}>01</Text>
             <Text style={styles.sectionName}>PORTFOLIO</Text>
             <Text style={styles.sectionMeta}>{summary.openCount} OPEN</Text>
           </View>
           {loading ? (
             <View style={styles.loadingRow}>
-              <ActivityIndicator color={colors.text} />
-              <Text style={styles.loadingText}>SYNCING ACCOUNT</Text>
+              <ActivityIndicator color={semanticColors.textPrimary} />
+              <Text accessibilityLiveRegion="polite" style={styles.loadingText}>SYNCING ACCOUNT</Text>
             </View>
           ) : (
             <>
@@ -97,40 +114,39 @@ export default function HomeScreen() {
               </Text>
               <View style={styles.metrics}>
                 <Metric label="NET P&L" value={summary.settledCount === 0 ? '—' : formatMoney(summary.netPnl, currency)} />
-                <Metric label="TRACKED" value={String(bets.length).padStart(2, '0')} />
-                <Metric label="SETTLED" value={String(summary.settledCount).padStart(2, '0')} />
+                <Metric label="TRACKED" value={String(bets.length)} />
+                <Metric label="SETTLED" value={String(summary.settledCount)} last />
               </View>
             </>
           )}
           {error ? (
             <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.errorBand}>
-              <Text accessibilityLiveRegion="polite" style={styles.errorText}>{error} — RETRY</Text>
+              <Text accessibilityLiveRegion="polite" style={styles.errorText}>{error}</Text>
+              <Text style={styles.retryText}>RETRY</Text>
             </Pressable>
           ) : null}
-        </Animated.View>
+        </BroadcastPanel>
 
-        <View style={styles.actionSplit}>
-          <SplitAction index="A" label="SCAN COUPON" onPress={() => router.push('/(app)/ai')} />
-          <SplitAction index="B" label="ADD BET" onPress={() => router.push('/(app)/bets/new')} inverted />
+        <View style={styles.quickActions}>
+          <QuickAction label="SCAN COUPON" onPress={() => router.push('/(app)/ai')} primary />
+          <QuickAction label="ADD BET" onPress={() => router.push('/(app)/bets/new')} />
         </View>
 
-        <View style={styles.recentSection}>
+        <BroadcastPanel style={styles.recentPanel}>
           <View style={styles.sectionTopline}>
-            <Text style={styles.sectionIndex}>02</Text>
             <Text style={styles.sectionName}>RECENT BETS</Text>
-            <Pressable accessibilityRole="button" onPress={() => router.push('/(app)/bets')} style={styles.viewAll}>
+            <Pressable accessibilityLabel="View all saved bets" accessibilityRole="button" onPress={() => router.push('/(app)/bets')} style={styles.viewAll}>
               <Text style={styles.viewAllText}>VIEW ALL →</Text>
             </Pressable>
           </View>
-          <EditorialRule label={`${recent.length} RECORDS`} />
           {recent.length === 0 && !loading ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>NO RECORDS</Text>
-              <Text style={styles.emptyText}>Scan a coupon or prepare the first decision.</Text>
+              <Text style={styles.emptyTitle}>NO SAVED BETS</Text>
+              <Text style={styles.emptyText}>A scan becomes a record only after you review and save it.</Text>
             </View>
           ) : recent.map((bet, index) => (
             <BetTicket
-              animationDelay={index * 70}
+              animationDelay={index * 50}
               bet={bet}
               compact
               currency={currency}
@@ -138,80 +154,80 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/(app)/bets/[id]', params: { id: bet.id } })}
             />
           ))}
-        </View>
+        </BroadcastPanel>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function EditorialAction({ label, onPress, primary = false }: { label: string; onPress: () => void; primary?: boolean }) {
+function QuickAction({ label, onPress, primary = false }: { label: string; onPress: () => void; primary?: boolean }) {
   return (
-    <MotionPressable accessibilityRole="button" onPress={onPress} style={[styles.editorialAction, primary ? styles.editorialActionPrimary : null]}>
-      <Text style={[styles.editorialActionText, primary ? styles.editorialActionTextPrimary : null]}>{label}</Text>
-    </MotionPressable>
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.quickAction, primary ? styles.quickActionPrimary : null, pressed ? styles.pressed : null]}
+    >
+      <Text style={[styles.quickActionText, primary ? styles.quickActionTextPrimary : null]}>{label}</Text>
+      <Text aria-hidden style={[styles.quickActionArrow, primary ? styles.quickActionTextPrimary : null]}>→</Text>
+    </Pressable>
   );
 }
 
-function SplitAction({ index, inverted = false, label, onPress }: { index: string; inverted?: boolean; label: string; onPress: () => void }) {
+function Metric({ label, last = false, value }: { label: string; last?: boolean; value: string }) {
   return (
-    <MotionPressable accessibilityRole="button" onPress={onPress} style={[styles.splitAction, inverted && styles.splitActionInverted]}>
-      <Text style={[styles.splitIndex, inverted && styles.splitTextInverted]}>{index}</Text>
-      <Text style={[styles.splitLabel, inverted && styles.splitTextInverted]}>{label}</Text>
-      <Text style={[styles.splitArrow, inverted && styles.splitTextInverted]}>↗</Text>
-    </MotionPressable>
+    <View style={[styles.metric, last ? styles.metricLast : null]}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text adjustsFontSizeToFit numberOfLines={1} style={styles.metricValue}>{value}</Text>
+    </View>
   );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return <View style={styles.metric}><Text style={styles.metricLabel}>{label}</Text><Text style={styles.metricValue}>{value}</Text></View>;
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: colors.background, flex: 1 },
-  content: { backgroundColor: colors.background, paddingBottom: 28 },
-  masthead: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', minHeight: 48, paddingHorizontal: 12 },
-  wordmark: { color: colors.text, fontSize: 17, fontWeight: '900', letterSpacing: -0.6 },
-  mastheadMeta: { color: colors.muted, flex: 1, fontSize: 8, letterSpacing: 0.9, marginLeft: 10 },
-  account: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingLeft: 10 },
-  accountText: { color: colors.text, fontSize: 9, fontWeight: '700', letterSpacing: 0.8 },
-  hero: { backgroundColor: '#050505', minHeight: 470, overflow: 'hidden', padding: 18 },
-  heroTopline: { flexDirection: 'row', justifyContent: 'space-between', zIndex: 2 },
-  heroIndex: { color: '#FFFFFF', fontSize: 8, fontWeight: '700', letterSpacing: 1.3 },
-  heroCopy: { flex: 1, justifyContent: 'center', zIndex: 2 },
-  heroTitle: { color: '#FFFFFF', fontSize: 43, fontWeight: '900', letterSpacing: -2.5, lineHeight: 40 },
-  heroBody: { color: '#C8C8C3', fontSize: 12, lineHeight: 17, marginTop: 18, maxWidth: 255 },
-  heroActions: { flexDirection: 'row', gap: 8, zIndex: 2 },
-  editorialAction: { alignItems: 'center', borderColor: '#FFFFFF', borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 10 },
-  editorialActionPrimary: { backgroundColor: '#FFFFFF' },
-  editorialActionText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
-  editorialActionTextPrimary: { color: '#050505' },
-  signalBand: { backgroundColor: colors.accentMuted, borderBottomColor: colors.border, borderBottomWidth: 1, borderTopColor: colors.border, borderTopWidth: 1, justifyContent: 'center', minHeight: 42, overflow: 'hidden', paddingHorizontal: 12 },
-  signalText: { color: '#050505', fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
-  portfolio: { paddingHorizontal: 14, paddingVertical: 22 },
-  sectionTopline: { alignItems: 'center', flexDirection: 'row', gap: 10, minHeight: 32 },
-  sectionIndex: { color: colors.muted, fontSize: 9, fontWeight: '700' },
-  sectionName: { color: colors.text, flex: 1, fontSize: 10, fontWeight: '900', letterSpacing: 1.3 },
-  sectionMeta: { color: colors.text, fontSize: 9, fontWeight: '700' },
-  balance: { color: colors.text, fontSize: 56, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: -3.2, marginVertical: 22 },
-  metrics: { borderBottomColor: colors.border, borderBottomWidth: 1, borderTopColor: colors.border, borderTopWidth: 1, flexDirection: 'row' },
-  metric: { borderRightColor: colors.border, borderRightWidth: 1, flex: 1, gap: 6, paddingHorizontal: 9, paddingVertical: 13 },
-  metricLabel: { color: colors.muted, fontSize: 8, fontWeight: '700', letterSpacing: 1 },
-  metricValue: { color: colors.text, fontSize: 16, fontVariant: ['tabular-nums'], fontWeight: '800' },
+  safeArea: { backgroundColor: semanticColors.night, flex: 1 },
+  content: { backgroundColor: semanticColors.night, gap: 12, padding: 12, paddingBottom: 28 },
+  masthead: { alignItems: 'center', flexDirection: 'row', minHeight: touchMinimum, paddingHorizontal: 4 },
+  mastheadCopy: { flex: 1, minWidth: 0 },
+  wordmark: { color: semanticColors.textPrimary, fontSize: 18, fontWeight: '900', letterSpacing: -0.7 },
+  mastheadMeta: { color: semanticColors.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 1, marginTop: 2 },
+  account: { alignItems: 'center', justifyContent: 'center', minHeight: touchMinimum, paddingHorizontal: 10 },
+  accountText: { color: semanticColors.textPrimary, fontSize: 12, fontWeight: '800', letterSpacing: 0.7 },
+  hero: { minHeight: 250, overflow: 'hidden', padding: 20 },
+  signalRail: { backgroundColor: semanticColors.signal, bottom: 0, left: 0, position: 'absolute', top: 0, width: 4 },
+  eyebrow: { color: semanticColors.textQuietRaised, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
+  heroTitle: { color: semanticColors.textPrimary, fontSize: 34, fontWeight: '900', letterSpacing: -1.6, lineHeight: 37, marginTop: 30 },
+  heroBody: { color: semanticColors.textMuted, fontSize: typography.bodyMobile.fontSize, lineHeight: typography.bodyMobile.lineHeight, marginTop: 18, maxWidth: 310 },
+  adaptivePanel: { borderColor: semanticColors.signal, minHeight: 240, padding: 18 },
+  sectionTopline: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
+  signalLabel: { color: semanticColors.signal, fontSize: 11, fontWeight: '900', letterSpacing: 1.2 },
+  sectionName: { color: semanticColors.textPrimary, flex: 1, fontSize: 12, fontWeight: '900', letterSpacing: 1.1 },
+  sectionMeta: { color: semanticColors.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 0.7 },
+  actionTitle: { color: semanticColors.textPrimary, fontSize: 28, fontWeight: '900', letterSpacing: -1, lineHeight: 32, marginTop: 30 },
+  actionBody: { color: semanticColors.textMuted, fontSize: 14, lineHeight: 21, marginTop: 8 },
+  primaryAction: { marginTop: 'auto' },
+  portfolio: { padding: 18 },
+  balance: { color: semanticColors.dataValue, fontSize: 48, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: -2.4, marginVertical: 24 },
+  metrics: { borderBottomColor: semanticColors.borderStrong, borderBottomWidth: 1, borderTopColor: semanticColors.borderStrong, borderTopWidth: 1, flexDirection: 'row' },
+  metric: { borderRightColor: semanticColors.borderStrong, borderRightWidth: 1, flex: 1, gap: 7, minWidth: 0, paddingHorizontal: 8, paddingVertical: 13 },
+  metricLast: { borderRightWidth: 0 },
+  metricLabel: { color: semanticColors.textQuietRaised, fontSize: 11, fontWeight: '700', letterSpacing: 0.7 },
+  metricValue: { color: semanticColors.dataValue, fontSize: 15, fontVariant: ['tabular-nums'], fontWeight: '800' },
   loadingRow: { alignItems: 'center', flexDirection: 'row', gap: 10, minHeight: 136 },
-  loadingText: { color: colors.muted, fontSize: 9, fontWeight: '700', letterSpacing: 1 },
-  errorBand: { backgroundColor: colors.danger, marginTop: 12, minHeight: 44, padding: 12 },
-  errorText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
-  actionSplit: { borderBottomColor: colors.border, borderBottomWidth: 1, borderTopColor: colors.border, borderTopWidth: 1, flexDirection: 'row' },
-  splitAction: { backgroundColor: '#FFFFFF', flex: 1, minHeight: 112, padding: 12 },
-  splitActionInverted: { backgroundColor: '#050505' },
-  splitIndex: { color: colors.muted, fontSize: 9 },
-  splitLabel: { color: colors.text, fontSize: 15, fontWeight: '900', marginTop: 'auto' },
-  splitArrow: { color: colors.text, fontSize: 20, position: 'absolute', right: 12, top: 10 },
-  splitTextInverted: { color: '#FFFFFF' },
-  recentSection: { paddingHorizontal: 14, paddingTop: 22 },
-  viewAll: { justifyContent: 'center', minHeight: 44 },
-  viewAllText: { color: colors.text, fontSize: 9, fontWeight: '800' },
+  loadingText: { color: semanticColors.textMuted, fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  errorBand: { borderColor: semanticColors.negative, borderRadius: geometry.radiusControl, borderWidth: 1, gap: 6, marginTop: 14, minHeight: touchMinimum, padding: 12 },
+  errorText: { color: semanticColors.negative, fontSize: 12, fontWeight: '800' },
+  retryText: { color: semanticColors.textPrimary, fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  quickActions: { flexDirection: 'row', gap: 10 },
+  quickAction: { alignItems: 'flex-end', backgroundColor: semanticColors.field, borderColor: semanticColors.borderStrong, borderRadius: geometry.radiusControl, borderWidth: 1, flex: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 96, padding: 14 },
+  quickActionPrimary: { backgroundColor: semanticColors.signal, borderColor: semanticColors.signal },
+  quickActionText: { color: semanticColors.textPrimary, flex: 1, fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
+  quickActionTextPrimary: { color: semanticColors.onSignal },
+  quickActionArrow: { color: semanticColors.textPrimary, fontSize: 20 },
+  pressed: { opacity: 0.82 },
+  recentPanel: { padding: 18 },
+  viewAll: { alignItems: 'center', justifyContent: 'center', minHeight: touchMinimum, paddingLeft: 10 },
+  viewAllText: { color: semanticColors.textPrimary, fontSize: 11, fontWeight: '900', letterSpacing: 0.4 },
   empty: { gap: 8, minHeight: 180, paddingVertical: 50 },
-  emptyTitle: { color: colors.text, fontSize: 26, fontWeight: '900' },
-  emptyText: { color: colors.muted, fontSize: 12 },
+  emptyTitle: { color: semanticColors.textPrimary, fontSize: 26, fontWeight: '900' },
+  emptyText: { color: semanticColors.textMuted, fontSize: 14, lineHeight: 21 },
 });

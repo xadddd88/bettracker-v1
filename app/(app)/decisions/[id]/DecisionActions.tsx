@@ -7,6 +7,11 @@ import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
 import { bucketOdds, bucketStake } from '@/lib/analytics/buckets'
 import RiskEvaluator from '@/components/risk/RiskEvaluator'
+import {
+  BroadcastButton,
+  BroadcastPanel,
+  BroadcastStatus,
+} from '@/components/ui/BroadcastNoir'
 
 interface Props {
   decisionId: string
@@ -136,11 +141,12 @@ export default function DecisionActions({
       )}
 
       {showStake && !showRisk && (
-        <div className="card border border-indigo-800 flex flex-col gap-3">
-          <p className="text-sm text-gray-300">
+        <BroadcastPanel className="flex flex-col gap-3 border-bn-review p-4">
+          <label className="text-sm text-bn-muted" htmlFor="decision-stake">
             {labels?.stakePrompt ?? 'Enter stake amount'}{offeredOdds ? ` (odds: ${offeredOdds})` : ''}:
-          </p>
+          </label>
           <input
+            id="decision-stake"
             className="input"
             type="number"
             step="0.01"
@@ -151,21 +157,21 @@ export default function DecisionActions({
             autoFocus
           />
           <div className="flex flex-col gap-2 sm:flex-row">
-            <button className="btn-primary w-full sm:flex-1" onClick={handleRiskCheck} disabled={saving}>
+            <BroadcastButton className="w-full sm:flex-1" onClick={handleRiskCheck} disabled={saving}>
               {labels?.checkRisk ?? 'Check Risk'}
-            </button>
-            <button className="btn-ghost w-full sm:w-auto" onClick={() => { setShowStake(false); setStakeInput('') }}>
+            </BroadcastButton>
+            <BroadcastButton tone="secondary" className="w-full sm:w-auto" onClick={() => { setShowStake(false); setStakeInput('') }}>
               {labels?.cancel ?? 'Cancel'}
-            </button>
+            </BroadcastButton>
           </div>
-        </div>
+        </BroadcastPanel>
       )}
 
       {!showStake && (
         <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
           {canPlaceBet && (
-            <button
-              className="btn-primary w-full sm:flex-1"
+            <BroadcastButton
+              className="w-full sm:flex-1"
               onClick={() => {
                 trackClientEvent(EVENTS.DECISION_ACTION_PLACE_CLICKED, {
                   decision_id: decisionId,
@@ -177,34 +183,34 @@ export default function DecisionActions({
               disabled={saving}
             >
               {labels?.placeBet ?? 'Place Bet'}
-            </button>
+            </BroadcastButton>
           )}
           {canWatch && (
-            <button
-              className="w-full sm:flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50"
+            <BroadcastButton
+              tone="secondary"
+              className="w-full sm:flex-1"
               onClick={() => handleAction('watchlisted')}
               disabled={saving}
             >
               {labels?.watch ?? 'Watch'}
-            </button>
+            </BroadcastButton>
           )}
-          <button
-            className="w-full sm:flex-1 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50"
+          <BroadcastButton
+            tone="secondary"
+            className="w-full sm:flex-1"
             onClick={() => handleAction('skipped')}
             disabled={saving}
           >
             {labels?.skip ?? 'Skip'}
-          </button>
+          </BroadcastButton>
         </div>
       )}
 
       {error && (
-        <div className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
-          {error}
-        </div>
+        <BroadcastStatus className="w-full" status="negative">{error}</BroadcastStatus>
       )}
 
-      <p className="text-xs text-gray-600 text-center">
+      <p className="text-center text-xs text-bn-quiet">
         {labels?.helper ?? 'Skipping or watching is a valid decision - it will be saved to your history.'}
       </p>
     </div>

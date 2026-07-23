@@ -14,6 +14,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { semanticColors } from '@/ui/theme';
+
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type MotionPressableProps = PropsWithChildren<
@@ -68,6 +70,6 @@ export function MotionPressable({
 
 const styles = StyleSheet.create({
   wipe: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: semanticColors.textPrimary,
   },
 });

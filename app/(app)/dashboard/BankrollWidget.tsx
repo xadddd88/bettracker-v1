@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation'
 
 interface Props {
   balance: number
-  sym: string
+  currency: string
 }
 
-export default function BankrollWidget({ balance, sym }: Props) {
+export default function BankrollWidget({ balance, currency }: Props) {
   const router = useRouter()
   const [open,    setOpen]    = useState(false)
   const [type,    setType]    = useState<'deposit' | 'withdrawal'>('deposit')
@@ -50,12 +50,12 @@ export default function BankrollWidget({ balance, sym }: Props) {
   }
 
   return (
-    <div className="relative overflow-hidden">
+    <div>
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <div className="font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-black/45">Available bankroll</div>
-          <div className={`mt-3 font-display text-[clamp(3.4rem,9vw,7.8rem)] font-black leading-[0.82] tracking-[-0.075em] ${balance < 0 ? 'text-red-700' : 'text-black'}`}>
-            {sym}{balance.toFixed(2)}
+          <div className="font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-bn-quiet">Available bankroll</div>
+          <div className={`mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] ${balance < 0 ? 'text-bn-negative' : 'text-bn-data'}`}>
+            {formatMoney(balance, currency)}
           </div>
         </div>
 
@@ -78,16 +78,16 @@ export default function BankrollWidget({ balance, sym }: Props) {
       </div>
 
       {open && (
-        <div className="mt-8 flex flex-col gap-4 border-t border-black pt-5">
-          <div className="flex w-fit border border-black text-xs">
+        <div className="mt-8 flex flex-col gap-4 border-t border-bn-border-strong pt-5">
+          <div className="flex w-fit rounded-control border border-bn-border-strong text-xs">
             {(['deposit', 'withdrawal'] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setType(t)}
-                className={`min-h-11 px-4 font-black uppercase tracking-[0.08em] transition-colors ${
+                className={`min-h-11 rounded-control px-4 font-black uppercase tracking-[0.08em] transition-colors ${
                   type === t
-                    ? 'editorial-dark bg-[#050505] text-white'
-                    : 'bg-white text-black hover:bg-[#e8ff00]'
+                    ? 'bg-bn-signal text-bn-on-signal'
+                    : 'bg-bn-field text-bn-text hover:bg-bn-raised'
                 }`}
               >
                 {t === 'deposit' ? 'Deposit' : 'Withdraw'}
@@ -98,6 +98,7 @@ export default function BankrollWidget({ balance, sym }: Props) {
           <div className="flex flex-wrap items-start gap-3">
             <input
               className="input w-40 text-sm"
+              aria-label="Bankroll amount"
               type="number"
               min="0.01"
               step="0.01"
@@ -108,6 +109,7 @@ export default function BankrollWidget({ balance, sym }: Props) {
             />
             <input
               className="input min-w-40 flex-1 text-sm"
+              aria-label="Bankroll note"
               type="text"
               placeholder="Note (optional)"
               value={note}
@@ -127,9 +129,19 @@ export default function BankrollWidget({ balance, sym }: Props) {
             </div>
           </div>
 
-          {error && <p className="text-xs font-semibold text-red-700">{error}</p>}
+          {error && <p aria-live="polite" className="text-xs font-semibold text-bn-negative">{error}</p>}
         </div>
       )}
     </div>
   )
+}
+
+function formatMoney(value: number, currency: string) {
+  return new Intl.NumberFormat('en', {
+    currency,
+    currencyDisplay: 'narrowSymbol',
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+    style: 'currency',
+  }).format(value)
 }
