@@ -21,7 +21,12 @@ function periodLabel(days: number): string {
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
 }
 
 // ─── Calibration grade badge ──────────────────────────────────
@@ -226,14 +231,14 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
         {/* Period selector */}
         <div>
           <label className="label mb-2">Period</label>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {PERIODS.map(p => (
               <BroadcastButton
                 key={p.value}
                 onClick={() => setPeriodDays(p.value)}
                 disabled={!canRun}
                 aria-pressed={periodDays === p.value}
-                className="flex-1"
+                className="w-full"
                 tone={periodDays === p.value ? 'primary' : 'secondary'}
               >
                 {p.label}

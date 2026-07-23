@@ -38,7 +38,7 @@ const VIEWPORTS = [
   { width: 1024, height: 900 },
   { width: 1440, height: 1000 },
 ]
-const ROUTES = ['/dashboard', '/ai', '/bets/new']
+const ROUTES = ['/dashboard', '/ai', '/bets/new', '/bankroll', '/coach']
 
 function normalizeHostname(urlValue) {
   try {
@@ -403,6 +403,33 @@ const supabaseStub = createServer((request, response) => {
     jsonResponse(response, 200, { balance: 1000, currency: 'USD' }, { 'content-range': '0-0/1' })
     return
   }
+  if (url.pathname === '/rest/v1/bankroll_transactions') {
+    jsonResponse(response, 200, [{
+      id: '00000000-0000-4000-8000-000000000002',
+      user_id: TEST_USER_ID,
+      bankroll_id: '00000000-0000-4000-8000-000000000003',
+      type: 'deposit',
+      amount: 250.5,
+      balance_after: 1000,
+      created_at: '2026-07-22T23:30:00.000Z',
+    }], { 'content-range': '0-0/1' })
+    return
+  }
+  if (url.pathname === '/rest/v1/coaching_sessions') {
+    jsonResponse(response, 200, [{
+      id: '00000000-0000-4000-8000-000000000004',
+      user_id: TEST_USER_ID,
+      period_days: 30,
+      bets_analysed: 5,
+      decisions_analysed: 5,
+      summary: 'Acceptance coaching summary.',
+      strengths: [],
+      weaknesses: [],
+      recommendations: [],
+      created_at: '2026-07-22T23:30:00.000Z',
+    }], { 'content-range': '0-0/1' })
+    return
+  }
   if (url.pathname === '/rest/v1/profiles') {
     jsonResponse(response, 200, { onboarding_completed: true }, { 'content-range': '0-0/1' })
     return
@@ -439,7 +466,12 @@ try {
   browser = await chromium.launch({ headless: true })
 
   for (const viewport of VIEWPORTS) {
-    const context = await browser.newContext({ serviceWorkers: 'block', viewport })
+    const context = await browser.newContext({
+      locale: 'uk-UA',
+      serviceWorkers: 'block',
+      timezoneId: 'Europe/Kyiv',
+      viewport,
+    })
     await context.routeWebSocket(/.*/, async webSocketRoute => {
       const url = webSocketRoute.url()
       if (isLoopback(url)) {
@@ -524,6 +556,8 @@ try {
   assert.deepEqual(browserConsoleErrors, [], 'Authenticated acceptance pages must have no application console errors')
   assert.ok(stubRequests.some(request => request === 'GET /auth/v1/user'), 'Acceptance must exercise the real auth contract through the local stub')
   assert.ok(stubRequests.some(request => request === 'GET /rest/v1/bets'), 'Dashboard acceptance must exercise local data reads')
+  assert.ok(stubRequests.some(request => request === 'GET /rest/v1/coaching_sessions'), 'Coach acceptance must exercise local session reads')
+  assert.ok(stubRequests.some(request => request === 'GET /rest/v1/bankroll_transactions'), 'Bankroll acceptance must exercise local transaction reads')
   console.log(`Web acceptance passed: ${VIEWPORTS.length} viewports × ${ROUTES.length} authenticated routes; zero external requests and zero writes.`)
 } catch (error) {
   console.error(error)
