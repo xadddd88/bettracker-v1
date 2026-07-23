@@ -155,11 +155,20 @@ The Integration Draft is acceptable only when:
   no-auto-save, provider, financial, settlement, and Event First boundaries;
 - the integration remains Draft and neither Web nor mobile is production-released.
 
-## Non-blocking P3 follow-up
+## P3 test/docs hardening
 
-1. Rerun axe and overflow checks after interactive states.
-2. Cover overflow of the internal shell scroll container.
-3. Normalize IPv6 loopback `[::1]` in the test harness.
+The local Integration Draft follow-up closes the three P3 items by:
+
+1. rerunning axe, duplicate-ID, document-overflow, and authenticated
+   shell-scroll-container overflow checks after interactive states;
+2. failing closed on every application `console.error`;
+3. directly proving bracketed IPv6 loopback `[::1]` normalization before the
+   hermetic network allowlist is applied.
+
+The supporting `docs/csp-report-only-observation-receipt-065.md` classifies the
+authenticated Preview telemetry/CSP evidence but authorizes no CSP enforcement.
+Exact-head GitHub CI, Vercel Preview, and independent review remain required
+before any Ready decision.
 
 ## Numbering
 

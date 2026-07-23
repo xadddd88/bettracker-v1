@@ -2333,9 +2333,14 @@ production-deployed. Production, Supabase/DB writes or migrations, real
 provider/AI runtime calls, Event First activation, and any new financial or
 settlement runtime remain unauthorized.
 
-**Non-blocking P3 follow-up:** rerun axe/overflow after interactive states; cover
-overflow of the internal shell scroll container; normalize IPv6 loopback
-`[::1]` in the test harness.
+**P3 test/docs hardening:** the local Integration Draft follow-up reruns
+axe/duplicate-ID/document and authenticated shell-scroll-container overflow
+checks after interactive states, directly proves bracketed IPv6 loopback
+`[::1]` normalization, and fails closed on every application `console.error`.
+`docs/csp-report-only-observation-receipt-065.md` classifies the authenticated
+Preview telemetry/CSP observations without authorizing CSP enforcement. The
+three P3 items are closed locally; exact-head GitHub CI, Vercel Preview, and
+independent review remain required before any Ready decision.
 
 **Numbering:** Decision #065 is occupied and ACTIVE. Decision #066 is next
 unreserved.

@@ -40,9 +40,26 @@ const VIEWPORTS = [
 ]
 const ROUTES = ['/dashboard', '/ai', '/bets/new']
 
-function isLoopback(urlValue) {
-  try { return LOOPBACK_HOSTS.has(new URL(urlValue).hostname) } catch { return false }
+function normalizeHostname(urlValue) {
+  try {
+    const hostname = new URL(urlValue).hostname.toLowerCase()
+    return hostname.startsWith('[') && hostname.endsWith(']')
+      ? hostname.slice(1, -1)
+      : hostname
+  } catch {
+    return null
+  }
 }
+
+function isLoopback(urlValue) {
+  const hostname = normalizeHostname(urlValue)
+  return hostname != null && LOOPBACK_HOSTS.has(hostname)
+}
+
+assert.equal(isLoopback('http://127.0.0.1:3000'), true, 'IPv4 loopback must remain allowlisted')
+assert.equal(isLoopback('http://localhost:3000'), true, 'localhost must remain allowlisted')
+assert.equal(isLoopback('http://[::1]:3000'), true, 'bracketed IPv6 loopback must normalize before allowlist matching')
+assert.equal(isLoopback('https://web-acceptance.invalid'), false, 'external hosts must remain blocked')
 
 function jsonResponse(response, status, body, extraHeaders = {}) {
   const payload = JSON.stringify(body)
@@ -164,10 +181,45 @@ async function assertAxe(page, label) {
   )
 }
 
+async function assertNoHorizontalOverflow(page, label) {
+  const metrics = await page.evaluate(() => {
+    const main = document.querySelector('main')
+    const shellScrollContainer = main?.parentElement
+    return {
+      document: {
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      },
+      shell: shellScrollContainer instanceof HTMLElement
+        ? {
+            clientWidth: shellScrollContainer.clientWidth,
+            scrollWidth: shellScrollContainer.scrollWidth,
+          }
+        : null,
+    }
+  })
+
+  assert.ok(metrics.shell, `${label} must expose the authenticated shell scroll container`)
+  assert.ok(
+    metrics.document.scrollWidth <= metrics.document.clientWidth,
+    `${label} document must not overflow horizontally (${metrics.document.scrollWidth}px > ${metrics.document.clientWidth}px)`,
+  )
+  assert.ok(
+    metrics.shell.scrollWidth <= metrics.shell.clientWidth,
+    `${label} shell scroll container must not overflow horizontally (${metrics.shell.scrollWidth}px > ${metrics.shell.clientWidth}px)`,
+  )
+}
+
+async function assertInteractiveAcceptance(page, label) {
+  await assertNoHorizontalOverflow(page, label)
+  await assertNoDuplicateIds(page, label)
+  await assertAxe(page, label)
+}
+
 async function assertBaseAcceptance(page, route, viewport) {
   assert.equal(new URL(page.url()).pathname, route, `${route} must render authenticated content`)
   assert.equal(await page.locator('main').count(), 1, `${route} must expose exactly one main landmark`)
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true, `${route} must not overflow at ${viewport.width}px`)
+  await assertNoHorizontalOverflow(page, `${route} at ${viewport.width}px`)
   await assertNoDuplicateIds(page, `${route} at ${viewport.width}px`)
   await assertAxe(page, `${route} at ${viewport.width}px`)
 }
@@ -190,6 +242,8 @@ async function assertAiLabels(page) {
   const sportButtons = sportGroup.getByRole('button')
   assert.equal(await sportButtons.count(), 7, 'Sport choices must remain complete')
   assert.equal(await sportButtons.evaluateAll(buttons => buttons.every(button => button.hasAttribute('aria-pressed'))), true, 'Sport choices must expose selected state')
+  await sportButtons.last().click()
+  assert.equal(await sportButtons.last().getAttribute('aria-pressed'), 'true', 'Sport selection must expose its interactive selected state')
 }
 
 async function assertTrackerLabels(page, exerciseDynamicLegs) {
@@ -226,6 +280,7 @@ async function assertFeedbackFocus(page, feedbackStubs) {
   await dialog.waitFor()
   const headerClose = dialog.locator('button[aria-label="Close"]')
   assert.equal(await headerClose.evaluate(element => element === document.activeElement), true, 'Feedback must focus Close initially')
+  await assertInteractiveAcceptance(page, 'Dashboard with feedback dialog open')
 
   await page.keyboard.press('Shift+Tab')
   assert.equal(await dialog.getByRole('button', { name: 'Send feedback' }).evaluate(element => element === document.activeElement), true, 'Shift+Tab must wrap to the final control')
@@ -251,6 +306,7 @@ async function assertFeedbackFocus(page, feedbackStubs) {
   await dialog.getByText('Feedback sent').waitFor()
   assert.equal(await page.evaluate(() => document.activeElement?.textContent?.includes('Feedback sent') ?? false), true, 'Successful submit must move focus after Submit is removed')
   assert.equal(await dialog.getByRole('button', { name: 'Send feedback' }).count(), 0, 'Successful submit must remove Submit')
+  await assertInteractiveAcceptance(page, 'Dashboard with feedback success state')
   await dialog.getByRole('button', { name: 'Close', exact: true }).last().click()
   await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Open feedback form')
   assert.equal(await trigger.evaluate(element => element === document.activeElement), true, 'Success Close must restore the original trigger')
@@ -375,6 +431,7 @@ const externalRequests = []
 const forbiddenWebSocketAttempts = []
 const observedExternalWebSockets = []
 const browserErrors = []
+const browserConsoleErrors = []
 const feedbackStubs = { count: 0 }
 
 try {
@@ -429,6 +486,12 @@ try {
       const page = await context.newPage()
       await page.addInitScript({ content: axe.source })
       page.on('pageerror', error => browserErrors.push(`${route} at ${viewport.width}px: ${error.message}`))
+      page.on('console', message => {
+        if (message.type() !== 'error') return
+        const location = message.location()
+        const source = location.url ? ` (${location.url}:${location.lineNumber ?? 0}:${location.columnNumber ?? 0})` : ''
+        browserConsoleErrors.push(`${route} at ${viewport.width}px: ${message.text()}${source}`)
+      })
       page.on('websocket', socket => {
         if (!isLoopback(socket.url())) observedExternalWebSockets.push(socket.url())
       })
@@ -438,6 +501,7 @@ try {
       if (route === '/ai') await assertAiLabels(page)
       if (route === '/bets/new') await assertTrackerLabels(page, viewport.width === 375)
       if (route === '/dashboard' && viewport.width === 375) await assertFeedbackFocus(page, feedbackStubs)
+      await assertInteractiveAcceptance(page, `${route} after interactive checks at ${viewport.width}px`)
       await page.close()
     }
     await context.close()
@@ -457,6 +521,7 @@ try {
   assert.deepEqual(forbiddenStubRequests, [], 'Hermetic Supabase stub must receive zero writes')
   assert.deepEqual(unexpectedStubRequests, [], 'Hermetic Supabase stub must receive only allowlisted auth/data reads')
   assert.deepEqual(browserErrors, [], 'Authenticated acceptance pages must have no uncaught browser errors')
+  assert.deepEqual(browserConsoleErrors, [], 'Authenticated acceptance pages must have no application console errors')
   assert.ok(stubRequests.some(request => request === 'GET /auth/v1/user'), 'Acceptance must exercise the real auth contract through the local stub')
   assert.ok(stubRequests.some(request => request === 'GET /rest/v1/bets'), 'Dashboard acceptance must exercise local data reads')
   console.log(`Web acceptance passed: ${VIEWPORTS.length} viewports × ${ROUTES.length} authenticated routes; zero external requests and zero writes.`)
