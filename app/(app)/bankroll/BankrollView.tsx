@@ -19,16 +19,16 @@ const TX_CONFIG: Record<TxnType, { icon: string; label: string }> = {
 }
 
 function fmtBalance(amount: number, symbol: string): string {
-  return `${symbol}${Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `${symbol}${Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function fmtDelta(amount: number, symbol: string): string {
   const sign = amount >= 0 ? '+' : '−'
-  return `${sign}${symbol}${Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `${sign}${symbol}${Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function fmtDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 }
 
 interface Stats {
@@ -145,13 +145,13 @@ export default function BankrollView({
       <BroadcastPanel className="p-6 text-center sm:p-8">
         <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-quiet">Current Balance</p>
         <BroadcastDataValue className="block font-display text-4xl font-black">
-          {symbol}{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {symbol}{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </BroadcastDataValue>
         <p className="mt-2 text-[11px] text-bn-muted">Deposits + payouts − stakes − withdrawals</p>
       </BroadcastPanel>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="stat-card">
           <p className="stat-label">Deposited</p>
           <BroadcastDataValue className="stat-value">{fmtBalance(stats.totalDeposited, symbol)}</BroadcastDataValue>
@@ -165,7 +165,7 @@ export default function BankrollView({
         <div className="stat-card">
           <p className="stat-label">Net from bets</p>
           <BroadcastDataValue className="stat-value">
-            {stats.netFromBets >= 0 ? '+' : '−'}{symbol}{Math.abs(stats.netFromBets).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {stats.netFromBets >= 0 ? '+' : '−'}{symbol}{Math.abs(stats.netFromBets).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </BroadcastDataValue>
           <p className="mt-0.5 text-[10px] text-bn-quiet">payouts minus stakes</p>
         </div>
