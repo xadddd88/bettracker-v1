@@ -794,7 +794,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               key={s.value}
               onClick={() => setSport(s.value)}
               type="button"
-              className={`min-h-11 rounded-control border px-3 py-2 text-sm font-bold transition-colors ${
+              className={`min-h-11 rounded-control border px-3 py-2 text-sm font-bold ${
                 sport === s.value
                   ? 'border-bn-signal bg-bn-signal text-bn-on-signal'
                   : 'border-bn-border-strong bg-bn-field text-bn-muted hover:border-bn-signal'
