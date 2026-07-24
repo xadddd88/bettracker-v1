@@ -12,6 +12,7 @@
     "smoke:providers": "npm run build:provider-scripts && node build/provider-smoke/scripts/provider-smoke.js",
     "test:provider-safety": "npm run build:provider-scripts && node scripts/test-provider-safety.mjs",
     "test:analysis-quality-gate": "npm run build:provider-scripts && node scripts/test-analysis-quality-gate.mjs",
+    "test:ai-baseline": "npm run build:provider-scripts && node scripts/ai-baseline-harness.mjs",
     "test:financial-safety": "npm run build:provider-scripts && node scripts/test-financial-safety.mjs",
     "test:domain-write-boundaries": "npm run build:provider-scripts && node scripts/test-domain-write-boundaries.mjs",
     "test:agent-write-boundaries": "node scripts/test-agent-write-boundaries.mjs",

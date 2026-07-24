@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "dataset_version": "ai-baseline-v1",
+  "flow": "analyst",
+  "fixtures": [
+    {
+      "id": "analyst-soccer-auto-success",
+      "sport": "soccer",
+      "language": "auto",
+      "class": "success",
+      "input": {"event_name": "North FC - South FC", "market_type": "Match result", "selection": "North FC", "offered_odds": 2.1},
+      "mock_output_template": "analyst_valid",
+      "expected": {"status": 200, "provider_attempts": 1, "persistence_attempts": 1, "schema_valid": true, "language_marker": "BASELINE_AUTO_EN"}
+    },
+    {
+      "id": "analyst-tennis-uk-success",
+      "sport": "tennis",
+      "language": "uk",
+      "class": "success",
+      "input": {"event_name": "Гравець Альфа - Гравець Бета", "market_type": "Переможець матчу", "selection": "Гравець Альфа", "offered_odds": 1.9},
+      "mock_output_template": "analyst_valid",
+      "expected": {"status": 200, "provider_attempts": 1, "persistence_attempts": 1, "schema_valid": true, "language_marker": "БАЗОВИЙ_UK"}
+    },
+    {
+      "id": "analyst-soccer-ru-success",
+      "sport": "soccer",
+      "language": "ru",
+      "class": "success",
+      "input": {"event_name": "Север - Юг", "market_type": "Исход матча", "selection": "Север", "offered_odds": 2.1},
+      "mock_output_template": "analyst_valid",
+      "expected": {"status": 200, "provider_attempts": 1, "persistence_attempts": 1, "schema_valid": true, "language_marker": "БАЗОВЫЙ_RU"}
+    },
+    {
+      "id": "analyst-tennis-en-success",
+      "sport": "tennis",
+      "language": "en",
+      "class": "success",
+      "input": {"event_name": "Player North - Player South", "market_type": "Match winner", "selection": "Player North", "offered_odds": 1.9},
+      "mock_output_template": "analyst_valid",
+      "expected": {"status": 200, "provider_attempts": 1, "persistence_attempts": 1, "schema_valid": true, "language_marker": "BASELINE_EN"}
+    },
+    {
+      "id": "analyst-soccer-es-success",
+      "sport": "soccer",
+      "language": "es",
+      "class": "success",
+      "input": {"event_name": "Norte - Sur", "market_type": "Ganador", "selection": "Norte", "offered_odds": 2.1},
+      "mock_output_template": "analyst_valid",
+      "expected": {"status": 200, "provider_attempts": 1, "persistence_attempts": 1, "schema_valid": true, "language_marker": "BASE_ES"}
+    },
+    {
+      "id": "analyst-tennis-fr-success",
+      "sport": "tennis",
+      "language": "fr",
+      "class": "success",
+      "input": {"event_name": "Joueur Nord - Joueur Sud", "market_type": "Vainqueur", "selection": "Joueur Nord", "offered_odds": 1.9},
+      "mock_output_template": "analyst_valid",
+      "expected": {"status": 200, "provider_attempts": 1, "persistence_attempts": 1, "schema_valid": true, "language_marker": "BASE_FR"}
+    },
+    {
+      "id": "analyst-soccer-de-success",
+      "sport": "soccer",
+      "language": "de",
+      "class": "success",
+      "input": {"event_name": "Nord - Süd", "market_type": "Sieger", "selection": "Nord", "offered_odds": 2.1},
+      "mock_output_template": "analyst_valid",
+      "expected": {"status": 200, "provider_attempts": 1, "persistence_attempts": 1, "schema_valid": true, "language_marker": "BASIS_DE"}
+    },
+    {
+      "id": "analyst-tennis-ar-success",
+      "sport": "tennis",
+      "language": "ar",
+      "class": "success",
+      "input": {"event_name": "اللاعب ألفا - اللاعب بيتا", "market_type": "الفائز", "selection": "اللاعب ألفا", "offered_odds": 1.9},
+      "mock_output_template": "analyst_valid",
+      "expected": {"status": 200, "provider_attempts": 1, "persistence_attempts": 1, "schema_valid": true, "language_marker": "أساس_AR"}
+    },
+    {
+      "id": "analyst-current-research-citation",
+      "sport": "soccer",
+      "language": "en",
+      "class": "success",
+      "input": {"event_name": "North FC - South FC", "market_type": "Match result", "selection": "North FC", "offered_odds": 2.1, "web_search": true},
+      "mock_output_template": "analyst_cited_research",
+      "expected": {"status": 200, "provider_attempts": 1, "persistence_attempts": 1, "schema_valid": true, "web_search_used": true, "bound_citations": 1, "language_marker": "BASELINE_EN"}
+    },
+    {
+      "id": "analyst-pause-turn-continuation",
+      "sport": "soccer",
+      "language": "en",
+      "class": "boundary",
+      "input": {"event_name": "North FC - South FC", "market_type": "Match result", "selection": "North FC", "offered_odds": 2.1},
+      "mock_output_template": "analyst_pause_then_valid",
+      "expected": {"status": 200, "provider_attempts": 2, "persistence_attempts": 1, "schema_valid": true, "language_marker": "BASELINE_EN"}
+    },
+    {
+      "id": "analyst-two-pause-continuations",
+      "sport": "soccer",
+      "language": "en",
+      "class": "boundary",
+      "input": {"event_name": "North FC - South FC", "market_type": "Match result", "selection": "North FC", "offered_odds": 2.1},
+      "mock_output_template": "analyst_two_pauses_then_valid",
+      "expected": {"status": 200, "provider_attempts": 3, "persistence_attempts": 1, "schema_valid": true, "language_marker": "BASELINE_EN"}
+    },
+    {
+      "id": "analyst-pause-continuation-limit",
+      "sport": "soccer",
+      "language": "en",
+      "class": "boundary",
+      "input": {"event_name": "North FC - South FC", "market_type": "Match result", "selection": "North FC", "offered_odds": 2.1},
+      "mock_output_template": "analyst_pause_over_limit",
+      "expected": {"status": 500, "provider_attempts": 3, "persistence_attempts": 0, "schema_valid": false}
+    },
+    {
+      "id": "analyst-live-input-rejected",
+      "sport": "tennis",
+      "language": "en",
+      "class": "boundary",
+      "input": {"event_name": "Player North - Player South", "market_type": "Live winner", "selection": "Player North", "offered_odds": 1.9, "coupon_is_live": true},
+      "mock_output_template": "unreachable",
+      "expected": {"status": 422, "provider_attempts": 0, "persistence_attempts": 0, "schema_valid": false}
+    },
+    {
+      "id": "analyst-malformed-output",
+      "sport": "soccer",
+      "language": "en",
+      "class": "error",
+      "input": {"event_name": "North FC - South FC", "market_type": "Match result", "selection": "North FC", "offered_odds": 2.1},
+      "mock_output_template": "malformed",
+      "expected": {"status": 502, "provider_attempts": 1, "persistence_attempts": 0, "schema_valid": false}
+    }
+  ]
+}

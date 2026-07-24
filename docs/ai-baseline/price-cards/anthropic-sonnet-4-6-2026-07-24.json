@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "price_card_id": "anthropic-sonnet-4-6-standard-global-2026-07-24",
+  "observed_at": "2026-07-24",
+  "currency": "USD",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-6",
+  "pricing_tier": "standard",
+  "scope": "global",
+  "source": "https://www.anthropic.com/claude/sonnet",
+  "per_million_tokens": {
+    "base_input": 3,
+    "output": 15
+  },
+  "excluded_from_estimate": [
+    "prompt-cache writes",
+    "prompt-cache reads",
+    "batch discounts",
+    "long-context premiums",
+    "web-search tool fees",
+    "tax",
+    "contracted discounts"
+  ],
+  "notes": [
+    "This snapshot is used only for reproducible local estimates.",
+    "Provider invoices and usage exports remain the authority for actual cost.",
+    "The current runtime does not capture provider token usage or cache-token categories."
+  ]
+}

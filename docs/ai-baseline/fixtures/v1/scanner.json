@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "dataset_version": "ai-baseline-v1",
+  "flow": "scanner",
+  "fixtures": [
+    {
+      "id": "scanner-football-uk-success",
+      "sport": "soccer",
+      "language": "uk",
+      "class": "success",
+      "media_type": "image/png",
+      "image_fixture": "synthetic-1px-png",
+      "mock_output_template": "scanner_football_uk",
+      "expected": {
+        "status": 200,
+        "provider_attempts": 1,
+        "persistence_attempts": 0,
+        "schema_valid": true,
+        "event_name": "Дніпро - Полісся",
+        "selection": "Дніпро",
+        "hard_fail_if": ["schema rejected", "OCR fields differ", "any persistence"]
+      }
+    },
+    {
+      "id": "scanner-tennis-en-success",
+      "sport": "tennis",
+      "language": "en",
+      "class": "success",
+      "media_type": "image/png",
+      "image_fixture": "synthetic-1px-png",
+      "mock_output_template": "scanner_tennis_en",
+      "expected": {
+        "status": 200,
+        "provider_attempts": 1,
+        "persistence_attempts": 0,
+        "schema_valid": true,
+        "event_name": "Player Alpha - Player Beta",
+        "selection": "Player Alpha",
+        "hard_fail_if": ["schema rejected", "OCR fields differ", "any persistence"]
+      }
+    },
+    {
+      "id": "scanner-missing-legs-fallback",
+      "sport": "soccer",
+      "language": "uk",
+      "class": "boundary",
+      "media_type": "image/png",
+      "image_fixture": "synthetic-1px-png",
+      "mock_output_template": "scanner_missing_legs_then_valid",
+      "expected": {
+        "status": 200,
+        "provider_attempts": 2,
+        "persistence_attempts": 0,
+        "schema_valid": true,
+        "hard_fail_if": ["no fallback", "more than one fallback", "any persistence"]
+      }
+    },
+    {
+      "id": "scanner-malformed-output",
+      "sport": "soccer",
+      "language": "uk",
+      "class": "error",
+      "media_type": "image/png",
+      "image_fixture": "synthetic-1px-png",
+      "mock_output_template": "malformed",
+      "expected": {
+        "status": 422,
+        "provider_attempts": 1,
+        "persistence_attempts": 0,
+        "schema_valid": false,
+        "hard_fail_if": ["accepted malformed output", "any persistence"]
+      }
+    },
+    {
+      "id": "scanner-oversized-input",
+      "sport": "soccer",
+      "language": "uk",
+      "class": "boundary",
+      "media_type": "image/png",
+      "image_fixture": "generated-over-limit",
+      "mock_output_template": "unreachable",
+      "expected": {
+        "status": 413,
+        "provider_attempts": 0,
+        "persistence_attempts": 0,
+        "schema_valid": false,
+        "hard_fail_if": ["provider called", "any persistence"]
+      }
+    }
+  ]
+}

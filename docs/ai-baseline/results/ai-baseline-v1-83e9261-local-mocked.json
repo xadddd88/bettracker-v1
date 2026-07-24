@@ -1,0 +1,1525 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-24T07:54:57.784Z",
+  "status": "BASELINE HARNESS PASS; NOT SCALE READY",
+  "runtime": {
+    "repository": "xadddd88/bettracker-v1",
+    "commit": "83e92616e2a485b351c41317e4034394bf0eee0b",
+    "tree": "a8a11fed1e9d30ec5a65e9043a2b5e2db9322590",
+    "harness_worktree_head": "83e92616e2a485b351c41317e4034394bf0eee0b",
+    "runtime_files_changed": [],
+    "evidence": {
+      "scanner": "app/api/ai/scanner/route.ts",
+      "analyst": "app/api/ai/analyst/route.ts",
+      "analyst_continuation": "lib/ai/analyst-research.ts",
+      "scout": "app/api/scout/route.ts",
+      "coach": "app/api/coach/route.ts",
+      "rate_limits": "lib/rate-limit.ts"
+    }
+  },
+  "dataset": {
+    "version": "ai-baseline-v1",
+    "fixture_count": 38,
+    "files": [
+      "docs/ai-baseline/fixtures/v1/scanner.json",
+      "docs/ai-baseline/fixtures/v1/analyst.json",
+      "docs/ai-baseline/fixtures/v1/scout.json",
+      "docs/ai-baseline/fixtures/v1/coach.json"
+    ],
+    "contract": "docs/ai-baseline/fixtures/v1/contracts.json"
+  },
+  "documentation": {
+    "checked_internal_links": [
+      {
+        "document": "docs/ai-baseline/README.md",
+        "target": "../adr/ADR-011-scale-readiness-ai-economics.md"
+      },
+      {
+        "document": "docs/ai-baseline/README.md",
+        "target": "protocol.md"
+      },
+      {
+        "document": "docs/ai-baseline/README.md",
+        "target": "fixtures/v1/contracts.json"
+      },
+      {
+        "document": "docs/ai-baseline/README.md",
+        "target": "fixtures/v1/scanner.json"
+      },
+      {
+        "document": "docs/ai-baseline/README.md",
+        "target": "fixtures/v1/analyst.json"
+      },
+      {
+        "document": "docs/ai-baseline/README.md",
+        "target": "fixtures/v1/scout.json"
+      },
+      {
+        "document": "docs/ai-baseline/README.md",
+        "target": "fixtures/v1/coach.json"
+      },
+      {
+        "document": "docs/ai-baseline/README.md",
+        "target": "price-cards/anthropic-sonnet-4-6-2026-07-24.json"
+      },
+      {
+        "document": "docs/ai-baseline/README.md",
+        "target": "results/ai-baseline-v1-83e9261-local-mocked.json"
+      },
+      {
+        "document": "docs/ai-baseline/README.md",
+        "target": "results/ai-baseline-v1-83e9261-local-mocked.md"
+      },
+      {
+        "document": "docs/ai-baseline/protocol.md",
+        "target": "fixtures/v1/contracts.json"
+      },
+      {
+        "document": "docs/ai-baseline/protocol.md",
+        "target": "../../app/api/ai/scanner/route.ts"
+      },
+      {
+        "document": "docs/ai-baseline/protocol.md",
+        "target": "../../app/api/ai/analyst/route.ts"
+      },
+      {
+        "document": "docs/ai-baseline/protocol.md",
+        "target": "../../lib/ai/analyst-research.ts"
+      },
+      {
+        "document": "docs/ai-baseline/protocol.md",
+        "target": "../../supabase/migrations/017_prepare_domain_write_boundaries.sql"
+      },
+      {
+        "document": "docs/ai-baseline/protocol.md",
+        "target": "../../app/api/scout/route.ts"
+      },
+      {
+        "document": "docs/ai-baseline/protocol.md",
+        "target": "../../supabase/migrations/019_prepare_agent_write_boundaries.sql"
+      },
+      {
+        "document": "docs/ai-baseline/protocol.md",
+        "target": "../../app/api/coach/route.ts"
+      },
+      {
+        "document": "docs/ai-baseline/protocol.md",
+        "target": "../../supabase/migrations/019_prepare_agent_write_boundaries.sql"
+      },
+      {
+        "document": "docs/ai-baseline/protocol.md",
+        "target": "../../lib/ai/analysis-quality-gate.ts"
+      },
+      {
+        "document": "docs/ai-baseline/protocol.md",
+        "target": "price-cards/anthropic-sonnet-4-6-2026-07-24.json"
+      }
+    ]
+  },
+  "environment": {
+    "node": "v24.18.0",
+    "platform": "win32",
+    "arch": "x64",
+    "logical_cpu_count": 24,
+    "total_memory_bytes": 68498386944,
+    "execution_class": "LOCAL MOCKED ROUTE OVERHEAD"
+  },
+  "fixtures": [
+    {
+      "fixture_id": "scanner-football-uk-success",
+      "flow": "scanner",
+      "sport": "soccer",
+      "language": "uk",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "persistence_rpc": [],
+      "latency_ms": 3.27,
+      "language_consistent_at_route_output": null,
+      "hard_failures": [],
+      "extracted": {
+        "event_name": "Дніпро - Полісся",
+        "selection": "Дніпро",
+        "leg_count": 1
+      }
+    },
+    {
+      "fixture_id": "scanner-tennis-en-success",
+      "flow": "scanner",
+      "sport": "tennis",
+      "language": "en",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "persistence_rpc": [],
+      "latency_ms": 0.487,
+      "language_consistent_at_route_output": null,
+      "hard_failures": [],
+      "extracted": {
+        "event_name": "Player Alpha - Player Beta",
+        "selection": "Player Alpha",
+        "leg_count": 1
+      }
+    },
+    {
+      "fixture_id": "scanner-missing-legs-fallback",
+      "flow": "scanner",
+      "sport": "soccer",
+      "language": "uk",
+      "class": "boundary",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 2,
+      "persistence_attempts": 0,
+      "persistence_rpc": [],
+      "latency_ms": 0.506,
+      "language_consistent_at_route_output": null,
+      "hard_failures": [],
+      "extracted": {
+        "event_name": "Дніпро - Полісся",
+        "selection": "Дніпро",
+        "leg_count": 1
+      }
+    },
+    {
+      "fixture_id": "scanner-malformed-output",
+      "flow": "scanner",
+      "sport": "soccer",
+      "language": "uk",
+      "class": "error",
+      "status": 422,
+      "schema_valid": false,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "persistence_rpc": [],
+      "latency_ms": 0.705,
+      "language_consistent_at_route_output": null,
+      "hard_failures": []
+    },
+    {
+      "fixture_id": "scanner-oversized-input",
+      "flow": "scanner",
+      "sport": "soccer",
+      "language": "uk",
+      "class": "boundary",
+      "status": 413,
+      "schema_valid": false,
+      "provider_attempts": 0,
+      "persistence_attempts": 0,
+      "persistence_rpc": [],
+      "latency_ms": 8.468,
+      "language_consistent_at_route_output": null,
+      "hard_failures": []
+    },
+    {
+      "fixture_id": "analyst-soccer-auto-success",
+      "flow": "analyst",
+      "sport": "soccer",
+      "language": "auto",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_analysis_decision"
+      ],
+      "latency_ms": 3.16,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "quality_gate_executed": true,
+      "pricing_suppressed": true,
+      "research": {
+        "web_search_used": false,
+        "source_count": 0,
+        "bound_claim_count": 0
+      }
+    },
+    {
+      "fixture_id": "analyst-tennis-uk-success",
+      "flow": "analyst",
+      "sport": "tennis",
+      "language": "uk",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_analysis_decision"
+      ],
+      "latency_ms": 0.565,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "quality_gate_executed": true,
+      "pricing_suppressed": true,
+      "research": {
+        "web_search_used": false,
+        "source_count": 0,
+        "bound_claim_count": 0
+      }
+    },
+    {
+      "fixture_id": "analyst-soccer-ru-success",
+      "flow": "analyst",
+      "sport": "soccer",
+      "language": "ru",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_analysis_decision"
+      ],
+      "latency_ms": 0.325,
+      "language_consistent_at_route_output": false,
+      "hard_failures": [],
+      "quality_gate_executed": true,
+      "pricing_suppressed": true,
+      "research": {
+        "web_search_used": false,
+        "source_count": 0,
+        "bound_claim_count": 0
+      }
+    },
+    {
+      "fixture_id": "analyst-tennis-en-success",
+      "flow": "analyst",
+      "sport": "tennis",
+      "language": "en",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_analysis_decision"
+      ],
+      "latency_ms": 0.422,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "quality_gate_executed": true,
+      "pricing_suppressed": true,
+      "research": {
+        "web_search_used": false,
+        "source_count": 0,
+        "bound_claim_count": 0
+      }
+    },
+    {
+      "fixture_id": "analyst-soccer-es-success",
+      "flow": "analyst",
+      "sport": "soccer",
+      "language": "es",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_analysis_decision"
+      ],
+      "latency_ms": 0.351,
+      "language_consistent_at_route_output": false,
+      "hard_failures": [],
+      "quality_gate_executed": true,
+      "pricing_suppressed": true,
+      "research": {
+        "web_search_used": false,
+        "source_count": 0,
+        "bound_claim_count": 0
+      }
+    },
+    {
+      "fixture_id": "analyst-tennis-fr-success",
+      "flow": "analyst",
+      "sport": "tennis",
+      "language": "fr",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_analysis_decision"
+      ],
+      "latency_ms": 0.298,
+      "language_consistent_at_route_output": false,
+      "hard_failures": [],
+      "quality_gate_executed": true,
+      "pricing_suppressed": true,
+      "research": {
+        "web_search_used": false,
+        "source_count": 0,
+        "bound_claim_count": 0
+      }
+    },
+    {
+      "fixture_id": "analyst-soccer-de-success",
+      "flow": "analyst",
+      "sport": "soccer",
+      "language": "de",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_analysis_decision"
+      ],
+      "latency_ms": 0.256,
+      "language_consistent_at_route_output": false,
+      "hard_failures": [],
+      "quality_gate_executed": true,
+      "pricing_suppressed": true,
+      "research": {
+        "web_search_used": false,
+        "source_count": 0,
+        "bound_claim_count": 0
+      }
+    },
+    {
+      "fixture_id": "analyst-tennis-ar-success",
+      "flow": "analyst",
+      "sport": "tennis",
+      "language": "ar",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_analysis_decision"
+      ],
+      "latency_ms": 0.268,
+      "language_consistent_at_route_output": false,
+      "hard_failures": [],
+      "quality_gate_executed": true,
+      "pricing_suppressed": true,
+      "research": {
+        "web_search_used": false,
+        "source_count": 0,
+        "bound_claim_count": 0
+      }
+    },
+    {
+      "fixture_id": "analyst-current-research-citation",
+      "flow": "analyst",
+      "sport": "soccer",
+      "language": "en",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_analysis_decision"
+      ],
+      "latency_ms": 1.675,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "quality_gate_executed": true,
+      "pricing_suppressed": true,
+      "research": {
+        "web_search_used": true,
+        "source_count": 1,
+        "bound_claim_count": 1
+      }
+    },
+    {
+      "fixture_id": "analyst-pause-turn-continuation",
+      "flow": "analyst",
+      "sport": "soccer",
+      "language": "en",
+      "class": "boundary",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 2,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_analysis_decision"
+      ],
+      "latency_ms": 0.431,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "quality_gate_executed": true,
+      "pricing_suppressed": true,
+      "research": {
+        "web_search_used": false,
+        "source_count": 0,
+        "bound_claim_count": 0
+      }
+    },
+    {
+      "fixture_id": "analyst-two-pause-continuations",
+      "flow": "analyst",
+      "sport": "soccer",
+      "language": "en",
+      "class": "boundary",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 3,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_analysis_decision"
+      ],
+      "latency_ms": 0.254,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "quality_gate_executed": true,
+      "pricing_suppressed": true,
+      "research": {
+        "web_search_used": false,
+        "source_count": 0,
+        "bound_claim_count": 0
+      }
+    },
+    {
+      "fixture_id": "analyst-pause-continuation-limit",
+      "flow": "analyst",
+      "sport": "soccer",
+      "language": "en",
+      "class": "boundary",
+      "status": 500,
+      "schema_valid": false,
+      "provider_attempts": 3,
+      "persistence_attempts": 0,
+      "persistence_rpc": [],
+      "latency_ms": 0.336,
+      "language_consistent_at_route_output": true,
+      "hard_failures": []
+    },
+    {
+      "fixture_id": "analyst-live-input-rejected",
+      "flow": "analyst",
+      "sport": "tennis",
+      "language": "en",
+      "class": "boundary",
+      "status": 422,
+      "schema_valid": false,
+      "provider_attempts": 0,
+      "persistence_attempts": 0,
+      "persistence_rpc": [],
+      "latency_ms": 0.073,
+      "language_consistent_at_route_output": true,
+      "hard_failures": []
+    },
+    {
+      "fixture_id": "analyst-malformed-output",
+      "flow": "analyst",
+      "sport": "soccer",
+      "language": "en",
+      "class": "error",
+      "status": 502,
+      "schema_valid": false,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "persistence_rpc": [],
+      "latency_ms": 0.159,
+      "language_consistent_at_route_output": true,
+      "hard_failures": []
+    },
+    {
+      "fixture_id": "scout-soccer-auto-success",
+      "flow": "scout",
+      "sport": "soccer",
+      "language": "auto",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_market_opportunities"
+      ],
+      "latency_ms": 0.844,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "pricing_suppressed": true,
+      "fallback_used": false
+    },
+    {
+      "fixture_id": "scout-tennis-uk-success",
+      "flow": "scout",
+      "sport": "tennis",
+      "language": "uk",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_market_opportunities"
+      ],
+      "latency_ms": 0.175,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "pricing_suppressed": true,
+      "fallback_used": false
+    },
+    {
+      "fixture_id": "scout-soccer-ru-success",
+      "flow": "scout",
+      "sport": "soccer",
+      "language": "ru",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_market_opportunities"
+      ],
+      "latency_ms": 0.228,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "pricing_suppressed": true,
+      "fallback_used": false
+    },
+    {
+      "fixture_id": "scout-tennis-en-success",
+      "flow": "scout",
+      "sport": "tennis",
+      "language": "en",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_market_opportunities"
+      ],
+      "latency_ms": 0.157,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "pricing_suppressed": true,
+      "fallback_used": false
+    },
+    {
+      "fixture_id": "scout-soccer-es-success",
+      "flow": "scout",
+      "sport": "soccer",
+      "language": "es",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_market_opportunities"
+      ],
+      "latency_ms": 0.157,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "pricing_suppressed": true,
+      "fallback_used": false
+    },
+    {
+      "fixture_id": "scout-tennis-fr-success",
+      "flow": "scout",
+      "sport": "tennis",
+      "language": "fr",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_market_opportunities"
+      ],
+      "latency_ms": 0.153,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "pricing_suppressed": true,
+      "fallback_used": false
+    },
+    {
+      "fixture_id": "scout-soccer-de-success",
+      "flow": "scout",
+      "sport": "soccer",
+      "language": "de",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_market_opportunities"
+      ],
+      "latency_ms": 0.143,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "pricing_suppressed": true,
+      "fallback_used": false
+    },
+    {
+      "fixture_id": "scout-tennis-ar-success",
+      "flow": "scout",
+      "sport": "tennis",
+      "language": "ar",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_market_opportunities"
+      ],
+      "latency_ms": 0.144,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "pricing_suppressed": true,
+      "fallback_used": false
+    },
+    {
+      "fixture_id": "scout-web-search-fallback",
+      "flow": "scout",
+      "sport": "soccer",
+      "language": "en",
+      "class": "boundary",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 2,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_market_opportunities"
+      ],
+      "latency_ms": 0.486,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "pricing_suppressed": true,
+      "fallback_used": true
+    },
+    {
+      "fixture_id": "scout-malformed-output",
+      "flow": "scout",
+      "sport": "tennis",
+      "language": "en",
+      "class": "error",
+      "status": 502,
+      "schema_valid": false,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "persistence_rpc": [],
+      "latency_ms": 0.122,
+      "language_consistent_at_route_output": false,
+      "hard_failures": []
+    },
+    {
+      "fixture_id": "coach-en-success",
+      "flow": "coach",
+      "sport": "mixed",
+      "language": "en",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_coaching_session"
+      ],
+      "latency_ms": 1.62,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "safety_contract": {
+        "forbidden_phrase_count": 0,
+        "retrospective_disclaimer_present": true
+      }
+    },
+    {
+      "fixture_id": "coach-uk-success",
+      "flow": "coach",
+      "sport": "mixed",
+      "language": "uk",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_coaching_session"
+      ],
+      "latency_ms": 0.735,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "safety_contract": {
+        "forbidden_phrase_count": 0,
+        "retrospective_disclaimer_present": true
+      }
+    },
+    {
+      "fixture_id": "coach-ru-success",
+      "flow": "coach",
+      "sport": "mixed",
+      "language": "ru",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_coaching_session"
+      ],
+      "latency_ms": 0.499,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "safety_contract": {
+        "forbidden_phrase_count": 0,
+        "retrospective_disclaimer_present": true
+      }
+    },
+    {
+      "fixture_id": "coach-es-success",
+      "flow": "coach",
+      "sport": "mixed",
+      "language": "es",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_coaching_session"
+      ],
+      "latency_ms": 0.285,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "safety_contract": {
+        "forbidden_phrase_count": 0,
+        "retrospective_disclaimer_present": true
+      }
+    },
+    {
+      "fixture_id": "coach-fr-success",
+      "flow": "coach",
+      "sport": "mixed",
+      "language": "fr",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_coaching_session"
+      ],
+      "latency_ms": 0.245,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "safety_contract": {
+        "forbidden_phrase_count": 0,
+        "retrospective_disclaimer_present": true
+      }
+    },
+    {
+      "fixture_id": "coach-de-success",
+      "flow": "coach",
+      "sport": "mixed",
+      "language": "de",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_coaching_session"
+      ],
+      "latency_ms": 0.26,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "safety_contract": {
+        "forbidden_phrase_count": 0,
+        "retrospective_disclaimer_present": true
+      }
+    },
+    {
+      "fixture_id": "coach-ar-success",
+      "flow": "coach",
+      "sport": "mixed",
+      "language": "ar",
+      "class": "success",
+      "status": 200,
+      "schema_valid": true,
+      "provider_attempts": 1,
+      "persistence_attempts": 1,
+      "persistence_rpc": [
+        "persist_coaching_session"
+      ],
+      "latency_ms": 0.244,
+      "language_consistent_at_route_output": true,
+      "hard_failures": [],
+      "safety_contract": {
+        "forbidden_phrase_count": 0,
+        "retrospective_disclaimer_present": true
+      }
+    },
+    {
+      "fixture_id": "coach-insufficient-history",
+      "flow": "coach",
+      "sport": "mixed",
+      "language": "en",
+      "class": "boundary",
+      "status": 422,
+      "schema_valid": false,
+      "provider_attempts": 0,
+      "persistence_attempts": 0,
+      "persistence_rpc": [],
+      "latency_ms": 0.143,
+      "language_consistent_at_route_output": false,
+      "hard_failures": []
+    },
+    {
+      "fixture_id": "coach-malformed-output",
+      "flow": "coach",
+      "sport": "mixed",
+      "language": "en",
+      "class": "error",
+      "status": 502,
+      "schema_valid": false,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "persistence_rpc": [],
+      "latency_ms": 0.204,
+      "language_consistent_at_route_output": false,
+      "hard_failures": []
+    }
+  ],
+  "quality": {
+    "scanner": {
+      "fixture_contracts": 5,
+      "schema_expectations_met": 5,
+      "deterministic_route_language_consistency": "NOT_APPLICABLE",
+      "live_model_quality": "NOT_MEASURED",
+      "factual_grounding": "NOT_MEASURED",
+      "completeness_consistency_safety": "Only deterministic route/schema gates are measured; semantic live-model quality is NOT_MEASURED."
+    },
+    "analyst": {
+      "fixture_contracts": 14,
+      "schema_expectations_met": 14,
+      "deterministic_route_language_consistency": {
+        "passed": 3,
+        "measured": 8
+      },
+      "live_model_quality": "NOT_MEASURED",
+      "factual_grounding": "Citation binding is measured with a synthetic citation; factual truth is NOT_MEASURED.",
+      "completeness_consistency_safety": "Only deterministic route/schema gates are measured; semantic live-model quality is NOT_MEASURED."
+    },
+    "scout": {
+      "fixture_contracts": 10,
+      "schema_expectations_met": 10,
+      "deterministic_route_language_consistency": {
+        "passed": 8,
+        "measured": 8
+      },
+      "live_model_quality": "NOT_MEASURED",
+      "factual_grounding": "NOT_MEASURED",
+      "completeness_consistency_safety": "Only deterministic route/schema gates are measured; semantic live-model quality is NOT_MEASURED."
+    },
+    "coach": {
+      "fixture_contracts": 9,
+      "schema_expectations_met": 9,
+      "deterministic_route_language_consistency": {
+        "passed": 7,
+        "measured": 7
+      },
+      "live_model_quality": "NOT_MEASURED",
+      "factual_grounding": "NOT_MEASURED",
+      "completeness_consistency_safety": "Only deterministic route/schema gates are measured; semantic live-model quality is NOT_MEASURED."
+    }
+  },
+  "fault_matrix": [
+    {
+      "flow": "scanner",
+      "fault": "timeout",
+      "status": 504,
+      "expected_status": 504,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "scanner",
+      "fault": "rate_limit",
+      "status": 502,
+      "expected_status": 502,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "scanner",
+      "fault": "server_error",
+      "status": 502,
+      "expected_status": 502,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "scanner",
+      "fault": "malformed",
+      "status": 422,
+      "expected_status": 422,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "analyst",
+      "fault": "timeout",
+      "status": 504,
+      "expected_status": 504,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "analyst",
+      "fault": "rate_limit",
+      "status": 429,
+      "expected_status": 429,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "analyst",
+      "fault": "server_error",
+      "status": 500,
+      "expected_status": 500,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "analyst",
+      "fault": "malformed",
+      "status": 502,
+      "expected_status": 502,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "scout",
+      "fault": "timeout",
+      "status": 504,
+      "expected_status": 504,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "scout",
+      "fault": "rate_limit",
+      "status": 429,
+      "expected_status": 429,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "scout",
+      "fault": "server_error",
+      "status": 503,
+      "expected_status": 503,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "scout",
+      "fault": "malformed",
+      "status": 502,
+      "expected_status": 502,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "coach",
+      "fault": "timeout",
+      "status": 500,
+      "expected_status": 500,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "coach",
+      "fault": "rate_limit",
+      "status": 500,
+      "expected_status": 500,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "coach",
+      "fault": "server_error",
+      "status": 500,
+      "expected_status": 500,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    },
+    {
+      "flow": "coach",
+      "fault": "malformed",
+      "status": 502,
+      "expected_status": 502,
+      "provider_attempts": 1,
+      "persistence_attempts": 0,
+      "safe_no_persistence": true
+    }
+  ],
+  "performance": [
+    {
+      "flow": "scanner",
+      "concurrency": 1,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 15.167,
+      "p95_ms": 17.557,
+      "p99_ms": 18.028,
+      "wall_ms": 680.97,
+      "throughput_requests_per_second": 73.425,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 216850,
+      "output_bytes_total": 20300,
+      "estimated_input_tokens": 54213,
+      "estimated_output_tokens": 5075,
+      "estimated_cost_usd": 0.238764
+    },
+    {
+      "flow": "scanner",
+      "concurrency": 5,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 15.021,
+      "p95_ms": 15.915,
+      "p99_ms": 15.928,
+      "wall_ms": 131.478,
+      "throughput_requests_per_second": 380.293,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 216850,
+      "output_bytes_total": 20300,
+      "estimated_input_tokens": 54213,
+      "estimated_output_tokens": 5075,
+      "estimated_cost_usd": 0.238764
+    },
+    {
+      "flow": "scanner",
+      "concurrency": 10,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 13.173,
+      "p95_ms": 16.052,
+      "p99_ms": 16.233,
+      "wall_ms": 60.967,
+      "throughput_requests_per_second": 820.12,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 216850,
+      "output_bytes_total": 20300,
+      "estimated_input_tokens": 54213,
+      "estimated_output_tokens": 5075,
+      "estimated_cost_usd": 0.238764
+    },
+    {
+      "flow": "scanner",
+      "concurrency": 25,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 15.309,
+      "p95_ms": 17.055,
+      "p99_ms": 17.267,
+      "wall_ms": 31.714,
+      "throughput_requests_per_second": 1576.571,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 216850,
+      "output_bytes_total": 20300,
+      "estimated_input_tokens": 54213,
+      "estimated_output_tokens": 5075,
+      "estimated_cost_usd": 0.238764
+    },
+    {
+      "flow": "analyst",
+      "concurrency": 1,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 14.79,
+      "p95_ms": 17.362,
+      "p99_ms": 18.063,
+      "wall_ms": 634.868,
+      "throughput_requests_per_second": 78.757,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 321000,
+      "output_bytes_total": 36500,
+      "estimated_input_tokens": 80250,
+      "estimated_output_tokens": 9125,
+      "estimated_cost_usd": 0.377625
+    },
+    {
+      "flow": "analyst",
+      "concurrency": 5,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 14.514,
+      "p95_ms": 17.657,
+      "p99_ms": 17.7,
+      "wall_ms": 118.681,
+      "throughput_requests_per_second": 421.297,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 321000,
+      "output_bytes_total": 36500,
+      "estimated_input_tokens": 80250,
+      "estimated_output_tokens": 9125,
+      "estimated_cost_usd": 0.377625
+    },
+    {
+      "flow": "analyst",
+      "concurrency": 10,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 15.516,
+      "p95_ms": 18.241,
+      "p99_ms": 18.271,
+      "wall_ms": 67.749,
+      "throughput_requests_per_second": 738.024,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 321000,
+      "output_bytes_total": 36500,
+      "estimated_input_tokens": 80250,
+      "estimated_output_tokens": 9125,
+      "estimated_cost_usd": 0.377625
+    },
+    {
+      "flow": "analyst",
+      "concurrency": 25,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 8.453,
+      "p95_ms": 10.376,
+      "p99_ms": 10.529,
+      "wall_ms": 17.789,
+      "throughput_requests_per_second": 2810.757,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 321000,
+      "output_bytes_total": 36500,
+      "estimated_input_tokens": 80250,
+      "estimated_output_tokens": 9125,
+      "estimated_cost_usd": 0.377625
+    },
+    {
+      "flow": "scout",
+      "concurrency": 1,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 15.681,
+      "p95_ms": 17.684,
+      "p99_ms": 17.986,
+      "wall_ms": 767.135,
+      "throughput_requests_per_second": 65.178,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 239950,
+      "output_bytes_total": 29350,
+      "estimated_input_tokens": 59988,
+      "estimated_output_tokens": 7338,
+      "estimated_cost_usd": 0.290034
+    },
+    {
+      "flow": "scout",
+      "concurrency": 5,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 14.887,
+      "p95_ms": 16.207,
+      "p99_ms": 16.35,
+      "wall_ms": 133.721,
+      "throughput_requests_per_second": 373.913,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 239950,
+      "output_bytes_total": 29350,
+      "estimated_input_tokens": 59988,
+      "estimated_output_tokens": 7338,
+      "estimated_cost_usd": 0.290034
+    },
+    {
+      "flow": "scout",
+      "concurrency": 10,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 15.428,
+      "p95_ms": 16.139,
+      "p99_ms": 16.268,
+      "wall_ms": 73.933,
+      "throughput_requests_per_second": 676.289,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 239950,
+      "output_bytes_total": 29350,
+      "estimated_input_tokens": 59988,
+      "estimated_output_tokens": 7338,
+      "estimated_cost_usd": 0.290034
+    },
+    {
+      "flow": "scout",
+      "concurrency": 25,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 13.2,
+      "p95_ms": 15.684,
+      "p99_ms": 15.776,
+      "wall_ms": 28.722,
+      "throughput_requests_per_second": 1740.82,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 239950,
+      "output_bytes_total": 29350,
+      "estimated_input_tokens": 59988,
+      "estimated_output_tokens": 7338,
+      "estimated_cost_usd": 0.290034
+    },
+    {
+      "flow": "coach",
+      "concurrency": 1,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 15.25,
+      "p95_ms": 17.701,
+      "p99_ms": 19.702,
+      "wall_ms": 692.159,
+      "throughput_requests_per_second": 72.238,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 218600,
+      "output_bytes_total": 30600,
+      "estimated_input_tokens": 54650,
+      "estimated_output_tokens": 7650,
+      "estimated_cost_usd": 0.2787
+    },
+    {
+      "flow": "coach",
+      "concurrency": 5,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 14.88,
+      "p95_ms": 16.792,
+      "p99_ms": 17.039,
+      "wall_ms": 119.283,
+      "throughput_requests_per_second": 419.17,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 218600,
+      "output_bytes_total": 30600,
+      "estimated_input_tokens": 54650,
+      "estimated_output_tokens": 7650,
+      "estimated_cost_usd": 0.2787
+    },
+    {
+      "flow": "coach",
+      "concurrency": 10,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 15.313,
+      "p95_ms": 18.761,
+      "p99_ms": 18.964,
+      "wall_ms": 80.478,
+      "throughput_requests_per_second": 621.291,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 218600,
+      "output_bytes_total": 30600,
+      "estimated_input_tokens": 54650,
+      "estimated_output_tokens": 7650,
+      "estimated_cost_usd": 0.2787
+    },
+    {
+      "flow": "coach",
+      "concurrency": 25,
+      "requests": 50,
+      "successes": 50,
+      "errors": 0,
+      "timeouts": 0,
+      "success_rate": 1,
+      "error_rate": 0,
+      "p50_ms": 16.523,
+      "p95_ms": 17.767,
+      "p99_ms": 17.893,
+      "wall_ms": 34.147,
+      "throughput_requests_per_second": 1464.245,
+      "provider_attempts": 50,
+      "provider_attempts_per_request": 1,
+      "duplicate_persistence_within_request": 0,
+      "input_bytes_total": 218600,
+      "output_bytes_total": 30600,
+      "estimated_input_tokens": 54650,
+      "estimated_output_tokens": 7650,
+      "estimated_cost_usd": 0.2787
+    }
+  ],
+  "replay_probe": [
+    {
+      "flow": "scanner",
+      "identical_payload_requests": 2,
+      "provider_attempts": 2,
+      "persistence_writes": 0,
+      "idempotency_or_dedup_observed": false,
+      "interpretation": "Scanner performs provider work twice and has no persistence."
+    },
+    {
+      "flow": "analyst",
+      "identical_payload_requests": 2,
+      "provider_attempts": 2,
+      "persistence_writes": 2,
+      "idempotency_or_dedup_observed": false,
+      "interpretation": "The same admitted payload performs provider work and persistence twice; current routes expose no AI idempotency key."
+    },
+    {
+      "flow": "scout",
+      "identical_payload_requests": 2,
+      "provider_attempts": 2,
+      "persistence_writes": 2,
+      "idempotency_or_dedup_observed": false,
+      "interpretation": "The same admitted payload performs provider work and persistence twice; current routes expose no AI idempotency key."
+    },
+    {
+      "flow": "coach",
+      "identical_payload_requests": 2,
+      "provider_attempts": 2,
+      "persistence_writes": 2,
+      "idempotency_or_dedup_observed": false,
+      "interpretation": "The same admitted payload performs provider work and persistence twice; current routes expose no AI idempotency key."
+    }
+  ],
+  "cost": {
+    "classification": "ESTIMATED",
+    "method": "ceil(UTF-8 serialized request/response bytes / 4) multiplied by versioned standard list price",
+    "price_card_id": "anthropic-sonnet-4-6-standard-global-2026-07-24",
+    "source": "https://www.anthropic.com/claude/sonnet",
+    "observed_at": "2026-07-24",
+    "currency": "USD",
+    "input_usd_per_million": 3,
+    "output_usd_per_million": 15,
+    "scanner_vision_caveat": "Serialization proxy only; provider image tokenization is NOT MEASURED.",
+    "actual_provider_usage": "BLOCKED / NOT MEASURED",
+    "actual_invoice_cost": "BLOCKED / NOT MEASURED"
+  },
+  "network": {
+    "fake_anthropic_transports": 866,
+    "blocked_real_outbound_attempts": 0,
+    "node_socket_attempts": 0,
+    "real_telegram_sends": 0,
+    "live_anthropic_calls": 0,
+    "live_supabase_calls": 0
+  },
+  "assertions": {
+    "passed": 605,
+    "failed": 0,
+    "failures": []
+  },
+  "limitations": [
+    "Mocked transport cannot establish live-model semantic quality.",
+    "Mocked local latency and throughput cannot establish Vercel, Supabase, or Anthropic capacity.",
+    "Character/byte token proxies are not provider usage.",
+    "Scanner vision tokens and Anthropic web-search fees are not estimated.",
+    "No provider usage export or invoice was authorized, so actual cost is blocked.",
+    "No queue exists in the current runtime; queue depth, backpressure, and terminal delivery are not measured.",
+    "Thresholds for scale, latency, quality non-inferiority, and spend remain TBD."
+  ],
+  "thresholds": {
+    "performance": "PROPOSED / TBD",
+    "quality_non_inferiority": "PROPOSED / TBD",
+    "simultaneous_ai_burst": "PROPOSED / TBD",
+    "daily_monthly_budget": "PROPOSED / TBD"
+  }
+}

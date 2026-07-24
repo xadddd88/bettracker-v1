@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "dataset_version": "ai-baseline-v1",
+  "runtime_commit": "83e92616e2a485b351c41317e4034394bf0eee0b",
+  "evaluation_dimensions": {
+    "required_fields": "Measured by each current Route Handler request/output schema and flow-specific assertions.",
+    "schema_validity": "Objective PASS/FAIL from the current route response and pinned expected status.",
+    "factual_grounding": "Only synthetic Analyst citation-to-claim binding is objective; real-world truth is NOT_MEASURED.",
+    "completeness": "Required-field completeness is objective; semantic completeness is NOT_MEASURED.",
+    "consistency": "Pinned field/persistence/attempt consistency is objective; semantic consistency is NOT_MEASURED.",
+    "safety": "Current deterministic pricing quarantine and Coach banned-phrase/disclaimer assertions are objective; broader live-model safety is NOT_MEASURED.",
+    "language_consistency": "The final route output locale/marker is observed; mock text is not proof of live-model fluency.",
+    "hard_fail_rules": [
+      "unexpected HTTP status",
+      "unexpected provider-attempt count",
+      "missing or duplicate persistence within one request",
+      "persistence on an error path",
+      "malformed output accepted",
+      "current deterministic pricing quarantine bypassed",
+      "Coach safety phrase or disclaimer contract violated",
+      "unexpected real network access"
+    ]
+  },
+  "flows": {
+    "scanner": {
+      "route": "app/api/ai/scanner/route.ts",
+      "clients": [
+        "app/(app)/ai/page.tsx",
+        "app/(app)/bets/new/page.tsx",
+        "apps/mobile/src/ai/scanner-client.ts"
+      ],
+      "provider": "anthropic",
+      "model_resolution": ["claude-sonnet-4-6"],
+      "max_tokens": 1200,
+      "timeout_ms_per_attempt": 60000,
+      "maximum_provider_attempts": 2,
+      "second_attempt_condition": "normalization failure with missing legs only",
+      "persistence": "none",
+      "language_contract": "OCR preserves visible text; no enumerated output locale",
+      "explicit_locales": []
+    },
+    "analyst": {
+      "route": "app/api/ai/analyst/route.ts",
+      "clients": ["app/(app)/ai/page.tsx"],
+      "provider": "anthropic",
+      "model_resolution": ["ANTHROPIC_MODEL_ANALYST", "claude-sonnet-4-6"],
+      "max_tokens": 5000,
+      "timeout_ms_total_turn": 60000,
+      "maximum_provider_attempts": 3,
+      "additional_attempt_condition": "at most two pause_turn continuations",
+      "persistence": "persist_analysis_decision RPC after schema, research, and quality gates",
+      "language_contract": "explicit output_language",
+      "explicit_locales": ["auto", "uk", "ru", "en", "es", "fr", "de", "ar"]
+    },
+    "scout": {
+      "route": "app/api/scout/route.ts",
+      "clients": ["app/(app)/scout/ScoutForm.tsx"],
+      "provider": "anthropic",
+      "model_resolution": ["ANTHROPIC_MODEL_SCOUT", "ANTHROPIC_MODEL_ANALYST", "claude-sonnet-4-6"],
+      "max_tokens": 2000,
+      "timeout_ms_per_attempt": 55000,
+      "maximum_provider_attempts": 2,
+      "second_attempt_condition": "first web-search-enabled attempt failed",
+      "persistence": "persist_market_opportunities RPC after schema and FP-001 pricing quarantine",
+      "language_contract": "explicit output_language for narrative fields",
+      "explicit_locales": ["auto", "uk", "ru", "en", "es", "fr", "de", "ar"]
+    },
+    "coach": {
+      "route": "app/api/coach/route.ts",
+      "clients": ["app/(app)/coach/CoachView.tsx"],
+      "provider": "anthropic",
+      "model_resolution": ["ANTHROPIC_MODEL_COACH", "ANTHROPIC_MODEL_ANALYST", "claude-sonnet-4-6"],
+      "max_tokens": 2000,
+      "timeout_ms_per_attempt": null,
+      "maximum_provider_attempts": 1,
+      "persistence": "persist_coaching_session RPC after minimum-history and schema gates",
+      "language_contract": "same language as focus_notes, otherwise English; not schema-enforced",
+      "explicit_locales": []
+    }
+  }
+}

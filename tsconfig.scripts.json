@@ -26,6 +26,8 @@
     "app/api/bets/[id]/cancel/route.ts",
     "app/api/ai/scanner/route.ts",
     "app/api/ai/analyst/route.ts",
+    "app/api/scout/route.ts",
+    "app/api/coach/route.ts",
     "app/api/settings/route.ts",
     "app/api/onboarding/complete/route.ts",
     "app/api/auth/register/route.ts",
