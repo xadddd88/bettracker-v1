@@ -7,6 +7,7 @@ import { EVENTS } from '@/lib/analytics/events'
 import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
 import { isSupportedSettlementStatus } from '@/lib/bets/settlement-metrics'
 import { BroadcastButton, BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
+import { formatMoney } from '@/lib/money'
 import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
 
 interface Props {
@@ -160,15 +161,4 @@ function statusTone(status: BetStatusKey): BroadcastNoirStatus {
   if (status === 'lost') return 'negative'
   if (status === 'pending' || status === 'partial') return 'review'
   return 'neutral'
-}
-
-function formatMoney(value: number, currency: string, showPositive = false) {
-  const formatted = new Intl.NumberFormat('en', {
-    currency,
-    currencyDisplay: 'narrowSymbol',
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-    style: 'currency',
-  }).format(value)
-  return showPositive && value > 0 ? `+${formatted}` : formatted
 }

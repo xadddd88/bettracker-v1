@@ -7,6 +7,7 @@ import { EVENTS } from '@/lib/analytics/events'
 import { PageView } from '@/lib/analytics/PageView'
 import { calcSettlementMetrics, isSupportedSettlementStatus } from '@/lib/bets/settlement-metrics'
 import { resolveBetStatus } from '@/lib/bets/bet-status'
+import { formatMoney } from '@/lib/money'
 import { createClient } from '@/lib/supabase/server'
 import type { Bet } from '@/types'
 
@@ -224,16 +225,4 @@ function Metric({ label, value }: { label: string; value: string }) {
       <BroadcastDataValue className="mt-3 block font-display text-2xl font-black tracking-[-0.04em]">{value}</BroadcastDataValue>
     </div>
   )
-}
-
-function formatMoney(value: number, currency: string, showSign = false) {
-  const formatted = new Intl.NumberFormat('en', {
-    currency,
-    currencyDisplay: 'narrowSymbol',
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-    style: 'currency',
-  }).format(Math.abs(value))
-  if (!showSign || value === 0) return value < 0 ? `-${formatted}` : formatted
-  return `${value > 0 ? '+' : '-'}${formatted}`
 }

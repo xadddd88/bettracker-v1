@@ -11,7 +11,7 @@ import {
   type AnalysisQualityGateResult,
   type AnalystTrustView,
 } from '@/lib/ai/analysis-quality-gate'
-import { currencySymbol } from '@/lib/money'
+import { formatMoney } from '@/lib/money'
 import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
 import {
   bindAnalystSourcedClaims,
@@ -176,7 +176,7 @@ export default async function DecisionDetailPage({
 
   if (!decision) notFound()
 
-  const stakeSymbol = currencySymbol(bankroll?.currency)
+  const currency = bankroll?.currency || 'USD'
 
   const d = decision as unknown as DecisionRow
   const rec    = d.recommendation ? REC_CONFIG[d.recommendation]   : null
@@ -451,7 +451,7 @@ export default async function DecisionDetailPage({
         <BroadcastPanel className="p-5 sm:p-7">
           <div className="mb-3 font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-muted">Linked Bet</div>
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            <span className="text-bn-muted">Stake: <BroadcastDataValue className="font-medium">{stakeSymbol}{linkedBet.stake}</BroadcastDataValue></span>
+            <span className="text-bn-muted">Stake: <BroadcastDataValue className="font-medium">{formatMoney(linkedBet.stake, currency)}</BroadcastDataValue></span>
             <span className="text-bn-muted">Odds: <BroadcastDataValue className="font-medium">{linkedBet.total_odds ?? d.offered_odds}</BroadcastDataValue></span>
             <BroadcastStatus status={linkedBetStatusTone(resolveBetStatus(linkedBet.status).key)}>
               {resolveBetStatus(linkedBet.status).label}

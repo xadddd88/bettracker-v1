@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { BroadcastDataValue, BroadcastStatus } from '@/components/ui/BroadcastNoir'
+import { formatMoneyAmount } from '@/lib/money'
 import {
   TRACKED_BET_SPORTS,
   MAX_TRACKED_BET_LEGS,
@@ -585,7 +586,7 @@ export default function NewBetPage() {
         {showPayoutPreview && (
           <div className="flex justify-between gap-4 rounded-control border border-bn-border-subtle bg-bn-raised px-4 py-3 text-sm">
             <span className="text-bn-muted">Potential payout · preview only</span>
-            <BroadcastDataValue className="font-black">{(stakeNum * effectiveTotal).toFixed(2)}</BroadcastDataValue>
+            <BroadcastDataValue className="font-black">{formatMoneyAmount(stakeNum * effectiveTotal)}</BroadcastDataValue>
           </div>
         )}
 

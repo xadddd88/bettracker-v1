@@ -3,13 +3,10 @@
 import { useState, useCallback } from 'react'
 import type { Profile } from '@/types'
 import { BroadcastButton, BroadcastDataValue, BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
+import { currencySymbol } from '@/lib/money'
 
 const CURRENCIES = ['USD', 'EUR', 'UAH', 'GBP', 'CAD', 'AUD'] as const
 type Currency = typeof CURRENCIES[number]
-
-const CURRENCY_SYMBOLS: Record<Currency, string> = {
-  USD: '$', EUR: '€', UAH: '₴', GBP: '£', CAD: 'CA$', AUD: 'A$',
-}
 
 interface SettingsFormProps {
   profile: Profile
@@ -98,7 +95,7 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
                 aria-pressed={currency === c}
                 tone={currency === c ? 'primary' : 'secondary'}
               >
-                {CURRENCY_SYMBOLS[c]} {c}
+                {currencySymbol(c)} {c}
               </BroadcastButton>
             ))}
           </div>
@@ -107,7 +104,7 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
         <div>
           <label className="label">Default stake</label>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-sm text-bn-muted">{CURRENCY_SYMBOLS[currency]}</span>
+            <span className="text-sm text-bn-muted">{currencySymbol(currency)}</span>
             <input
               className="input flex-1"
               type="number"
