@@ -16,6 +16,8 @@ const SYNTHETIC_EXTERNAL_WEBSOCKET = 'wss://web-acceptance.invalid/blocked-befor
 const BLOCKED_WEBSOCKET_CODE = 1008
 const BLOCKED_WEBSOCKET_REASON = 'External WebSocket blocked by Web acceptance'
 const TEST_USER_ID = '00000000-0000-4000-8000-000000000001'
+const TEST_BET_ID = '00000000-0000-4000-8000-000000000005'
+const TEST_SETTLED_AT = '2026-07-22T23:30:00.000Z'
 const TEST_USER = {
   id: TEST_USER_ID,
   aud: 'authenticated',
@@ -38,7 +40,7 @@ const VIEWPORTS = [
   { width: 1024, height: 900 },
   { width: 1440, height: 1000 },
 ]
-const ROUTES = ['/dashboard', '/ai', '/bets/new', '/bankroll', '/coach']
+const ROUTES = ['/dashboard', '/ai', '/bets/new', `/bets/${TEST_BET_ID}`, '/bankroll', '/coach']
 
 function normalizeHostname(urlValue) {
   try {
@@ -110,6 +112,7 @@ function safeChildEnvironment(supabaseOrigin) {
     ...inherited,
     NODE_ENV: 'development',
     NODE_OPTIONS: `--require=${NETWORK_GUARD}`,
+    TZ: 'UTC',
     NEXT_TELEMETRY_DISABLED: '1',
     NEXT_FONT_GOOGLE_MOCKED_RESPONSES: FONT_MOCKS,
     NEXT_PUBLIC_SUPABASE_URL: supabaseOrigin,
@@ -222,6 +225,26 @@ async function assertBaseAcceptance(page, route, viewport) {
   await assertNoHorizontalOverflow(page, `${route} at ${viewport.width}px`)
   await assertNoDuplicateIds(page, `${route} at ${viewport.width}px`)
   await assertAxe(page, `${route} at ${viewport.width}px`)
+}
+
+async function assertBetDetailHydration(page) {
+  const timestamps = await page.locator('main').evaluate(root => {
+    const settledTerm = [...root.querySelectorAll('dt')]
+      .find(element => element.textContent?.trim() === 'Settled')
+    const settlementKicker = [...root.querySelectorAll('.editorial-kicker')]
+      .find(element => element.textContent?.trim() === 'Settlement')
+
+    return {
+      detail: settledTerm?.nextElementSibling?.textContent?.trim() ?? null,
+      settlement: settlementKicker?.parentElement
+        ?.querySelector('.text-bn-muted')
+        ?.textContent
+        ?.trim() ?? null,
+    }
+  })
+
+  assert.equal(timestamps.detail, '22 Jul 2026, 23:30', 'Server-rendered settled timestamp must use the UTC release contract')
+  assert.equal(timestamps.settlement, timestamps.detail, 'Client settlement timestamp must match the server-rendered value byte-for-byte')
 }
 
 async function assertAiLabels(page) {
@@ -396,6 +419,33 @@ const supabaseStub = createServer((request, response) => {
     return
   }
   if (url.pathname === '/rest/v1/bets') {
+    if (url.searchParams.get('id') === `eq.${TEST_BET_ID}`) {
+      jsonResponse(response, 200, {
+        id: TEST_BET_ID,
+        user_id: TEST_USER_ID,
+        status: 'void',
+        stake: 100,
+        total_odds: 2.14,
+        pnl: 0,
+        bookmaker: 'Acceptance',
+        source: 'acceptance',
+        notes: null,
+        placed_at: '2026-07-22T20:00:00.000Z',
+        settled_at: TEST_SETTLED_AT,
+        archived_at: null,
+        legs: [{
+          id: '00000000-0000-4000-8000-000000000006',
+          bet_id: TEST_BET_ID,
+          leg_index: 0,
+          event_name: 'Acceptance fixture',
+          market_type: 'Match winner',
+          selection: 'Home',
+          odds: 2.14,
+          sport: 'football',
+        }],
+      }, { 'content-range': '0-0/1' })
+      return
+    }
     jsonResponse(response, 200, [], { 'content-range': '*/0' })
     return
   }
@@ -532,6 +582,7 @@ try {
       await assertBaseAcceptance(page, route, viewport)
       if (route === '/ai') await assertAiLabels(page)
       if (route === '/bets/new') await assertTrackerLabels(page, viewport.width === 375)
+      if (route === `/bets/${TEST_BET_ID}`) await assertBetDetailHydration(page)
       if (route === '/dashboard' && viewport.width === 375) await assertFeedbackFocus(page, feedbackStubs)
       await assertInteractiveAcceptance(page, `${route} after interactive checks at ${viewport.width}px`)
       await page.close()

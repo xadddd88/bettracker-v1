@@ -121,7 +121,7 @@ export default async function BetDetailPage({ params }: { params: Promise<{ id: 
         betId={bet.id}
         status={bet.status}
         pnl={bet.pnl}
-        settledAt={bet.settled_at}
+        settledAtLabel={bet.settled_at ? formatDateTime(bet.settled_at) : undefined}
         currency={currency}
       />
     </main>

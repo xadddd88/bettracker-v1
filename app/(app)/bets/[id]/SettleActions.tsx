@@ -14,11 +14,11 @@ interface Props {
   betId: string
   status: string
   pnl?: number | null
-  settledAt?: string
+  settledAtLabel?: string
   currency: string
 }
 
-export default function SettleActions({ betId, status, pnl, settledAt, currency }: Props) {
+export default function SettleActions({ betId, status, pnl, settledAtLabel, currency }: Props) {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError]     = useState('')
@@ -37,12 +37,9 @@ export default function SettleActions({ betId, status, pnl, settledAt, currency 
               {formatMoney(pnl, currency, true)}
             </span>
           )}
-          {settledAt && (
+          {settledAtLabel && (
             <span className="text-xs text-bn-muted">
-              {new Date(settledAt).toLocaleDateString('en-GB', {
-                day: '2-digit', month: 'short', year: 'numeric',
-                hour: '2-digit', minute: '2-digit',
-              })}
+              {settledAtLabel}
             </span>
           )}
         </div>
