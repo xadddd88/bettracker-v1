@@ -117,5 +117,7 @@ for (const path of tsxFilesUnder(join(root, 'app'))) {
 const aiPage = readFileSync(join(root, 'app/(app)/ai/page.tsx'), 'utf8')
 assert.match(aiPage, /broadcastNoirColors/, 'standalone Analyst report must source colors from the Broadcast Noir adapter')
 assert.match(aiPage, /var\(--bn-data-value\)/, 'standalone Analyst report must expose semantic CSS variables')
+assert.match(aiPage, /@media print\{[\s\S]*-webkit-print-color-adjust:exact;print-color-adjust:exact/, 'standalone Analyst report must preserve semantic print colors when browser background graphics are disabled')
+assert.match(aiPage, /break-inside:avoid;page-break-inside:avoid/, 'standalone Analyst report must keep bounded report sections together across printed pages')
 
 console.log(`Broadcast Noir v${tokens.version}: parity, contrast and semantic-form gates passed`)

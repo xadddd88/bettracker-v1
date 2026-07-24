@@ -648,7 +648,11 @@ export default function AIAnalystPage() {
   td{padding:7px 8px;border-bottom:1px solid var(--bn-border-subtle);font-size:13px;vertical-align:top}
   .disclaimer{font-size:11px;color:var(--bn-quiet);margin-top:16px;padding-top:12px;border-top:1px solid var(--bn-border-subtle)}
   .footer{margin-top:24px;font-size:11px;color:var(--bn-quiet);text-align:center}
-  @media print{body{margin:20px}}
+  @media print{
+    html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{margin:20px}
+    .stat,.quality-gate,.research,.builder,.research-leg,.rec,.reasoning,tr{break-inside:avoid;page-break-inside:avoid}
+  }
 </style></head><body>
 <h1>${escapeHtml(a.event_name)}</h1>
 <div class="meta">${escapeHtml(metaSport)} \u00B7 ${escapeHtml(a.market_type)}${a.selection?' \u00B7 '+escapeHtml(a.selection):''} \u00B7 @${a.offered_odds}${a.bookmaker?' \u00B7 '+escapeHtml(a.bookmaker):''}</div>
