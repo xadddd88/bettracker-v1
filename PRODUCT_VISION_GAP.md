@@ -389,6 +389,27 @@ Needs:
 - Settlement logs and audit trail
 - Manual override for edge cases
 
+### Mandatory Milestone — Scale Readiness & AI Economics
+
+This milestone is a release gate before Phase 8, mass marketing, or any claim that
+BetTracker is ready for 1000+ concurrent web/mobile sessions. Architecture review
+alone does not pass the gate: the measurable criteria in
+[ADR-011 — Scale Readiness & AI Economics](docs/adr/ADR-011-scale-readiness-ai-economics.md)
+must be demonstrated by future load, failure, quality, and cost tests.
+
+1. Establish performance, AI quality, and AI cost baselines.
+2. Implement request, runtime, database, provider, and AI observability.
+3. Introduce a durable AI usage ledger with actual token and cost accounting.
+4. Add safe caching, Anthropic prompt caching, request deduplication, and idempotency.
+5. Introduce explicit model-routing and bounded fallback policies.
+6. Add durable queues, priorities, backpressure, and provider-aware rate limits.
+7. Enforce per-user, per-plan, and global budget guardrails.
+8. Prove Supabase connection-pooling and query-capacity readiness.
+9. Run representative web/mobile load tests and a separate simultaneous-AI stress
+   test.
+10. Roll out gradually through 10% → 25% → 50% → 100% cohorts with soak gates.
+11. Approve a capacity plan, incident-response procedure, and rollback runbook.
+
 ### Phase 8 — Public Site + Auth Split
 - Public landing page
 - Public example analysis
@@ -464,6 +485,9 @@ The following must all be true before an external beta launch:
 - Product learns from outcomes and calibration over time
 - Video/social/expert analysis is supported as a future ingestion layer with
   legal/commercial constraints
+- The mandatory Scale Readiness & AI Economics milestone has passed with measured
+  load-test, failure-test, quality, and cost evidence; design review alone is not
+  sufficient
 
 ---
 
