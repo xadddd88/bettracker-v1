@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "dataset_version": "ai-baseline-v1",
+  "flow": "coach",
+  "fixtures": [
+    {"id":"coach-en-success","sport":"mixed","language":"en","class":"success","input":{"period_days":30,"focus_notes":"Review discipline and variance in English."},"history_fixture":"synthetic-settled-history","mock_output_template":"coach_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"BASELINE_EN"}},
+    {"id":"coach-uk-success","sport":"mixed","language":"uk","class":"success","input":{"period_days":30,"focus_notes":"Оціни дисципліну та вплив дисперсії."},"history_fixture":"synthetic-settled-history","mock_output_template":"coach_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"БАЗОВИЙ_UK"}},
+    {"id":"coach-ru-success","sport":"mixed","language":"ru","class":"success","input":{"period_days":30,"focus_notes":"Оцени дисциплину и влияние дисперсии."},"history_fixture":"synthetic-settled-history","mock_output_template":"coach_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"БАЗОВЫЙ_RU"}},
+    {"id":"coach-es-success","sport":"mixed","language":"es","class":"success","input":{"period_days":30,"focus_notes":"Evalúa la disciplina y la varianza."},"history_fixture":"synthetic-settled-history","mock_output_template":"coach_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"BASE_ES"}},
+    {"id":"coach-fr-success","sport":"mixed","language":"fr","class":"success","input":{"period_days":30,"focus_notes":"Évalue la discipline et la variance."},"history_fixture":"synthetic-settled-history","mock_output_template":"coach_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"BASE_FR"}},
+    {"id":"coach-de-success","sport":"mixed","language":"de","class":"success","input":{"period_days":30,"focus_notes":"Bewerte Disziplin und Varianz."},"history_fixture":"synthetic-settled-history","mock_output_template":"coach_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"BASIS_DE"}},
+    {"id":"coach-ar-success","sport":"mixed","language":"ar","class":"success","input":{"period_days":30,"focus_notes":"قيّم الانضباط والتباين."},"history_fixture":"synthetic-settled-history","mock_output_template":"coach_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"أساس_AR"}},
+    {"id":"coach-insufficient-history","sport":"mixed","language":"en","class":"boundary","input":{"period_days":7},"history_fixture":"synthetic-insufficient-history","mock_output_template":"unreachable","expected":{"status":422,"provider_attempts":0,"persistence_attempts":0,"schema_valid":false}},
+    {"id":"coach-malformed-output","sport":"mixed","language":"en","class":"error","input":{"period_days":30,"focus_notes":"Review discipline."},"history_fixture":"synthetic-settled-history","mock_output_template":"malformed","expected":{"status":502,"provider_attempts":1,"persistence_attempts":0,"schema_valid":false}}
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "dataset_version": "ai-baseline-v1",
+  "flow": "scout",
+  "fixtures": [
+    {"id":"scout-soccer-auto-success","sport":"soccer","language":"auto","class":"success","input":{"context":"Synthetic league context","timeframe":"today"},"mock_output_template":"scout_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"BASELINE_AUTO_EN"}},
+    {"id":"scout-tennis-uk-success","sport":"tennis","language":"uk","class":"success","input":{"context":"Синтетичний контекст турніру","timeframe":"tomorrow"},"mock_output_template":"scout_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"БАЗОВИЙ_UK"}},
+    {"id":"scout-soccer-ru-success","sport":"soccer","language":"ru","class":"success","input":{"context":"Синтетический контекст лиги","timeframe":"today"},"mock_output_template":"scout_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"БАЗОВЫЙ_RU"}},
+    {"id":"scout-tennis-en-success","sport":"tennis","language":"en","class":"success","input":{"context":"Synthetic tournament context","timeframe":"tomorrow"},"mock_output_template":"scout_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"BASELINE_EN"}},
+    {"id":"scout-soccer-es-success","sport":"soccer","language":"es","class":"success","input":{"context":"Contexto sintético de liga","timeframe":"today"},"mock_output_template":"scout_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"BASE_ES"}},
+    {"id":"scout-tennis-fr-success","sport":"tennis","language":"fr","class":"success","input":{"context":"Contexte synthétique du tournoi","timeframe":"tomorrow"},"mock_output_template":"scout_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"BASE_FR"}},
+    {"id":"scout-soccer-de-success","sport":"soccer","language":"de","class":"success","input":{"context":"Synthetischer Ligakontext","timeframe":"today"},"mock_output_template":"scout_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"BASIS_DE"}},
+    {"id":"scout-tennis-ar-success","sport":"tennis","language":"ar","class":"success","input":{"context":"سياق بطولة اصطناعي","timeframe":"tomorrow"},"mock_output_template":"scout_valid","expected":{"status":200,"provider_attempts":1,"persistence_attempts":1,"schema_valid":true,"language_marker":"أساس_AR"}},
+    {"id":"scout-web-search-fallback","sport":"soccer","language":"en","class":"boundary","input":{"context":"Synthetic league context","timeframe":"today","web_search":true},"mock_output_template":"scout_web_error_then_valid","expected":{"status":200,"provider_attempts":2,"persistence_attempts":1,"schema_valid":true,"fallback_used":true,"language_marker":"BASELINE_EN"}},
+    {"id":"scout-malformed-output","sport":"tennis","language":"en","class":"error","input":{"context":"Synthetic tournament context","timeframe":"tomorrow"},"mock_output_template":"malformed","expected":{"status":502,"provider_attempts":1,"persistence_attempts":0,"schema_valid":false}}
+  ]
+}
