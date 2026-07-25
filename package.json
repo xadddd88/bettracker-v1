@@ -14,6 +14,7 @@
     "test:analysis-quality-gate": "npm run build:provider-scripts && node scripts/test-analysis-quality-gate.mjs",
     "test:ai-baseline": "npm run build:provider-scripts && node scripts/ai-baseline-harness.mjs",
     "test:tennis": "npm run build:provider-scripts && node scripts/test-tennis-series.mjs",
+    "test:tennis-access-gate": "npm run build:provider-scripts && node scripts/test-tennis-access-gate.mjs",
     "test:financial-safety": "npm run build:provider-scripts && node scripts/test-financial-safety.mjs",
     "test:domain-write-boundaries": "npm run build:provider-scripts && node scripts/test-domain-write-boundaries.mjs",
     "test:agent-write-boundaries": "node scripts/test-agent-write-boundaries.mjs",
