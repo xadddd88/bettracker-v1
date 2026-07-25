@@ -26,7 +26,7 @@ for required in "$MIGRATION_026" "$MIGRATION_027" "$MIGRATION_028" "$ROLLBACK_02
 done
 
 pass() {
-  printf '[%02d/14] %s — PASS\n' "$1" "$2"
+  printf '[%02d/15] %s — PASS\n' "$1" "$2"
 }
 
 if grep -Eiq 'SECURITY[[:space:]]+DEFINER' "$MIGRATION_028"; then
@@ -126,7 +126,7 @@ SET ROLE service_role;
 SELECT public.tennis_create_series(
   '10000000-0000-4000-8000-000000000001',
   'a0000000-0000-4000-8000-000000000001',
-  38.00, 20.00, 0.01, 'USD', 5000.00, 500.00, 15, 5000.00,
+  38.00, NULL, 0.01, 'USD', 5000.00, 500.00, 15, 5000.00,
   'v1', 'authority gate'
 )->>'series_id';
 RESET ROLE;
@@ -134,6 +134,32 @@ SQL
 )"
 [[ "$SERIES_ID" =~ ^[0-9a-f-]{36}$ ]] || { echo "invalid series id returned" >&2; exit 1; }
 pass 6 "create isolated series"
+
+SEED_RESULT="$(
+psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 -At <<'SQL'
+SET ROLE service_role;
+WITH seeded AS (
+  SELECT public.tennis_create_series(
+    '10000000-0000-4000-8000-000000000001',
+    'd0000000-0000-4000-8000-000000000001',
+    5.00, 20.00, 0.01, 'USD', 5000.00, 500.00, 15, 5000.00,
+    'v1', 'first stake seed gate'
+  )->>'series_id' AS series_id
+)
+SELECT public.tennis_confirm_step(
+  '10000000-0000-4000-8000-000000000001',
+  seeded.series_id::uuid,
+  'd0000000-0000-4000-8000-000000000002',
+  0, 1, 1, 3.00, 3.00, 20.00
+)::text
+FROM seeded;
+RESET ROLE;
+SQL
+)"
+printf '%s' "$SEED_RESULT" | grep -q '"recommended_stake": "20.00"'
+printf '%s' "$SEED_RESULT" | grep -q '"target_profit_snapshot": "5.00"'
+printf '%s' "$SEED_RESULT" | grep -q '"projected_series_result": "40.00"'
+pass 7 "use configured starting stake for game one only"
 
 FIRST_RESULT="$(
 psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 -At -v series_id="$SERIES_ID" <<'SQL'
@@ -152,7 +178,7 @@ printf '%s' "$FIRST_RESULT" | grep -q '"loss_before": "0"'
 printf '%s' "$FIRST_RESULT" | grep -q '"projected_series_result": "38.00"'
 FIRST_STEP_ID="$(printf '%s' "$FIRST_RESULT" | sed -n 's/.*"step_id": "\([^"]*\)".*/\1/p')"
 [[ "$FIRST_STEP_ID" =~ ^[0-9a-f-]{36}$ ]] || { echo "invalid first step id" >&2; exit 1; }
-pass 7 "derive first recommendation and projection"
+pass 8 "derive first recommendation when no seed is configured"
 
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -v series_id="$SERIES_ID" -v step_id="$FIRST_STEP_ID" <<'SQL' >/dev/null
 SET ROLE service_role;
@@ -164,7 +190,7 @@ SELECT public.tennis_settle_step(
 );
 RESET ROLE;
 SQL
-pass 8 "settle first step as authoritative loss"
+pass 9 "settle first step as authoritative loss"
 
 SECOND_RESULT="$(
 psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 -At -v series_id="$SERIES_ID" <<'SQL'
@@ -182,7 +208,7 @@ printf '%s' "$SECOND_RESULT" | grep -q '"recommended_stake": "26.61"'
 printf '%s' "$SECOND_RESULT" | grep -q '"loss_before": "20.00"'
 printf '%s' "$SECOND_RESULT" | grep -q '"target_profit_snapshot": "38.00"'
 printf '%s' "$SECOND_RESULT" | grep -q '"projected_series_result": "32.15"'
-pass 9 "derive loss, recommendation and accepted projection"
+pass 10 "derive loss, recommendation and accepted projection"
 
 if psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -v series_id="$SERIES_ID" <<'SQL' >/dev/null 2>&1
 SET ROLE service_role;
@@ -198,7 +224,7 @@ then
   echo "legacy client-derived signature unexpectedly remains callable" >&2
   exit 1
 fi
-pass 10 "legacy tampered payload is not callable"
+pass 11 "legacy tampered payload is not callable"
 
 LIMIT_SERIES_ID="$(
 psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 -At <<'SQL'
@@ -248,7 +274,7 @@ then
   echo "recommended stake bypassed remaining bankroll" >&2
   exit 1
 fi
-pass 11 "required stake cannot bypass remaining bankroll"
+pass 12 "required stake cannot bypass remaining bankroll"
 
 ACCEPTED_LIMIT_SERIES_ID="$(
 psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 -At <<'SQL'
@@ -276,7 +302,7 @@ then
   echo "accepted stake bypassed exposure limit" >&2
   exit 1
 fi
-pass 12 "accepted stake cannot bypass exposure limit"
+pass 13 "accepted stake cannot bypass exposure limit"
 
 REPLAY="$(
 psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 -At -v series_id="$SERIES_ID" <<'SQL'
@@ -306,7 +332,7 @@ then
   echo "same operation id accepted a conflicting payload" >&2
   exit 1
 fi
-pass 13 "payload-bound idempotency preserved"
+pass 14 "payload-bound idempotency preserved"
 
 if psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$MIGRATION_028" >/dev/null 2>&1; then
   echo "migration 028 unexpectedly accepted non-empty command history" >&2
@@ -330,6 +356,6 @@ BEGIN
 END
 $$;
 SQL
-pass 14 "upgrade guard and fail-closed rollback"
+pass 15 "upgrade guard and fail-closed rollback"
 
 echo "migration 028 verification: ALL CHECKS PASSED"

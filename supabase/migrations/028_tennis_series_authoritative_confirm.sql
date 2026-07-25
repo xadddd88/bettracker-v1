@@ -158,11 +158,18 @@ BEGIN
     RAISE EXCEPTION 'invalid_calculation_input';
   END IF;
 
-  v_recommended_raw_minor :=
-    ((v_loss_minor + v_target_minor) * 1000 + v_denominator - 1) / v_denominator;
-  v_recommended_minor :=
-    ((v_recommended_raw_minor + v_stake_increment_minor - 1) / v_stake_increment_minor)
-    * v_stake_increment_minor;
+  -- Product semantics: an explicitly configured starting stake seeds game 1
+  -- only. Every later recommendation (and game 1 when no seed is configured)
+  -- is recalculated dynamically from realised loss, target and current odds.
+  IF v_next_step = 1 AND v_series.initial_stake IS NOT NULL THEN
+    v_recommended_minor := (v_series.initial_stake * 100)::bigint;
+  ELSE
+    v_recommended_raw_minor :=
+      ((v_loss_minor + v_target_minor) * 1000 + v_denominator - 1) / v_denominator;
+    v_recommended_minor :=
+      ((v_recommended_raw_minor + v_stake_increment_minor - 1) / v_stake_increment_minor)
+      * v_stake_increment_minor;
+  END IF;
   v_projected_minor :=
     (v_accepted_stake_minor * (v_accepted_odds_scaled - 1000) / 1000) - v_loss_minor;
 

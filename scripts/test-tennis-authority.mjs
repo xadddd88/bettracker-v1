@@ -74,6 +74,8 @@ test('loss is derived from settled lost steps under the series lock', () => {
 test('required stake uses exact integer ceil and configured stake increment', () => {
   assert.ok(migration.includes('(p_quoted_odds * 1000)::bigint'))
   assert.ok(migration.includes('(v_series.stake_increment * 100)::bigint'))
+  assert.ok(migration.includes('v_next_step = 1 AND v_series.initial_stake IS NOT NULL'))
+  assert.ok(migration.includes('(v_series.initial_stake * 100)::bigint'))
   assert.ok(migration.includes('v_recommended_raw_minor'))
   assert.ok(migration.includes('v_recommended_raw_minor + v_stake_increment_minor - 1'))
   assert.ok(!migration.includes('double precision'))
