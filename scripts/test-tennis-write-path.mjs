@@ -40,6 +40,10 @@ const defaultResults = {
     step_number: 1,
     status: 'active',
     version: 1,
+    recommended_stake: '20.00',
+    loss_before: '0.00',
+    target_profit_snapshot: '46.80',
+    projected_series_result: '46.80',
     replayed: false,
   },
   settle: {
@@ -74,12 +78,8 @@ const validBodies = {
     set_number: 1,
     game_number: 1,
     quoted_odds: '3.34',
-    recommended_stake: '20',
     accepted_odds: '3.34',
     accepted_stake: '20',
-    loss_before: '0',
-    target_profit_snapshot: '46.8',
-    projected_series_result: '-0.5',
   },
   settle: {
     series_id: SERIES,
@@ -452,6 +452,21 @@ await testAsync('extra odds precision is rejected, never rounded', async () => {
   assert.equal(result.calls.rpc.length, 0)
 })
 
+await testAsync('client-derived financial fields are rejected', async () => {
+  for (const field of [
+    'recommended_stake',
+    'loss_before',
+    'target_profit_snapshot',
+    'projected_series_result',
+  ]) {
+    const result = await invoke('confirm', {
+      body: { ...validBodies.confirm, [field]: '0.01' },
+    })
+    assert.equal(result.status, 400)
+    assert.equal(result.calls.rpc.length, 0)
+  }
+})
+
 await testAsync('idempotency conflict maps to a sanitized 409', async () => {
   const result = await invoke('create', {
     rpc: { data: null, error: { message: 'idempotency_conflict' } },
@@ -513,9 +528,12 @@ await testAsync('create uses session-derived owner and canonical decimal strings
   })
 })
 
-await testAsync('confirm delegates once with canonical odds and signed money', async () => {
+await testAsync('confirm delegates only operator-entered values', async () => {
   const result = await invoke('confirm')
   assert.equal(result.status, 200)
+  assert.equal(result.body.recommended_stake, '20.00')
+  assert.equal(result.body.loss_before, '0.00')
+  assert.equal(result.body.projected_series_result, '46.80')
   assert.deepEqual(result.calls.rpc[0], {
     name: 'tennis_confirm_step',
     args: {
@@ -526,12 +544,8 @@ await testAsync('confirm delegates once with canonical odds and signed money', a
       p_set_number: 1,
       p_game_number: 1,
       p_quoted_odds: '3.340',
-      p_recommended_stake: '20.00',
       p_accepted_odds: '3.340',
       p_accepted_stake: '20.00',
-      p_loss_before: '0.00',
-      p_target_profit_snapshot: '46.80',
-      p_projected_series_result: '-0.50',
     },
   })
 })

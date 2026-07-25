@@ -96,6 +96,35 @@ jobs:
         run: npm run test:design-system
       - name: "Corrective PR H gate"
         run: npm run test:corrective-pr-h
+      - name: "Tennis authoritative confirmation gate"
+        run: npm run test:tennis-authority
+      - name: "Tennis server write-path regression"
+        run: npm run test:tennis-write-path
+
+  # PostgreSQL 17 contract gate for the corrective Tennis confirmation RPC.
+  # Uses a disposable CI service only; no Supabase or production credentials.
+  tennis-authority-postgres:
+    name: Tennis authority PostgreSQL 17
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Run migration 028 authority verifier
+        run: bash scripts/verify-migration-028.sh postgresql://postgres:postgres@localhost:5432/postgres
 
   # ── Job: Cross-platform design-system compile gate ─────────────────────────
   design-system:
