@@ -16,13 +16,13 @@ type Locale    = 'auto' | 'uk' | 'ru' | 'en' | 'es' | 'fr' | 'de' | 'ar'
 type Timeframe = 'today' | 'tomorrow' | 'this_week'
 
 const SPORTS: { value: Sport; label: string }[] = [
-  { value: 'soccer',     label: 'Football'   },
-  { value: 'tennis',     label: 'Tennis'     },
+  { value: 'soccer',     label: 'Футбол'     },
+  { value: 'tennis',     label: 'Теннис'     },
   { value: 'cs2',        label: 'CS2'        },
-  { value: 'basketball', label: 'Basketball' },
-  { value: 'ice_hockey', label: 'Hockey'     },
+  { value: 'basketball', label: 'Баскетбол'  },
+  { value: 'ice_hockey', label: 'Хоккей'     },
   { value: 'mma',        label: 'MMA'        },
-  { value: 'other',      label: 'Other'      },
+  { value: 'other',      label: 'Другое'     },
 ]
 
 const SPORT_ABBR: Record<Sport, string> = {
@@ -36,7 +36,7 @@ const SPORT_ABBR: Record<Sport, string> = {
 }
 
 const LOCALES: { value: Locale; label: string }[] = [
-  { value: 'auto', label: 'Auto (detect)' },
+  { value: 'auto', label: 'Авто' },
   { value: 'en',   label: 'English' },
   { value: 'uk',   label: 'Українська' },
   { value: 'ru',   label: 'Русский' },
@@ -47,24 +47,30 @@ const LOCALES: { value: Locale; label: string }[] = [
 ]
 
 const TIMEFRAMES: { value: Timeframe; label: string }[] = [
-  { value: 'today',     label: 'Today' },
-  { value: 'tomorrow',  label: 'Tomorrow' },
-  { value: 'this_week', label: 'This week' },
+  { value: 'today',     label: 'Сегодня' },
+  { value: 'tomorrow',  label: 'Завтра' },
+  { value: 'this_week', label: 'На этой неделе' },
 ]
 
 const STATUS_BADGE: Record<OpportunityStatus, { label: string; status: BroadcastNoirStatus } | null> = {
   discovered:            null,
-  research_needed:       { label: 'In Analysis', status: 'review' },
-  watchlisted:           { label: 'Watching', status: 'review' },
-  converted_to_decision: { label: 'Converted', status: 'success' },
+  research_needed:       { label: 'В анализе', status: 'review' },
+  watchlisted:           { label: 'В наблюдении', status: 'review' },
+  converted_to_decision: { label: 'Передано', status: 'success' },
   dismissed:             null,
   expired:               null,
 }
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const MONTHS = ['янв.','фев.','мар.','апр.','мая','июн.','июл.','авг.','сен.','окт.','ноя.','дек.']
 function fmtMatchDate(d: string): string {
   const parts = d.split('-')
   return `${parseInt(parts[2])} ${MONTHS[parseInt(parts[1]) - 1]}`
+}
+
+function riskLabel(risk: string): string {
+  if (risk === 'high') return 'Высокий'
+  if (risk === 'medium') return 'Средний'
+  return 'Низкий'
 }
 
 // ─── Opportunity card ─────────────────────────────────────────
@@ -108,12 +114,12 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
           {opp.opportunity_type}
         </span>
         <span className="text-bn-quiet">·</span>
-        <BroadcastDataValue className="text-[11px] font-medium">Score {score}</BroadcastDataValue>
+        <BroadcastDataValue className="text-[11px] font-medium">Оценка {score}</BroadcastDataValue>
         {opp.risk_level && (
           <>
             <span className="text-bn-quiet">·</span>
             <BroadcastStatus status={opp.risk_level === 'high' ? 'negative' : opp.risk_level === 'medium' ? 'review' : 'neutral'}>
-              {opp.risk_level.charAt(0).toUpperCase() + opp.risk_level.slice(1)} risk
+              {riskLabel(opp.risk_level)} риск
             </BroadcastStatus>
           </>
         )}
@@ -141,7 +147,7 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
             onClick={onToggle}
             className="mt-1 min-h-11 text-xs font-bold text-bn-text underline underline-offset-4"
           >
-            {expanded ? 'Show less' : 'Show more'}
+            {expanded ? 'Скрыть' : 'Показать больше'}
           </button>
         )}
       </div>
@@ -150,7 +156,7 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
       {opp.required_checks && opp.required_checks.length > 0 && (
         <div>
           <p className="mb-1 font-mono text-[11px] font-medium uppercase tracking-wide text-bn-quiet">
-            Required checks
+            Что проверить
           </p>
           <ul className="flex flex-col gap-0.5">
             {opp.required_checks.map((check, i) => (
@@ -172,7 +178,7 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
             disabled={actionBusy}
           >
             <Search size={13} strokeWidth={2} />
-            Analyze
+            Анализ
           </BroadcastButton>
           <BroadcastButton
             tone="secondary"
@@ -181,14 +187,14 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
             disabled={actionBusy || opp.status === 'watchlisted'}
           >
             <Eye size={13} strokeWidth={2} />
-            {opp.status === 'watchlisted' ? 'Watching' : 'Watchlist'}
+            {opp.status === 'watchlisted' ? 'В наблюдении' : 'Наблюдать'}
           </BroadcastButton>
           <BroadcastButton
             tone="secondary"
-            aria-label={`Dismiss ${opp.event_name}`}
+            aria-label={`Скрыть ${opp.event_name}`}
             onClick={onDismiss}
             disabled={actionBusy}
-            title="Dismiss"
+            title="Скрыть"
           >
             <X size={13} strokeWidth={2} />
           </BroadcastButton>
@@ -247,7 +253,7 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
   // ── Scout run ───────────────────────────────────────────────
   const handleScout = useCallback(async () => {
     if (!context.trim()) {
-      setError('Describe what you are looking for (league, teams, timeframe context…)')
+      setError('Опишите, что ищем: лига, команды, период и контекст.')
       return
     }
     setError('')
@@ -266,7 +272,7 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
       })
       const json = await res.json()
       if (!res.ok || !json.success) {
-        setError(json.error ?? 'Scout failed. Please try again.')
+        setError(json.error ?? 'Скаут не сработал. Попробуйте ещё раз.')
         return
       }
       const { opportunities: newOpps, disclaimer: disc } = json.data as {
@@ -276,7 +282,7 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
       setOpportunities(prev => [...newOpps, ...prev])
       if (disc) setDisclaimer(disc)
     } catch {
-      setError('Network error — please try again.')
+      setError('Ошибка сети — попробуйте ещё раз.')
     } finally {
       setLoading(false)
     }
@@ -336,7 +342,7 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
         {/* Event Pulse quick picks */}
         {pulsePresets && pulsePresets.length > 0 && (
           <div>
-            <p className="label mb-2">Quick picks</p>
+            <p className="label mb-2">Быстрый выбор</p>
             <div className="flex flex-wrap gap-2">
               {pulsePresets.map(preset => (
                 <BroadcastButton
@@ -357,7 +363,7 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
 
         {/* Sport selector */}
         <div>
-          <label className="label mb-2">Sport</label>
+          <label className="label mb-2">Спорт</label>
           <div className="flex flex-wrap gap-2">
             {SPORTS.map(s => (
               <BroadcastButton
@@ -374,11 +380,11 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
 
         {/* Context */}
         <div>
-          <label className="label">What are you looking for?</label>
+          <label className="label">Что ищем?</label>
           <textarea
             className="input resize-none mt-1"
             rows={3}
-            placeholder="e.g. Top Premier League fixtures this weekend — looking for underdog value or strong away sides…"
+            placeholder="Например: матчи АПЛ на выходных — ищем недооценённого андердога или сильную гостевую команду..."
             value={context}
             onChange={e => { setContext(e.target.value); setError('') }}
           />
@@ -386,7 +392,7 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
 
         {/* Timeframe */}
         <div>
-          <label className="label mb-2">Timeframe</label>
+          <label className="label mb-2">Период</label>
           <div className="flex gap-2">
             {TIMEFRAMES.map(t => (
               <BroadcastButton
@@ -404,7 +410,7 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
 
         {/* Language */}
         <div>
-          <label className="label">Output language</label>
+          <label className="label">Язык результата</label>
           <select className="input mt-1" value={locale} onChange={e => setLocale(e.target.value as Locale)}>
             {LOCALES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
           </select>
@@ -423,12 +429,12 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
         >
           {loading ? (
             <>
-              Scouting…
+              Ищем...
             </>
           ) : (
             <>
               <Search size={14} strokeWidth={2} />
-              Run Scout
+              Запустить Скаут
             </>
           )}
         </BroadcastButton>
@@ -443,14 +449,14 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
       {opportunities.length > 0 ? (
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <p className="text-xs text-bn-muted">{opportunities.length} opportunit{opportunities.length === 1 ? 'y' : 'ies'} · sorted by most recent</p>
+            <p className="text-xs text-bn-muted">Кандидатов: {opportunities.length} · сначала новые</p>
             <p className="text-[10px] text-bn-quiet">
-              value = candidate to investigate · contrarian = alternative angle · pattern = contextual pattern ·{' '}
-              score 0–100 = research relevance, not probability or price edge · Analyze → AI Analyst
+              value = кандидат для проверки · contrarian = альтернативный угол · pattern = контекстный паттерн ·{' '}
+              оценка 0-100 = релевантность исследования, не вероятность и не ценовой edge · Анализ → AI Analyst
             </p>
           </div>
           {opportunities.length < 5 && (
-            <BetaNote>Scout may return fewer candidates when low-quality or incomplete candidates are filtered out.</BetaNote>
+            <BetaNote>Скаут может вернуть меньше кандидатов, если слабые или неполные идеи отфильтрованы.</BetaNote>
           )}
           {opportunities.map(opp => (
             <OpportunityCard
@@ -466,7 +472,7 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
           ))}
         </div>
       ) : !loading && (
-        <BroadcastPanel className="flex flex-col items-center gap-3 py-10 text-center"><BroadcastStatus status="neutral">Empty</BroadcastStatus><p className="text-sm font-medium text-bn-text">No scouted opportunities yet</p><p className="text-xs text-bn-muted">Run Scout to find markets worth analyzing.</p></BroadcastPanel>
+        <BroadcastPanel className="flex flex-col items-center gap-3 py-10 text-center"><BroadcastStatus status="neutral">Пусто</BroadcastStatus><p className="text-sm font-medium text-bn-text">Кандидатов пока нет</p><p className="text-xs text-bn-muted">Запустите Скаут, чтобы найти рынки для дальнейшего анализа.</p></BroadcastPanel>
       )}
     </div>
   )

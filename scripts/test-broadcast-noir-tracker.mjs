@@ -33,7 +33,7 @@ for (const [name, file] of [
 
 assert.match(webList, /legs\.map\(\(leg, index\)/, 'Web Tracker must render every ordered leg')
 assert.match(webDetail, /legs\.map\(\(leg, index\)/, 'Web detail must render every ordered leg')
-assert.match(webEditor, /Save Bet/)
+assert.match(webEditor, /Сохранить ставку/)
 assert.match(webEditor, /idempotency_key: begin\.key/)
 assert.match(mobileList, /BetTicket/, 'Mobile Tracker must use the ordered-leg ticket')
 assert.match(mobileDetail, /coupon\.legs\.map\(\(leg, index\)/, 'Mobile detail must render every ordered leg')

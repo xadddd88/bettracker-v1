@@ -230,9 +230,9 @@ async function assertBaseAcceptance(page, route, viewport) {
 async function assertBetDetailHydration(page) {
   const timestamps = await page.locator('main').evaluate(root => {
     const settledTerm = [...root.querySelectorAll('dt')]
-      .find(element => element.textContent?.trim() === 'Settled')
+      .find(element => element.textContent?.trim() === 'Рассчитана')
     const settlementKicker = [...root.querySelectorAll('.editorial-kicker')]
-      .find(element => element.textContent?.trim() === 'Settlement')
+      .find(element => element.textContent?.trim() === 'Расчёт ставки')
 
     return {
       detail: settledTerm?.nextElementSibling?.textContent?.trim() ?? null,
@@ -243,7 +243,7 @@ async function assertBetDetailHydration(page) {
     }
   })
 
-  assert.equal(timestamps.detail, '22 Jul 2026, 23:30', 'Server-rendered settled timestamp must use the UTC release contract')
+  assert.equal(timestamps.detail, '22 июл. 2026 г., 23:30', 'Server-rendered settled timestamp must use the UTC release contract')
   assert.equal(timestamps.settlement, timestamps.detail, 'Client settlement timestamp must match the server-rendered value byte-for-byte')
 }
 
@@ -282,8 +282,8 @@ async function assertTrackerLabels(page, exerciseDynamicLegs) {
   ]) await assertLabelFocus(page, id)
 
   if (!exerciseDynamicLegs) return
-  await page.getByRole('button', { name: 'Express', exact: true }).click()
-  await page.getByRole('button', { name: /^\+ Add leg/ }).click()
+  await page.getByRole('button', { name: 'Экспресс', exact: true }).click()
+  await page.getByRole('button', { name: /^\+ Добавить плечо/ }).click()
   await page.locator('#tracker-leg-1-event').waitFor()
   for (const id of [
     'tracker-leg-1-event',

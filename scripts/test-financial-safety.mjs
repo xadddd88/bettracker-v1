@@ -700,21 +700,21 @@ await withCompiledAlias(async () => {
   test('#058: partial resolves to an explicit Partial label, never Void', () => {
     const r = resolveBetStatus('partial');
     assert.equal(r.key, 'partial');
-    assert.equal(r.label, 'Partial');
-    assert.notEqual(r.label, 'Void');
+    assert.equal(r.label, 'Частично');
+    assert.notEqual(r.label, 'Возврат');
   });
 
   test('#058: unknown statuses resolve to Unknown, never Void or raw text', () => {
     for (const value of ['half_won', 'settled', '', 'VOID ', 'garbage']) {
       const r = resolveBetStatus(value);
       assert.equal(r.key, 'unknown', `'${value}' must resolve to unknown`);
-      assert.equal(r.label, 'Unknown');
+      assert.equal(r.label, 'Неизвестно');
     }
     // Every known status + unknown has an explicit label — no gaps to fall through.
     for (const key of [...KNOWN_BET_STATUSES, 'unknown']) {
       assert.ok(BET_STATUS_LABELS[key], `missing label for ${key}`);
     }
-    assert.equal(resolveBetStatus('cashed_out').label, 'Cashed out');
+    assert.equal(resolveBetStatus('cashed_out').label, 'Выкуплена');
   });
 
   test('#058: calcPerformance (analytics surface) delegates to the canonical helper', () => {
@@ -1712,7 +1712,7 @@ test('tracked-bet: form and route sources — API-only path, idempotency lifecyc
   assert.equal((page.match(/resolveSubmit\(intentRef\.current, 'retryable'\)/g) ?? []).length, 2,
     'HTTP failures and network throws must both resolve as retryable');
   assert.ok(page.includes("begin.reason === 'conflict_unchanged'"), 'the conflict-unchanged block must be handled');
-  assert.ok(page.includes("setErrors({ _root: 'Request conflict' })"), 'the fixed Request conflict error must be shown');
+  assert.ok(page.includes("setErrors({ _root: 'Конфликт запроса' })"), 'the fixed Request conflict error must be shown');
   assert.ok(!/keyRef|lastPayloadRef|conflictLockRef|inFlightRef/.test(page),
     'no second, component-local lifecycle implementation may exist');
   assert.ok(page.includes('disabled={busy}'), 'submit must be locked while busy (in flight or scanning)');
@@ -1839,7 +1839,7 @@ test('page: Single / Express controls are real accessible buttons, not passive i
   assert.ok(page.includes('onClick={() => selectBetMode(\'express\')}'), 'Express must invoke the mode transition');
   assert.ok(page.includes('aria-pressed={!isExpress}') && page.includes('aria-pressed={isExpress}'),
     'both mode buttons must expose their selected state');
-  assert.ok(page.includes("window.confirm('Switch to Single and remove the additional Express legs?')"),
+  assert.ok(page.includes("window.confirm('Переключиться на одиночную ставку и удалить дополнительные плечи экспресса?')"),
     'dropping additional legs requires explicit confirmation');
 });
 
@@ -1855,7 +1855,7 @@ test('page: overflow branch runs BEFORE any state write, with the fixed non-echo
   const page = readFileSync(path.join(repoRoot, 'app/(app)/bets/new/page.tsx'), 'utf8');
   const okCheck = page.indexOf('if (!mapped.ok)');
   assert.ok(okCheck !== -1, 'the page must branch on the discriminated union');
-  assert.ok(page.includes("setScanMsg('Coupon has more than 20 legs and was not imported.')"),
+  assert.ok(page.includes("setScanMsg('В купоне больше 20 плеч, поэтому он не импортирован.')"),
     'the refusal message must be fixed text (no coupon content, no leg count echo)');
   for (const write of ['setLegs(mapped.legs)', 'setTotalOdds(mapped.totalOdds)', 'setStake(mapped.stake)',
     'setBookmaker(mapped.bookmaker)', "setSource('scanner')"]) {
@@ -1881,7 +1881,7 @@ test('page: busy lock — one fieldset boundary disables fields, leg mutations, 
   assert.ok(page.includes('</fieldset>'), 'the fieldset must wrap the whole form body');
   assert.ok((page.match(/aria-busy=\{busy\}/g) ?? []).length >= 2, 'form and scanner zone must announce aria-busy');
   assert.ok(page.includes('disabled={busy || legs.length >= MAX_TRACKED_BET_LEGS}'), 'Add leg must respect the busy lock');
-  assert.ok(/aria-label=\{`Remove leg \$\{index \+ 1\}`\}\s*\n\s*disabled=\{busy\}/.test(page), 'Remove leg must respect the busy lock');
+  assert.ok(/aria-label=\{`Удалить плечо \$\{index \+ 1\}`\}\s*\n\s*disabled=\{busy\}/.test(page), 'Remove leg must respect the busy lock');
   assert.ok(/onClick=\{\(\) => router\.back\(\)\}\s*\n\s*disabled=\{busy\}/.test(page), 'Cancel must be locked while busy');
   assert.ok(page.includes('disabled={busy}>') || /type="submit"[^>]*disabled=\{busy\}/.test(page), 'Save must be locked while busy');
 });
@@ -2117,9 +2117,9 @@ test('cancel: web controls require confirmation and explain the refund/audit beh
     assert.ok(src.includes('window.confirm('), `${name}: destructive confirmation missing`);
     assert.ok(src.includes('/cancel`'), `${name}: cancel endpoint missing`);
     assert.ok(src.includes("'Idempotency-Key': crypto.randomUUID()"), `${name}: idempotency key missing`);
-    assert.ok(src.includes('stake will be returned'), `${name}: refund consequence must be explicit`);
+    assert.ok(src.includes('Сумма вернётся в банкролл'), `${name}: refund consequence must be explicit`);
   }
-  assert.ok(detail.includes('The financial audit record is retained.'), 'detail must explain that deletion is a soft delete');
+  assert.ok(detail.includes('Финансовая audit-запись сохраняется.'), 'detail must explain that deletion is a soft delete');
 });
 
 test('cancel: every product bet read excludes archived cancellations', () => {

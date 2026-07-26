@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { BroadcastDataValue, BroadcastStatus } from '@/components/ui/BroadcastNoir'
+import SectionGuide from '@/components/ui/SectionGuide'
 import { formatMoneyAmount } from '@/lib/money'
 import {
   TRACKED_BET_SPORTS,
@@ -23,13 +24,13 @@ import {
 } from '@/lib/bets/tracked-bet'
 
 const SPORT_LABEL: Record<TrackedBetSport, string> = {
-  soccer: 'Soccer / Football',
-  tennis: 'Tennis',
-  basketball: 'Basketball',
-  ice_hockey: 'Ice Hockey',
+  soccer: 'Футбол',
+  tennis: 'Теннис',
+  basketball: 'Баскетбол',
+  ice_hockey: 'Хоккей',
   cs2: 'CS2',
   mma: 'MMA',
-  other: 'Other',
+  other: 'Другое',
 }
 const BOOKMAKERS = ['Bet365', 'William Hill', '1xBet', 'Stake', 'Pinnacle', 'Other']
 
@@ -139,7 +140,7 @@ export default function NewBetPage() {
   function selectBetMode(mode: 'single' | 'express') {
     if (busy) return
     if (mode === 'single' && legs.length > 1) {
-      const confirmed = window.confirm('Switch to Single and remove the additional Express legs?')
+      const confirmed = window.confirm('Переключиться на одиночную ставку и удалить дополнительные плечи экспресса?')
       if (!confirmed) return
       setTotalOdds('')
     }
@@ -154,7 +155,7 @@ export default function NewBetPage() {
     if (scanningRef.current || intentRef.current.status === 'in_flight') return
     scanningRef.current = true
     setScanning(true)
-    setScanMsg('Scanning coupon...')
+    setScanMsg('Сканируем купон...')
 
     try {
       const { data, media_type } = await fileToBase64(file)
@@ -167,7 +168,7 @@ export default function NewBetPage() {
 
       const json = await res.json()
       if (!res.ok || !json.success) {
-        setScanMsg(json.error ?? 'Scan failed')
+        setScanMsg(json.error ?? 'Скан не удался')
         return
       }
 
@@ -182,7 +183,7 @@ export default function NewBetPage() {
       const mapped = scannerDataToDrafts(json.data)
       if (!mapped.ok) {
         setScannerOverflowBlocked(true)
-        setScanMsg('Coupon has more than 20 legs and was not imported.')
+        setScanMsg('В купоне больше 20 плеч, поэтому он не импортирован.')
         return
       }
       // Full-replacement policy: a successful scan replaces EVERY
@@ -199,11 +200,11 @@ export default function NewBetPage() {
       setErrors({})
       setScanMsg(
         mapped.legs.length >= 2
-          ? `✅ Express scanned — ${mapped.legs.length} legs. Review and save`
-          : '✅ Coupon scanned — review and save'
+          ? `Экспресс отсканирован — плеч: ${mapped.legs.length}. Проверьте и сохраните`
+          : 'Купон отсканирован — проверьте и сохраните'
       )
     } catch {
-      setScanMsg('Scan error — try again')
+      setScanMsg('Ошибка скана — попробуйте ещё раз')
     } finally {
       scanningRef.current = false
       setScanning(false)
@@ -280,7 +281,7 @@ export default function NewBetPage() {
       // 'conflict_unchanged': the conflicted intent was resubmitted
       // unchanged — blocked with no network call and NO new UUID.
       if (begin.reason === 'conflict_unchanged') {
-        setErrors({ _root: 'Request conflict' })
+        setErrors({ _root: 'Конфликт запроса' })
       }
       return
     }
@@ -311,7 +312,7 @@ export default function NewBetPage() {
         // and locks this intent — no automatic retry, no key rotation.
         // Only a deliberate payload change starts a new intent.
         intentRef.current = resolveSubmit(intentRef.current, 'conflict')
-        setErrors({ _root: 'Request conflict' })
+        setErrors({ _root: 'Конфликт запроса' })
         return
       }
 
@@ -319,22 +320,22 @@ export default function NewBetPage() {
       // retry replays server-side instead of creating a second bet.
       intentRef.current = resolveSubmit(intentRef.current, 'retryable')
       if (res.status === 401) {
-        setErrors({ _root: 'Session expired — please sign in again.' })
+        setErrors({ _root: 'Сессия истекла — войдите заново.' })
       } else if (res.status === 429) {
-        setErrors({ _root: 'Too many bets — please wait a moment and try again.' })
+        setErrors({ _root: 'Слишком много ставок — подождите немного и попробуйте ещё раз.' })
       } else if (res.status === 503) {
-        setErrors({ _root: 'Service temporarily unavailable — try again shortly. Retrying is safe.' })
+        setErrors({ _root: 'Сервис временно недоступен — попробуйте скоро ещё раз. Повтор безопасен.' })
       } else if (res.status === 400 || res.status === 404 || res.status === 422) {
         // Sanitized, deterministic messages from our own API.
-        setErrors({ _root: json.error ?? 'Bet validation failed' })
+        setErrors({ _root: json.error ?? 'Проверка ставки не прошла' })
       } else {
-        setErrors({ _root: 'Bet could not be saved — press Save again. Retrying is safe.' })
+        setErrors({ _root: 'Ставку не удалось сохранить — нажмите сохранение ещё раз. Повтор безопасен.' })
       }
     } catch {
       // Network-unknown result: keep the UUID and snapshot for an
       // exact retry.
       intentRef.current = resolveSubmit(intentRef.current, 'retryable')
-      setErrors({ _root: 'Network error — check your connection and press Save again. Retrying is safe.' })
+      setErrors({ _root: 'Ошибка сети — проверьте подключение и нажмите сохранение ещё раз. Повтор безопасен.' })
     } finally {
       setLoading(false)
     }
@@ -348,12 +349,34 @@ export default function NewBetPage() {
   return (
     <main className="bn-page mx-auto w-full max-w-3xl space-y-4 pb-8" onPaste={handlePaste}>
       <header className="bn-panel p-5 sm:p-7">
-        <p className="editorial-kicker">Tracker · editable draft</p>
-        <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,5.5rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Add bet</h1>
+        <p className="editorial-kicker">Ставки · редактируемый черновик</p>
+        <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,5.5rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Добавить ставку</h1>
         <p className="mt-4 max-w-xl text-sm leading-6 text-bn-muted">
-          Paste a screenshot or enter the coupon manually. Nothing is saved until you press Save.
+          Вставьте скриншот или внесите купон вручную. Ничего не сохраняется, пока вы не нажмёте сохранение.
         </p>
       </header>
+
+      <SectionGuide
+        title="Как добавить ставку"
+        items={[
+          {
+            title: 'Выберите источник',
+            body: 'Можно вставить скриншот купона или заполнить форму вручную. После скана все поля остаются редактируемыми.',
+          },
+          {
+            title: 'Проверьте тип ставки',
+            body: 'Для ординара сохраняется один выбор. Для экспресса добавляйте плечи по порядку, как они идут в купоне.',
+          },
+          {
+            title: 'Сохраните только проверенный черновик',
+            body: 'Перед сохранением сверяйте матч, рынок, выбор, коэффициент, ставку и общий коэффициент экспресса.',
+          },
+        ]}
+        note={{
+          title: 'Безопасный повтор',
+          body: 'Если сеть оборвалась во время сохранения, можно нажать сохранение ещё раз: запрос защищён idempotency-ключом.',
+        }}
+      />
 
       <label
         aria-busy={busy}
@@ -384,15 +407,15 @@ export default function NewBetPage() {
           <div aria-live="polite" className="text-sm text-bn-text">{scanMsg}</div>
         ) : (
           <div>
-            <div className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-quiet">Capture coupon</div>
-            <p className="mt-2 text-sm font-semibold text-bn-text">Paste screenshot (Ctrl+V) or choose an image</p>
-            <p className="mt-1 text-xs text-bn-muted">Single and Express coupons are supported</p>
+            <div className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-quiet">Скан купона</div>
+            <p className="mt-2 text-sm font-semibold text-bn-text">Вставьте скриншот (Ctrl+V) или выберите изображение</p>
+            <p className="mt-1 text-xs text-bn-muted">Поддерживаются одиночные ставки и экспрессы</p>
           </div>
         )}
       </label>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex w-full gap-1 rounded-control border border-bn-border-strong bg-bn-field p-1 min-[420px]:w-fit" role="group" aria-label="Bet type">
+        <div className="flex w-full gap-1 rounded-control border border-bn-border-strong bg-bn-field p-1 min-[420px]:w-fit" role="group" aria-label="Тип ставки">
           <button
             type="button"
             aria-pressed={!isExpress}
@@ -400,7 +423,7 @@ export default function NewBetPage() {
             onClick={() => selectBetMode('single')}
             className={`min-h-11 flex-1 rounded-control px-4 text-sm font-black disabled:opacity-50 min-[420px]:flex-none ${!isExpress ? 'bg-bn-signal text-bn-on-signal' : 'text-bn-muted'}`}
           >
-            Single
+            Одиночная
           </button>
           <button
             type="button"
@@ -409,10 +432,10 @@ export default function NewBetPage() {
             onClick={() => selectBetMode('express')}
             className={`min-h-11 flex-1 rounded-control px-4 text-sm font-black disabled:opacity-50 min-[420px]:flex-none ${isExpress ? 'bg-bn-signal text-bn-on-signal' : 'text-bn-muted'}`}
           >
-            Express{isExpress ? ` · ${legs.length}` : ''}
+            Экспресс{isExpress ? ` · ${legs.length}` : ''}
           </button>
         </div>
-        {source === 'scanner' ? <BroadcastStatus status="review">Scanner draft · review required</BroadcastStatus> : null}
+        {source === 'scanner' ? <BroadcastStatus status="review">Черновик сканера · нужна проверка</BroadcastStatus> : null}
       </div>
 
       <form onSubmit={handleSubmit} className="bn-panel flex flex-col gap-4 p-4 sm:p-6" aria-busy={busy}>
@@ -425,31 +448,31 @@ export default function NewBetPage() {
         <fieldset disabled={busy} className="contents">
         {/* ── Legs (order preserved) ──────────────────────── */}
         {legs.map((leg, index) => (
-          <section key={index} aria-label={isExpress ? `Leg ${index + 1}` : 'Single bet'} className="flex flex-col gap-3 rounded-control border border-bn-border-strong bg-bn-night p-3 sm:p-4">
+          <section key={index} aria-label={isExpress ? `Плечо ${index + 1}` : 'Одиночная ставка'} className="flex flex-col gap-3 rounded-control border border-bn-border-strong bg-bn-night p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <span className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-muted">
-                {isExpress ? `Leg ${index + 1}` : 'Bet'}
+                {isExpress ? `Плечо ${index + 1}` : 'Ставка'}
               </span>
               {legs.length > 1 && (
                 <button
                   type="button"
                   className="bn-button bn-button-destructive px-3"
                   onClick={() => removeLeg(index)}
-                  aria-label={`Remove leg ${index + 1}`}
+                  aria-label={`Удалить плечо ${index + 1}`}
                   disabled={busy}
                 >
-                  Remove
+                  Удалить
                 </button>
               )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
-                <label className="label" htmlFor={`tracker-leg-${index}-event`}>Event *</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-event`}>Событие *</label>
                 <input
                   id={`tracker-leg-${index}-event`}
                   className={`input w-full ${errors[`legs.${index}.event_name`] ? '!border-bn-negative' : ''}`}
-                  placeholder="Germany vs Netherlands"
+                  placeholder="Германия vs Нидерланды"
                   value={leg.event_name}
                   onChange={e => updateLeg(index, 'event_name', e.target.value)}
                 />
@@ -459,7 +482,7 @@ export default function NewBetPage() {
               </div>
 
               <div>
-                <label className="label" htmlFor={`tracker-leg-${index}-market`}>Market *</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-market`}>Рынок *</label>
                 <input
                   id={`tracker-leg-${index}-market`}
                   className={`input w-full ${errors[`legs.${index}.market_type`] ? '!border-bn-negative' : ''}`}
@@ -473,18 +496,18 @@ export default function NewBetPage() {
               </div>
 
               <div>
-                <label className="label" htmlFor={`tracker-leg-${index}-selection`}>Selection</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-selection`}>Выбор</label>
                 <input
                   id={`tracker-leg-${index}-selection`}
                   className="input w-full"
-                  placeholder="Germany"
+                  placeholder="Германия"
                   value={leg.selection}
                   onChange={e => updateLeg(index, 'selection', e.target.value)}
                 />
               </div>
 
               <div>
-                <label className="label" htmlFor={`tracker-leg-${index}-odds`}>Odds *</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-odds`}>Кэф *</label>
                 <input
                   id={`tracker-leg-${index}-odds`}
                   className={`input w-full ${errors[`legs.${index}.odds`] ? '!border-bn-negative' : ''}`}
@@ -498,7 +521,7 @@ export default function NewBetPage() {
               </div>
 
               <div>
-                <label className="label" htmlFor={`tracker-leg-${index}-sport`}>Sport</label>
+                <label className="label" htmlFor={`tracker-leg-${index}-sport`}>Спорт</label>
                 <select
                   id={`tracker-leg-${index}-sport`}
                   className="input w-full"
@@ -522,13 +545,13 @@ export default function NewBetPage() {
           onClick={addLeg}
           disabled={busy || legs.length >= MAX_TRACKED_BET_LEGS}
         >
-          + Add leg{legs.length >= MAX_TRACKED_BET_LEGS ? ` (max ${MAX_TRACKED_BET_LEGS})` : ''}
+          + Добавить плечо{legs.length >= MAX_TRACKED_BET_LEGS ? ` (макс. ${MAX_TRACKED_BET_LEGS})` : ''}
         </button>
 
         {/* ── Express total odds (UI preview never submits) ── */}
         {isExpress && (
           <div>
-            <label className="label" htmlFor="tracker-total-odds">Total odds (express) *</label>
+            <label className="label" htmlFor="tracker-total-odds">Общий кэф экспресса *</label>
             <input
               id="tracker-total-odds"
               className={`input w-full ${errors.total_odds ? '!border-bn-negative' : ''}`}
@@ -538,7 +561,7 @@ export default function NewBetPage() {
             />
             {previewTotal != null && (
               <p className="mt-1 text-xs leading-5 text-bn-muted">
-                Calculated from legs: {previewTotal} (preview only — the saved value is what you enter here)
+                Расчёт по плечам: {previewTotal} (это только предпросмотр — сохранится значение, которое вы введёте здесь)
               </p>
             )}
             {errors.total_odds && <p className="mt-1 text-xs text-bn-negative">{errors.total_odds}</p>}
@@ -548,7 +571,7 @@ export default function NewBetPage() {
         {/* ── Money + meta ───────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="label" htmlFor="tracker-stake">Stake *</label>
+            <label className="label" htmlFor="tracker-stake">Ставка *</label>
             <input
               id="tracker-stake"
               className={`input w-full ${errors.stake ? '!border-bn-negative' : ''}`}
@@ -560,7 +583,7 @@ export default function NewBetPage() {
           </div>
 
           <div>
-            <label className="label" htmlFor="tracker-bookmaker">Bookmaker</label>
+            <label className="label" htmlFor="tracker-bookmaker">Букмекер</label>
             <select
               id="tracker-bookmaker"
               className="input w-full"
@@ -573,10 +596,10 @@ export default function NewBetPage() {
           </div>
 
           <div className="sm:col-span-2">
-            <label className="label" htmlFor="tracker-notes">Notes</label>
+            <label className="label" htmlFor="tracker-notes">Заметки</label>
             <textarea
               id="tracker-notes"
-              className="input w-full resize-none" rows={2} placeholder="Optional..."
+              className="input w-full resize-none" rows={2} placeholder="Необязательно..."
               value={notes}
               onChange={e => { setNotes(e.target.value); markManualEdit('notes') }}
             />
@@ -585,7 +608,7 @@ export default function NewBetPage() {
 
         {showPayoutPreview && (
           <div className="flex justify-between gap-4 rounded-control border border-bn-border-subtle bg-bn-raised px-4 py-3 text-sm">
-            <span className="text-bn-muted">Potential payout · preview only</span>
+            <span className="text-bn-muted">Потенциальная выплата · только предпросмотр</span>
             <BroadcastDataValue className="font-black">{formatMoneyAmount(stakeNum * effectiveTotal)}</BroadcastDataValue>
           </div>
         )}
@@ -598,7 +621,7 @@ export default function NewBetPage() {
 
         <div className="flex flex-col sm:flex-row gap-3">
           <button type="submit" className="bn-button bn-button-primary w-full sm:flex-1" disabled={busy}>
-            {loading ? 'Saving...' : isExpress ? `Save Express (${legs.length} legs)` : 'Save Bet'}
+            {loading ? 'Сохраняем...' : isExpress ? `Сохранить экспресс (${legs.length})` : 'Сохранить ставку'}
           </button>
           <button
             type="button"
@@ -606,7 +629,7 @@ export default function NewBetPage() {
             onClick={() => router.back()}
             disabled={busy}
           >
-            Cancel
+            Отмена
           </button>
         </div>
         </fieldset>

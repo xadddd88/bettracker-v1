@@ -22,18 +22,18 @@ import {
 } from 'lucide-react'
 
 const PRIMARY_NAV: { href: string; Icon: LucideIcon; label: string }[] = [
-  { href: '/dashboard', Icon: LayoutDashboard, label: 'Home' },
-  { href: '/ai', Icon: Bot, label: 'Scan' },
-  { href: '/bets', Icon: Target, label: 'Tracker' },
-  { href: '/analytics', Icon: TrendingUp, label: 'Stats' },
+  { href: '/dashboard', Icon: LayoutDashboard, label: 'Главная' },
+  { href: '/ai', Icon: Bot, label: 'Скан' },
+  { href: '/bets', Icon: Target, label: 'Ставки' },
+  { href: '/analytics', Icon: TrendingUp, label: 'Статистика' },
 ]
 
 const SECONDARY_NAV: { href: string; Icon: LucideIcon; label: string }[] = [
-  { href: '/decisions', Icon: ClipboardList, label: 'Decisions' },
-  { href: '/scout', Icon: Search, label: 'Scout' },
-  { href: '/coach', Icon: Brain, label: 'Coach' },
-  { href: '/bankroll', Icon: Wallet, label: 'Bankroll' },
-  { href: '/settings', Icon: Settings, label: 'Settings' },
+  { href: '/decisions', Icon: ClipboardList, label: 'Решения' },
+  { href: '/scout', Icon: Search, label: 'Скаут' },
+  { href: '/coach', Icon: Brain, label: 'Коуч' },
+  { href: '/bankroll', Icon: Wallet, label: 'Банкролл' },
+  { href: '/settings', Icon: Settings, label: 'Настройки' },
 ]
 
 export default function AppHeader({
@@ -50,7 +50,7 @@ export default function AppHeader({
   const secondaryNav = tennisCalcEnabled
     ? [
         ...SECONDARY_NAV.slice(0, -1),
-        { href: '/tennis-calculator', Icon: Calculator, label: 'Live Series' },
+        { href: '/tennis-calculator', Icon: Calculator, label: 'Серия 40:40' },
         SECONDARY_NAV[SECONDARY_NAV.length - 1],
       ]
     : SECONDARY_NAV
@@ -72,14 +72,14 @@ export default function AppHeader({
       <div className="mx-auto flex min-h-16 w-full max-w-[1600px] items-center gap-4 px-4 md:px-8">
         <Link
           href="/dashboard"
-          aria-label="BetTracker home"
+          aria-label="Главная BetTracker"
           className="flex min-h-11 shrink-0 items-center gap-2.5 rounded-[var(--radius-control)] focus:outline-none"
         >
           <span className="h-2.5 w-2.5 rounded-control bg-[var(--signal)]" aria-hidden />
           <span className="font-display text-lg font-black uppercase tracking-[-0.045em]">BetTracker</span>
         </Link>
 
-        <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1 md:flex" aria-label="Primary navigation">
+        <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1 md:flex" aria-label="Основная навигация">
           {PRIMARY_NAV.map(({ href, Icon, label }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`)
             return (
@@ -105,17 +105,17 @@ export default function AppHeader({
             <span className="grid h-7 w-7 place-items-center rounded-control border border-[var(--border-strong)] font-mono text-[10px] font-black text-[var(--text-primary)]">
               {initials}
             </span>
-            <span className="hidden text-[10px] font-extrabold uppercase tracking-[0.08em] sm:inline">Account</span>
+            <span className="hidden text-[10px] font-extrabold uppercase tracking-[0.08em] sm:inline">Аккаунт</span>
             <ChevronDown className="transition-transform group-open:rotate-180" size={14} aria-hidden />
           </summary>
 
           <div className="absolute right-0 top-[calc(100%+8px)] w-64 overflow-hidden rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--field)] shadow-2xl shadow-black/35">
             <div className="border-b border-[var(--border-subtle)] px-4 py-3">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-quiet)]">Signed in</p>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-quiet)]">Вход выполнен</p>
               <p className="mt-1 truncate text-xs text-[var(--text-muted)]">{user.email}</p>
             </div>
 
-            <nav className="p-2" aria-label="Tools navigation">
+            <nav className="p-2" aria-label="Навигация инструментов">
               {secondaryNav.map(({ href, Icon, label }) => {
                 const active = pathname === href || pathname.startsWith(`${href}/`)
                 return (
@@ -142,7 +142,7 @@ export default function AppHeader({
                 onClick={handleLogout}
                 className="flex min-h-11 w-full items-center justify-between rounded-[var(--radius-control)] px-3 text-xs font-bold uppercase tracking-[0.05em] text-[var(--negative)] hover:bg-[var(--field-raised)]"
               >
-                Sign out
+                Выйти
                 <LogOut size={15} strokeWidth={1.8} aria-hidden />
               </button>
             </div>

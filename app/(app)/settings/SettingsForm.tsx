@@ -31,7 +31,7 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
 
     const stakeNum = parseFloat(defaultStake)
     if (isNaN(stakeNum) || stakeNum < 0.01 || stakeNum > 100_000) {
-      setErrorMsg('Default stake must be between 0.01 and 100,000')
+      setErrorMsg('Базовая ставка должна быть от 0.01 до 100 000')
       return
     }
 
@@ -51,13 +51,13 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
       })
       const json = await res.json()
       if (!res.ok || !json.success) {
-        setErrorMsg(json.error ?? 'Failed to save settings')
+        setErrorMsg(json.error ?? 'Не удалось сохранить настройки')
         return
       }
-      setSuccessMsg('Settings saved')
+      setSuccessMsg('Настройки сохранены')
       setTimeout(() => setSuccessMsg(''), 3000)
     } catch {
-      setErrorMsg('Network error — please try again')
+      setErrorMsg('Ошибка сети — попробуйте ещё раз')
     } finally {
       setSaving(false)
     }
@@ -67,14 +67,14 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
     <div className="flex max-w-lg flex-col gap-4">
       {/* Profile */}
       <BroadcastPanel className="flex flex-col gap-4 p-4 sm:p-5">
-        <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">Profile</h2>
+        <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">Профиль</h2>
         <div>
-          <label className="label">Display name</label>
+          <label className="label">Имя в приложении</label>
           <input
             className="input mt-1"
             type="text"
             maxLength={50}
-            placeholder="Your name"
+            placeholder="Ваше имя"
             value={displayName}
             onChange={e => setDisplayName(e.target.value)}
           />
@@ -83,9 +83,9 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
 
       {/* Currency & Bankroll */}
       <BroadcastPanel className="flex flex-col gap-4 p-4 sm:p-5">
-        <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">Currency & Bankroll</h2>
+        <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">Валюта и банкролл</h2>
         <div>
-          <label className="label">Currency</label>
+          <label className="label">Валюта</label>
           <div className="flex gap-2 flex-wrap mt-1">
             {CURRENCIES.map(c => (
               <BroadcastButton
@@ -99,10 +99,10 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
               </BroadcastButton>
             ))}
           </div>
-          <div className="mt-2"><BroadcastStatus status="review">Changing currency does not convert your balance.</BroadcastStatus></div>
+          <div className="mt-2"><BroadcastStatus status="review">Смена валюты не конвертирует баланс.</BroadcastStatus></div>
         </div>
         <div>
-          <label className="label">Default stake</label>
+          <label className="label">Базовая ставка</label>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-sm text-bn-muted">{currencySymbol(currency)}</span>
             <input
@@ -120,10 +120,10 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
 
       {/* AI & Analysis */}
       <BroadcastPanel className="flex flex-col gap-4 p-4 sm:p-5">
-        <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">AI & Analysis</h2>
+        <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">AI и анализ</h2>
         <div>
           <label className="label">
-            Kelly fraction — <BroadcastDataValue>{kellyFraction.toFixed(2)}×</BroadcastDataValue>
+            Доля Kelly — <BroadcastDataValue>{kellyFraction.toFixed(2)}×</BroadcastDataValue>
           </label>
           <input
             className="mt-2 w-full [accent-color:var(--signal)]"
@@ -135,22 +135,22 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
             onChange={e => setKellyFraction(parseFloat(e.target.value))}
           />
           <div className="mt-0.5 flex justify-between text-[10px] text-bn-muted">
-            <span>0.10× (cautious)</span>
-            <span>1.00× (full Kelly)</span>
+            <span>0.10× (осторожно)</span>
+            <span>1.00× (полный Kelly)</span>
           </div>
         </div>
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
-            <label className="label">Web search in Scout & Analyst</label>
+            <label className="label">Веб-поиск в Scout и Analyst</label>
             <p className="mt-0.5 text-[11px] text-bn-muted">
-              Allows Scout and Analyst to consult current sources. Exact pricing still requires verified model inputs. Requires server-side activation.
+              Позволяет Scout и Analyst сверяться с актуальными источниками. Точные коэффициенты всё равно требуют проверенных входных данных. Нужна серверная активация.
             </p>
           </div>
           <button
             type="button"
             role="switch"
             aria-checked={webSearchEnabled}
-            aria-label="Web search in Scout and Analyst"
+            aria-label="Веб-поиск в Scout и Analyst"
             onClick={() => setWebSearchEnabled(v => !v)}
             className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-control border transition-colors ${
               webSearchEnabled ? 'border-bn-signal bg-bn-signal' : 'border-bn-border-strong bg-bn-raised'
@@ -165,7 +165,7 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
 
       {/* Account */}
       <BroadcastPanel className="flex flex-col gap-4 p-4 sm:p-5">
-        <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">Account</h2>
+        <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">Аккаунт</h2>
         <div>
           <label className="label">Email</label>
           <input
@@ -177,7 +177,7 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
           />
         </div>
         <div>
-          <label className="label">Timezone</label>
+          <label className="label">Часовой пояс</label>
           <input
             className="input mt-1"
             type="text"
@@ -185,7 +185,7 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
             value={timezone}
             onChange={e => setTimezone(e.target.value)}
           />
-          <p className="mt-0.5 text-[11px] text-bn-muted">e.g. Europe/Kyiv, America/New_York</p>
+          <p className="mt-0.5 text-[11px] text-bn-muted">Например: Europe/Kyiv, America/New_York</p>
         </div>
       </BroadcastPanel>
 
@@ -201,7 +201,7 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
         onClick={handleSave}
         disabled={saving}
       >
-        {saving ? 'Saving…' : 'Save settings'}
+        {saving ? 'Сохраняем…' : 'Сохранить настройки'}
       </BroadcastButton>
     </div>
   )

@@ -9,6 +9,7 @@ import { EVENTS } from '@/lib/analytics/events'
 import { bucketOdds, bucketStake } from '@/lib/analytics/buckets'
 import RiskEvaluator from '@/components/risk/RiskEvaluator'
 import { Camera, Eye, X, CheckCircle, Search } from 'lucide-react'
+import SectionGuide from '@/components/ui/SectionGuide'
 import {
   buildAnalystTrustView,
   localizeAnalystTrustSport,
@@ -1087,6 +1088,28 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           {copy.heroBody}
         </p>
       </section>
+
+      <SectionGuide
+        title="Как работает сканер"
+        items={[
+          {
+            title: 'Загрузите купон или событие',
+            body: 'Добавьте скрин, вставьте изображение или заполните событие вручную. Система сначала извлекает поля, а не сохраняет ставку.',
+          },
+          {
+            title: 'Проверьте каждое поле',
+            body: 'Сверьте спорт, матч, рынок, выбор, линию, коэффициент и время. Для экспресса порядок плеч сохраняется и должен быть проверен вручную.',
+          },
+          {
+            title: 'Запускайте анализ только после проверки',
+            body: 'AI Analyst использует подтверждённый черновик. Если данных не хватает или матч уже неактуален, quality gate должен остановить вывод.',
+          },
+        ]}
+        note={{
+          title: 'Что важно помнить',
+          body: 'Анализ не сохраняет ставку автоматически. Ставка появляется в Tracker только после отдельного сохранения проверенной записи.',
+        }}
+      />
 
       {/* ── Scout pre-fill indicator ───────────────────────── */}
       {scoutId && !analysis && (

@@ -38,7 +38,7 @@ assert.deepEqual(hrefsIn(appHeader, 'const SECONDARY_NAV', 'export default'), [
   '/bankroll',
   '/settings',
 ])
-assert.match(appHeader, /aria-label="Primary navigation"/)
+assert.match(appHeader, /aria-label="(?:Primary navigation|Основная навигация)"/)
 assert.match(appHeader, /aria-current=\{active \? 'page'/)
 assert.match(appHeader, /BetTracker/)
 assert.match(appHeader, /var\(--signal\)/)

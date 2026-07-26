@@ -7,16 +7,16 @@ import { BroadcastButton, BroadcastDataValue, BroadcastPanel, BroadcastStatus } 
 import { currencySymbol, formatMoney } from '@/lib/money'
 
 const TX_CONFIG: Record<TxnType, { icon: string; label: string }> = {
-  deposit:    { icon: '↑', label: 'Deposit' },
-  withdrawal: { icon: '↓', label: 'Withdrawal' },
-  stake:      { icon: '●', label: 'Stake' },
-  payout:     { icon: '✓', label: 'Payout' },
-  adjustment: { icon: '±', label: 'Adjustment' },
-  bonus:      { icon: '★', label: 'Bonus' },
+  deposit:    { icon: '↑', label: 'Пополнение' },
+  withdrawal: { icon: '↓', label: 'Вывод' },
+  stake:      { icon: '●', label: 'Ставка' },
+  payout:     { icon: '✓', label: 'Выплата' },
+  adjustment: { icon: '±', label: 'Корректировка' },
+  bonus:      { icon: '★', label: 'Бонус' },
 }
 
 function fmtDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+  return new Date(dateStr).toLocaleDateString('ru-RU', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 }
 
 interface Stats {
@@ -67,7 +67,7 @@ export default function BankrollView({
   const handleSubmit = useCallback(async () => {
     const amountNum = parseFloat(amount)
     if (isNaN(amountNum) || amountNum <= 0) {
-      setFormError('Enter a valid positive amount')
+      setFormError('Введите положительную сумму')
       return
     }
     setFormError('')
@@ -86,7 +86,7 @@ export default function BankrollView({
       })
       const json = await res.json()
       if (!res.ok || !json.success) {
-        setFormError(json.error ?? 'Transaction failed')
+        setFormError(json.error ?? 'Операция не выполнена')
         return
       }
 
@@ -121,7 +121,7 @@ export default function BankrollView({
       }))
       closeForm()
     } catch {
-      setFormError('Network error — please try again')
+      setFormError('Ошибка сети — попробуйте ещё раз')
     } finally {
       setSubmitting(false)
     }
@@ -131,34 +131,34 @@ export default function BankrollView({
     <div className="flex flex-col gap-6">
       {/* Balance */}
       <BroadcastPanel className="p-6 text-center sm:p-8">
-        <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-quiet">Current Balance</p>
+        <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-quiet">Текущий баланс</p>
         <BroadcastDataValue className="block font-display text-4xl font-black">
           {formatMoney(balance, currency)}
         </BroadcastDataValue>
-        <p className="mt-2 text-[11px] text-bn-muted">Deposits + payouts − stakes − withdrawals</p>
+        <p className="mt-2 text-[11px] text-bn-muted">Пополнения + выплаты - ставки - выводы</p>
       </BroadcastPanel>
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="stat-card">
-          <p className="stat-label">Deposited</p>
+          <p className="stat-label">Пополнено</p>
           <BroadcastDataValue className="stat-value">{formatMoney(stats.totalDeposited, currency)}</BroadcastDataValue>
-          <p className="mt-0.5 text-[10px] text-bn-quiet">total added</p>
+          <p className="mt-0.5 text-[10px] text-bn-quiet">всего добавлено</p>
         </div>
         <div className="stat-card">
-          <p className="stat-label">Withdrawn</p>
+          <p className="stat-label">Выведено</p>
           <BroadcastDataValue className="stat-value">{formatMoney(stats.totalWithdrawn, currency)}</BroadcastDataValue>
-          <p className="mt-0.5 text-[10px] text-bn-quiet">total removed</p>
+          <p className="mt-0.5 text-[10px] text-bn-quiet">всего снято</p>
         </div>
         <div className="stat-card">
-          <p className="stat-label">Net from bets</p>
+          <p className="stat-label">Нетто по ставкам</p>
           <BroadcastDataValue className="stat-value">
             {formatMoney(stats.netFromBets, currency, true)}
           </BroadcastDataValue>
-          <p className="mt-0.5 text-[10px] text-bn-quiet">payouts minus stakes</p>
+          <p className="mt-0.5 text-[10px] text-bn-quiet">выплаты минус ставки</p>
         </div>
       </div>
-      <p className="-mt-2 text-center text-[10px] text-bn-muted">Pending bet stakes are not automatically deducted from your balance.</p>
+      <p className="-mt-2 text-center text-[10px] text-bn-muted">Открытые ставки пока не списываются автоматически из баланса.</p>
 
       {/* Action buttons */}
       <div className="flex gap-3">
@@ -167,23 +167,23 @@ export default function BankrollView({
           tone={form === 'deposit' ? 'primary' : 'secondary'}
           onClick={() => form === 'deposit' ? closeForm() : openForm('deposit')}
         >
-          + Deposit
+          + Пополнить
         </BroadcastButton>
         <BroadcastButton
           className="flex-1"
           tone={form === 'withdrawal' ? 'destructive' : 'secondary'}
           onClick={() => form === 'withdrawal' ? closeForm() : openForm('withdrawal')}
         >
-          − Withdraw
+          - Вывести
         </BroadcastButton>
       </div>
 
       {/* Inline form */}
       {form && (
         <BroadcastPanel className="flex flex-col gap-3 p-4">
-          <p className="text-sm font-medium capitalize text-bn-text">{form}</p>
+          <p className="text-sm font-medium text-bn-text">{form === 'deposit' ? 'Пополнение' : 'Вывод'}</p>
           <div>
-            <label className="label">Amount</label>
+            <label className="label">Сумма</label>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-sm text-bn-muted">{symbol}</span>
               <input
@@ -200,13 +200,13 @@ export default function BankrollView({
           </div>
           <div>
             <label className="label">
-              Note <span className="font-normal text-bn-quiet">(optional)</span>
+              Комментарий <span className="font-normal text-bn-quiet">(необязательно)</span>
             </label>
             <input
               className="input mt-1"
               type="text"
               maxLength={200}
-              placeholder="e.g. Initial deposit"
+              placeholder="Например: стартовое пополнение"
               value={note}
               onChange={e => setNote(e.target.value)}
             />
@@ -220,7 +220,7 @@ export default function BankrollView({
               onClick={handleSubmit}
               disabled={submitting}
             >
-              {submitting ? 'Processing…' : `Confirm ${form}`}
+              {submitting ? 'Обрабатываем...' : form === 'deposit' ? 'Подтвердить пополнение' : 'Подтвердить вывод'}
             </BroadcastButton>
             <BroadcastButton
               className="flex-1"
@@ -228,7 +228,7 @@ export default function BankrollView({
               onClick={closeForm}
               disabled={submitting}
             >
-              Cancel
+              Отмена
             </BroadcastButton>
           </div>
         </BroadcastPanel>
@@ -237,15 +237,15 @@ export default function BankrollView({
       {/* Transaction history */}
       <div>
         <p className="mb-3 font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-quiet">
-          Transaction history
+          История операций
         </p>
         {transactions.length === 0 ? (
           <BroadcastPanel className="flex flex-col items-center gap-3 py-10 text-center">
-            <BroadcastStatus status="neutral">Empty</BroadcastStatus>
-            <p className="text-sm font-medium text-bn-text">No transactions yet</p>
-            <p className="text-xs text-bn-muted">Make your first deposit to get started.</p>
+            <BroadcastStatus status="neutral">Пусто</BroadcastStatus>
+            <p className="text-sm font-medium text-bn-text">Операций пока нет</p>
+            <p className="text-xs text-bn-muted">Сделайте первое пополнение, чтобы начать вести банкролл.</p>
             <BroadcastButton className="mt-1" onClick={() => openForm('deposit')}>
-              + Deposit
+              + Пополнить
             </BroadcastButton>
           </BroadcastPanel>
         ) : (

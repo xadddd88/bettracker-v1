@@ -9,19 +9,19 @@ import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
 type PeriodDays = 7 | 30 | 90 | 0
 
 const PERIODS: { value: PeriodDays; label: string }[] = [
-  { value: 7,  label: '7 days' },
-  { value: 30, label: '30 days' },
-  { value: 90, label: '90 days' },
-  { value: 0,  label: 'All time' },
+  { value: 7,  label: '7 дней' },
+  { value: 30, label: '30 дней' },
+  { value: 90, label: '90 дней' },
+  { value: 0,  label: 'Всё время' },
 ]
 
 function periodLabel(days: number): string {
-  if (days === 0) return 'All time'
-  return `Last ${days} days`
+  if (days === 0) return 'Всё время'
+  return `Последние ${days} дней`
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  return new Date(dateStr).toLocaleDateString('ru-RU', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -29,14 +29,20 @@ function formatDate(dateStr: string): string {
   })
 }
 
+function priorityLabel(priority: CoachRecommendation['priority']): string {
+  if (priority === 'high') return 'Высокий'
+  if (priority === 'medium') return 'Средний'
+  return 'Низкий'
+}
+
 // ─── Calibration grade badge ──────────────────────────────────
 function CalibrationBadge({ grade }: { grade?: CalibrationGrade | null }) {
   if (!grade) return null
   const config: Record<CalibrationGrade, { label: string; status: BroadcastNoirStatus }> = {
-    excellent: { label: 'Excellent calibration', status: 'success' },
-    good:      { label: 'Good calibration', status: 'success' },
-    fair:      { label: 'Fair calibration', status: 'review' },
-    poor:      { label: 'Poor calibration', status: 'negative' },
+    excellent: { label: 'Отличная калибровка', status: 'success' },
+    good:      { label: 'Хорошая калибровка', status: 'success' },
+    fair:      { label: 'Средняя калибровка', status: 'review' },
+    poor:      { label: 'Слабая калибровка', status: 'negative' },
   }
   const c = config[grade]
   return (
@@ -63,7 +69,7 @@ function RecommendationCard({
     <div className="flex flex-col gap-1.5 rounded-control border border-bn-border-subtle bg-bn-raised px-3 py-2.5">
       <div className="flex items-start justify-between gap-2">
         <span className="flex-1 text-sm font-medium text-bn-text">{rec.action}</span>
-        <BroadcastStatus className="shrink-0" status={priorityStatus}>{rec.priority}</BroadcastStatus>
+        <BroadcastStatus className="shrink-0" status={priorityStatus}>{priorityLabel(rec.priority)}</BroadcastStatus>
       </div>
       {expanded && (
         <p className="text-xs leading-relaxed text-bn-muted">{rec.detail}</p>
@@ -72,7 +78,7 @@ function RecommendationCard({
         onClick={() => onToggle(recKey)}
         className="min-h-11 text-left text-xs font-bold text-bn-text underline underline-offset-4"
       >
-        {expanded ? 'Hide detail' : 'Show detail'}
+        {expanded ? 'Скрыть детали' : 'Показать детали'}
       </button>
     </div>
   )
@@ -95,12 +101,12 @@ function SessionCard({
           <span className="text-bn-quiet">·</span>
           <span>{formatDate(session.created_at)}</span>
           <span className="text-bn-quiet">·</span>
-          <span>{session.bets_analysed} bets analysed</span>
+          <span>Ставок в анализе: {session.bets_analysed}</span>
         </div>
         <CalibrationBadge grade={session.calibration_grade} />
       </div>
       {session.calibration_grade && (
-        <p className="-mt-2 text-[10px] text-bn-muted">Calibration: how well your confidence predictions matched your actual results.</p>
+        <p className="-mt-2 text-[10px] text-bn-muted">Калибровка показывает, насколько ваша уверенность совпадала с фактическими результатами.</p>
       )}
 
       {/* Summary */}
@@ -109,7 +115,7 @@ function SessionCard({
       {/* Strengths */}
       {session.strengths.length > 0 && (
         <div>
-          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-bn-success">Strengths</p>
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-bn-success">Сильные стороны</p>
           <ul className="flex flex-col gap-1.5">
             {session.strengths.map((s, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-bn-text">
@@ -124,7 +130,7 @@ function SessionCard({
       {/* Weaknesses */}
       {session.weaknesses.length > 0 && (
         <div>
-          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-bn-review">Areas to improve</p>
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-bn-review">Что улучшить</p>
           <ul className="flex flex-col gap-1.5">
             {session.weaknesses.map((w, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-bn-text">
@@ -139,7 +145,7 @@ function SessionCard({
       {/* Recommendations */}
       {session.recommendations.length > 0 && (
         <div>
-          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-bn-text">Recommendations</p>
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-bn-text">Рекомендации</p>
           <div className="flex flex-col gap-2">
             {session.recommendations.map((rec, i) => (
               <RecommendationCard
@@ -156,7 +162,7 @@ function SessionCard({
 
       {/* Disclaimer */}
       <p className="rounded-control border border-bn-border-subtle px-3 py-2 text-[11px] leading-relaxed text-bn-muted">
-        &#9888; {session.disclaimer ?? 'Past performance does not predict future results. This analysis is retrospective and does not constitute financial advice.'}
+        &#9888; {session.disclaimer ?? 'Прошлые результаты не предсказывают будущие. Анализ является ретроспективой и не является финансовой рекомендацией.'}
       </p>
     </div>
   )
@@ -194,12 +200,12 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
       })
       const json = await res.json()
       if (!res.ok || !json.success) {
-        setError(json.error ?? 'Coach failed. Please try again.')
+        setError(json.error ?? 'Коуч не сработал. Попробуйте ещё раз.')
         return
       }
       setSessions(prev => [json.data as CoachingSession, ...prev])
     } catch {
-      setError('Network error — please try again.')
+      setError('Ошибка сети — попробуйте ещё раз.')
     } finally {
       setLoading(false)
     }
@@ -230,7 +236,7 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
       <BroadcastPanel className="flex flex-col gap-4 p-4 sm:p-5">
         {/* Period selector */}
         <div>
-          <label className="label mb-2">Period</label>
+          <label className="label mb-2">Период</label>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {PERIODS.map(p => (
               <BroadcastButton
@@ -245,17 +251,17 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
               </BroadcastButton>
             ))}
           </div>
-          <p className="mt-1.5 text-[11px] text-bn-muted">Limits the AI to settled bets within this window — narrower periods show recent trends.</p>
+          <p className="mt-1.5 text-[11px] text-bn-muted">Коуч берёт только закрытые ставки внутри выбранного окна. Узкий период лучше показывает свежие паттерны.</p>
         </div>
 
         {/* Focus notes */}
         <div>
-          <label className="label">Focus notes <span className="font-normal text-bn-quiet">(optional)</span></label>
+          <label className="label">Фокус анализа <span className="font-normal text-bn-quiet">(необязательно)</span></label>
           <textarea
             className="input resize-none mt-1"
             rows={2}
             maxLength={500}
-            placeholder="What do you want to focus on? e.g. I think I'm overbet on soccer parlays…"
+            placeholder="Что проверить отдельно? Например: кажется, я перебираю с футбольными экспрессами..."
             value={focusNotes}
             onChange={e => setFocusNotes(e.target.value)}
             disabled={!canRun || loading}
@@ -267,7 +273,7 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
 
         {/* Gate message */}
         {!canRun && (
-          <BroadcastStatus className="w-full" status="review">Add at least 5 settled bets first.</BroadcastStatus>
+          <BroadcastStatus className="w-full" status="review">Сначала нужно закрыть хотя бы 5 ставок.</BroadcastStatus>
         )}
 
         {/* Error */}
@@ -281,9 +287,9 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
-              Analysing…
+              Анализируем...
             </span>
-          ) : '🧠 Get coaching'}
+          ) : 'Получить разбор'}
         </BroadcastButton>
       </BroadcastPanel>
 
@@ -298,12 +304,12 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
         </BroadcastPanel>
       ) : (
         <BroadcastPanel className="flex flex-col items-center gap-3 py-10 text-center">
-          <BroadcastStatus status="neutral">Empty</BroadcastStatus>
-          <p className="text-sm font-medium text-bn-text">No coaching sessions yet</p>
+          <BroadcastStatus status="neutral">Пусто</BroadcastStatus>
+          <p className="text-sm font-medium text-bn-text">Разборов пока нет</p>
           <p className="text-xs text-bn-muted">
             {canRun
-              ? 'Run Coach to get your first performance analysis.'
-              : "Run Coach after you've settled at least 5 bets."}
+              ? 'Запустите Коуч, чтобы получить первый разбор результатов.'
+              : 'Коуч станет доступен после 5 закрытых ставок.'}
           </p>
         </BroadcastPanel>
       )}
@@ -311,7 +317,7 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
       {/* ── Next-step CTA ──────────────────────────────────── */}
       {latestSession && (
         <div className="flex items-center justify-between px-1">
-          <p className="text-xs text-bn-muted">Apply these insights in your next analysis.</p>
+          <p className="text-xs text-bn-muted">Примените выводы в следующем анализе.</p>
           <Link href="/ai" className="shrink-0 text-xs font-bold text-bn-text underline underline-offset-4">→ AI Analyst</Link>
         </div>
       )}
@@ -319,7 +325,7 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
       {/* ── Past sessions ───────────────────────────────────── */}
       {pastSessions.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-quiet">Past sessions</p>
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-quiet">Прошлые разборы</p>
           {pastSessions.map(s => {
             const isExpanded = expandedSessions.has(s.id)
             return (
@@ -334,7 +340,7 @@ export default function CoachView({ initialSessions, settledBetsCount }: CoachVi
                       <span className="text-bn-quiet">·</span>
                       <span>{periodLabel(s.period_days)}</span>
                       <span className="text-bn-quiet">·</span>
-                      <span>{s.bets_analysed} bets</span>
+                      <span>Ставок: {s.bets_analysed}</span>
                       {s.calibration_grade && (
                         <>
                           <span className="text-bn-quiet">·</span>
