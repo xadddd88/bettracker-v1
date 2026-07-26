@@ -16,6 +16,7 @@
     "test:tennis": "npm run build:provider-scripts && node scripts/test-tennis-series.mjs",
     "test:tennis-access-gate": "npm run build:provider-scripts && node scripts/test-tennis-access-gate.mjs",
     "test:tennis-write-path": "npm run build:provider-scripts && node scripts/test-tennis-write-path.mjs",
+    "test:tennis-authority": "npm run build:provider-scripts && node scripts/test-tennis-authority.mjs",
     "test:financial-safety": "npm run build:provider-scripts && node scripts/test-financial-safety.mjs",
     "test:domain-write-boundaries": "npm run build:provider-scripts && node scripts/test-domain-write-boundaries.mjs",
     "test:agent-write-boundaries": "node scripts/test-agent-write-boundaries.mjs",

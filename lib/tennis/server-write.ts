@@ -87,12 +87,8 @@ const confirmSchema = z.object({
   set_number: POSITIVE_INTEGER.nullable().optional().default(null),
   game_number: POSITIVE_INTEGER.nullable().optional().default(null),
   quoted_odds: oddsSchema,
-  recommended_stake: moneySchema({ positive: true }),
   accepted_odds: oddsSchema,
   accepted_stake: moneySchema({ positive: true }),
-  loss_before: moneySchema(),
-  target_profit_snapshot: moneySchema({ positive: true }),
-  projected_series_result: moneySchema({ signed: true }),
 }).strict()
 
 const settleSchema = z.object({
@@ -130,6 +126,10 @@ const resultSchemas = {
     step_id: UUID,
     step_number: z.number().int().min(1).max(15),
     status: z.enum(['active']),
+    recommended_stake: moneySchema({ positive: true }),
+    loss_before: moneySchema(),
+    target_profit_snapshot: moneySchema({ positive: true }),
+    projected_series_result: moneySchema({ signed: true }),
   }),
   settle: baseResultSchema.extend({
     step_id: UUID,
@@ -189,6 +189,14 @@ function rpcErrorResponse(message: string | undefined): NextResponse {
   }
   if ([
     'invalid_identity_or_operation',
+    'invalid_version',
+    'invalid_set_number',
+    'invalid_game_number',
+    'invalid_odds',
+    'invalid_stake',
+    'invalid_calculation_input',
+    'recommended_stake_out_of_range',
+    'projected_result_out_of_range',
     'invalid_result',
     'return_required',
     'unexpected_return',
