@@ -87,6 +87,13 @@ export const EVENTS = {
   SETTINGS_PAGE_VIEWED: 'settings_page_viewed',
   SETTINGS_SAVED:       'settings_saved',
 
+  // Tennis live series calculator
+  TENNIS_CALCULATOR_VIEWED: 'tennis_calculator_viewed',
+  TENNIS_SERIES_CREATED:    'tennis_series_created',
+  TENNIS_STEP_CONFIRMED:    'tennis_step_confirmed',
+  TENNIS_STEP_SETTLED:      'tennis_step_settled',
+  TENNIS_SERIES_STOPPED:    'tennis_series_stopped',
+
   // Page views
   DASHBOARD_VIEWED:        'dashboard_viewed',
   AI_PAGE_VIEWED:          'ai_page_viewed',
