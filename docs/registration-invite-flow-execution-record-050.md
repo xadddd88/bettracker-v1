@@ -2,11 +2,11 @@
 
 ## Status
 
-PARTIALLY EXECUTED 2026-07-10 — migration applied, merged, server-side verified. **The
-SMTP email round-trip is PENDING a founder test** (cannot be verified from the automation
-environment). Rides under Decision #050.
+EXECUTED / VERIFIED / CLOSED 2026-07-26 — migration applied, merged, routes verified,
+founder-controlled email round-trip confirmed, negative non-allowlisted path verified, and
+Supabase Invite template/signup controls verified. Rides under Decision #050.
 
-## Sequence executed (server-verifiable portion)
+## Sequence executed
 
 1. **Migration 021 applied** via Supabase migration tooling
    (`beta_access_invite_flow_021`) and verified: `invited_at` column present; status CHECK =
@@ -25,26 +25,23 @@ environment). Rides under Decision #050.
    | `GET /auth/set-password` | 200 reachable ✓ |
    | DB after non-allowlisted attempts | 0 stray `beta_access` rows, 0 stray `auth.users` — no side effects, no enumeration ✓ |
 
-## PENDING — founder email round-trip (SMTP-dependent, cannot automate)
+## Founder round-trip and production verification — completed 2026-07-26
 
-`inviteUserByEmail` sends a real email; the automation environment cannot receive it. Before
-this flow is trusted in production the founder must confirm:
+| Check | Evidence |
+|-------|----------|
+| Controlled invite delivery | Founder confirmed the production invite email arrived |
+| Action link and session | Link opened the callback/set-password flow |
+| Password and destination | Password was set and dashboard reached |
+| Lifecycle | Read-only state showed `invited_at`, `used_at`, `used_by_user_id`, status `used`, and a matching Auth user |
+| Non-allowlisted request | Neutral response; 0 `beta_access` rows; 0 `auth.users`; no invite-send log for the unique test address |
+| Invite template | Supabase Invite template uses `{{ .ConfirmationURL }}`; runtime supplies `/auth/callback?next=/auth/set-password` |
+| Signup control | "Allow new users to sign up" is OFF |
 
-1. Approve a real test email in `beta_access` (status `approved`).
-2. On the login page, Register tab → enter that email → "Send Invite Link" → neutral message.
-3. Receive the invite email; the action link should open `/auth/callback?next=/auth/set-password`.
-4. Land on `/auth/set-password` (authenticated), set a password, reach the dashboard.
-5. Verify the `beta_access` row moved `approved → invited → used` with `used_by_user_id` set.
-6. Verify a NON-allowlisted email gets the neutral message and **no email arrives**.
+The verified delivery uses the current Supabase email service. Custom SMTP is not configured
+and remains a separate scale/readiness follow-up before wider beta; it is not part of this
+closure and does not reopen Decision #050.
 
-Supabase dashboard checks (founder):
-- Auth → Email Templates → **Invite**: action link points at the site `/auth/callback`.
-- Auth → Providers → Email → **"Enable email signups" OFF** (allowlist is enforced
-  server-side; the invite path uses the service role).
-
-Once the founder confirms the round-trip, this record is updated to EXECUTED.
-
-## Security properties confirmed server-side
+## Security properties confirmed server-side## Security properties confirmed server-side
 
 - The password path (`createUser({ email_confirm: true, password })`) is gone — no account is
   created from a caller-supplied password.
@@ -52,6 +49,8 @@ Once the founder confirms the round-trip, this record is updated to EXECUTED.
   non-allowlisted attempt creates no row and no user.
 - `complete-invite` is authenticated and binds consumption to `auth.uid()`'s email, not the
   request body.
+- The founder-confirmed mailbox path and matching `used` lifecycle verify email ownership
+  through the deployed flow.
 
 ## Holds unchanged
 
