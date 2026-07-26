@@ -10,6 +10,7 @@ const read = file => readFileSync(path.join(root, file), 'utf8')
 const events = read('lib/analytics/events.ts')
 const helper = read('lib/tennis/server-write.ts')
 const page = read('app/(app)/tennis-calculator/page.tsx')
+const smokeFeedback = read('app/(app)/tennis-calculator/PrivateSmokeFeedback.tsx')
 const sanitizer = read('lib/analytics/sanitize.ts')
 const docs = read('docs/product/tennis-live-series.md')
 
@@ -72,6 +73,18 @@ test('global sanitizer continues blocking raw financial properties', () => {
   for (const key of ['stake', 'pnl', 'profit', 'balance', 'bankroll_balance']) {
     assert.ok(sanitizer.includes(`'${key}'`), `${key} is not blocked`)
   }
+})
+
+test('private smoke feedback uses the existing beta feedback channel without raw-value telemetry', () => {
+  assert.ok(smokeFeedback.includes("fetch('/api/feedback'"))
+  assert.ok(smokeFeedback.includes('buildSmokeMessage(state)'))
+  assert.ok(smokeFeedback.includes("rating: hasFailure(state) ? 2 : 5"))
+  assert.ok(smokeFeedback.includes("category: hasFailure(state) ? 'bug' : 'general'"))
+  assert.ok(!smokeFeedback.includes('trackClientEvent'))
+  assert.ok(!smokeFeedback.includes('EVENTS.'))
+  assert.ok(!smokeFeedback.includes('offered_odds'))
+  assert.ok(!smokeFeedback.includes('bankroll_limit'))
+  assert.ok(!smokeFeedback.includes('match_label'))
 })
 
 test('operations guide preserves default-OFF and separate-approval rollout', () => {

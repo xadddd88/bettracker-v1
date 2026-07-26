@@ -34,7 +34,8 @@ Open https://btdk.app/tennis-calculator
    - games: 10
 3. Check that profit grows from game 1 to game 10.
 4. Run "Analysis for the last 24 hours".
-5. Send a screenshot and answer:
+5. Fill the "Private smoke" report block at the bottom of the page.
+6. Send a screenshot and answer:
    - did the calculator open without 404?
    - how many matches did the 24h analysis find?
    - what was confusing?
@@ -55,6 +56,7 @@ Found matches: ___
 Mobile issue: none / brief note
 Confusing copy: none / brief note
 Screenshot received: YES / NO
+In-app smoke report submitted: YES / NO
 
 Tester B
 Access: PASS / FAIL
@@ -65,6 +67,7 @@ Found matches: ___
 Mobile issue: none / brief note
 Confusing copy: none / brief note
 Screenshot received: YES / NO
+In-app smoke report submitted: YES / NO
 ```
 
 ## Pass criteria
@@ -75,6 +78,7 @@ The private smoke passes only if both testers can:
 - create the requested series without help;
 - see that projected profit grows across the configured games;
 - run the 24h analysis and report the found/analyzed match counts;
+- submit the in-app private smoke report;
 - send at least one screenshot that matches the requested flow.
 
 ## Triage rules
@@ -98,4 +102,6 @@ After both testers report back:
 2. Check Sentry for new production issues during the smoke window.
 3. Check PostHog only for approved event names; do not inspect raw money, odds,
    match labels, IDs, or tester free text in analytics.
-4. Record the result in the next release/decision note before broadening access.
+4. Review the `beta_feedback` smoke report text only as founder QA input, not as
+   product telemetry.
+5. Record the result in the next release/decision note before broadening access.

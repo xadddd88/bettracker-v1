@@ -101,12 +101,114 @@ function getDecisionTrustView(d: DecisionRow, qualityGate: AnalysisQualityGateRe
 
 function localizedRiskLabel(risk: string | null, fallback: string | null, trustView: AnalystTrustView | null): string | null {
   if (!fallback) return null
+  if (trustView?.locale === 'ru') {
+    if (risk === 'high') return 'Высокий риск'
+    if (risk === 'medium') return 'Средний риск'
+    if (risk === 'low') return 'Низкий риск'
+    return fallback
+  }
   if (trustView?.locale !== 'uk') return fallback
   if (risk === 'high') return 'Високий ризик'
   if (risk === 'medium') return 'Середній ризик'
   if (risk === 'low') return 'Низький ризик'
   return fallback
 }
+
+function decisionLocale(trustView: AnalystTrustView | null): 'en' | 'uk' | 'ru' {
+  if (trustView?.locale === 'uk') return 'uk'
+  if (trustView?.locale === 'ru') return 'ru'
+  return 'en'
+}
+
+const DECISION_COPY = {
+  en: {
+    back: 'Decisions',
+    odds: 'Odds',
+    aiAnalysis: 'AI Analysis',
+    modelProbability: 'Model prob.',
+    impliedProbability: 'Implied',
+    edge: 'Edge',
+    periodPhase: 'Period / phase',
+    statusSource: 'Status source',
+    confidence: 'Confidence',
+    factorAnalysis: 'Factor Analysis',
+    linkedBet: 'Linked Bet',
+    stake: 'Stake',
+    checkRisk: 'Check Risk',
+    cancel: 'Cancel',
+    stakePrompt: 'Enter stake amount',
+    invalidStake: 'Enter a valid stake amount',
+    helper: 'Skipping or watching is a valid decision - it will be saved to your history.',
+    research: {
+      conditionalMarketReview: 'Conditional market review',
+      trustBoundary: 'Narrative analysis is conditional. Only verbatim excerpts under Cited claims are bound to current sources.',
+      builderCorrelation: 'Bet Builder correlation',
+      leg: 'Leg',
+      conditionalLogic: 'Conditional logic',
+      failureModes: 'Failure modes',
+      analystVerdict: 'Analyst verdict',
+      citedClaims: 'Cited claims - verbatim source excerpts',
+    },
+  },
+  uk: {
+    back: 'Рішення',
+    odds: 'Коефіцієнт',
+    aiAnalysis: 'AI-аналіз',
+    modelProbability: 'Оцінка моделі',
+    impliedProbability: 'За коефіцієнтом',
+    edge: 'Перевага',
+    periodPhase: 'Період / фаза',
+    statusSource: 'Джерело статусу',
+    confidence: 'Впевненість',
+    factorAnalysis: 'Аналіз факторів',
+    linkedBet: 'Повʼязана ставка',
+    stake: 'Сума ставки',
+    checkRisk: 'Перевірити ризик',
+    cancel: 'Скасувати',
+    stakePrompt: 'Введіть суму ставки',
+    invalidStake: 'Введіть коректну суму ставки',
+    helper: 'Пропуск або спостереження буде збережено в історії рішень.',
+    research: {
+      conditionalMarketReview: 'Умовний огляд ринку',
+      trustBoundary: 'Наративний аналіз умовний. Лише дослівні уривки в цитованих твердженнях привʼязані до актуальних джерел.',
+      builderCorrelation: 'Кореляція Bet Builder',
+      leg: 'Подія',
+      conditionalLogic: 'Умовна логіка',
+      failureModes: 'Сценарії ризику',
+      analystVerdict: 'Висновок аналітика',
+      citedClaims: 'Цитовані твердження - дослівні уривки з джерел',
+    },
+  },
+  ru: {
+    back: 'Решения',
+    odds: 'Коэффициент',
+    aiAnalysis: 'AI-анализ',
+    modelProbability: 'Оценка модели',
+    impliedProbability: 'По коэффициенту',
+    edge: 'Преимущество',
+    periodPhase: 'Период / фаза',
+    statusSource: 'Источник статуса',
+    confidence: 'Уверенность',
+    factorAnalysis: 'Анализ факторов',
+    linkedBet: 'Связанная ставка',
+    stake: 'Сумма ставки',
+    checkRisk: 'Проверить риск',
+    cancel: 'Отмена',
+    stakePrompt: 'Введите сумму ставки',
+    invalidStake: 'Введите корректную сумму ставки',
+    helper: 'Пропуск или наблюдение будет сохранено в истории решений.',
+    research: {
+      conditionalMarketReview: 'Условный обзор рынка',
+      trustBoundary: 'Нарративный анализ условный. Только дословные фрагменты в цитированных утверждениях привязаны к актуальным источникам.',
+      builderCorrelation: 'Корреляция Bet Builder',
+      leg: 'Событие',
+      conditionalLogic: 'Условная логика',
+      failureModes: 'Сценарии риска',
+      analystVerdict: 'Вывод аналитика',
+      citedClaims: 'Цитированные утверждения - дословные фрагменты источников',
+    },
+  },
+} as const
 
 function actionTone(action: string): BroadcastNoirStatus {
   return action === 'pending' || action === 'watchlisted' ? 'review' : 'neutral'
@@ -219,6 +321,7 @@ export default async function DecisionDetailPage({
     rawFactors:         d.factors,
   })
   const trustView = surface.trustView
+  const copy = DECISION_COPY[decisionLocale(trustView)]
   const displayFactors: Factor[] = trustView && !showPricing ? trustView.displayFactors : d.factors ?? []
 
   const date = new Date(d.created_at).toLocaleDateString('en-GB', {
@@ -228,7 +331,7 @@ export default async function DecisionDetailPage({
   return (
     <main className="bn-page mx-auto flex w-full max-w-4xl flex-col gap-4 pb-8">
       <PageView event={EVENTS.DECISION_DETAIL_VIEWED} props={{ sport: d.sport, final_action: d.final_action }} />
-      <Link href="/decisions" className="bn-button bn-button-secondary w-fit">← Decisions</Link>
+      <Link href="/decisions" className="bn-button bn-button-secondary w-fit">← {copy.back}</Link>
 
       <BroadcastPanel className="p-5 sm:p-7">
         <div className="flex flex-wrap items-center gap-2">
@@ -241,7 +344,7 @@ export default async function DecisionDetailPage({
             {d.market_type}{d.selection ? ` · ${d.selection}` : ''}{d.line != null ? ` · ${d.line}` : ''}
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            {d.offered_odds != null ? <BroadcastDataValue className="text-sm font-black">Odds {d.offered_odds.toFixed(2)}</BroadcastDataValue> : null}
+            {d.offered_odds != null ? <BroadcastDataValue className="text-sm font-black">{copy.odds} {d.offered_odds.toFixed(2)}</BroadcastDataValue> : null}
             {(rec || surface.isTrustBlocked) && (
               <span className={`text-xs font-black uppercase tracking-[0.06em] ${showPricing ? 'text-bn-text' : 'text-bn-review'}`}>
                 {showPricing ? `AI: ${rec?.label ?? surface.detailRecommendationLabel}` : surface.detailRecommendationLabel}
@@ -257,20 +360,20 @@ export default async function DecisionDetailPage({
         <section className="overflow-hidden rounded-control border border-bn-border-strong bg-bn-field text-bn-text" aria-labelledby="saved-research-heading">
           <div className="border-b border-bn-border-strong bg-bn-night px-5 py-5 sm:px-7">
             <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-review">
-              Conditional market review
+              {copy.research.conditionalMarketReview}
             </p>
             <h2 id="saved-research-heading" className="mt-3 font-display text-3xl font-black leading-none tracking-[-0.04em] text-bn-text">
               {researchBrief.headline}
             </h2>
             <p className="mt-3 text-sm leading-6 text-bn-muted">{researchBrief.summary}</p>
             <p className="mt-3 border-l-2 border-bn-review pl-3 font-mono text-[11px] font-bold uppercase leading-5 tracking-[0.06em] text-bn-muted">
-              Narrative analysis is conditional. Only verbatim excerpts under Cited claims are bound to current sources.
+              {copy.research.trustBoundary}
             </p>
           </div>
 
           {researchBrief.builderRisk && (
             <div className="border-b border-bn-review bg-bn-raised px-5 py-4 text-sm font-semibold leading-6 text-bn-review sm:px-7">
-              <span className="font-mono text-[11px] font-black uppercase tracking-[0.1em]">Bet Builder correlation</span>
+              <span className="font-mono text-[11px] font-black uppercase tracking-[0.1em]">{copy.research.builderCorrelation}</span>
               <p className="mt-1">{researchBrief.builderRisk}</p>
             </div>
           )}
@@ -280,7 +383,7 @@ export default async function DecisionDetailPage({
               <article key={`${leg.legNumber}-${leg.eventName}-${leg.marketType}`} className="px-5 py-5 sm:px-7">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-mono text-[11px] font-black uppercase tracking-[0.1em] text-bn-quiet">Leg {leg.legNumber}</p>
+                    <p className="font-mono text-[11px] font-black uppercase tracking-[0.1em] text-bn-quiet">{copy.research.leg} {leg.legNumber}</p>
                     <h3 className="mt-1 font-display text-xl font-black">{leg.eventName}</h3>
                     <p className="mt-1 text-sm text-bn-muted">{leg.marketType}{leg.selection ? ` · ${leg.selection}` : ''}</p>
                   </div>
@@ -291,13 +394,13 @@ export default async function DecisionDetailPage({
                 <p className="mt-3 text-sm font-semibold leading-6 text-bn-text">{leg.assessment}</p>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <div>
-                    <p className="mb-2 font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-quiet">Conditional logic</p>
+                    <p className="mb-2 font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-quiet">{copy.research.conditionalLogic}</p>
                     <ul className="space-y-1 text-sm text-bn-muted">
                     {leg.evidence.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>+ {item}</li>)}
                     </ul>
                   </div>
                   <div>
-                    <p className="mb-2 font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-quiet">Failure modes</p>
+                    <p className="mb-2 font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-quiet">{copy.research.failureModes}</p>
                     <ul className="space-y-1 text-sm text-bn-muted">
                     {leg.risks.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>− {item}</li>)}
                     </ul>
@@ -308,13 +411,13 @@ export default async function DecisionDetailPage({
           </div>
 
           <div className="border-t border-bn-border-strong px-5 py-5 sm:px-7">
-            <p className="font-mono text-[11px] font-black uppercase tracking-[0.1em] text-bn-quiet">Analyst verdict</p>
+            <p className="font-mono text-[11px] font-black uppercase tracking-[0.1em] text-bn-quiet">{copy.research.analystVerdict}</p>
             <p className="mt-2 text-base font-bold leading-6 text-bn-text">{researchBrief.verdict}</p>
           </div>
 
           {researchBrief.sourcedClaims.length > 0 && researchSources.length > 0 && (
             <div className="border-t border-bn-border-strong bg-bn-night px-5 py-4 sm:px-7">
-              <p className="font-mono text-[11px] font-black uppercase tracking-[0.1em] text-bn-quiet">Cited claims — verbatim source excerpts</p>
+              <p className="font-mono text-[11px] font-black uppercase tracking-[0.1em] text-bn-quiet">{copy.research.citedClaims}</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {researchBrief.sourcedClaims.map((claim, claimIndex) => {
                   const source = researchSources.find(item => item.url === claim.sourceUrl)
@@ -338,21 +441,21 @@ export default async function DecisionDetailPage({
       {/* AI Analysis card */}
       {(showPricing || surface.isTrustBlocked || d.reasoning) && (
         <BroadcastPanel className="flex flex-col gap-4 p-5 sm:p-7">
-          <div className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-muted">{trustView?.locale === 'uk' ? 'AI-аналіз' : 'AI Analysis'}</div>
+          <div className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-muted">{copy.aiAnalysis}</div>
 
           {/* Probabilities */}
           {showPricing && (
             <dl className="grid grid-cols-3 gap-3 text-center">
               <div>
-                <dt className="mb-1 text-xs text-bn-muted">Model prob.</dt>
+                <dt className="mb-1 text-xs text-bn-muted">{copy.modelProbability}</dt>
                 <dd><BroadcastDataValue className="text-2xl font-black">{d.model_probability?.toFixed(1)}%</BroadcastDataValue></dd>
               </div>
               <div>
-                <dt className="mb-1 text-xs text-bn-muted">Implied</dt>
+                <dt className="mb-1 text-xs text-bn-muted">{copy.impliedProbability}</dt>
                 <dd><BroadcastDataValue className="text-2xl font-black">{d.implied_probability != null ? `${d.implied_probability.toFixed(1)}%` : '—'}</BroadcastDataValue></dd>
               </div>
               <div>
-                <dt className="mb-1 text-xs text-bn-muted">Edge</dt>
+                <dt className="mb-1 text-xs text-bn-muted">{copy.edge}</dt>
                 <dd><BroadcastDataValue className="text-2xl font-black">
                   {d.edge_percent != null
                     ? `${d.edge_percent >= 0 ? '+' : ''}${d.edge_percent.toFixed(1)}%`
@@ -388,13 +491,13 @@ export default async function DecisionDetailPage({
                         <div className="mt-1 text-bn-text">{leg.eventName}</div>
                         <div>{leg.marketType}{leg.selection ? ` / ${leg.selection}` : ''}</div>
                         {leg.periodOrPhase && (
-                          <div>{trustView.locale === 'uk' ? 'Період / фаза' : 'Period / phase'}: {leg.periodOrPhase}</div>
+                          <div>{copy.periodPhase}: {leg.periodOrPhase}</div>
                         )}
                         {leg.statusSourceLabel && (
-                          <div>{trustView.locale === 'uk' ? 'Джерело статусу' : 'Status source'}: {leg.statusSourceLabel}</div>
+                          <div>{copy.statusSource}: {leg.statusSourceLabel}</div>
                         )}
                         {leg.odds != null && (
-                          <div>{trustView.locale === 'uk' ? 'Коефіцієнт' : 'Odds'}: {leg.odds}</div>
+                          <div>{copy.odds}: {leg.odds}</div>
                         )}
                         <div className="mt-1 text-bn-review">{leg.fixtureStatusLabel} · {leg.supportLabel} · {leg.actionabilityLabel}</div>
                         <ul className="mt-1 list-disc pl-4 text-bn-muted">
@@ -412,10 +515,10 @@ export default async function DecisionDetailPage({
           {d.confidence_score != null && (
             <div>
               <div className="flex justify-between text-xs mb-1">
-                <span className="text-bn-muted">{trustView?.confidenceLabel ?? 'Confidence'}</span>
+                <span className="text-bn-muted">{trustView?.confidenceLabel ?? copy.confidence}</span>
                 <BroadcastDataValue>{d.confidence_score}/100</BroadcastDataValue>
               </div>
-              <div className="h-1.5 rounded-control bg-bn-raised" role="img" aria-label={`${trustView?.confidenceLabel ?? 'Confidence'} ${d.confidence_score} out of 100`}>
+              <div className="h-1.5 rounded-control bg-bn-raised" role="img" aria-label={`${trustView?.confidenceLabel ?? copy.confidence} ${d.confidence_score}/100`}>
                 <div
                   aria-hidden="true"
                   className="h-1.5 rounded-control bg-bn-data"
@@ -435,7 +538,7 @@ export default async function DecisionDetailPage({
       {/* Factors */}
       {displayFactors.length > 0 && (
         <BroadcastPanel className="flex flex-col gap-2 p-5 sm:p-7">
-          <h3 className="mb-1 text-sm font-semibold text-bn-text">{trustView?.factorAnalysisLabel ?? 'Factor Analysis'}</h3>
+          <h3 className="mb-1 text-sm font-semibold text-bn-text">{trustView?.factorAnalysisLabel ?? copy.factorAnalysis}</h3>
           {displayFactors.map((f: Factor, i: number) => (
             <div key={i} className="border-b border-bn-border-subtle py-2 last:border-0">
               <span className="text-sm text-bn-text">{f.name}</span>
@@ -449,10 +552,10 @@ export default async function DecisionDetailPage({
       {/* Linked bet */}
       {linkedBet && (
         <BroadcastPanel className="p-5 sm:p-7">
-          <div className="mb-3 font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-muted">Linked Bet</div>
+          <div className="mb-3 font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-muted">{copy.linkedBet}</div>
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            <span className="text-bn-muted">Stake: <BroadcastDataValue className="font-medium">{formatMoney(linkedBet.stake, currency)}</BroadcastDataValue></span>
-            <span className="text-bn-muted">Odds: <BroadcastDataValue className="font-medium">{linkedBet.total_odds ?? d.offered_odds}</BroadcastDataValue></span>
+            <span className="text-bn-muted">{copy.stake}: <BroadcastDataValue className="font-medium">{formatMoney(linkedBet.stake, currency)}</BroadcastDataValue></span>
+            <span className="text-bn-muted">{copy.odds}: <BroadcastDataValue className="font-medium">{linkedBet.total_odds ?? d.offered_odds}</BroadcastDataValue></span>
             <BroadcastStatus status={linkedBetStatusTone(resolveBetStatus(linkedBet.status).key)}>
               {resolveBetStatus(linkedBet.status).label}
             </BroadcastStatus>
@@ -471,13 +574,11 @@ export default async function DecisionDetailPage({
             placeBet:     trustView.placeBetLabel,
             watch:        trustView.watchLabel,
             skip:         trustView.skipLabel,
-            checkRisk:    trustView.locale === 'uk' ? 'Перевірити ризик' : 'Check Risk',
-            cancel:       trustView.locale === 'uk' ? 'Скасувати' : 'Cancel',
-            stakePrompt:  trustView.locale === 'uk' ? 'Введіть суму ставки' : 'Enter stake amount',
-            invalidStake: trustView.locale === 'uk' ? 'Введіть коректну суму ставки' : 'Enter a valid stake amount',
-            helper:       trustView.locale === 'uk'
-              ? 'Пропуск або спостереження буде збережено в історії рішень.'
-              : 'Skipping or watching is a valid decision - it will be saved to your history.',
+            checkRisk:    copy.checkRisk,
+            cancel:       copy.cancel,
+            stakePrompt:  copy.stakePrompt,
+            invalidStake: copy.invalidStake,
+            helper:       copy.helper,
           } : undefined}
         />
       )}

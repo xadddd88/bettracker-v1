@@ -216,8 +216,8 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
       const body = await response.json() as CommandResponse
       if (!response.ok || !body.success) {
         setMessage(response.status === 409
-          ? 'State changed in another tab. Refreshing server truth.'
-          : body.error ?? 'Command rejected')
+          ? 'Серия изменилась в другой вкладке. Обновляем данные с сервера.'
+          : body.error ?? 'Команда отклонена')
         if (response.status === 409) router.refresh()
         return
       }
@@ -225,7 +225,7 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
       delete operations.current[key]
       router.refresh()
     } catch {
-      setMessage('Network error. Retry will reuse the same operation id.')
+      setMessage('Ошибка сети. Повторная попытка безопасна: используется тот же id операции.')
     } finally {
       inFlight.current = false
       setBusy(false)
