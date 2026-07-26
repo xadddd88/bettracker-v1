@@ -260,7 +260,7 @@ async function assertAiLabels(page) {
     'ai-context-notes',
   ]) await assertLabelFocus(page, id)
 
-  const sportGroup = page.getByRole('group', { name: 'Sport' })
+  const sportGroup = page.getByRole('group', { name: /^(Sport|Спорт)$/ })
   assert.equal(await sportGroup.count(), 1, 'Sport must have a programmatic group name')
   const sportButtons = sportGroup.getByRole('button')
   assert.equal(await sportButtons.count(), 7, 'Sport choices must remain complete')
