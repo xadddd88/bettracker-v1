@@ -100,8 +100,9 @@ test('five-field setup has two explicit calculation modes and no legacy technica
     'Количество геймов',
     'Начальная ставка',
     'Максимальный банк',
-    'От начальной ставки',
-    'От максимального банка',
+    'Выберите, что вводите вручную',
+    'Ввожу начальную ставку',
+    'Ввожу максимальный банк',
   ]) {
     assert.ok(calculator.includes(copy), `${copy} is missing`)
   }
@@ -118,6 +119,26 @@ test('five-field setup has two explicit calculation modes and no legacy technica
   assert.ok(calculator.includes("currency_or_unit: 'USD'"))
   assert.ok(calculator.includes('exposure_limit: formatMoneyMinor(preview.configuredBankMinor)'))
   assert.ok(calculator.includes('maximum_stake: null'))
+  assert.ok(calculator.includes("tabIndex={create.calculationMode === 'maximum_bank' ? -1 : 0}"))
+  assert.ok(calculator.includes("tabIndex={create.calculationMode === 'initial_stake' ? -1 : 0}"))
+})
+
+test('setup preview itemizes every game, cumulative spend and net profit on a win', () => {
+  for (const copy of [
+    'Расчёт по каждому гейму',
+    'Гейм',
+    'Ставка',
+    'Накопительно поставлено',
+    'Прибыль при победе',
+    'все предыдущие проигранные ставки и ставку текущего гейма',
+    'чистый результат всей серии',
+  ]) {
+    assert.ok(calculator.includes(copy), `${copy} is missing from the game table`)
+  }
+  assert.ok(calculator.includes('createPreview.plan.stakesMinor.map'))
+  assert.ok(calculator.includes('checkedAdd(accumulatedBeforeMinor, stakeMinor)'))
+  assert.ok(calculator.includes('actualProfitMinor(stakeMinor, odds, accumulatedBeforeMinor)'))
+  assert.ok(calculator.includes('signedMoney(row.profitOnWinMinor)'))
 })
 
 test('fixed coefficient survives refresh and drives every server-authoritative step', () => {

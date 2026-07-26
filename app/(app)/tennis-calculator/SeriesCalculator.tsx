@@ -357,6 +357,23 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
       : createPreview
         ? formatMoneyMinor(createPreview.configuredBankMinor)
         : ''
+    const previewRows = createPreview
+      ? (() => {
+          const odds = parseOddsScaled(create.calculationOdds)
+          let accumulatedBeforeMinor = BigInt(0)
+          return createPreview.plan.stakesMinor.map((stakeMinor, index) => {
+            const accumulatedWithCurrentMinor = checkedAdd(accumulatedBeforeMinor, stakeMinor)
+            const profitOnWinMinor = actualProfitMinor(stakeMinor, odds, accumulatedBeforeMinor)
+            accumulatedBeforeMinor = accumulatedWithCurrentMinor
+            return {
+              game: index + 1,
+              stakeMinor,
+              accumulatedWithCurrentMinor,
+              profitOnWinMinor,
+            }
+          })
+        })()
+      : []
 
     return (
       <div className="flex flex-col gap-4">
@@ -375,7 +392,10 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
             ) : null}
           </div>
 
-          <div className="mt-6 grid grid-cols-2 overflow-hidden rounded-control border border-bn-border-strong">
+          <p className="mt-6 text-xs font-black uppercase tracking-[0.16em] text-bn-muted">
+            Выберите, что вводите вручную
+          </p>
+          <div className="mt-2 grid grid-cols-2 overflow-hidden rounded-control border border-bn-border-strong">
             <button
               type="button"
               aria-pressed={create.calculationMode === 'initial_stake'}
@@ -389,7 +409,7 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
                 setMessage('')
               }}
             >
-              От начальной ставки
+              Ввожу начальную ставку
             </button>
             <button
               type="button"
@@ -404,7 +424,7 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
                 setMessage('')
               }}
             >
-              От максимального банка
+              Ввожу максимальный банк
             </button>
           </div>
           <p className="mt-3 text-xs leading-5 text-bn-muted">
@@ -465,12 +485,17 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
                 {create.calculationMode === 'maximum_bank' ? ' · рассчитана' : ''}
               </span>
               <input
-                className={`input font-mono ${create.calculationMode === 'maximum_bank' ? 'cursor-default bg-bn-night text-bn-data' : ''}`}
+                className={`input font-mono ${
+                  create.calculationMode === 'maximum_bank'
+                    ? 'pointer-events-none cursor-default border-dashed bg-bn-night text-bn-data opacity-70'
+                    : ''
+                }`}
                 inputMode="decimal"
                 min="0.01"
                 step="0.01"
                 readOnly={create.calculationMode === 'maximum_bank'}
                 aria-readonly={create.calculationMode === 'maximum_bank'}
+                tabIndex={create.calculationMode === 'maximum_bank' ? -1 : 0}
                 value={displayedInitialStake}
                 onChange={event => {
                   setCreate(value => ({ ...value, initialStake: event.target.value }))
@@ -485,12 +510,17 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
                 {create.calculationMode === 'initial_stake' ? ' · рассчитан' : ''}
               </span>
               <input
-                className={`input font-mono ${create.calculationMode === 'initial_stake' ? 'cursor-default bg-bn-night text-bn-data' : ''}`}
+                className={`input font-mono ${
+                  create.calculationMode === 'initial_stake'
+                    ? 'pointer-events-none cursor-default border-dashed bg-bn-night text-bn-data opacity-70'
+                    : ''
+                }`}
                 inputMode="decimal"
                 min="0.01"
                 step="0.01"
                 readOnly={create.calculationMode === 'initial_stake'}
                 aria-readonly={create.calculationMode === 'initial_stake'}
+                tabIndex={create.calculationMode === 'initial_stake' ? -1 : 0}
                 value={displayedMaximumBank}
                 onChange={event => {
                   setCreate(value => ({ ...value, bankrollLimit: event.target.value }))
@@ -517,6 +547,46 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
               </BroadcastDataValue>
             </div>
           </div>
+
+          {previewRows.length > 0 ? (
+            <div className="mt-6 border-t border-bn-border-subtle pt-6">
+              <h3 className="font-display text-xl font-black tracking-[-0.03em] text-bn-text">
+                Расчёт по каждому гейму
+              </h3>
+              <p className="mt-2 text-xs leading-5 text-bn-muted">
+                Накопительно поставлено включает все предыдущие проигранные ставки и ставку текущего гейма.
+                Прибыль — чистый результат всей серии, если 40:40 случится в этом гейме.
+              </p>
+              <div className="mt-4 overflow-x-auto rounded-control border border-bn-border-subtle">
+                <table className="w-full min-w-[38rem] border-collapse text-sm">
+                  <thead className="bg-bn-field text-left">
+                    <tr className="border-b border-bn-border-strong">
+                      <th className="px-4 py-3 font-black text-bn-muted">Гейм</th>
+                      <th className="px-4 py-3 text-right font-black text-bn-muted">Ставка</th>
+                      <th className="px-4 py-3 text-right font-black text-bn-muted">Накопительно поставлено</th>
+                      <th className="px-4 py-3 text-right font-black text-bn-muted">Прибыль при победе</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-bn-border-subtle">
+                    {previewRows.map(row => (
+                      <tr key={row.game}>
+                        <td className="px-4 py-3 font-mono font-black text-bn-text">{row.game}</td>
+                        <td className="px-4 py-3 text-right font-mono text-bn-data">
+                          {formatMoneyMinor(row.stakeMinor)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-bn-text">
+                          {formatMoneyMinor(row.accumulatedWithCurrentMinor)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-black text-bn-signal">
+                          {signedMoney(row.profitOnWinMinor)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
 
           <p className="mt-4 text-xs leading-5 text-bn-muted">
             Расчёт размера ставок не повышает вероятность выигрыша. При серии проигрышей можно потерять весь выбранный банк.
