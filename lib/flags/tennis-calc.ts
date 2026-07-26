@@ -1,4 +1,4 @@
-// Tennis Live Series Calculator — PR-2 access gate (flag + owner) ONLY.
+// Tennis Live Series Calculator — access gate (flag + private allowlist) ONLY.
 //
 // Server-only module. It is NOT wired to any feature surface yet: nothing in the
 // running product imports it, so production runtime behaviour is unchanged by PR-2.
@@ -11,9 +11,11 @@
 //      lib/providers/fixture-sync.ts, `SPORTS_PROVIDER_LINK_WRITE_ENABLED` in
 //      lib/providers/sportmonks-provider-link-write.ts) rather than inventing a
 //      second flag system.
-//   2. OWNER_USER_ID — server-only owner allowlist of exactly one id. Missing or
-//      malformed (non-UUID) closes the gate. No profiles/role column, no migration,
-//      no Supabase read: the caller passes the already-authenticated user id in.
+//   2. OWNER_USER_ID / TENNIS_CALC_ALLOWED_USER_IDS — server-only allowlists. The owner
+//      id remains supported for the founder, while the optional tester list accepts
+//      comma-separated UUIDs. Missing or malformed config closes the gate for callers
+//      not present in a valid entry. No profiles/role column, no migration, no Supabase
+//      read: the caller passes the already-authenticated user id in.
 //
 // SECRET DISCIPLINE: neither env value is ever logged, thrown, formatted, or returned.
 // The result carries a typed reason enum only — never an id, never an env value. There
@@ -29,6 +31,7 @@ import { timingSafeEqual } from 'node:crypto'
 /** Canonical env var names, exported for tests/runbooks (names only, never values). */
 export const TENNIS_CALC_FLAG_ENV = 'TENNIS_CALC_ENABLED'
 export const TENNIS_CALC_OWNER_ENV = 'OWNER_USER_ID'
+export const TENNIS_CALC_ALLOWED_USERS_ENV = 'TENNIS_CALC_ALLOWED_USER_IDS'
 
 /** The only value that opens the feature flag. Any other value denies. */
 const FLAG_ENABLED_VALUE = 'true'
@@ -68,6 +71,15 @@ function configuredOwnerId(): string | null {
   return isUuid(raw) ? raw : null
 }
 
+function configuredAllowedUserIds(): string[] {
+  const raw = process.env[TENNIS_CALC_ALLOWED_USERS_ENV]
+  if (typeof raw !== 'string') return []
+  return raw
+    .split(',')
+    .map(part => part.trim())
+    .filter(isUuid)
+}
+
 /** Constant-time equality, mirroring safeEqual() in the admin sync routes. */
 function safeEqual(left: string, right: string): boolean {
   const leftBuffer = Buffer.from(left)
@@ -91,12 +103,18 @@ export function checkTennisCalcAccess(userId: string | null | undefined): Tennis
   if (!isTennisCalcEnabled()) return { allowed: false, reason: 'feature_disabled' }
 
   const ownerId = configuredOwnerId()
-  if (ownerId === null) return { allowed: false, reason: 'owner_not_configured' }
+  const allowedUserIds = configuredAllowedUserIds()
+  if (ownerId === null && allowedUserIds.length === 0) {
+    return { allowed: false, reason: 'owner_not_configured' }
+  }
 
   // A real authenticated user always carries a UUID; anything else is not authenticated.
   if (!isUuid(userId)) return { allowed: false, reason: 'unauthenticated' }
 
-  if (!safeEqual(userId, ownerId)) return { allowed: false, reason: 'not_owner' }
+  if (ownerId !== null && safeEqual(userId, ownerId)) return { allowed: true }
+  if (allowedUserIds.some(allowedUserId => safeEqual(userId, allowedUserId))) {
+    return { allowed: true }
+  }
 
-  return { allowed: true }
+  return { allowed: false, reason: 'not_owner' }
 }

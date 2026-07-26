@@ -7,8 +7,10 @@ recalculates stake size from recorded outcomes and current operator-entered odds
 It does not place a bet, connect to a bookmaker, scrape odds, predict a winner,
 or claim that stake sizing changes event probability.
 
-Access is founder-only and default OFF. Both navigation and the route are hidden
-unless the authenticated user passes the server-side access check.
+Access is private and default OFF. Both navigation and the route are hidden
+unless the authenticated user passes the server-side access check. The founder
+keeps the dedicated `OWNER_USER_ID`; a short founder-controlled smoke test may
+add specific Supabase auth user ids to `TENNIS_CALC_ALLOWED_USER_IDS`.
 
 ## State and authority
 
@@ -44,13 +46,16 @@ details are not an analytics contract.
 4. Verify the replacement RPC signature, ACL, RLS, and rollback guard.
 5. Rebase and publish the mobile UI and analytics changes.
 6. Keep `TENNIS_CALC_ENABLED` default OFF during deployment.
-7. Set the owner identifier and then enable `TENNIS_CALC_ENABLED=true` only under
-   separate approval.
+7. Set the owner identifier, optionally set a comma-separated
+   `TENNIS_CALC_ALLOWED_USER_IDS` tester allowlist, and then enable
+   `TENNIS_CALC_ENABLED=true` only under separate approval.
 8. Run one founder-only canary series with a small isolated limit.
 9. Verify server state, idempotent retries, analytics events, and no raw-value
    telemetry before considering any broader rollout.
 
-Turning the feature OFF is the immediate application kill switch. If the
+Turning the feature OFF is the immediate application kill switch. Removing a
+tester id from `TENNIS_CALC_ALLOWED_USER_IDS` immediately removes calculator
+access for that user after the next deployment. If the
 authority migration must be rolled back, use the guarded rollback that removes
 confirmation entirely; it must never restore the insecure client-derived RPC
 signature.
