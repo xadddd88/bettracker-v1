@@ -193,6 +193,25 @@ async function assertNoHorizontalOverflow(page, label) {
         clientWidth: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth,
       },
+      offenders: [...document.querySelectorAll('body *')]
+        .map(element => {
+          const bounds = element.getBoundingClientRect()
+          return {
+            element: `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}`,
+            className: typeof element.className === 'string' ? element.className.slice(0, 120) : '',
+            text: element.textContent?.trim().replace(/\s+/g, ' ').slice(0, 80) ?? '',
+            left: Math.round(bounds.left),
+            right: Math.round(bounds.right),
+            clientWidth: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+          }
+        })
+        .filter(element => (
+          element.left < 0
+          || element.right > document.documentElement.clientWidth
+          || element.scrollWidth > element.clientWidth
+        ))
+        .slice(0, 12),
       shell: shellScrollContainer instanceof HTMLElement
         ? {
             clientWidth: shellScrollContainer.clientWidth,
@@ -205,7 +224,7 @@ async function assertNoHorizontalOverflow(page, label) {
   assert.ok(metrics.shell, `${label} must expose the authenticated shell scroll container`)
   assert.ok(
     metrics.document.scrollWidth <= metrics.document.clientWidth,
-    `${label} document must not overflow horizontally (${metrics.document.scrollWidth}px > ${metrics.document.clientWidth}px)`,
+    `${label} document must not overflow horizontally (${metrics.document.scrollWidth}px > ${metrics.document.clientWidth}px); offenders=${JSON.stringify(metrics.offenders)}`,
   )
   assert.ok(
     metrics.shell.scrollWidth <= metrics.shell.clientWidth,
