@@ -82,7 +82,7 @@ The verified delivery uses the current Supabase email service. Custom SMTP is no
 and remains a separate scale/readiness follow-up before wider beta; it does not block or
 reopen Decision #050.
 
-## Non-goals## Non-goals
+## Non-goals
 
 No change to the password Sign-In or Magic-Link login paths, no change to the allowlist
 admin process (founder still approves rows), no programmatic invite-resend beyond re-running
