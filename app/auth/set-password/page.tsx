@@ -34,8 +34,8 @@ export default function SetPasswordPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
-    if (password !== confirm) { setError('Passwords do not match.'); return }
+    if (password.length < 8) { setError('Пароль должен содержать минимум 8 символов.'); return }
+    if (password !== confirm) { setError('Пароли не совпадают.'); return }
 
     setSubmitting(true)
     try {
@@ -46,13 +46,13 @@ export default function SetPasswordPage() {
       const res = await fetch('/api/auth/complete-invite', { method: 'POST' })
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
-        throw new Error(json.error ?? 'Could not finish setup. Please try again.')
+        throw new Error(json.error ?? 'Не удалось завершить настройку. Попробуйте ещё раз.')
       }
 
       router.push('/dashboard')
       router.refresh()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setError(err instanceof Error ? err.message : 'Что-то пошло не так')
     } finally {
       setSubmitting(false)
     }
@@ -63,23 +63,23 @@ export default function SetPasswordPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="mb-1 font-display text-3xl font-black">BetTracker</div>
-          <div className="text-sm text-bn-muted">Set your password</div>
+          <div className="text-sm text-bn-muted">Задайте пароль</div>
         </div>
 
         <BroadcastPanel className="p-4 sm:p-5">
           {!ready ? (
-            <div aria-live="polite" className="py-4 text-center"><BroadcastStatus status="neutral">Loading</BroadcastStatus></div>
+            <div aria-live="polite" className="py-4 text-center"><BroadcastStatus status="neutral">Загрузка</BroadcastStatus></div>
           ) : !hasSession ? (
             <div className="text-center py-4">
               <div className="mb-3 text-sm text-bn-muted">
-                This page can only be opened from your invite email link.
+                Эту страницу можно открыть только по ссылке из письма с инвайтом.
               </div>
-              <a href="/login" className="min-h-11 text-xs font-bold text-bn-text underline underline-offset-4">Go to sign in</a>
+              <a href="/login" className="min-h-11 text-xs font-bold text-bn-text underline underline-offset-4">Перейти ко входу</a>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="label" htmlFor="new-password">New password</label>
+                <label className="label" htmlFor="new-password">Новый пароль</label>
                 <input
                   id="new-password"
                   className="input"
@@ -92,7 +92,7 @@ export default function SetPasswordPage() {
                 />
               </div>
               <div>
-                <label className="label" htmlFor="confirm-password">Confirm password</label>
+                <label className="label" htmlFor="confirm-password">Подтвердите пароль</label>
                 <input
                   id="confirm-password"
                   className="input"
@@ -110,7 +110,7 @@ export default function SetPasswordPage() {
               )}
 
               <BroadcastButton type="submit" className="mt-1 w-full" disabled={submitting}>
-                {submitting ? 'Saving…' : 'Set password & continue'}
+                {submitting ? 'Сохраняем...' : 'Задать пароль и продолжить'}
               </BroadcastButton>
             </form>
           )}

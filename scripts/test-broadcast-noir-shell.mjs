@@ -59,7 +59,7 @@ assert.deepEqual(hrefsIn(mobileNav, 'const MORE_LINKS', 'const MORE_ROUTES'), [
 assert.match(mobileNav, /paddingBottom:\s*'env\(safe-area-inset-bottom\)'/)
 assert.match(mobileNav, /bg-\[var\(--signal\)\] text-\[var\(--on-signal\)\]/)
 
-assert.match(loginPage, /<div className="min-w-0">\s*<p className="editorial-kicker">Access \/ BetTracker<\/p>/)
+assert.match(loginPage, /<div className="min-w-0">\s*<p className="editorial-kicker">Доступ \/ BetTracker<\/p>/)
 assert.match(loginPage, /text-\[clamp\(2\.7rem,4\.8vw,4rem\)\]/)
 assert.doesNotMatch(loginPage, /text-\[clamp\(2\.7rem,6vw,5rem\)\]/)
 

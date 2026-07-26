@@ -8,9 +8,9 @@ import { BroadcastButton, BroadcastPanel, BroadcastStatus } from '@/components/u
 type Mode = 'login' | 'register' | 'magic'
 
 const MODES: { label: string; value: Mode }[] = [
-  { label: 'Sign in', value: 'login' },
-  { label: 'Register', value: 'register' },
-  { label: 'Magic link', value: 'magic' },
+  { label: 'Вход', value: 'login' },
+  { label: 'Инвайт', value: 'register' },
+  { label: 'Ссылка', value: 'magic' },
 ]
 
 export default function LoginPage() {
@@ -44,7 +44,7 @@ export default function LoginPage() {
           body: JSON.stringify({ email }),
         })
         const json = await response.json()
-        if (!response.ok) throw new Error(json.error ?? 'Something went wrong. Please try again.')
+        if (!response.ok) throw new Error(json.error ?? 'Не удалось отправить инвайт. Попробуйте ещё раз.')
         setSuccessMsg(json.message)
       } else {
         const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
@@ -53,7 +53,7 @@ export default function LoginPage() {
         router.refresh()
       }
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : 'Something went wrong')
+      setError(caught instanceof Error ? caught.message : 'Что-то пошло не так')
     } finally {
       setLoading(false)
     }
@@ -67,12 +67,12 @@ export default function LoginPage() {
   }
 
   const submitLabel = loading
-    ? 'Working…'
+    ? 'Работаем...'
     : mode === 'magic'
-      ? 'Send magic link'
+      ? 'Отправить ссылку'
       : mode === 'register'
-        ? 'Send invite link'
-        : 'Enter workspace'
+        ? 'Отправить инвайт'
+        : 'Войти в рабочее пространство'
 
   return (
     <main className="web-editorial grid min-h-screen bg-[var(--night)] lg:grid-cols-[minmax(0,1.35fr)_minmax(420px,0.65fr)]">
@@ -82,22 +82,22 @@ export default function LoginPage() {
         </div>
         <header className="relative z-10 flex min-h-12 items-center border-y border-bn-border-strong">
           <div className="font-display text-xl font-black tracking-[-0.045em] text-[var(--text-primary)]">BETTRACKER</div>
-          <div className="ml-4 flex-1 font-mono text-[9px] font-bold tracking-[0.14em] text-[var(--text-quiet)]">SHARED VISUAL SYSTEM / V3.1</div>
+          <div className="ml-4 flex-1 font-mono text-[9px] font-bold tracking-[0.14em] text-[var(--text-quiet)]">ЕДИНАЯ ВИЗУАЛЬНАЯ СИСТЕМА / V3.1</div>
           <div className="h-2.5 w-2.5 rounded-control bg-[var(--signal)]" aria-hidden />
         </header>
         <div className="relative z-10 my-auto py-12 lg:py-20">
-          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--signal)]">Private decision intelligence</p>
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--signal)]">Приватная система решений</p>
           <h1 className="mt-6 max-w-4xl font-display text-[clamp(3.2rem,7vw,8rem)] font-black uppercase leading-[0.8] tracking-[-0.075em] text-bn-text">
-            Evidence<br />before<br />action
+            Факты<br />перед<br />действием
           </h1>
           <p className="mt-8 max-w-md text-sm leading-6 text-bn-muted">
-            Analyze the signal. Keep every coupon leg in order. Build a record you can trust.
+            Сначала проверьте сигнал, сохраните каждое плечо купона по порядку и только потом принимайте решение.
           </p>
         </div>
         <div className="relative z-10 grid grid-cols-3 border-y border-bn-border-strong py-4 font-mono text-[8px] font-bold uppercase tracking-[0.15em] text-bn-muted">
-          <span>01 / Scan</span>
-          <span className="text-center">02 / Verify</span>
-          <span className="text-right">03 / Track</span>
+          <span>01 / Скан</span>
+          <span className="text-center">02 / Проверка</span>
+          <span className="text-right">03 / Учёт</span>
         </div>
       </section>
 
@@ -105,9 +105,9 @@ export default function LoginPage() {
         <div className="editorial-page w-full max-w-xl lg:mx-auto">
           <div className="flex items-end justify-between border-b border-[var(--border-strong)] pb-4">
             <div className="min-w-0">
-              <p className="editorial-kicker">Access / BetTracker</p>
+              <p className="editorial-kicker">Доступ / BetTracker</p>
               <h2 className="mt-3 font-display text-[clamp(2.7rem,4.8vw,4rem)] font-black uppercase leading-[0.83] tracking-[-0.07em]">
-                Founder<br />workspace
+                Рабочее<br />пространство
               </h2>
             </div>
             <span className="mb-1 h-3 w-3 rounded-control bg-[var(--signal)]" aria-hidden />
@@ -133,9 +133,9 @@ export default function LoginPage() {
 
           {magicSent ? (
             <BroadcastPanel className="mt-8 border-bn-success p-6">
-              <BroadcastStatus status="success">Sent</BroadcastStatus>
-              <p className="mt-5 font-display text-3xl font-black uppercase tracking-[-0.05em]">Check your inbox</p>
-              <p className="mt-3 text-sm text-[var(--text-muted)]">The secure login link is waiting in your email.</p>
+              <BroadcastStatus status="success">Отправлено</BroadcastStatus>
+              <p className="mt-5 font-display text-3xl font-black uppercase tracking-[-0.05em]">Проверьте почту</p>
+              <p className="mt-3 text-sm text-[var(--text-muted)]">Безопасная ссылка для входа уже в вашем email.</p>
             </BroadcastPanel>
           ) : (
             <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
@@ -155,7 +155,7 @@ export default function LoginPage() {
 
               {mode === 'login' && (
                 <div>
-                  <label className="label" htmlFor="login-password">Password</label>
+                  <label className="label" htmlFor="login-password">Пароль</label>
                   <input
                     id="login-password"
                     className="input"
@@ -171,7 +171,7 @@ export default function LoginPage() {
 
               {mode === 'register' && (
                 <p className="rounded-[var(--radius-control)] border-l-4 border-[var(--signal)] bg-[var(--field-raised)] px-4 py-3 text-xs leading-5 text-[var(--text-muted)]">
-                  Beta access is invite-only. We will email a secure link so you can set your password.
+                  Beta-доступ работает только по инвайту. Мы отправим безопасную ссылку, чтобы вы могли задать пароль.
                 </p>
               )}
 
@@ -191,7 +191,7 @@ export default function LoginPage() {
           )}
 
           <p className="mt-8 border-t border-[var(--border-strong)] pt-4 font-mono text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--text-quiet)]">
-            Secure account access / No public betting execution
+            Безопасный доступ / без публичного исполнения ставок
           </p>
         </div>
       </section>
