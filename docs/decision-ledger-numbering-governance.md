@@ -36,7 +36,7 @@ Next unreserved: #066
 | #047 | Atomic Financial Writes & No-Overdraft Policy — EXECUTED |
 | #048 | Core Domain Write Boundaries — EXECUTED |
 | #049 | Scout/Coach Agent Write Boundaries — EXECUTED |
-| #050 | Registration Invite Flow — DEPLOYED / ROUTE-VERIFIED; founder SMTP round-trip pending |
+| #050 | Registration Invite Flow — EXECUTED / VERIFIED / CLOSED 2026-07-26; founder round-trip, negative path, and Supabase controls verified |
 | #051 | FP-001 Legacy Pricing Quarantine — EXECUTED |
 | #052 | Global Durable Rate Limits — EXECUTED |
 | #053 | Project State & Migration Reconciliation — EXECUTED / CLOSED |
@@ -83,7 +83,7 @@ Decision numbering does not grant runtime authority.
 - Decision #065 Web rollout is CLOSED and production-deployed via PR #202 followed by #203 → #224; its mobile source still has only explicit Review → manual Save through the existing tracked-bet endpoint and no auto-save.
 - Decision #065 did not change the server route, RPC, schema, migrations, settlement behavior, financial formulas, provider/runtime authority, CSP enforcement, EAS/device builds, beta distribution, or app publication.
 - Decision #061 remains ACTIVE because Phase A2 browser E2E is deferred / not approved. Phase A1 was merged via PR #162 as `a6d4ebb` and deployed READY with 0 post-deployment runtime errors; it performed no production smoke and no scanner/API/Supabase runtime call or write. Phase A1 authorizes no further runtime, no migrations, and no RPC or schema changes.
-- FP-001 remains active. Decision #054 Phase B is not approved. Decision #050's founder SMTP round-trip remains pending.
+- FP-001 remains active. Decision #054 Phase B is not approved. Decision #050 is EXECUTED / VERIFIED / CLOSED; custom SMTP scale/readiness is a separate follow-up.
 
 ## Reconciliation Receipt — 2026-07-22
 
