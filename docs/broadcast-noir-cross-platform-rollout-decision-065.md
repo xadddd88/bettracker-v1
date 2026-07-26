@@ -1,7 +1,7 @@
 # Decision #065 — Broadcast Noir Cross-Platform Rollout
 
 Date: 2026-07-21
-Status: ACTIVE / INTEGRATION DRAFT PR #202
+Status: WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED
 Approved by: Founder
 
 ## Decision
@@ -106,8 +106,9 @@ database, provider, financial, route, or Event First change.
 
 The verified chain is #187 → #188 → #190 → #194 → #195 → #196 → #197 →
 #199 → #200 → #201. Stages PR A–J, including the full Web rollout, are present
-in Integration Draft PR #202. Decision #065 remains ACTIVE: the integration PR
-is not Ready, not merged, and not production-deployed.
+in Integration Draft PR #202. Decision #065's Web rollout is now closed and
+production-deployed after #202 and the hardening/polish chain #203 → #224.
+The production checkpoint is `main` commit `eb51d91`.
 
 Web is prepared first. The integration diff also contains the reviewed mobile
 source, but it authorizes no mobile release. Scanner hands only a reviewed,
@@ -127,11 +128,11 @@ validated end to end.
 
 ## Explicit non-authorization
 
-Decision #065 and Integration Draft PR #202 authorize no Supabase/DB write,
-migration apply, new server route/RPC/schema, provider/AI runtime call, result
-write, grading/settlement caller, payout/refund/bankroll change, Event First
-activation, production smoke or deployment, Ready transition, merge, EAS Build
-or Update, Android/iPhone build, beta distribution, or app publication.
+Decision #065 authorizes the completed Web rollout and its production deployment.
+It authorizes no Supabase/DB write, migration apply, new server route/RPC/schema,
+provider runtime call, result write, grading/settlement caller,
+payout/refund/bankroll change, Event First activation, EAS Build or Update,
+Android/iPhone build, beta distribution, or app publication.
 
 FP-001, Decision #057, Decision #064, and all existing auth, rate-limit,
 idempotency, scanner no-auto-save, and financial boundaries remain active.
@@ -143,7 +144,7 @@ the documented device matrix is recorded under separate authority.
 
 ## Acceptance evidence
 
-The Integration Draft is acceptable only when:
+The Web rollout was accepted only while:
 
 - canonical, CSS, Web, and mobile semantic values remain in parity;
 - the pinned contrast matrix passes;
@@ -153,7 +154,7 @@ The Integration Draft is acceptable only when:
   preview smoke, and Vercel Preview are successful on the exact PR head;
 - the verified source preserves authentication, idempotency, manual Save,
   no-auto-save, provider, financial, settlement, and Event First boundaries;
-- the integration remains Draft and neither Web nor mobile is production-released.
+- the mobile release remains unauthorized.
 
 ## P3 test/docs hardening
 
@@ -167,10 +168,10 @@ The local Integration Draft follow-up closes the three P3 items by:
 
 The supporting `docs/csp-report-only-observation-receipt-065.md` classifies the
 authenticated Preview telemetry/CSP evidence but authorizes no CSP enforcement.
-Exact-head GitHub CI, Vercel Preview, and independent review remain required
-before any Ready decision.
+The later hardening chain #203 → #224 preserved the same server/RPC/schema,
+provider, settlement, financial, no-auto-save, and mobile-release boundaries.
 
 ## Numbering
 
-Decision #065 is occupied and ACTIVE in Integration Draft PR #202.
+Decision #065 is occupied and CLOSED for the Web rollout.
 Decision #066 is the next unreserved number.

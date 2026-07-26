@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-22 (Decision #064 foundation merged but unapplied; Decision #065 ACTIVE in Integration Draft PR #202 after verified stages A–J; Decision #066 next unreserved)
+> Last updated: 2026-07-26 (production `main` at `eb51d91`; Decision #065 Web rollout closed and deployed; Decision #066 next unreserved)
 
 ## 1. Executive Status
 
@@ -13,11 +13,11 @@
 | Production | `https://btdk.app` |
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
-| Latest completed operational milestone | **PR #181 — Express/tracker correction and safe pending-bet cancellation; migration `20260721152711_cancel_pending_bet` applied; merged as `d5ebb87d`, deployed READY** |
-| Highest-numbered closed decision | **#063 — Tracked-Leg Fixture Lineage Contract (docs-only; merged via PR #183 as `df4723f`)** |
-| Active decisions | **#065 — Broadcast Noir Cross-Platform Rollout (ACTIVE / INTEGRATION DRAFT PR #202; verified stages A–J and full Web rollout; Web-first release boundary remains in force)**; **#064 — Tracked-Leg Fixture Lineage Foundation (implementation merged via PR #186; migration 025 + `create_tracked_bet_v2` unapplied; no caller/runtime authority)**; **#062 — Mobile Founder client (Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171; Event analysis remains deferred and Tracker Save remains manual after Review)**; **#061 — Founder Daily Flow Acceptance**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
+| Latest completed operational milestone | **PR #224 — Russian auth screen localization; merged as `eb51d91`, deployed READY** |
+| Highest-numbered closed decision | **#065 — Broadcast Noir Cross-Platform Rollout (Web rollout closed and production-deployed via #202 → #224; mobile release remains unauthorized)** |
+| Active decisions | **#064 — Tracked-Leg Fixture Lineage Foundation (implementation merged via PR #186; migration 025 + `create_tracked_bet_v2` unapplied; no caller/runtime authority)**; **#062 — Mobile Founder client (Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171; Event analysis remains deferred and Tracker Save remains manual after Review)**; **#061 — Founder Daily Flow Acceptance**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
-| Next unreserved decision | **#066** — #065 is occupied and remains ACTIVE in Integration Draft PR #202 |
+| Next unreserved decision | **#066** |
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 completed one canonical-linked base-response dry-run with zero writes. Decision #055 then closed the trust/storage contract. Decision #056's Class A structural-presence implementation is merged and deployed (PR #146); its production provider call remains not approved and has not been run. Decision #057 closed the results-ingestion and settlement trust contract (docs-evidence only; no results runtime, result writes, or automated settlement is approved).
 
@@ -37,7 +37,9 @@ Decision #061 (Founder Daily Flow Acceptance) is ACTIVE. Its Phase A read-only a
 
 Mobile repository checkpoint: PR #170 merged the Decision #062 Phase 1A authenticated Bearer bridge as `5ef838d5d863bf8dd0436e437d1ad85f06525a36`; PR #171 merged the authenticated mobile Coupon Scanner as `43a6ee7fe5944dc1ed64d81a715bd94a7f02d11d`. Coupon analysis remains review-only and never saves a Tracker bet automatically; Event analysis remains deferred. This documentation receipt asserts no new production mobile smoke, Supabase/provider call, settlement, or financial write.
 
-Decision #065 integration checkpoint (2026-07-23): verified stages PR A–J are represented by #187 → #188 → #190 → #194 → #195 → #196 → #197 → #199 → #200 → #201 and reconciled in Integration Draft PR #202. The full Web rollout is implemented and Web is prepared first. The included mobile source adds only an explicit Review → manual Save caller to the existing `POST /api/bets/tracked`; it never auto-saves. Decision #065 changed no server route, RPC, schema, migration, settlement behavior, or financial formula. Local test/docs hardening closes the three P3 follow-ups by rerunning axe/duplicate-ID/document and shell-scroller overflow checks after interactive states, normalizing bracketed IPv6 loopback, and failing closed on application console errors; `docs/csp-report-only-observation-receipt-065.md` classifies the authenticated Preview telemetry/CSP observations without authorizing enforcement. Remote exact-head CI, Vercel Preview, and independent review remain required. PR #202 is not Ready, not merged, and not production-deployed; production, Supabase/DB writes, provider/AI runtime calls, CSP enforcement, EAS Build/Update, Android/iPhone builds, beta distribution, and app publication remain unauthorized.
+Decision #065 Web rollout checkpoint (2026-07-26): verified stages PR A–J are represented by #187 → #188 → #190 → #194 → #195 → #196 → #197 → #199 → #200 → #201, reconciled in PR #202, and followed by production hardening/polish PRs #203 → #224. The Web rollout is closed and production is deployed at `eb51d91`. The included mobile source still authorizes only an explicit Review → manual Save caller to the existing `POST /api/bets/tracked`; it never auto-saves and does not authorize EAS/device builds, beta distribution, or app publication. Decision #065 changed no server route, RPC, schema, migration, settlement behavior, or financial formula. CSP enforcement remains separately governed by Decision #054 Phase B and is not approved by this checkpoint.
+
+Post-#202 production hardening checkpoint: #203 made locale formatting hydration-safe; #204 unified money formatting and semantic colors; #205 preserved AI report print contrast; #206 stabilized settled timestamp hydration; #207 recorded Scale Readiness & AI Economics ADR-011; #208 added the offline AI baseline harness; #209 → #219 built the private Tennis Live Series Calculator behind gated rollout controls; #220 tightened AI analysis language and stale-event gates; #221 polished Web language and analysis UX; #222 improved Russian authenticated Web UX; #223 fixed production smoke for the Russian Analyst UI; #224 localized auth/set-password screens to Russian and updated smoke/guard selectors. These changes do not authorize provider writes, odds ingestion, result writes, automated settlement, public beta, or mobile release.
 
 ## 2. Current Production Facts
 
@@ -174,7 +176,7 @@ External beta remains paused because the product vision is not yet complete. Imp
 4. Odds ingestion/normalization and user-facing trust validation.
 5. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated. Decision #058 unifies the metric formulas (G4) and removes the misleading Void fallback (G12), but adds no new settlement semantics. Tracker legs in production still have no safe relationship to `canonical_fixtures` or `fixture_provider_links`. Closed docs-only Decision #063 defines the contract; active Decision #064 is merged as an unapplied migration/RPC foundation only, with no application caller or matching authority.
 6. Trusted Analyst/Scout v2 using verified provider data rather than ungrounded pricing.
-7. Full i18n UX, including Arabic RTL.
+7. Full i18n UX, including Arabic RTL. Russian Web/auth coverage is improved, but full supported-language coverage is not complete.
 8. Mobile/tablet product polish and closed-beta onboarding.
 
 ## 6. Holds
@@ -193,7 +195,7 @@ CSP enforcement / nonce / strict-dynamic — NOT APPROVED in Phase A
 Decision #060 — EXECUTED / VERIFIED / CLOSED; no further synthetic runtime smoke authorized
 Decision #061 — Playwright / Supabase-stub E2E harness — DEFERRED, NOT APPROVED
 Decision #064 — migration 025 / create_tracked_bet_v2 — IMPLEMENTATION MERGED, UNAPPLIED; no application caller
-Decision #065 — ACTIVE / INTEGRATION DRAFT PR #202; verified PR A–J and full Web rollout; Web-first; no production/mobile release authority
+Decision #065 — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via #202 → #224; no mobile release authority
 ```
 
 ## 7. Documentation and Migration Status
@@ -201,7 +203,7 @@ Decision #065 — ACTIVE / INTEGRATION DRAFT PR #202; verified PR A–J and full
 - Decision #053 reconciled this file, README, the numbering ledger, and the migration inventory.
 - Decision #063 was approved and merged docs-only via PR #183 as `df4723f`.
 - Decision #064 implementation merged via PR #186 as `4fce917701b95b3d3ad98ad9f157d02216323d3e`: additive migration 025, `create_tracked_bet_v2`, lineage constraints/triggers, rollback, and status docs. The migration remains unapplied and no caller/runtime authority exists.
-- Decision #065 remains ACTIVE in Integration Draft PR #202 after verified stages A–J and the full Web rollout. Mobile source is present but authorizes only Review → manual Save through the existing tracked-bet endpoint; no auto-save, EAS/device build, beta, publication, production, Supabase/provider/AI runtime, server/RPC/schema/migration, settlement, or financial-formula change is authorized. #066 is next unreserved.
+- Decision #065 Web rollout is closed and production-deployed via PR #202 followed by #203 → #224, ending at `eb51d91`. Mobile source remains present but authorizes only Review → manual Save through the existing tracked-bet endpoint; no auto-save, EAS/device build, beta, publication, Supabase/provider runtime, server/RPC/schema/migration, settlement, or financial-formula change is authorized. #066 is next unreserved.
 - PR #182 merged as `d103947f` and deployed the fail-closed grading foundation without production provider calls, result writes, scheduling, or automatic settlement.
 - PR #181 applied production migration `20260721152711_cancel_pending_bet`, merged as `d5ebb87d`, and deployed READY. Its emergency kill switch is `docs/cancel-pending-bet-rollback.sql`; the executable SQL is unchanged by the governance rename.
 - `supabase/migrations` contains numbered files through 025, with no 008 file. Migration 025 is review-only and unapplied. Decision #060 is **EXECUTED / VERIFIED / CLOSED**. Migration 024 production version: `20260716142736_create_tracked_bet_024`; Phase B added no migrations.
@@ -225,8 +227,8 @@ Decision #065 — ACTIVE / INTEGRATION DRAFT PR #202; verified PR A–J and full
 #062 — Mobile Founder client — ACTIVE; Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171; Event analysis and automatic Tracker save remain deferred
 #063 — Tracked-Leg Fixture Lineage Contract — EXECUTED / CLOSED, DOCS-ONLY; Founder-approved; merged via PR #183 as df4723f; no runtime or production authority
 #064 — Tracked-Leg Fixture Lineage Foundation — ACTIVE / IMPLEMENTATION MERGED via PR #186; migration 025 and create_tracked_bet_v2 unapplied; no caller/runtime authority
-#065 — Broadcast Noir Cross-Platform Rollout — ACTIVE / INTEGRATION DRAFT PR #202; verified PR A–J and full Web rollout; Web-first; not Ready/merged/production-deployed
-#066 — next unreserved decision (#065 is occupied and active)
+#065 — Broadcast Noir Cross-Platform Rollout — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via #202 → #224; mobile release remains unauthorized
+#066 — next unreserved decision
 ```
 
 PR #90 is closed without merge; its policy is not adopted. Decision #020 is never reused.
