@@ -73,12 +73,12 @@ test('authenticated Analyst production smoke stays outside financial writes', as
   const runMarker = process.env.GITHUB_RUN_ID || String(Date.now())
   const eventName = `QA SMOKE ${runMarker} — Germany vs Netherlands`
 
-  await page.getByPlaceholder('Germany vs Netherlands').fill(eventName)
-  await page.getByPlaceholder('Match Winner / Total / Handicap').fill('Match Winner')
-  await page.getByPlaceholder('Germany / Over / -1').fill('Germany')
-  await page.locator('input[type="number"][step="0.01"]').fill('1.85')
-  await page.locator('select').selectOption('en')
-  await page.getByPlaceholder('Injuries, lineups, motivation, recent form, anything relevant…').fill(
+  await page.locator('#ai-output-language').selectOption('ru')
+  await page.locator('#ai-event-name').fill(eventName)
+  await page.locator('#ai-market-type').fill('Победитель матча')
+  await page.locator('#ai-selection').fill('Германия')
+  await page.locator('#ai-odds').fill('1.85')
+  await page.locator('#ai-context-notes').fill(
     'Automated production smoke. Schema and persistence verification only; never place a bet.',
   )
 
@@ -89,11 +89,11 @@ test('authenticated Analyst production smoke stays outside financial writes', as
     { timeout: 120_000 },
   )
 
-  await page.getByRole('button', { name: 'Analyze', exact: true }).click()
+  await page.getByRole('button', { name: 'Анализировать', exact: true }).click()
   const analystResponse = await analystResponsePromise
 
   expect(analystResponse.status()).toBe(200)
-  await expect(page.getByRole('button', { name: 'Skip', exact: true })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: 'Пропустить', exact: true })).toBeVisible({ timeout: 30_000 })
   expect(analystRequests).toHaveLength(1)
   expect(forbiddenRequests).toEqual([])
 
@@ -101,7 +101,7 @@ test('authenticated Analyst production smoke stays outside financial writes', as
     page.waitForURL(url => url.origin === baseUrl && /^\/decisions\/[0-9a-f-]+$/i.test(url.pathname), {
       timeout: 30_000,
     }),
-    page.getByRole('button', { name: 'Skip', exact: true }).click(),
+    page.getByRole('button', { name: 'Пропустить', exact: true }).click(),
   ])
 
   await expect(
