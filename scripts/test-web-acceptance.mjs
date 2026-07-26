@@ -193,6 +193,25 @@ async function assertNoHorizontalOverflow(page, label) {
         clientWidth: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth,
       },
+      offenders: [...document.querySelectorAll('body *')]
+        .map(element => {
+          const bounds = element.getBoundingClientRect()
+          return {
+            element: `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}`,
+            className: typeof element.className === 'string' ? element.className.slice(0, 120) : '',
+            text: element.textContent?.trim().replace(/\s+/g, ' ').slice(0, 80) ?? '',
+            left: Math.round(bounds.left),
+            right: Math.round(bounds.right),
+            clientWidth: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+          }
+        })
+        .filter(element => (
+          element.left < 0
+          || element.right > document.documentElement.clientWidth
+          || element.scrollWidth > element.clientWidth
+        ))
+        .slice(0, 12),
       shell: shellScrollContainer instanceof HTMLElement
         ? {
             clientWidth: shellScrollContainer.clientWidth,
@@ -205,7 +224,7 @@ async function assertNoHorizontalOverflow(page, label) {
   assert.ok(metrics.shell, `${label} must expose the authenticated shell scroll container`)
   assert.ok(
     metrics.document.scrollWidth <= metrics.document.clientWidth,
-    `${label} document must not overflow horizontally (${metrics.document.scrollWidth}px > ${metrics.document.clientWidth}px)`,
+    `${label} document must not overflow horizontally (${metrics.document.scrollWidth}px > ${metrics.document.clientWidth}px); offenders=${JSON.stringify(metrics.offenders)}`,
   )
   assert.ok(
     metrics.shell.scrollWidth <= metrics.shell.clientWidth,
@@ -225,6 +244,47 @@ async function assertBaseAcceptance(page, route, viewport) {
   await assertNoHorizontalOverflow(page, `${route} at ${viewport.width}px`)
   await assertNoDuplicateIds(page, `${route} at ${viewport.width}px`)
   await assertAxe(page, `${route} at ${viewport.width}px`)
+}
+
+async function assertLoginAcceptance(page, viewport) {
+  const label = `/login at ${viewport.width}px`
+  assert.equal(new URL(page.url()).pathname, '/login', '/login must remain publicly reachable')
+  assert.equal(await page.locator('main').count(), 1, '/login must expose exactly one main landmark')
+  await assertNoHorizontalOverflow(page, label)
+  await assertNoDuplicateIds(page, label)
+  await assertAxe(page, label)
+
+  const metrics = await page.locator('main').evaluate(root => {
+    const heading = root.querySelector('h2')
+    const visibleText = [...root.querySelectorAll('*')]
+      .filter(element => element.children.length === 0 && element.textContent?.trim())
+      .filter(element => element instanceof HTMLElement && element.offsetParent !== null)
+    return {
+      heading: heading
+        ? { clientWidth: heading.clientWidth, scrollWidth: heading.scrollWidth }
+        : null,
+      undersizedText: visibleText
+        .map(element => ({
+          size: Number.parseFloat(getComputedStyle(element).fontSize),
+          text: element.textContent?.trim().slice(0, 60),
+        }))
+        .filter(item => item.size < 11),
+      buttonSizes: [...root.querySelectorAll('button')]
+        .map(button => Number.parseFloat(getComputedStyle(button).fontSize)),
+    }
+  })
+
+  assert.ok(metrics.heading, `${label} must expose the workspace heading`)
+  assert.ok(
+    metrics.heading.scrollWidth <= metrics.heading.clientWidth,
+    `${label} workspace heading must fit its panel (${metrics.heading.scrollWidth}px > ${metrics.heading.clientWidth}px)`,
+  )
+  assert.deepEqual(metrics.undersizedText, [], `${label} must not render text below 11px`)
+  assert.equal(
+    metrics.buttonSizes.every(size => size >= 12),
+    true,
+    `${label} controls must render at 12px or larger`,
+  )
 }
 
 async function assertBetDetailHydration(page) {
@@ -532,15 +592,6 @@ try {
       forbiddenWebSocketAttempts.push(url)
       await webSocketRoute.close({ code: BLOCKED_WEBSOCKET_CODE, reason: BLOCKED_WEBSOCKET_REASON })
     })
-    await context.addCookies([{
-      name: 'sb-127-auth-token',
-      value: sessionCookieValue(),
-      domain: '127.0.0.1',
-      path: '/',
-      httpOnly: false,
-      secure: false,
-      sameSite: 'Lax',
-    }])
     await context.route('**/*', async route => {
       const request = route.request()
       const url = new URL(request.url())
@@ -560,6 +611,30 @@ try {
       }
       await route.continue()
     })
+
+    const loginPage = await context.newPage()
+    await loginPage.addInitScript({ content: axe.source })
+    loginPage.on('pageerror', error => browserErrors.push(`/login at ${viewport.width}px: ${error.message}`))
+    loginPage.on('console', message => {
+      if (message.type() !== 'error') return
+      const location = message.location()
+      const source = location.url ? ` (${location.url}:${location.lineNumber ?? 0}:${location.columnNumber ?? 0})` : ''
+      browserConsoleErrors.push(`/login at ${viewport.width}px: ${message.text()}${source}`)
+    })
+    const loginResponse = await loginPage.goto(`${nextOrigin}/login`, { waitUntil: 'networkidle', timeout: 120_000 })
+    assert.equal(loginResponse?.status(), 200, '/login must return 200 from the local app')
+    await assertLoginAcceptance(loginPage, viewport)
+    await loginPage.close()
+
+    await context.addCookies([{
+      name: 'sb-127-auth-token',
+      value: sessionCookieValue(),
+      domain: '127.0.0.1',
+      path: '/',
+      httpOnly: false,
+      secure: false,
+      sameSite: 'Lax',
+    }])
 
     if (viewport === VIEWPORTS[0]) {
       await assertExternalWebSocketPreblocked(context, forbiddenWebSocketAttempts)
@@ -610,7 +685,7 @@ try {
   assert.ok(stubRequests.some(request => request === 'GET /rest/v1/bets'), 'Dashboard acceptance must exercise local data reads')
   assert.ok(stubRequests.some(request => request === 'GET /rest/v1/coaching_sessions'), 'Coach acceptance must exercise local session reads')
   assert.ok(stubRequests.some(request => request === 'GET /rest/v1/bankroll_transactions'), 'Bankroll acceptance must exercise local transaction reads')
-  console.log(`Web acceptance passed: ${VIEWPORTS.length} viewports × ${ROUTES.length} authenticated routes; zero external requests and zero writes.`)
+  console.log(`Web acceptance passed: ${VIEWPORTS.length} viewports × (1 public + ${ROUTES.length} authenticated routes); zero external requests and zero writes.`)
 } catch (error) {
   console.error(error)
   console.error('\nHermetic Next log tail:\n', nextOutput)

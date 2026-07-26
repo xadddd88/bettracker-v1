@@ -75,38 +75,38 @@ export default function LoginPage() {
         : 'Войти в рабочее пространство'
 
   return (
-    <main className="web-editorial grid min-h-screen bg-[var(--night)] lg:grid-cols-[minmax(0,1.35fr)_minmax(420px,0.65fr)]">
-      <section className="relative flex min-h-[44vh] flex-col overflow-hidden border-b border-[var(--border-strong)] bg-[var(--night)] p-5 text-[var(--text-primary)] lg:min-h-screen lg:border-b-0 lg:border-r lg:p-10">
-        <div className="pointer-events-none absolute -bottom-8 -left-5 select-none font-display text-[clamp(8rem,24vw,24rem)] font-black leading-none tracking-[-0.1em] text-bn-raised/30" aria-hidden>
+    <main className="web-editorial grid min-h-screen min-w-0 grid-cols-[minmax(0,1fr)] bg-[var(--night)] lg:grid-cols-[minmax(0,1.35fr)_minmax(420px,0.65fr)]">
+      <section className="relative flex min-h-[44vh] min-w-0 flex-col overflow-hidden border-b border-[var(--border-strong)] bg-[var(--night)] p-5 text-[var(--text-primary)] lg:min-h-screen lg:border-b-0 lg:border-r lg:p-10">
+        <div className="pointer-events-none absolute -bottom-6 -left-4 select-none font-display text-[clamp(7rem,18vw,18rem)] font-black leading-none tracking-[-0.08em] text-bn-raised/20" aria-hidden>
           BETTRACKER
         </div>
         <header className="relative z-10 flex min-h-12 items-center border-y border-bn-border-strong">
           <div className="font-display text-xl font-black tracking-[-0.045em] text-[var(--text-primary)]">BETTRACKER</div>
-          <div className="ml-4 flex-1 font-mono text-[9px] font-bold tracking-[0.14em] text-[var(--text-quiet)]">ЕДИНАЯ ВИЗУАЛЬНАЯ СИСТЕМА / V3.1</div>
+          <div className="ml-4 min-w-0 flex-1 truncate font-mono text-[11px] font-bold tracking-[0.1em] text-[var(--text-quiet)]">ЕДИНАЯ ВИЗУАЛЬНАЯ СИСТЕМА / V3.1</div>
           <div className="h-2.5 w-2.5 rounded-control bg-[var(--signal)]" aria-hidden />
         </header>
         <div className="relative z-10 my-auto py-12 lg:py-20">
           <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--signal)]">Приватная система решений</p>
-          <h1 className="mt-6 max-w-4xl font-display text-[clamp(3.2rem,7vw,8rem)] font-black uppercase leading-[0.8] tracking-[-0.075em] text-bn-text">
+          <h1 className="mt-6 max-w-4xl font-display text-[clamp(2.75rem,7vw,8rem)] font-black uppercase leading-[0.8] tracking-[-0.065em] text-bn-text">
             Факты<br />перед<br />действием
           </h1>
           <p className="mt-8 max-w-md text-sm leading-6 text-bn-muted">
             Сначала проверьте сигнал, сохраните каждое плечо купона по порядку и только потом принимайте решение.
           </p>
         </div>
-        <div className="relative z-10 grid grid-cols-3 border-y border-bn-border-strong py-4 font-mono text-[8px] font-bold uppercase tracking-[0.15em] text-bn-muted">
+        <div className="relative z-10 grid grid-cols-3 border-y border-bn-border-strong py-4 font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-bn-muted">
           <span>01 / Скан</span>
           <span className="text-center">02 / Проверка</span>
           <span className="text-right">03 / Учёт</span>
         </div>
       </section>
 
-      <section className="flex items-center bg-[var(--field)] px-5 py-10 text-[var(--text-primary)] md:px-10 lg:px-12">
+      <section className="flex min-w-0 items-center bg-[var(--field)] px-5 py-10 text-[var(--text-primary)] md:px-10 lg:px-12">
         <div className="editorial-page w-full max-w-xl lg:mx-auto">
           <div className="flex items-end justify-between border-b border-[var(--border-strong)] pb-4">
             <div className="min-w-0">
               <p className="editorial-kicker">Доступ / BetTracker</p>
-              <h2 className="mt-3 font-display text-[clamp(2.7rem,4.8vw,4rem)] font-black uppercase leading-[0.83] tracking-[-0.07em]">
+              <h2 className="mt-3 max-w-full break-words font-display text-[clamp(2rem,3vw,3.2rem)] font-black uppercase leading-[0.9] tracking-[-0.055em]">
                 Рабочее<br />пространство
               </h2>
             </div>
@@ -120,7 +120,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => selectMode(item.value)}
                 aria-pressed={mode === item.value}
-                className={`min-h-12 border-r border-[var(--border-strong)] px-2 font-mono text-[10px] font-black uppercase tracking-[0.06em] transition-colors last:border-r-0 ${
+                className={`min-h-12 border-r border-[var(--border-strong)] px-2 font-mono text-xs font-black uppercase tracking-[0.04em] transition-colors last:border-r-0 ${
                   mode === item.value
                     ? 'bg-[var(--signal)] text-[var(--on-signal)]'
                     : 'bg-[var(--field)] text-[var(--text-muted)] hover:bg-[var(--field-raised)] hover:text-[var(--text-primary)]'
@@ -190,7 +190,7 @@ export default function LoginPage() {
             </form>
           )}
 
-          <p className="mt-8 border-t border-[var(--border-strong)] pt-4 font-mono text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--text-quiet)]">
+          <p className="mt-8 border-t border-[var(--border-strong)] pt-4 font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--text-quiet)]">
             Безопасный доступ / без публичного исполнения ставок
           </p>
         </div>

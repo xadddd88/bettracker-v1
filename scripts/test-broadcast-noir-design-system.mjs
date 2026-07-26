@@ -8,6 +8,8 @@ const css = readFileSync(join(root, 'app/globals.css'), 'utf8')
 const mobileTheme = readFileSync(join(root, 'apps/mobile/src/ui/theme.ts'), 'utf8')
 const webPrimitives = readFileSync(join(root, 'components/ui/BroadcastNoir.tsx'), 'utf8')
 const mobilePrimitives = readFileSync(join(root, 'apps/mobile/src/ui/broadcast-noir-primitives.tsx'), 'utf8')
+const appLayout = readFileSync(join(root, 'app/layout.tsx'), 'utf8')
+const tailwindConfig = readFileSync(join(root, 'tailwind.config.ts'), 'utf8')
 
 assert.equal(tokens.name, 'Broadcast Noir')
 assert.equal(tokens.version, '3.1.0')
@@ -86,6 +88,9 @@ assert.equal(tokens.geometry.webTouchMinimum, 44)
 assert.equal(tokens.geometry.iosTouchMinimum, 44)
 assert.equal(tokens.geometry.androidTouchMinimum, 48)
 assert.ok(tokens.typography.metadataCompact.fontSize >= 11)
+assert.match(appLayout, /subsets:\s*\['latin', 'cyrillic'\]/)
+assert.match(appLayout, /<html lang="ru"/)
+assert.match(tailwindConfig, /display:\s*\['var\(--font-space-grotesk\)', 'var\(--font-inter\)'/)
 assert.equal(tokens.motion.infiniteDecorativeLoops, false)
 assert.doesNotMatch(css, /animation\s*:[^;]*\binfinite\b/i)
 assert.doesNotMatch(css, /(?:linear|radial|conic)-gradient\s*\(/i)
@@ -109,10 +114,21 @@ function tsxFilesUnder(directory) {
 }
 
 const hardcodedHex = /(?:["'`:]\s*)#[0-9A-Fa-f]{3,8}\b/g
-for (const path of tsxFilesUnder(join(root, 'app'))) {
+const webTsxFiles = [
+  ...tsxFilesUnder(join(root, 'app')),
+  ...tsxFilesUnder(join(root, 'components')),
+]
+const undersizedText = []
+for (const path of webTsxFiles) {
   const source = readFileSync(path, 'utf8')
   assert.doesNotMatch(source, hardcodedHex, `${path} must consume semantic design tokens instead of hardcoded hex colors`)
+  for (const match of source.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)) {
+    if (Number(match[1]) < tokens.typography.metadataCompact.fontSize) {
+      undersizedText.push(`${path}:${match[0]}`)
+    }
+  }
 }
+assert.deepEqual(undersizedText, [], 'Web text must not render below the 11px compact-metadata token')
 
 const aiPage = readFileSync(join(root, 'app/(app)/ai/page.tsx'), 'utf8')
 assert.match(aiPage, /broadcastNoirColors/, 'standalone Analyst report must source colors from the Broadcast Noir adapter')

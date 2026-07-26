@@ -134,7 +134,7 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
             value={kellyFraction}
             onChange={e => setKellyFraction(parseFloat(e.target.value))}
           />
-          <div className="mt-0.5 flex justify-between text-[10px] text-bn-muted">
+          <div className="mt-0.5 flex justify-between text-[11px] text-bn-muted">
             <span>0.10× (осторожно)</span>
             <span>1.00× (полный Kelly)</span>
           </div>

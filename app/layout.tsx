@@ -4,7 +4,7 @@ import './globals.css'
 import { PostHogProvider } from '@/components/PostHogProvider'
 
 const inter = Inter({
-  subsets: ['latin'],
+  subsets: ['latin', 'cyrillic'],
   variable: '--font-inter',
   display: 'swap',
 })
@@ -16,7 +16,7 @@ const spaceGrotesk = Space_Grotesk({
 })
 
 const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
+  subsets: ['latin', 'cyrillic'],
   variable: '--font-jetbrains-mono',
   display: 'swap',
 })
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="ru" className="dark">
       <body className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
         <PostHogProvider>{children}</PostHogProvider>
       </body>

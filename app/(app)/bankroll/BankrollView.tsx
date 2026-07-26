@@ -143,22 +143,22 @@ export default function BankrollView({
         <div className="stat-card">
           <p className="stat-label">Пополнено</p>
           <BroadcastDataValue className="stat-value">{formatMoney(stats.totalDeposited, currency)}</BroadcastDataValue>
-          <p className="mt-0.5 text-[10px] text-bn-quiet">всего добавлено</p>
+          <p className="mt-0.5 text-[11px] text-bn-quiet">всего добавлено</p>
         </div>
         <div className="stat-card">
           <p className="stat-label">Выведено</p>
           <BroadcastDataValue className="stat-value">{formatMoney(stats.totalWithdrawn, currency)}</BroadcastDataValue>
-          <p className="mt-0.5 text-[10px] text-bn-quiet">всего снято</p>
+          <p className="mt-0.5 text-[11px] text-bn-quiet">всего снято</p>
         </div>
         <div className="stat-card">
           <p className="stat-label">Нетто по ставкам</p>
           <BroadcastDataValue className="stat-value">
             {formatMoney(stats.netFromBets, currency, true)}
           </BroadcastDataValue>
-          <p className="mt-0.5 text-[10px] text-bn-quiet">выплаты минус ставки</p>
+          <p className="mt-0.5 text-[11px] text-bn-quiet">выплаты минус ставки</p>
         </div>
       </div>
-      <p className="-mt-2 text-center text-[10px] text-bn-muted">Открытые ставки пока не списываются автоматически из баланса.</p>
+      <p className="-mt-2 text-center text-[11px] text-bn-muted">Открытые ставки пока не списываются автоматически из баланса.</p>
 
       {/* Action buttons */}
       <div className="flex gap-3">

@@ -96,7 +96,7 @@ function OpportunityCard({ opp, expanded, actionBusy, onToggle, onAnalyse, onWat
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="rounded-control border border-bn-border-subtle bg-bn-raised px-1.5 py-0.5 font-mono text-[10px] font-bold text-bn-muted">{sportAbbr}</span>
+            <span className="rounded-control border border-bn-border-subtle bg-bn-raised px-1.5 py-0.5 font-mono text-[11px] font-bold text-bn-muted">{sportAbbr}</span>
             <span className="truncate text-sm font-semibold text-bn-text">{opp.event_name}</span>
           </div>
           <div className="mt-0.5 text-xs text-bn-muted">
@@ -450,7 +450,7 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <p className="text-xs text-bn-muted">Кандидатов: {opportunities.length} · сначала новые</p>
-            <p className="text-[10px] text-bn-quiet">
+            <p className="text-[11px] text-bn-quiet">
               value = кандидат для проверки · contrarian = альтернативный угол · pattern = контекстный паттерн ·{' '}
               оценка 0-100 = релевантность исследования, не вероятность и не ценовой edge · Анализ → AI Analyst
             </p>
