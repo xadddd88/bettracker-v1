@@ -16,11 +16,11 @@
 
 ### Included
 
-- 
+-
 
 ### Excluded
 
-- 
+-
 
 ## Risk boundaries
 
@@ -29,7 +29,7 @@
 - Auth/RLS/privacy: unchanged / changed (explain)
 - External providers/AI: no live calls / explain
 - Feature flags/env: unchanged / explain
-- Rollback: 
+- Rollback:
 
 ## Validation
 
