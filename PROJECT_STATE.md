@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-26 (production `main` at `eb51d91`; Decision #065 Web rollout closed and deployed; Decision #066 next unreserved)
+> Last updated: 2026-07-26 (production `main` at `9040673`; Decision #065 Web rollout closed and deployed; post-rollout Web audit correction #228 deployed; Decision #066 next unreserved)
 
 ## 1. Executive Status
 
@@ -13,7 +13,7 @@
 | Production | `https://btdk.app` |
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
-| Latest completed operational milestone | **PR #224 — Russian auth screen localization; merged as `eb51d91`, deployed READY** |
+| Latest completed operational milestone | **PR #228 — Cyrillic typography, control sizing, and responsive Web acceptance hardening; merged as `9040673`, deployed READY** |
 | Highest-numbered closed decision | **#065 — Broadcast Noir Cross-Platform Rollout (Web rollout closed and production-deployed via #202 → #224; mobile release remains unauthorized)** |
 | Active decisions | **#064 — Tracked-Leg Fixture Lineage Foundation (implementation merged via PR #186; migration 025 + `create_tracked_bet_v2` unapplied; no caller/runtime authority)**; **#062 — Mobile Founder client (Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171; Event analysis remains deferred and Tracker Save remains manual after Review)**; **#061 — Founder Daily Flow Acceptance**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
@@ -39,7 +39,7 @@ Mobile repository checkpoint: PR #170 merged the Decision #062 Phase 1A authenti
 
 Decision #065 Web rollout checkpoint (2026-07-26): verified stages PR A–J are represented by #187 → #188 → #190 → #194 → #195 → #196 → #197 → #199 → #200 → #201, reconciled in PR #202, and followed by production hardening/polish PRs #203 → #224. The Web rollout is closed and production is deployed at `eb51d91`. The included mobile source still authorizes only an explicit Review → manual Save caller to the existing `POST /api/bets/tracked`; it never auto-saves and does not authorize EAS/device builds, beta distribution, or app publication. Decision #065 changed no server route, RPC, schema, migration, settlement behavior, or financial formula. CSP enforcement remains separately governed by Decision #054 Phase B and is not approved by this checkpoint.
 
-Post-#202 production hardening checkpoint: #203 made locale formatting hydration-safe; #204 unified money formatting and semantic colors; #205 preserved AI report print contrast; #206 stabilized settled timestamp hydration; #207 recorded Scale Readiness & AI Economics ADR-011; #208 added the offline AI baseline harness; #209 → #219 built the private Tennis Live Series Calculator behind gated rollout controls; #220 tightened AI analysis language and stale-event gates; #221 polished Web language and analysis UX; #222 improved Russian authenticated Web UX; #223 fixed production smoke for the Russian Analyst UI; #224 localized auth/set-password screens to Russian and updated smoke/guard selectors. These changes do not authorize provider writes, odds ingestion, result writes, automated settlement, public beta, or mobile release.
+Post-#202 production hardening checkpoint: #203 made locale formatting hydration-safe; #204 unified money formatting and semantic colors; #205 preserved AI report print contrast; #206 stabilized settled timestamp hydration; #207 recorded Scale Readiness & AI Economics ADR-011; #208 added the offline AI baseline harness; #209 → #219 built the private Tennis Live Series Calculator behind gated rollout controls; #220 tightened AI analysis language and stale-event gates; #221 polished Web language and analysis UX; #222 improved Russian authenticated Web UX; #223 fixed production smoke for the Russian Analyst UI; #224 localized auth/set-password screens to Russian and updated smoke/guard selectors. Post-rollout PR #228 then fixed deterministic Cyrillic font fallback, sub-11px metadata, undersized controls, the clipped auth heading, and mobile horizontal overflow; its hermetic acceptance gate covers public `/login` at 320/375/1024/1440 plus the existing authenticated routes. These changes do not authorize provider writes, odds ingestion, result writes, automated settlement, public beta, or mobile release.
 
 ## 2. Current Production Facts
 
@@ -176,7 +176,7 @@ External beta remains paused because the product vision is not yet complete. Imp
 3. Odds ingestion/normalization and user-facing trust validation.
 4. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated. Decision #058 unifies the metric formulas (G4) and removes the misleading Void fallback (G12), but adds no new settlement semantics. Tracker legs in production still have no safe relationship to `canonical_fixtures` or `fixture_provider_links`. Closed docs-only Decision #063 defines the contract; active Decision #064 is merged as an unapplied migration/RPC foundation only, with no application caller or matching authority.
 5. Trusted Analyst/Scout v2 using verified provider data rather than ungrounded pricing.
-6. Full i18n UX, including Arabic RTL. Russian Web/auth coverage is improved, but full supported-language coverage is not complete.
+6. Full i18n UX, including Arabic RTL. Russian Web/auth coverage and deterministic Cyrillic rendering are improved, but full supported-language coverage is not complete.
 7. Mobile/tablet product polish and closed-beta onboarding.
 
 ## 6. Holds
@@ -205,6 +205,7 @@ Decision #065 — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via #202 → #224; no
 - Decision #063 was approved and merged docs-only via PR #183 as `df4723f`.
 - Decision #064 implementation merged via PR #186 as `4fce917701b95b3d3ad98ad9f157d02216323d3e`: additive migration 025, `create_tracked_bet_v2`, lineage constraints/triggers, rollback, and status docs. The migration remains unapplied and no caller/runtime authority exists.
 - Decision #065 Web rollout is closed and production-deployed via PR #202 followed by #203 → #224, ending at `eb51d91`. Mobile source remains present but authorizes only Review → manual Save through the existing tracked-bet endpoint; no auto-save, EAS/device build, beta, publication, Supabase/provider runtime, server/RPC/schema/migration, settlement, or financial-formula change is authorized. #066 is next unreserved.
+- Post-rollout corrective PR #228 merged as `9040673` and deployed READY after exact-head green CI, Vercel READY, and Chrome re-verification. It changes Web typography, control sizing, and browser acceptance coverage only; it does not consume Decision #066 or expand any runtime authority.
 - PR #182 merged as `d103947f` and deployed the fail-closed grading foundation without production provider calls, result writes, scheduling, or automatic settlement.
 - PR #181 applied production migration `20260721152711_cancel_pending_bet`, merged as `d5ebb87d`, and deployed READY. Its emergency kill switch is `docs/cancel-pending-bet-rollback.sql`; the executable SQL is unchanged by the governance rename.
 - `supabase/migrations` contains numbered files through 025, with no 008 file. Migration 025 is review-only and unapplied. Decision #060 is **EXECUTED / VERIFIED / CLOSED**. Migration 024 production version: `20260716142736_create_tracked_bet_024`; Phase B added no migrations.
