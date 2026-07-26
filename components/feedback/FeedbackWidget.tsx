@@ -8,10 +8,10 @@ import { BroadcastButton, BroadcastPanel, BroadcastStatus } from '@/components/u
 type Category = 'bug' | 'suggestion' | 'general' | 'praise'
 
 const CATEGORIES: { value: Category; label: string }[] = [
-  { value: 'bug',        label: '🐛 Bug' },
-  { value: 'suggestion', label: '💡 Suggestion' },
-  { value: 'praise',     label: '⭐ Praise' },
-  { value: 'general',    label: '💬 General' },
+  { value: 'bug',        label: 'Ошибка' },
+  { value: 'suggestion', label: 'Идея' },
+  { value: 'praise',     label: 'Полезно' },
+  { value: 'general',    label: 'Общее' },
 ]
 
 export default function FeedbackWidget() {
@@ -91,7 +91,7 @@ export default function FeedbackWidget() {
 
   async function submit() {
     if (rating === 0) {
-      setError('Please select a rating.')
+      setError('Выберите оценку.')
       return
     }
     setLoading(true)
@@ -104,12 +104,12 @@ export default function FeedbackWidget() {
       })
       const json = await res.json()
       if (!res.ok || !json.success) {
-        setError(json.error ?? 'Failed to submit. Please try again.')
+        setError(json.error ?? 'Не удалось отправить. Попробуйте ещё раз.')
         return
       }
       setDone(true)
     } catch {
-      setError('Network error. Please try again.')
+      setError('Ошибка сети. Попробуйте ещё раз.')
     } finally {
       setLoading(false)
     }
@@ -124,10 +124,10 @@ export default function FeedbackWidget() {
         ref={triggerRef}
         onClick={openModal}
         className="fixed bottom-20 right-0 z-40 flex min-h-11 items-center gap-2 rounded-l-control border border-bn-border-strong bg-bn-field px-4 font-mono text-[9px] font-black uppercase tracking-[0.12em] text-bn-text transition-colors hover:border-bn-signal hover:bg-bn-raised md:bottom-6"
-        aria-label="Open feedback form"
+        aria-label="Открыть форму обратной связи"
       >
         <span aria-hidden>+</span>
-        <span>Feedback</span>
+        <span>Отзыв</span>
       </button>
 
       {/* Backdrop + dialog */}
@@ -140,12 +140,12 @@ export default function FeedbackWidget() {
           <BroadcastPanel aria-labelledby="feedback-title" aria-modal="true" className="w-full overflow-hidden" role="dialog">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-bn-border-strong px-5 py-4">
-              <h2 id="feedback-title" className="font-display text-lg font-black uppercase tracking-[-0.04em] text-bn-text">Beta feedback</h2>
+              <h2 id="feedback-title" className="font-display text-lg font-black uppercase tracking-[-0.04em] text-bn-text">Отзыв по бете</h2>
               <button
                 ref={closeRef}
                 onClick={closeModal}
                 className="min-h-11 min-w-11 rounded-control text-xs text-bn-text transition-colors hover:bg-bn-raised"
-                aria-label="Close"
+                aria-label="Закрыть"
               >
                 &#x2715;
               </button>
@@ -153,18 +153,18 @@ export default function FeedbackWidget() {
 
             {done ? (
               <div ref={successRef} className="px-5 py-10 text-center" tabIndex={-1}>
-                <BroadcastStatus status="success">Feedback sent</BroadcastStatus>
-                <p className="mt-3 text-sm font-semibold text-bn-text">Thank you!</p>
-                <p className="mt-1 text-xs text-bn-muted">Your feedback helps us build a better product.</p>
+                <BroadcastStatus status="success">Отзыв отправлен</BroadcastStatus>
+                <p className="mt-3 text-sm font-semibold text-bn-text">Спасибо.</p>
+                <p className="mt-1 text-xs text-bn-muted">Это помогает быстрее улучшать продукт.</p>
                 <BroadcastButton className="mt-5 w-full" onClick={closeModal}>
-                  Close
+                  Закрыть
                 </BroadcastButton>
               </div>
             ) : (
               <div className="px-5 py-4 flex flex-col gap-4">
                 {/* Star rating */}
                 <div>
-                  <p className="label mb-2">How&apos;s BetTracker AI working for you?</p>
+                  <p className="label mb-2">Как работает BetTracker AI?</p>
                   <div
                     className="flex gap-1"
                     onMouseLeave={() => setHovered(0)}
@@ -176,9 +176,9 @@ export default function FeedbackWidget() {
                         onMouseEnter={() => setHovered(n)}
                         aria-pressed={rating === n}
                         className={`min-h-11 min-w-11 rounded-control border text-xl transition-colors ${n <= activeRating ? 'border-bn-signal bg-bn-raised opacity-100' : 'border-bn-border-subtle opacity-60'}`}
-                        aria-label={`${n} star${n === 1 ? '' : 's'}`}
+                        aria-label={`${n} из 5`}
                       >
-                        ⭐
+                        *
                       </button>
                     ))}
                   </div>
@@ -186,7 +186,7 @@ export default function FeedbackWidget() {
 
                 {/* Category pills */}
                 <div>
-                  <p className="label mb-2">Type</p>
+                  <p className="label mb-2">Тип</p>
                   <div className="flex flex-wrap gap-2">
                     {CATEGORIES.map(c => (
                       <BroadcastButton
@@ -204,14 +204,14 @@ export default function FeedbackWidget() {
                 {/* Message */}
                 <div>
                   <label className="label mb-2 block" htmlFor="feedback-message">
-                    Message{' '}
-                    <span className="font-normal text-bn-quiet">(optional)</span>
+                    Сообщение{' '}
+                    <span className="font-normal text-bn-quiet">(необязательно)</span>
                   </label>
                   <textarea
                     id="feedback-message"
                     className="input resize-none text-sm"
                     rows={3}
-                    placeholder="Tell us anything…"
+                    placeholder="Что было непонятно или неудобно?"
                     value={message}
                     maxLength={2000}
                     onChange={e => setMessage(e.target.value)}
@@ -225,7 +225,7 @@ export default function FeedbackWidget() {
                   onClick={submit}
                   disabled={loading}
                 >
-                  {loading ? 'Sending…' : 'Send feedback'}
+                  {loading ? 'Отправляем…' : 'Отправить отзыв'}
                 </BroadcastButton>
               </div>
             )}

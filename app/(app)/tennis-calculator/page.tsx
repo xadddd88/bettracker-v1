@@ -11,6 +11,7 @@ import type {
 } from '@/lib/tennis/ui-contract'
 
 import { Last24HoursAnalysis } from './Last24HoursAnalysis'
+import { PrivateSmokeFeedback } from './PrivateSmokeFeedback'
 import { SeriesCalculator } from './SeriesCalculator'
 
 const SERIES_SELECT = `
@@ -303,6 +304,8 @@ export default async function TennisCalculatorPage() {
           initialSeries={snapshot}
         />
       )}
+
+      <PrivateSmokeFeedback />
     </main>
   )
 }

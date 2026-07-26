@@ -9,6 +9,7 @@ const read = file => readFileSync(path.join(root, file), 'utf8')
 
 const page = read('app/(app)/tennis-calculator/page.tsx')
 const calculator = read('app/(app)/tennis-calculator/SeriesCalculator.tsx')
+const smokeFeedback = read('app/(app)/tennis-calculator/PrivateSmokeFeedback.tsx')
 const layout = read('app/(app)/layout.tsx')
 const header = read('components/ui/AppHeader.tsx')
 const mobileNav = read('components/ui/MobileNav.tsx')
@@ -161,7 +162,7 @@ test('commands are double-tap guarded and retries keep payload-bound operation i
   assert.ok(calculator.includes('if (inFlight.current) return'))
   assert.ok(calculator.includes('cache[key]?.payload !== serialized'))
   assert.ok(calculator.includes('crypto.randomUUID()'))
-  assert.ok(calculator.includes('Retry will reuse the same operation id.'))
+  assert.ok(calculator.includes('используется тот же id операции'))
 })
 
 test('manual workflow exposes create, confirm, Win/Loss/Void, stop and journal states', () => {
@@ -190,6 +191,26 @@ test('mobile interaction and risk copy stay accessible and outcome-neutral', () 
   assert.ok(calculator.includes('не повышает вероятность выигрыша'))
   assert.doesNotMatch(calculator, /guaranteed profit|guarantees? profit|risk[- ]free/i)
   assert.doesNotMatch(calculator, /bookmaker login|scrap(?:e|ing)|auto[- ]bet/i)
+})
+
+test('private smoke report captures tester QA without new product scope', () => {
+  assert.ok(page.includes('<PrivateSmokeFeedback />'))
+  for (const copy of [
+    'Закрытый тест',
+    'Отчёт после проверки',
+    'Калькулятор открылся без 404',
+    'Серия создалась без помощи',
+    'Рост прибыли по геймам понятен',
+    'Анализ за 24 часа завершился',
+    'Скрин отправлен Диме',
+    'Сколько матчей нашёл анализ',
+    'Отправить отчёт',
+  ]) {
+    assert.ok(smokeFeedback.includes(copy), `${copy} is missing from smoke feedback`)
+  }
+  assert.ok(smokeFeedback.includes("fetch('/api/feedback'"))
+  assert.ok(smokeFeedback.includes("'[tennis_private_smoke_v1]'"))
+  assert.ok(smokeFeedback.includes("category: hasFailure(state) ? 'bug' : 'general'"))
 })
 
 test('navigation is derived on the server and receives only an allowed boolean', () => {

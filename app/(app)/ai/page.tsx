@@ -171,7 +171,7 @@ const SPORTS: { value: Sport; label: string }[] = [
 ]
 
 const LOCALES: { value: Locale; label: string }[] = [
-  { value: 'auto', label: 'Auto (detect)' },
+  { value: 'auto', label: 'Авто' },
   { value: 'en',   label: 'English' },
   { value: 'uk',   label: '\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430' },
   { value: 'ru',   label: '\u0420\u0443\u0441\u0441\u043A\u0438\u0439' },
@@ -202,6 +202,69 @@ function normalizeAiPageLocale(locale: string | null | undefined): UiLocale {
 
 const AI_PAGE_COPY = {
   en: {
+    heroKicker: 'AI Scanner · explicit review',
+    heroTitle: 'Capture. Extract. Review.',
+    heroBody: 'Add a screenshot, verify every extracted field, then choose whether to continue. Analyze never saves a bet automatically.',
+    scoutPrefill: 'Pre-filled from Scout — enter current odds to analyse',
+    captureType: 'Capture type',
+    captureModes: { coupon: 'Coupon', event: 'Event' },
+    couponScreenshot: 'Coupon screenshot',
+    selectedPreviewAlt: 'Selected screenshot preview',
+    previewReady: 'Preview ready',
+    previewHelp: 'Replace or remove the image before continuing. Coupon extraction remains editable below.',
+    replaceImage: 'Replace image',
+    removeImage: 'Remove image',
+    chooseScreenshot: 'Choose screenshot',
+    chooseHelp: 'Paste, camera export or photo library',
+    sport: 'Sport',
+    sports: {
+      soccer: 'Football',
+      tennis: 'Tennis',
+      cs2: 'CS2',
+      basketball: 'Basketball',
+      ice_hockey: 'Ice Hockey',
+      mma: 'MMA',
+      other: 'Other',
+    },
+    event: 'Event',
+    eventPlaceholder: 'Germany vs Netherlands',
+    market: 'Market',
+    marketPlaceholder: 'Match Winner / Total / Handicap',
+    selection: 'Selection',
+    selectionPlaceholder: 'Germany / Over / -1',
+    line: 'Line',
+    bookmaker: 'Bookmaker',
+    bookmakerPlaceholder: 'Bet365, Pinnacle',
+    outputLanguage: 'Output language',
+    couponDateTime: 'Coupon date / time',
+    couponDateTimePlaceholder: 'Today, 22:10 / 19.07.2026, 22:10',
+    couponDateTimeHelp: 'Keep the exact text from the coupon so the Analyst can identify the fixture.',
+    contextNotes: 'Context / Notes',
+    contextNotesPlaceholder: 'Injuries, lineups, motivation, recent form, anything relevant',
+    extractedCouponLegs: 'Extracted coupon legs',
+    riskLabels: { low: 'Low risk', medium: 'Medium risk', high: 'High risk' },
+    recommendationLabels: { bet: 'BET', watch: 'WATCH', skip: 'SKIP', no_value: 'NO VALUE' },
+    recommendationDetails: {
+      bet: 'Edge detected — AI sees value at these odds.',
+      watch: 'Uncertain — monitor for odds movement or new info.',
+      skip: 'No meaningful edge found at current odds.',
+      no_value: 'AI does not recommend this market.',
+    },
+    pricingMeta: 'edge · confidence · market',
+    modelProbability: 'Model prob.',
+    modelProbabilityHelp: 'AI win estimate',
+    impliedProbability: 'Implied',
+    impliedProbabilityHelp: 'From your odds',
+    edge: 'Edge',
+    edgeHelp: 'Model minus implied',
+    factorAnalysis: 'Factor Analysis',
+    downloadPdf: 'Download PDF',
+    copied: 'Copied!',
+    copyToShare: 'Copy to share',
+    placeBet: 'Place Bet',
+    watch: 'Watch',
+    skip: 'Skip',
+    closeStakeInput: 'Close stake input',
     waitForScan: 'Wait for coupon scanning to finish.',
     liveBlocked: 'Live analysis requires the current score, match phase, game clock, and current live odds. Use a pre-match coupon.',
     scanningCoupon: 'Scanning coupon...',
@@ -247,6 +310,69 @@ const AI_PAGE_COPY = {
     skipWatchSaved: 'Skipping or watching is a valid decision - it will be saved to your history.',
   },
   uk: {
+    heroKicker: 'AI Scanner · ручна перевірка',
+    heroTitle: 'Скан. Перевірка. Рішення.',
+    heroBody: 'Додайте скриншот, перевірте кожне розпізнане поле й лише потім вирішуйте, чи продовжувати. Аналіз ніколи не зберігає ставку автоматично.',
+    scoutPrefill: 'Заповнено зі Scout — введіть актуальний коефіцієнт для аналізу',
+    captureType: 'Тип знімка',
+    captureModes: { coupon: 'Купон', event: 'Подія' },
+    couponScreenshot: 'Скриншот купона',
+    selectedPreviewAlt: 'Превʼю вибраного скриншота',
+    previewReady: 'Превʼю готове',
+    previewHelp: 'Замініть або видаліть зображення перед продовженням. Розпізнаний купон нижче можна редагувати.',
+    replaceImage: 'Замінити зображення',
+    removeImage: 'Видалити зображення',
+    chooseScreenshot: 'Вибрати скриншот',
+    chooseHelp: 'Вставка, експорт з камери або фотогалерея',
+    sport: 'Спорт',
+    sports: {
+      soccer: 'Футбол',
+      tennis: 'Теніс',
+      cs2: 'CS2',
+      basketball: 'Баскетбол',
+      ice_hockey: 'Хокей',
+      mma: 'MMA',
+      other: 'Інше',
+    },
+    event: 'Подія',
+    eventPlaceholder: 'Німеччина vs Нідерланди',
+    market: 'Ринок',
+    marketPlaceholder: 'Переможець / тотал / фора',
+    selection: 'Вибір',
+    selectionPlaceholder: 'Німеччина / більше / -1',
+    line: 'Лінія',
+    bookmaker: 'Букмекер',
+    bookmakerPlaceholder: 'Bet365, Pinnacle',
+    outputLanguage: 'Мова відповіді',
+    couponDateTime: 'Дата / час купона',
+    couponDateTimePlaceholder: 'Сьогодні, 22:10 / 19.07.2026, 22:10',
+    couponDateTimeHelp: 'Залиште точний текст із купона, щоб Analyst міг визначити подію.',
+    contextNotes: 'Контекст / нотатки',
+    contextNotesPlaceholder: 'Травми, склади, мотивація, форма, усе важливе',
+    extractedCouponLegs: 'Розпізнані події купона',
+    riskLabels: { low: 'Низький ризик', medium: 'Середній ризик', high: 'Високий ризик' },
+    recommendationLabels: { bet: 'СТАВКА', watch: 'СПОСТЕРІГАТИ', skip: 'ПРОПУСТИТИ', no_value: 'БЕЗ ЦІННОСТІ' },
+    recommendationDetails: {
+      bet: 'Знайдено перевагу — AI бачить цінність у цьому коефіцієнті.',
+      watch: 'Невизначено — варто стежити за рухом лінії або новими даними.',
+      skip: 'На поточному коефіцієнті значущої переваги не знайдено.',
+      no_value: 'AI не рекомендує цей ринок.',
+    },
+    pricingMeta: 'перевага · впевненість · ринок',
+    modelProbability: 'Оцінка моделі',
+    modelProbabilityHelp: 'Оцінка шансу AI',
+    impliedProbability: 'За коефіцієнтом',
+    impliedProbabilityHelp: 'З вашого коефіцієнта',
+    edge: 'Перевага',
+    edgeHelp: 'Модель мінус коефіцієнт',
+    factorAnalysis: 'Аналіз факторів',
+    downloadPdf: 'Завантажити PDF',
+    copied: 'Скопійовано!',
+    copyToShare: 'Копіювати для відправки',
+    placeBet: 'Зробити ставку',
+    watch: 'Спостерігати',
+    skip: 'Пропустити',
+    closeStakeInput: 'Закрити введення ставки',
     waitForScan: 'Дочекайтеся завершення сканування купона.',
     liveBlocked: 'Live-аналіз недоступний без поточного рахунку, фази матчу, ігрового часу та актуальної live-лінії. Використайте pre-match купон.',
     scanningCoupon: 'Скануємо купон...',
@@ -292,6 +418,69 @@ const AI_PAGE_COPY = {
     skipWatchSaved: 'Пропуск або спостереження буде збережено в історії рішень.',
   },
   ru: {
+    heroKicker: 'AI Scanner · ручная проверка',
+    heroTitle: 'Скан. Проверка. Решение.',
+    heroBody: 'Добавьте скриншот, проверьте каждое распознанное поле и только потом решайте, продолжать ли. Анализ никогда не сохраняет ставку автоматически.',
+    scoutPrefill: 'Заполнено из Scout — введите актуальный коэффициент для анализа',
+    captureType: 'Тип снимка',
+    captureModes: { coupon: 'Купон', event: 'Событие' },
+    couponScreenshot: 'Скриншот купона',
+    selectedPreviewAlt: 'Превью выбранного скриншота',
+    previewReady: 'Превью готово',
+    previewHelp: 'Замените или удалите изображение перед продолжением. Распознанный купон ниже можно редактировать.',
+    replaceImage: 'Заменить изображение',
+    removeImage: 'Удалить изображение',
+    chooseScreenshot: 'Выбрать скриншот',
+    chooseHelp: 'Вставка, экспорт с камеры или фотогалерея',
+    sport: 'Спорт',
+    sports: {
+      soccer: 'Футбол',
+      tennis: 'Теннис',
+      cs2: 'CS2',
+      basketball: 'Баскетбол',
+      ice_hockey: 'Хоккей',
+      mma: 'MMA',
+      other: 'Другое',
+    },
+    event: 'Событие',
+    eventPlaceholder: 'Германия vs Нидерланды',
+    market: 'Рынок',
+    marketPlaceholder: 'Победитель / тотал / фора',
+    selection: 'Выбор',
+    selectionPlaceholder: 'Германия / больше / -1',
+    line: 'Линия',
+    bookmaker: 'Букмекер',
+    bookmakerPlaceholder: 'Bet365, Pinnacle',
+    outputLanguage: 'Язык ответа',
+    couponDateTime: 'Дата / время купона',
+    couponDateTimePlaceholder: 'Сегодня, 22:10 / 19.07.2026, 22:10',
+    couponDateTimeHelp: 'Оставьте точный текст с купона, чтобы Analyst мог определить событие.',
+    contextNotes: 'Контекст / заметки',
+    contextNotesPlaceholder: 'Травмы, составы, мотивация, форма, всё важное',
+    extractedCouponLegs: 'Распознанные события купона',
+    riskLabels: { low: 'Низкий риск', medium: 'Средний риск', high: 'Высокий риск' },
+    recommendationLabels: { bet: 'СТАВКА', watch: 'НАБЛЮДАТЬ', skip: 'ПРОПУСТИТЬ', no_value: 'НЕТ ЦЕННОСТИ' },
+    recommendationDetails: {
+      bet: 'Найдено преимущество — AI видит ценность в этом коэффициенте.',
+      watch: 'Неопределённо — лучше следить за движением линии или новыми данными.',
+      skip: 'На текущем коэффициенте значимого преимущества не найдено.',
+      no_value: 'AI не рекомендует этот рынок.',
+    },
+    pricingMeta: 'преимущество · уверенность · рынок',
+    modelProbability: 'Оценка модели',
+    modelProbabilityHelp: 'Оценка шанса AI',
+    impliedProbability: 'По коэффициенту',
+    impliedProbabilityHelp: 'Из вашего коэффициента',
+    edge: 'Преимущество',
+    edgeHelp: 'Модель минус коэффициент',
+    factorAnalysis: 'Анализ факторов',
+    downloadPdf: 'Скачать PDF',
+    copied: 'Скопировано!',
+    copyToShare: 'Копировать для отправки',
+    placeBet: 'Сделать ставку',
+    watch: 'Наблюдать',
+    skip: 'Пропустить',
+    closeStakeInput: 'Закрыть ввод ставки',
     waitForScan: 'Дождитесь завершения сканирования купона.',
     liveBlocked: 'Live-анализ недоступен без текущего счёта, фазы матча, игрового времени и актуальной live-линии. Используйте pre-match купон.',
     scanningCoupon: 'Сканируем купон...',
@@ -399,7 +588,7 @@ export default function AIAnalystPage() {
 
   const [scoutId,    setScoutId]    = useState<string | null>(null)
   const [sport,      setSport]      = useState<Sport>('soccer')
-  const [locale,     setLocale]     = useState<Locale>('auto')
+  const [locale,     setLocale]     = useState<Locale>('ru')
   const [form,       setForm]       = useState({ event_name: '', market_type: '', selection: '', line: '', odds: '', bookmaker: '', event_time: '', notes: '' })
   const [errors,     setErrors]     = useState<Record<string, string>>({})
   const [analysis,   setAnalysis]   = useState<Analysis | null>(null)
@@ -603,7 +792,8 @@ export default function AIAnalystPage() {
   const handleAction = useCallback(async (action: 'placed' | 'skipped' | 'watchlisted') => {
     if (!analysis) return
     if (!analysis.decision_id) {
-      setRootErr('Decision ID missing \u2014 please re-analyze (restart dev server if in development)')
+      const copy = AI_PAGE_COPY[normalizeAiPageLocale(analysis.trust_view?.locale ?? analysis.output_language)]
+      setRootErr(copy.analysisFailed)
       return
     }
 
@@ -692,7 +882,7 @@ export default function AIAnalystPage() {
     const a = analysis
     const trustView = getAnalysisTrustView(a)
     const pdfCopy = AI_PAGE_COPY[normalizeAiPageLocale(trustView?.locale ?? a.output_language)]
-    const recLabels: Record<string, string> = { bet: 'BET', skip: 'SKIP', watch: 'WATCH', no_value: 'NO VALUE' }
+    const recLabels = pdfCopy.recommendationLabels
     const showPricing = shouldShowPricingStats({
       qualityGate:        a.quality_gate,
       modelProbability:   a.model_probability,
@@ -712,26 +902,26 @@ export default function AIAnalystPage() {
       }</ul></li>`
     ).join('') ?? ''
     const researchHtml = a.research_brief ? `<section class="research">
-  <div class="research-kicker">CONDITIONAL MARKET REVIEW</div>
+  <div class="research-kicker">${escapeHtml(pdfCopy.conditionalMarketReview)}</div>
   <h2>${escapeHtml(a.research_brief.headline)}</h2>
   <p>${escapeHtml(a.research_brief.summary)}</p>
-  <p><strong>Trust boundary:</strong> Narrative analysis is conditional. Only verbatim excerpts under Cited claims are bound to current sources.</p>
-  ${a.research_brief.builderRisk ? `<div class="builder"><strong>Bet Builder correlation</strong><br>${escapeHtml(a.research_brief.builderRisk)}</div>` : ''}
+  <p><strong>${escapeHtml(pdfCopy.trustBoundary)}</strong></p>
+  ${a.research_brief.builderRisk ? `<div class="builder"><strong>${escapeHtml(pdfCopy.builderCorrelation)}</strong><br>${escapeHtml(a.research_brief.builderRisk)}</div>` : ''}
   ${a.research_brief.legs.map(leg => `<div class="research-leg">
     <strong>${leg.legNumber}. ${escapeHtml(leg.eventName)}</strong>
     <div>${escapeHtml(leg.marketType)}${leg.selection ? ` · ${escapeHtml(leg.selection)}` : ''}</div>
     <p>${escapeHtml(leg.assessment)}</p>
-    ${leg.evidence.length ? `<ul>${leg.evidence.map(item => `<li>+ Conditional: ${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
-    ${leg.risks.length ? `<ul>${leg.risks.map(item => `<li>− ${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+    ${leg.evidence.length ? `<ul>${leg.evidence.map(item => `<li>+ ${escapeHtml(pdfCopy.conditionalLogic)}: ${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+    ${leg.risks.length ? `<ul>${leg.risks.map(item => `<li>- ${escapeHtml(pdfCopy.failureModes)}: ${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
   </div>`).join('')}
-  <div class="verdict"><strong>Verdict</strong><br>${escapeHtml(a.research_brief.verdict)}</div>
-  ${a.research_brief.sourcedClaims.length ? `<div class="sources"><strong>Cited claims</strong><ul>${a.research_brief.sourcedClaims.map(claim => `<li>“${escapeHtml(claim.text)}” — ${escapeHtml(claim.sourceUrl)}</li>`).join('')}</ul></div>` : ''}
+  <div class="verdict"><strong>${escapeHtml(pdfCopy.analystVerdict)}</strong><br>${escapeHtml(a.research_brief.verdict)}</div>
+  ${a.research_brief.sourcedClaims.length ? `<div class="sources"><strong>${escapeHtml(pdfCopy.citedClaims)}</strong><ul>${a.research_brief.sourcedClaims.map(claim => `<li>${escapeHtml(claim.text)} — ${escapeHtml(claim.sourceUrl)}</li>`).join('')}</ul></div>` : ''}
 </section>` : ''
     const pricingHtml = showPricing
       ? `<div class="grid">
-  <div class="stat"><div class="stat-label">Model probability</div><div class="stat-value">${a.model_probability?.toFixed(1)}%</div></div>
-  <div class="stat"><div class="stat-label">Implied probability</div><div class="stat-value">${a.implied_probability?.toFixed(1)}%</div></div>
-  <div class="stat"><div class="stat-label">Edge</div><div class="stat-value" style="color:${(a.edge_percent ?? 0)>=0?'var(--bn-data-value)':'var(--bn-negative)'}">${(a.edge_percent ?? 0)>=0?'+':''}${a.edge_percent?.toFixed(1)}%</div></div>
+  <div class="stat"><div class="stat-label">${escapeHtml(pdfCopy.modelProbability)}</div><div class="stat-value">${a.model_probability?.toFixed(1)}%</div></div>
+  <div class="stat"><div class="stat-label">${escapeHtml(pdfCopy.impliedProbability)}</div><div class="stat-value">${a.implied_probability?.toFixed(1)}%</div></div>
+  <div class="stat"><div class="stat-label">${escapeHtml(pdfCopy.edge)}</div><div class="stat-value" style="color:${(a.edge_percent ?? 0)>=0?'var(--bn-data-value)':'var(--bn-negative)'}">${(a.edge_percent ?? 0)>=0?'+':''}${a.edge_percent?.toFixed(1)}%</div></div>
 </div>`
       : `<div class="quality-gate">
   <div class="gate-kicker">${escapeHtml(trustView?.riskWarningLabel ?? 'Risk warning')}</div>
@@ -814,7 +1004,7 @@ ${researchHtml}
 ${pricingHtml}
 <div class="reasoning">${escapeHtml(trustView && !showPricing ? trustView.displayReasoning : a.reasoning)}</div>
 ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:''}
-<h3 style="margin-top:20px;font-size:14px">${escapeHtml(trustView?.factorAnalysisLabel ?? 'Factor Analysis')}</h3>
+<h3 style="margin-top:20px;font-size:14px">${escapeHtml(trustView?.factorAnalysisLabel ?? pdfCopy.factorAnalysis)}</h3>
 <table><thead><tr><th>${escapeHtml(factorHeader)}</th><th>${escapeHtml(scoreHeader)}</th><th>${escapeHtml(detailHeader)}</th></tr></thead><tbody>${factorsHtml}</tbody></table>
 <div class="footer">BetTracker AI \u00B7 ${escapeHtml(generatedLabel)} ${new Date().toLocaleDateString()} \u00B7 ${escapeHtml(footerLabel)}</div>
 </body></html>`
@@ -889,12 +1079,12 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
     <main className="bn-page mx-auto flex w-full max-w-5xl flex-col gap-4 pb-8" onPaste={handlePaste}>
       <section className="bn-panel relative overflow-hidden p-5 sm:p-7 lg:p-9">
         <div aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-bn-signal" />
-        <p className="editorial-kicker">AI Scanner · explicit review</p>
+        <p className="editorial-kicker">{copy.heroKicker}</p>
         <h1 className="mt-4 max-w-3xl font-display text-[clamp(2.4rem,7vw,5.5rem)] font-black leading-[0.92] tracking-[-0.055em] text-bn-text">
-          Capture. Extract. Review.
+          {copy.heroTitle}
         </h1>
         <p className="mt-5 max-w-2xl text-sm leading-6 text-bn-muted sm:text-base">
-          Add a screenshot, verify every extracted field, then choose whether to continue. Analyze never saves a bet automatically.
+          {copy.heroBody}
         </p>
       </section>
 
@@ -902,13 +1092,13 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
       {scoutId && !analysis && (
         <div className="flex min-h-11 items-center gap-2 rounded-control border border-bn-signal bg-bn-field px-3 py-2 text-xs text-bn-signal">
           <Search size={12} strokeWidth={2} />
-          Pre-filled from Scout — enter current odds to analyse
+          {copy.scoutPrefill}
         </div>
       )}
 
       {/* ── Scanner zone ────────────────────────────────────── */}
       <section className="bn-panel overflow-hidden" aria-labelledby="capture-heading">
-        <div className="grid grid-cols-2 border-b border-bn-border-strong" role="radiogroup" aria-label="Capture type">
+        <div className="grid grid-cols-2 border-b border-bn-border-strong" role="radiogroup" aria-label={copy.captureType}>
           {(['coupon', 'event'] as const).map((mode, index) => (
             <button
               aria-checked={captureMode === mode}
@@ -919,27 +1109,27 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               role="radio"
               type="button"
             >
-              <span className="mr-2 font-mono">0{index + 1}</span>{mode}
+              <span className="mr-2 font-mono">0{index + 1}</span>{copy.captureModes[mode]}
             </button>
           ))}
         </div>
 
-        <input ref={fileRef} aria-label="Coupon screenshot" type="file" accept="image/*" className="sr-only" onChange={handleFileChange} />
+        <input ref={fileRef} aria-label={copy.couponScreenshot} type="file" accept="image/*" className="sr-only" onChange={handleFileChange} />
         {previewUrl ? (
           <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_18rem]">
             <div className="relative min-h-80 bg-bn-night">
-              <Image alt={`Selected ${captureMode} screenshot preview`} className="h-full w-full object-contain" fill sizes="(max-width: 1024px) 100vw, 70vw" src={previewUrl} unoptimized />
+              <Image alt={copy.selectedPreviewAlt} className="h-full w-full object-contain" fill sizes="(max-width: 1024px) 100vw, 70vw" src={previewUrl} unoptimized />
               {scanning ? <div aria-hidden="true" className="bn-operation-sweep absolute inset-x-0 top-0 h-1 bg-bn-signal" /> : null}
             </div>
             <div className="flex flex-col gap-3 border-t border-bn-border-strong p-5 lg:border-l lg:border-t-0">
-              <p id="capture-heading" className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-text">Preview ready</p>
-              <p className="text-sm leading-6 text-bn-muted">Replace or remove the image before continuing. Coupon extraction remains editable below.</p>
+              <p id="capture-heading" className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-text">{copy.previewReady}</p>
+              <p className="text-sm leading-6 text-bn-muted">{copy.previewHelp}</p>
               {scanMsg ? (
                 <BroadcastStatus className="w-full" aria-live="polite" status={scanStatusTone(scanMsg, scanning, captureMode)}>{scanMsg.replace('✅ ', '')}</BroadcastStatus>
               ) : null}
               <div className="mt-auto grid gap-2">
-                <button className="bn-button bn-button-secondary" disabled={scanning} onClick={() => fileRef.current?.click()} type="button">Replace image</button>
-                <button className="bn-button bn-button-destructive" disabled={scanning} onClick={removeCapture} type="button">Remove image</button>
+                <button className="bn-button bn-button-secondary" disabled={scanning} onClick={() => fileRef.current?.click()} type="button">{copy.replaceImage}</button>
+                <button className="bn-button bn-button-destructive" disabled={scanning} onClick={removeCapture} type="button">{copy.removeImage}</button>
               </div>
             </div>
           </div>
@@ -952,8 +1142,8 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           >
             <span>
               <Camera aria-hidden="true" className="mx-auto text-bn-data" size={34} strokeWidth={1.5} />
-              <span id="capture-heading" className="mt-5 block font-display text-2xl font-black tracking-[-0.04em] text-bn-text">Choose screenshot</span>
-              <span className="mt-2 block text-sm text-bn-muted">Paste, camera export or photo library</span>
+              <span id="capture-heading" className="mt-5 block font-display text-2xl font-black tracking-[-0.04em] text-bn-text">{copy.chooseScreenshot}</span>
+              <span className="mt-2 block text-sm text-bn-muted">{copy.chooseHelp}</span>
             </span>
           </button>
         )}
@@ -961,7 +1151,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
       {/* ── Sport selector ──────────────────────────────────── */}
       <fieldset>
-        <legend className="label mb-2">Sport</legend>
+        <legend className="label mb-2">{copy.sport}</legend>
         <div className="flex flex-wrap gap-2">
           {SPORTS.map(s => (
             <button
@@ -975,7 +1165,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                   : 'border-bn-border-strong bg-bn-field text-bn-muted hover:border-bn-signal'
               }`}
             >
-              {s.label}
+              {copy.sports[s.value]}
             </button>
           ))}
         </div>
@@ -985,11 +1175,11 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
       <div className="bn-panel flex flex-col gap-4 p-4 sm:p-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
-            <label className="label" htmlFor="ai-event-name">Event *</label>
+            <label className="label" htmlFor="ai-event-name">{copy.event} *</label>
             <input
               id="ai-event-name"
               className={`input ${errors.event_name ? 'border-bn-negative' : ''}`}
-              placeholder="Germany vs Netherlands"
+              placeholder={copy.eventPlaceholder}
               value={form.event_name}
               onChange={e => setField('event_name', e.target.value)}
             />
@@ -997,11 +1187,11 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           </div>
 
           <div>
-            <label className="label" htmlFor="ai-market-type">Market *</label>
+            <label className="label" htmlFor="ai-market-type">{copy.market} *</label>
             <input
               id="ai-market-type"
               className={`input ${errors.market_type ? 'border-bn-negative' : ''}`}
-              placeholder="Match Winner / Total / Handicap"
+              placeholder={copy.marketPlaceholder}
               value={form.market_type}
               onChange={e => setField('market_type', e.target.value)}
             />
@@ -1009,22 +1199,22 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           </div>
 
           <div>
-            <label className="label" htmlFor="ai-selection">Selection</label>
+            <label className="label" htmlFor="ai-selection">{copy.selection}</label>
             <input
               id="ai-selection"
               className="input"
-              placeholder="Germany / Over / -1"
+              placeholder={copy.selectionPlaceholder}
               value={form.selection}
               onChange={e => setField('selection', e.target.value)}
             />
           </div>
 
           <div>
-            <label className="label" htmlFor="ai-odds">Odds *</label>
+            <label className="label" htmlFor="ai-odds">{copy.odds} *</label>
             <input
               id="ai-odds"
               className={`input ${errors.odds ? 'border-bn-negative' : ''}`}
-              type="number" step="0.01" min="1.01" placeholder={scoutId ? 'Enter current odds' : '1.85'}
+              type="number" step="0.01" min="1.01" placeholder="1.85"
               value={form.odds}
               onChange={e => setField('odds', e.target.value)}
             />
@@ -1032,7 +1222,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           </div>
 
           <div>
-            <label className="label" htmlFor="ai-line">Line</label>
+            <label className="label" htmlFor="ai-line">{copy.line}</label>
             <input
               id="ai-line"
               className="input"
@@ -1043,41 +1233,41 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           </div>
 
           <div>
-            <label className="label" htmlFor="ai-bookmaker">Bookmaker</label>
+            <label className="label" htmlFor="ai-bookmaker">{copy.bookmaker}</label>
             <input
               id="ai-bookmaker"
               className="input"
-              placeholder="Bet365, Pinnacle…"
+              placeholder={copy.bookmakerPlaceholder}
               value={form.bookmaker}
               onChange={e => setField('bookmaker', e.target.value)}
             />
           </div>
 
           <div>
-            <label className="label" htmlFor="ai-output-language">Output language</label>
+            <label className="label" htmlFor="ai-output-language">{copy.outputLanguage}</label>
             <select id="ai-output-language" className="input" value={locale} onChange={e => setLocale(e.target.value as Locale)}>
               {LOCALES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
             </select>
           </div>
 
           <div className="sm:col-span-2">
-            <label className="label" htmlFor="ai-coupon-date-time">Coupon date / time</label>
+            <label className="label" htmlFor="ai-coupon-date-time">{copy.couponDateTime}</label>
             <input
               id="ai-coupon-date-time"
               className="input"
-              placeholder="Today, 22:10 / 19.07.2026, 22:10"
+              placeholder={copy.couponDateTimePlaceholder}
               value={form.event_time}
               onChange={e => setField('event_time', e.target.value)}
             />
-            <p className="mt-1 text-[11px] text-bn-muted">Keep the exact text from the coupon so the Analyst can identify the fixture.</p>
+            <p className="mt-1 text-[11px] text-bn-muted">{copy.couponDateTimeHelp}</p>
           </div>
 
           <div className="sm:col-span-2">
-            <label className="label" htmlFor="ai-context-notes">Context / Notes</label>
+            <label className="label" htmlFor="ai-context-notes">{copy.contextNotes}</label>
             <textarea
               id="ai-context-notes"
               className="input resize-none" rows={2}
-              placeholder="Injuries, lineups, motivation, recent form, anything relevant…"
+              placeholder={copy.contextNotesPlaceholder}
               value={form.notes}
               onChange={e => setField('notes', e.target.value)}
             />
@@ -1088,7 +1278,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           <section className="rounded-control border border-bn-border-strong bg-bn-night" aria-labelledby="coupon-legs-heading">
             <div className="flex items-center justify-between border-b border-bn-border-strong px-4 py-3">
               <h2 id="coupon-legs-heading" className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-text">
-                Extracted coupon legs
+                {copy.extractedCouponLegs}
               </h2>
               <span className="rounded-control border border-bn-border-strong bg-bn-field px-2 py-1 font-mono text-[11px] font-black text-bn-data">{couponLegs.length}</span>
             </div>
@@ -1281,28 +1471,22 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               impliedProbability: a.implied_probability,
               edgePercent:        a.edge_percent,
             })
-            const recDetail: Record<Recommendation, string> = {
-              bet:      'Edge detected — AI sees value at these odds.',
-              watch:    'Uncertain — monitor for odds movement or new info.',
-              skip:     'No meaningful edge found at current odds.',
-              no_value: 'AI does not recommend this market.',
-            }
             const disclaimerText = trust && !showPricing ? trust.uiDisclaimer : a.disclaimer
             return (
               <div className="flex flex-col gap-3 rounded-control border border-bn-border-strong bg-bn-field p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <BroadcastStatus status={showPricing ? rec.status : 'review'}>
-                      {showPricing ? rec.label : a.research_brief ? copy.priceNotVerified : trust?.label ?? gate?.label ?? 'INSUFFICIENT DATA'}
+                      {showPricing ? copy.recommendationLabels[a.recommendation] : a.research_brief ? copy.priceNotVerified : trust?.label ?? gate?.label ?? 'INSUFFICIENT DATA'}
                     </BroadcastStatus>
                     <p className="mt-1 text-xs text-bn-muted">
-                      {showPricing ? recDetail[a.recommendation] : a.research_brief ? copy.priceNotVerifiedSupport : trust?.supportLabel ?? gate?.supportLabel ?? 'Unsupported / partially supported bet'}
+                      {showPricing ? copy.recommendationDetails[a.recommendation] : a.research_brief ? copy.priceNotVerifiedSupport : trust?.supportLabel ?? gate?.supportLabel ?? 'Unsupported / partially supported bet'}
                     </p>
                   </div>
                   {showPricing ? (
                   <div className="text-right shrink-0">
-                      <BroadcastStatus status={risk.status}>{risk.label}</BroadcastStatus>
-                    <p className="mt-1 text-[11px] text-bn-muted">edge · confidence · market</p>
+                      <BroadcastStatus status={risk.status}>{copy.riskLabels[a.risk_level]}</BroadcastStatus>
+                    <p className="mt-1 text-[11px] text-bn-muted">{copy.pricingMeta}</p>
                   </div>
                   ) : (
                     <div className="text-right shrink-0">
@@ -1316,21 +1500,21 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 {showPricing ? (
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div>
-                    <div className="mb-1 text-xs text-bn-muted">Model prob.</div>
+                    <div className="mb-1 text-xs text-bn-muted">{copy.modelProbability}</div>
                     <div className="text-xl font-bold text-bn-data">{a.model_probability?.toFixed(1)}%</div>
-                    <div className="mt-1 text-[11px] text-bn-muted">AI win estimate</div>
+                    <div className="mt-1 text-[11px] text-bn-muted">{copy.modelProbabilityHelp}</div>
                   </div>
                   <div>
-                    <div className="mb-1 text-xs text-bn-muted">Implied</div>
+                    <div className="mb-1 text-xs text-bn-muted">{copy.impliedProbability}</div>
                     <div className="text-xl font-bold text-bn-data">{a.implied_probability?.toFixed(1)}%</div>
-                    <div className="mt-1 text-[11px] text-bn-muted">From your odds</div>
+                    <div className="mt-1 text-[11px] text-bn-muted">{copy.impliedProbabilityHelp}</div>
                   </div>
                   <div>
-                    <div className="mb-1 text-xs text-bn-muted">Edge</div>
+                    <div className="mb-1 text-xs text-bn-muted">{copy.edge}</div>
                     <div className={`text-xl font-bold ${(a.edge_percent ?? 0) >= 0 ? 'text-bn-data' : 'text-bn-negative'}`}>
                       {(a.edge_percent ?? 0) >= 0 ? '+' : ''}{a.edge_percent?.toFixed(1)}%
                     </div>
-                    <div className="mt-1 text-[11px] text-bn-muted">Model minus implied</div>
+                    <div className="mt-1 text-[11px] text-bn-muted">{copy.edgeHelp}</div>
                   </div>
                 </div>
                 ) : gate && (
@@ -1411,7 +1595,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
             <h3 className="mb-1 text-sm font-semibold text-bn-text">
               {a.research_brief && !pricingVisible
                 ? copy.pricingVerification
-                : trustView?.factorAnalysisLabel ?? 'Factor Analysis'}
+                : trustView?.factorAnalysisLabel ?? copy.factorAnalysis}
             </h3>
             {(trustView && !pricingVisible ? trustView.displayFactors : a.factors).map((f, i) => (
               <div key={i} className="border-b border-bn-border-strong py-2 last:border-0">
@@ -1430,13 +1614,13 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               onClick={downloadPDF}
               className="bn-button bn-button-secondary"
             >
-              \uD83D\uDCC4 {trustView?.downloadPdfLabel ?? 'Download PDF'}
+              {trustView?.downloadPdfLabel ?? copy.downloadPdf}
             </button>
             <button
               onClick={handleShare}
               className="bn-button bn-button-secondary"
             >
-              {copied ? `\u2705 ${trustView?.copiedLabel ?? 'Copied!'}` : `\uD83D\uDD17 ${trustView?.copyToShareLabel ?? 'Copy to share'}`}
+              {copied ? (trustView?.copiedLabel ?? copy.copied) : (trustView?.copyToShareLabel ?? copy.copyToShare)}
             </button>
           </div>
 
@@ -1486,7 +1670,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 {copy.checkRisk}
               </button>
               <button
-                aria-label="Close stake input"
+                aria-label={copy.closeStakeInput}
                 className="bn-button bn-button-secondary px-3"
                 onClick={() => { setShowStake(false); setShowRisk(false); setStakeStr(''); setRootErr('') }}
               >
@@ -1513,7 +1697,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 }}
                 disabled={saving}
               >
-                <CheckCircle size={14} strokeWidth={2} /> {trustView?.placeBetLabel ?? 'Place Bet'}
+                <CheckCircle size={14} strokeWidth={2} /> {trustView?.placeBetLabel ?? copy.placeBet}
               </button>
             )}
             {trustView?.showWatch !== false && (
@@ -1522,7 +1706,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 onClick={() => handleAction('watchlisted')}
                 disabled={saving}
               >
-                <Eye size={14} strokeWidth={2} /> {trustView?.watchLabel ?? 'Watch'}
+                <Eye size={14} strokeWidth={2} /> {trustView?.watchLabel ?? copy.watch}
               </button>
             )}
             <button
@@ -1530,7 +1714,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               onClick={() => handleAction('skipped')}
               disabled={saving}
             >
-              <X size={14} strokeWidth={2} /> {trustView?.skipLabel ?? 'Skip'}
+              <X size={14} strokeWidth={2} /> {trustView?.skipLabel ?? copy.skip}
             </button>
           </div>
           <p className="text-center text-xs text-bn-muted">

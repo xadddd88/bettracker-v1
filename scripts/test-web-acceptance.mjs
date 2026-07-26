@@ -297,16 +297,16 @@ async function assertTrackerLabels(page, exerciseDynamicLegs) {
 }
 
 async function assertFeedbackFocus(page, feedbackStubs) {
-  const trigger = page.getByRole('button', { name: 'Open feedback form' })
+  const trigger = page.getByRole('button', { name: 'Открыть форму обратной связи' })
   await trigger.click()
-  const dialog = page.getByRole('dialog', { name: 'Beta feedback' })
+  const dialog = page.getByRole('dialog', { name: 'Отзыв по бете' })
   await dialog.waitFor()
-  const headerClose = dialog.locator('button[aria-label="Close"]')
-  assert.equal(await headerClose.evaluate(element => element === document.activeElement), true, 'Feedback must focus Close initially')
+  const headerClose = dialog.locator('button[aria-label="Закрыть"]')
+  assert.equal(await headerClose.evaluate(element => element === document.activeElement), true, 'Feedback must focus close initially')
   await assertInteractiveAcceptance(page, 'Dashboard with feedback dialog open')
 
   await page.keyboard.press('Shift+Tab')
-  assert.equal(await dialog.getByRole('button', { name: 'Send feedback' }).evaluate(element => element === document.activeElement), true, 'Shift+Tab must wrap to the final control')
+  assert.equal(await dialog.getByRole('button', { name: 'Отправить отзыв' }).evaluate(element => element === document.activeElement), true, 'Shift+Tab must wrap to the final control')
   await page.keyboard.press('Tab')
   assert.equal(await headerClose.evaluate(element => element === document.activeElement), true, 'Tab must wrap to the first control')
 
@@ -314,24 +314,24 @@ async function assertFeedbackFocus(page, feedbackStubs) {
   assert.equal(await headerClose.evaluate(element => element === document.activeElement), true, 'Background focus must be contained by the dialog')
 
   await page.keyboard.press('Escape')
-  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Open feedback form')
+  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Открыть форму обратной связи')
   assert.equal(await trigger.evaluate(element => element === document.activeElement), true, 'Escape must restore the original trigger')
 
   await trigger.click()
-  await dialog.locator('button[aria-label="Close"]').click()
-  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Open feedback form')
+  await dialog.locator('button[aria-label="Закрыть"]').click()
+  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Открыть форму обратной связи')
   assert.equal(await trigger.evaluate(element => element === document.activeElement), true, 'Close must restore the original trigger')
 
   await trigger.click()
   await assertLabelFocus(page, 'feedback-message')
-  await dialog.getByRole('button', { name: '5 stars' }).click()
-  await dialog.getByRole('button', { name: 'Send feedback' }).click()
-  await dialog.getByText('Feedback sent').waitFor()
-  assert.equal(await page.evaluate(() => document.activeElement?.textContent?.includes('Feedback sent') ?? false), true, 'Successful submit must move focus after Submit is removed')
-  assert.equal(await dialog.getByRole('button', { name: 'Send feedback' }).count(), 0, 'Successful submit must remove Submit')
+  await dialog.getByRole('button', { name: '5 из 5' }).click()
+  await dialog.getByRole('button', { name: 'Отправить отзыв' }).click()
+  await dialog.getByText('Отзыв отправлен').waitFor()
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent?.includes('Отзыв отправлен') ?? false), true, 'Successful submit must move focus after submit is removed')
+  assert.equal(await dialog.getByRole('button', { name: 'Отправить отзыв' }).count(), 0, 'Successful submit must remove submit')
   await assertInteractiveAcceptance(page, 'Dashboard with feedback success state')
-  await dialog.getByRole('button', { name: 'Close', exact: true }).last().click()
-  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Open feedback form')
+  await dialog.getByRole('button', { name: 'Закрыть', exact: true }).last().click()
+  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Открыть форму обратной связи')
   assert.equal(await trigger.evaluate(element => element === document.activeElement), true, 'Success Close must restore the original trigger')
   assert.equal(feedbackStubs.count, 1, 'Feedback acceptance must use exactly one local browser stub')
 }
@@ -339,6 +339,7 @@ async function assertFeedbackFocus(page, feedbackStubs) {
 async function assertSourceOnlyControls() {
   const ai = await readFile(new URL('../app/(app)/ai/page.tsx', import.meta.url), 'utf8')
   const decisions = await readFile(new URL('../app/(app)/decisions/[id]/DecisionActions.tsx', import.meta.url), 'utf8')
+  assert.match(ai, /useState<Locale>\('ru'\)/, 'Analyst page must default to the current beta language')
   assert.match(ai, /<label className="label" htmlFor="ai-stake">[\s\S]*?<\/label>[\s\S]*?<input[\s\S]*?id="ai-stake"/, 'Conditional Analyst stake must have a bound label')
   assert.match(decisions, /<label[^>]+htmlFor="decision-stake"[\s\S]*?<input[\s\S]*?id="decision-stake"/, 'Decision stake must have a bound label')
 }
