@@ -5,6 +5,7 @@ import {
   BroadcastPanel,
   BroadcastStatus,
 } from '@/components/ui/BroadcastNoir'
+import SectionGuide from '@/components/ui/SectionGuide'
 import { EVENTS } from '@/lib/analytics/events'
 import { PageView } from '@/lib/analytics/PageView'
 import {
@@ -44,26 +45,26 @@ interface DecisionListRow {
 }
 
 const FILTERS: Array<{ label: string; value: Filter }> = [
-  { label: 'All', value: 'all' },
-  { label: 'Watchlisted', value: 'watchlisted' },
-  { label: 'Pending', value: 'pending' },
-  { label: 'Placed', value: 'placed' },
-  { label: 'Skipped', value: 'skipped' },
+  { label: 'Все', value: 'all' },
+  { label: 'В наблюдении', value: 'watchlisted' },
+  { label: 'Ожидают', value: 'pending' },
+  { label: 'Поставлены', value: 'placed' },
+  { label: 'Пропущены', value: 'skipped' },
 ]
 
 const ACTION_LABEL: Record<string, string> = {
-  ignored: 'Ignored',
-  pending: 'Pending',
-  placed: 'Placed',
-  skipped: 'Skipped',
-  watchlisted: 'Watchlisted',
+  ignored: 'Игнорировано',
+  pending: 'Ожидает',
+  placed: 'Поставлено',
+  skipped: 'Пропущено',
+  watchlisted: 'В наблюдении',
 }
 
 const RECOMMENDATION_LABEL: Record<string, string> = {
-  bet: 'BET',
-  no_value: 'NO VALUE',
-  skip: 'SKIP',
-  watch: 'WATCH',
+  bet: 'СТАВИТЬ',
+  no_value: 'НЕТ ЦЕННОСТИ',
+  skip: 'ПРОПУСТИТЬ',
+  watch: 'НАБЛЮДАТЬ',
 }
 
 export default async function DecisionsPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
@@ -94,14 +95,36 @@ export default async function DecisionsPage({ searchParams }: { searchParams: Pr
 
       <BroadcastPanel className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div>
-          <p className="editorial-kicker">Decision archive · persisted analyses</p>
-          <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Decisions</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-bn-muted">{decisions.length} {filter === 'all' ? 'records' : filter} in the current view.</p>
+          <p className="editorial-kicker">Архив решений · сохранённые анализы</p>
+          <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Решения</h1>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-bn-muted">Записей в текущем виде: {decisions.length}</p>
         </div>
-        <Link className="bn-button bn-button-primary" href="/ai">Analyze</Link>
+        <Link className="bn-button bn-button-primary" href="/ai">Проанализировать</Link>
       </BroadcastPanel>
 
-      <nav aria-label="Decision filters" className="flex max-w-full gap-1 overflow-x-auto rounded-control border border-bn-border-strong bg-bn-field p-1">
+      <SectionGuide
+        title="Как использовать решения"
+        items={[
+          {
+            title: 'Храните каждый анализ отдельно',
+            body: 'Решение фиксирует матч, рынок, коэффициент, рекомендацию, уверенность и ваш финальный статус действия.',
+          },
+          {
+            title: 'Фильтруйте по действию',
+            body: 'Отдельные виды показывают, что вы поставили, что пропустили и что оставили в наблюдении. Так легче проверять собственную дисциплину.',
+          },
+          {
+            title: 'Открывайте карточку для деталей',
+            body: 'Внутри решения видны аргументы, quality gate, источники исследования и действия после анализа, если они были сохранены.',
+          },
+        ]}
+        note={{
+          title: 'Граница раздела',
+          body: 'Решение не равно ставке. Оно становится ставкой только тогда, когда вы отдельно сохраняете запись в Tracker.',
+        }}
+      />
+
+      <nav aria-label="Фильтры решений" className="flex max-w-full gap-1 overflow-x-auto rounded-control border border-bn-border-strong bg-bn-field p-1">
         {FILTERS.map(({ label, value }) => (
           <Link
             aria-current={filter === value ? 'page' : undefined}
@@ -117,14 +140,14 @@ export default async function DecisionsPage({ searchParams }: { searchParams: Pr
       {decisions.length === 0 ? (
         <BroadcastPanel className="grid min-h-72 place-items-center p-6 text-center">
           <div className="max-w-md">
-            <BroadcastStatus status="neutral">Empty · no {filter === 'all' ? '' : `${filter} `}decisions</BroadcastStatus>
-            <h2 className="mt-5 font-display text-3xl font-black tracking-[-0.04em] text-bn-text">No records in this view</h2>
-            <p className="mt-3 text-sm leading-6 text-bn-muted">An analysis is saved here only through the existing decision contract.</p>
-            {filter === 'all' ? <Link className="bn-button bn-button-primary mt-6" href="/ai">Analyze a match</Link> : null}
+            <BroadcastStatus status="neutral">Пусто · решений нет</BroadcastStatus>
+            <h2 className="mt-5 font-display text-3xl font-black tracking-[-0.04em] text-bn-text">В этом виде нет записей</h2>
+            <p className="mt-3 text-sm leading-6 text-bn-muted">Анализ сохраняется сюда только через действующий контракт решений.</p>
+            {filter === 'all' ? <Link className="bn-button bn-button-primary mt-6" href="/ai">Проанализировать матч</Link> : null}
           </div>
         </BroadcastPanel>
       ) : (
-        <ol aria-label="Saved decisions" className="space-y-3">
+        <ol aria-label="Сохранённые решения" className="space-y-3">
           {decisions.map((decision) => {
             const analysisOutput = decision.ai_analysis_runs?.[0]?.output_json ?? null
             const surface = buildAnalystDecisionSurfaceView({
@@ -164,7 +187,7 @@ export default async function DecisionsPage({ searchParams }: { searchParams: Pr
                       </div>
                       <h2 className="mt-4 break-words font-display text-xl font-black tracking-[-0.035em] text-bn-text">{decision.event_name}</h2>
                       <p className="mt-2 break-words text-sm leading-6 text-bn-muted">
-                        {[decision.market_type, decision.selection].filter(Boolean).join(' · ') || 'Market not recorded'}
+                        {[decision.market_type, decision.selection].filter(Boolean).join(' · ') || 'Рынок не записан'}
                       </p>
                       {recommendation ? (
                         <p className={`mt-3 text-xs font-black uppercase tracking-[0.08em] ${surface.isTrustBlocked ? 'text-bn-review' : 'text-bn-text'}`}>
@@ -174,9 +197,9 @@ export default async function DecisionsPage({ searchParams }: { searchParams: Pr
                     </div>
 
                     <dl className="grid grid-cols-3 gap-4 border-t border-bn-border-subtle pt-4 lg:min-w-64 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-                      <DataPoint label="Odds" value={decision.offered_odds?.toFixed(2) ?? '—'} />
-                      <DataPoint label="Confidence" value={decision.confidence_score == null ? '—' : `${decision.confidence_score}/100`} />
-                      <DataPoint label="Saved" value={formatDate(decision.created_at)} />
+                      <DataPoint label="Кэф" value={decision.offered_odds?.toFixed(2) ?? '—'} />
+                      <DataPoint label="Уверенность" value={decision.confidence_score == null ? '—' : `${decision.confidence_score}/100`} />
+                      <DataPoint label="Сохранено" value={formatDate(decision.created_at)} />
                     </dl>
                   </BroadcastPanel>
                 </Link>
@@ -198,5 +221,5 @@ function actionTone(action: string): BroadcastNoirStatus {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value))
+  return new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value))
 }

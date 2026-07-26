@@ -23,7 +23,7 @@ export default function NextBestAction({ action }: { action: NextAction }) {
     >
       <div className="flex items-center justify-between gap-4">
         <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-signal">
-          Adaptive action
+          Следующее действие
         </p>
         <span className="font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-bn-muted">{action.meta}</span>
       </div>
@@ -32,7 +32,7 @@ export default function NextBestAction({ action }: { action: NextAction }) {
         <p className="mt-3 text-sm leading-6 text-bn-muted">{action.detail}</p>
       </div>
       <span className="inline-flex min-h-11 items-center justify-between rounded-control bg-bn-signal px-4 text-xs font-black uppercase tracking-[0.08em] text-bn-on-signal">
-        Continue <span aria-hidden="true" className="text-lg transition-transform group-hover:translate-x-1">→</span>
+        Продолжить <span aria-hidden="true" className="text-lg transition-transform group-hover:translate-x-1">→</span>
       </span>
     </Link>
   )

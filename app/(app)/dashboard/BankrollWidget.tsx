@@ -20,7 +20,7 @@ export default function BankrollWidget({ balance, currency }: Props) {
 
   async function submit() {
     const num = parseFloat(amount)
-    if (!num || num <= 0) { setError('Enter a valid amount'); return }
+    if (!num || num <= 0) { setError('Введите корректную сумму'); return }
 
     setLoading(true)
     setError('')
@@ -31,13 +31,13 @@ export default function BankrollWidget({ balance, currency }: Props) {
         body:    JSON.stringify({ amount: num, type, note: note.trim() || undefined }),
       })
       const json = await res.json()
-      if (!res.ok || !json.success) { setError(json.error ?? 'Failed'); return }
+      if (!res.ok || !json.success) { setError(json.error ?? 'Операция не выполнена'); return }
       setOpen(false)
       setAmount('')
       setNote('')
       router.refresh()
     } catch {
-      setError('Network error')
+      setError('Ошибка сети')
     } finally {
       setLoading(false)
     }
@@ -54,7 +54,7 @@ export default function BankrollWidget({ balance, currency }: Props) {
     <div>
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <div className="font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-bn-quiet">Available bankroll</div>
+          <div className="font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-bn-quiet">Доступный банкролл</div>
           <div className={`mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] ${balance < 0 ? 'text-bn-negative' : 'text-bn-data'}`}>
             {formatMoney(balance, currency)}
           </div>
@@ -66,13 +66,13 @@ export default function BankrollWidget({ balance, currency }: Props) {
               onClick={() => { setOpen(true); setType('deposit') }}
               className="btn-ghost"
             >
-              Deposit
+              Пополнить
             </button>
             <button
               onClick={() => { setOpen(true); setType('withdrawal') }}
               className="btn-ghost"
             >
-              Withdraw
+              Вывести
             </button>
           </div>
         )}
@@ -91,7 +91,7 @@ export default function BankrollWidget({ balance, currency }: Props) {
                     : 'bg-bn-field text-bn-text hover:bg-bn-raised'
                 }`}
               >
-                {t === 'deposit' ? 'Deposit' : 'Withdraw'}
+                {t === 'deposit' ? 'Пополнить' : 'Вывести'}
               </button>
             ))}
           </div>
@@ -99,20 +99,20 @@ export default function BankrollWidget({ balance, currency }: Props) {
           <div className="flex flex-wrap items-start gap-3">
             <input
               className="input w-40 text-sm"
-              aria-label="Bankroll amount"
+              aria-label="Сумма операции банкролла"
               type="number"
               min="0.01"
               step="0.01"
-              placeholder="Amount"
+              placeholder="Сумма"
               value={amount}
               onChange={e => { setAmount(e.target.value); setError('') }}
               autoFocus
             />
             <input
               className="input min-w-40 flex-1 text-sm"
-              aria-label="Bankroll note"
+              aria-label="Комментарий к операции банкролла"
               type="text"
-              placeholder="Note (optional)"
+              placeholder="Комментарий (необязательно)"
               value={note}
               onChange={e => setNote(e.target.value)}
             />
@@ -122,10 +122,10 @@ export default function BankrollWidget({ balance, currency }: Props) {
                 disabled={loading}
                 className="btn-primary"
               >
-                {loading ? '…' : 'Confirm'}
+                {loading ? '...' : 'Подтвердить'}
               </button>
               <button onClick={close} className="btn-ghost">
-                Cancel
+                Отмена
               </button>
             </div>
           </div>

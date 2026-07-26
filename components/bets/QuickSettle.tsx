@@ -29,11 +29,11 @@ export default function QuickSettle({ betId }: Props) {
         body:    JSON.stringify({ outcome }),
       })
       const json = await res.json()
-      if (res.status === 409) { setError('Already settled'); return }
-      if (!res.ok || !json.success) { setError(json.error ?? 'Settlement failed'); return }
+      if (res.status === 409) { setError('Ставка уже рассчитана'); return }
+      if (!res.ok || !json.success) { setError(json.error ?? 'Не удалось рассчитать ставку'); return }
       router.refresh()
     } catch {
-      setError('Network error — try again')
+      setError('Ошибка сети — попробуйте ещё раз')
     } finally {
       lockRef.current = false
       setBusy(null)
@@ -42,7 +42,7 @@ export default function QuickSettle({ betId }: Props) {
 
   async function cancelBet() {
     if (lockRef.current) return
-    if (!window.confirm('Delete this pending bet? The stake will be returned to your bankroll. This cannot be undone.')) return
+    if (!window.confirm('Удалить эту открытую ставку? Сумма вернётся в банкролл. Действие нельзя отменить.')) return
 
     lockRef.current = true
     setBusy('delete')
@@ -54,10 +54,10 @@ export default function QuickSettle({ betId }: Props) {
         headers: { 'Idempotency-Key': crypto.randomUUID() },
       })
       const json = await res.json()
-      if (!res.ok || !json.success) { setError(json.error ?? 'Bet could not be deleted'); return }
+      if (!res.ok || !json.success) { setError(json.error ?? 'Не удалось удалить ставку'); return }
       router.refresh()
     } catch {
-      setError('Network error — try again')
+      setError('Ошибка сети — попробуйте ещё раз')
     } finally {
       lockRef.current = false
       setBusy(null)
@@ -66,13 +66,13 @@ export default function QuickSettle({ betId }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-t border-bn-border-strong bg-bn-night px-4 py-3 sm:px-6">
-      <span className="shrink-0 basis-full font-mono text-[11px] font-bold uppercase tracking-[0.06em] text-bn-quiet sm:basis-auto">Record outcome</span>
+      <span className="shrink-0 basis-full font-mono text-[11px] font-bold uppercase tracking-[0.06em] text-bn-quiet sm:basis-auto">Записать итог</span>
       <BroadcastButton
         className="min-h-11 px-3"
         onClick={() => settle('won')}
         disabled={busy !== null}
       >
-        {busy === 'won' ? '…' : 'Won'}
+        {busy === 'won' ? '…' : 'Выиграла'}
       </BroadcastButton>
       <BroadcastButton
         className="min-h-11 px-3"
@@ -80,7 +80,7 @@ export default function QuickSettle({ betId }: Props) {
         disabled={busy !== null}
         tone="secondary"
       >
-        {busy === 'lost' ? '…' : 'Lost'}
+        {busy === 'lost' ? '…' : 'Проиграла'}
       </BroadcastButton>
       <BroadcastButton
         className="min-h-11 px-3"
@@ -88,7 +88,7 @@ export default function QuickSettle({ betId }: Props) {
         disabled={busy !== null}
         tone="secondary"
       >
-        {busy === 'void' ? '…' : 'Void'}
+        {busy === 'void' ? '…' : 'Возврат'}
       </BroadcastButton>
       <BroadcastButton
         className="min-h-11 px-3 sm:ml-auto"
@@ -96,7 +96,7 @@ export default function QuickSettle({ betId }: Props) {
         disabled={busy !== null}
         tone="destructive"
       >
-        {busy === 'delete' ? 'Deleting…' : 'Delete'}
+        {busy === 'delete' ? 'Удаляем…' : 'Удалить'}
       </BroadcastButton>
       {error && <span aria-live="polite" className="basis-full text-[11px] font-semibold text-bn-negative sm:ml-1 sm:basis-auto">{error}</span>}
     </div>

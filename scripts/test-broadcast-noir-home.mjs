@@ -17,12 +17,12 @@ const mobileTicket = read('apps/mobile/src/ui/bet-ticket.tsx')
 for (const [name, source] of [['Web Home', webHome], ['native Home', mobileHome]]) {
   assert.doesNotMatch(source, /EventPulse|primaryEvent|LIVE DATA|LIVE PORTFOLIO|editorial-ticker/i, `${name} must not claim live/event state`)
   assert.doesNotMatch(source, /watchlist|scout for new value|model_probability|edge_percent/i, `${name} must not invent an Adaptive Action`)
-  assert.match(source, /Scan coupon/i, `${name} must expose the safe empty-account action`)
-  assert.match(source, /(?:review_pending|Review pending bets)/i, `${name} must expose the persisted pending-state action`)
+  assert.match(source, /(?:Scan coupon|Сканировать купон)/i, `${name} must expose the safe empty-account action`)
+  assert.match(source, /(?:review_pending|Review pending bets|Проверить .*открыт)/i, `${name} must expose the persisted pending-state action`)
 }
 
 assert.match(webHome, /calcSettlementMetrics\(bets\)/)
-assert.match(webHome, /ordered legs/)
+assert.match(webHome, /(?:ordered legs|исходов по порядку)/)
 assert.match(webHome, /BroadcastStatus/)
 assert.match(webAction, /bg-bn-signal[^"\n]*text-bn-on-signal/)
 

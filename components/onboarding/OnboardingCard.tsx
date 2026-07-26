@@ -8,23 +8,23 @@ import { BroadcastButton, BroadcastPanel } from '@/components/ui/BroadcastNoir'
 const STEPS = [
   {
     icon:  '🤖',
-    title: 'AI-powered analysis',
-    body:  'The AI Analyst checks source coverage and risk. Pricing is shown only when the required model inputs are verified.',
+    title: 'AI-анализ без выдуманных цифр',
+    body:  'AI Analyst проверяет покрытие источников и риск. Расчёт цены показывается только когда нужные входные данные подтверждены.',
   },
   {
     icon:  '🔍',
-    title: 'Scout for value bets',
-    body:  "Scout searches for opportunities across sports and leagues. Save promising finds to your watchlist and convert them to decisions when you're ready.",
+    title: 'Поиск ставок через Скаут',
+    body:  'Скаут ищет возможности по видам спорта и лигам. Перспективные варианты можно сохранить и позже превратить в решение.',
   },
   {
     icon:  '🎯',
-    title: 'Track every bet',
-    body:  "Log bets manually, scan coupons from screenshots, or place directly from the AI's recommendation. Risk Manager checks your bankroll before each bet.",
+    title: 'Учёт каждой ставки',
+    body:  'Добавляй ставки вручную, сканируй купоны со скриншотов или сохраняй ставку из AI-рекомендации. Риск проверяется перед сохранением.',
   },
   {
     icon:  '📈',
-    title: 'Improve with data',
-    body:  'Stats shows exact win rate, ROI, and outcomes from saved records. Coach uses settled history for retrospective advice.',
+    title: 'Улучшение по данным',
+    body:  'Статистика показывает win rate, ROI и исходы только из сохранённых записей. Коуч использует закрытую историю для ретроспективных выводов.',
   },
 ]
 
@@ -70,7 +70,7 @@ export default function OnboardingCard() {
           <span className="text-2xl shrink-0">{current.icon}</span>
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-wider text-bn-review">
-              Welcome to BetTracker AI &middot; {step + 1} of {STEPS.length}
+              Добро пожаловать в BetTracker AI &middot; {step + 1} из {STEPS.length}
             </p>
             <h2 className="mt-0.5 text-base font-semibold text-bn-text">{current.title}</h2>
           </div>
@@ -79,7 +79,7 @@ export default function OnboardingCard() {
           className="min-h-11 min-w-11 shrink-0 rounded-control text-xs text-bn-muted transition-colors hover:bg-bn-raised"
           onClick={() => markComplete(step + 1)}
           disabled={closing}
-          aria-label="Dismiss onboarding"
+          aria-label="Закрыть обучение"
         >
           ✕
         </button>
@@ -111,14 +111,14 @@ export default function OnboardingCard() {
               tone="secondary"
               onClick={() => setStep(s => s - 1)}
             >
-              &larr; Back
+              &larr; Назад
             </BroadcastButton>
           )}
           <BroadcastButton
             onClick={handleNext}
             disabled={closing}
           >
-            {isLast ? '✓ Got it' : 'Next →'}
+            {isLast ? '✓ Понятно' : 'Дальше →'}
           </BroadcastButton>
         </div>
       </div>

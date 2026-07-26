@@ -27,8 +27,8 @@ for (const [name, file] of [
 
 assert.match(webStats, /calcPerformance\(bets, decisions\)/)
 assert.match(performance, /calcSettlementMetrics\(bets\)/)
-assert.match(webStats, /unsupported or unknown status/)
-assert.match(webStats, /No sample chart or estimated result is shown/)
+assert.match(webStats, /Статусы вне финансовой модели/)
+assert.match(webStats, /Демо-графики и выдуманные результаты не показываются/)
 assert.doesNotMatch(webStats, /(?:sampleData|mockData|placeholderChart|Math\.random)/)
 
 assert.match(mobileStats, /fetchBets\(userId\)/)

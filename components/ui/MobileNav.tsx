@@ -21,18 +21,18 @@ import {
 } from 'lucide-react'
 
 const NAV: { href: string; Icon: LucideIcon; label: string }[] = [
-  { href: '/dashboard', Icon: LayoutDashboard, label: 'Home' },
-  { href: '/ai', Icon: Bot, label: 'Scan' },
-  { href: '/bets', Icon: Target, label: 'Tracker' },
-  { href: '/analytics', Icon: TrendingUp, label: 'Stats' },
+  { href: '/dashboard', Icon: LayoutDashboard, label: 'Главная' },
+  { href: '/ai', Icon: Bot, label: 'Скан' },
+  { href: '/bets', Icon: Target, label: 'Ставки' },
+  { href: '/analytics', Icon: TrendingUp, label: 'Статистика' },
 ]
 
 const MORE_LINKS: { href: string; Icon: LucideIcon; label: string }[] = [
-  { href: '/decisions', Icon: ClipboardList, label: 'Decisions' },
-  { href: '/scout', Icon: Search, label: 'Scout' },
-  { href: '/coach', Icon: Brain, label: 'Coach' },
-  { href: '/bankroll', Icon: Wallet, label: 'Bankroll' },
-  { href: '/settings', Icon: Settings, label: 'Settings' },
+  { href: '/decisions', Icon: ClipboardList, label: 'Решения' },
+  { href: '/scout', Icon: Search, label: 'Скаут' },
+  { href: '/coach', Icon: Brain, label: 'Коуч' },
+  { href: '/bankroll', Icon: Wallet, label: 'Банкролл' },
+  { href: '/settings', Icon: Settings, label: 'Настройки' },
 ]
 
 const MORE_ROUTES = MORE_LINKS.map(link => link.href)
@@ -47,7 +47,7 @@ export default function MobileNav({ tennisCalcEnabled }: { tennisCalcEnabled: bo
   const moreLinks = tennisCalcEnabled
     ? [
         ...MORE_LINKS.slice(0, -1),
-        { href: '/tennis-calculator', Icon: Calculator, label: 'Live Series' },
+        { href: '/tennis-calculator', Icon: Calculator, label: 'Серия 40:40' },
         MORE_LINKS[MORE_LINKS.length - 1],
       ]
     : MORE_LINKS
@@ -103,7 +103,7 @@ export default function MobileNav({ tennisCalcEnabled }: { tennisCalcEnabled: bo
     <>
       <nav
         className="fixed inset-x-0 bottom-0 z-50 flex border-t border-[var(--border-strong)] bg-[var(--night)] px-1 pt-1 text-[var(--text-primary)] md:hidden"
-        aria-label="Mobile navigation"
+        aria-label="Мобильная навигация"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {NAV.map(({ href, Icon, label }) => {
@@ -139,7 +139,7 @@ export default function MobileNav({ tennisCalcEnabled }: { tennisCalcEnabled: bo
           }`}
         >
           <MoreHorizontal size={18} strokeWidth={1.8} aria-hidden />
-          <span className="font-mono text-[9px] font-black uppercase tracking-[0.08em]">More</span>
+          <span className="font-mono text-[9px] font-black uppercase tracking-[0.08em]">Ещё</span>
         </button>
       </nav>
 
@@ -151,7 +151,7 @@ export default function MobileNav({ tennisCalcEnabled }: { tennisCalcEnabled: bo
           type="button"
           className="absolute inset-0 bg-bn-night/90"
           onClick={() => setOpen(false)}
-          aria-label="Close navigation"
+          aria-label="Закрыть навигацию"
           tabIndex={open ? 0 : -1}
         />
         <div
@@ -159,12 +159,12 @@ export default function MobileNav({ tennisCalcEnabled }: { tennisCalcEnabled: bo
           ref={sheetRef}
           role="dialog"
           aria-modal="true"
-          aria-label="More navigation"
+          aria-label="Дополнительная навигация"
           inert={!open}
           className={`absolute inset-x-0 bottom-0 border-t border-[var(--border-strong)] bg-[var(--field)] text-[var(--text-primary)] transition-transform duration-300 ${open ? 'translate-y-0' : 'translate-y-full'}`}
         >
           <div className="flex items-center justify-between border-b border-[var(--border-strong)] px-4 py-3">
-            <span className="font-display text-xl font-black tracking-[-0.045em]">MORE / BETTRACKER</span>
+            <span className="font-display text-xl font-black tracking-[-0.045em]">ЕЩЁ / BETTRACKER</span>
             <span className="h-2.5 w-2.5 rounded-control bg-[var(--signal)]" aria-hidden />
           </div>
           <div className="flex flex-col">
@@ -193,7 +193,7 @@ export default function MobileNav({ tennisCalcEnabled }: { tennisCalcEnabled: bo
               onClick={handleLogout}
               className="flex min-h-[52px] items-center justify-between bg-[var(--field)] px-4 text-xs font-black uppercase tracking-[0.06em] text-[var(--negative)]"
             >
-              Sign out
+              Выйти
               <LogOut size={15} strokeWidth={1.8} aria-hidden />
             </button>
           </div>

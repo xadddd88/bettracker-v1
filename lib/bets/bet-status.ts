@@ -21,14 +21,14 @@ export type KnownBetStatus = (typeof KNOWN_BET_STATUSES)[number]
 export type BetStatusKey = KnownBetStatus | 'unknown'
 
 export const BET_STATUS_LABELS: Record<BetStatusKey, string> = {
-  pending: 'Pending',
-  won: 'Won',
-  lost: 'Lost',
-  void: 'Void',
+  pending: 'Открыта',
+  won: 'Выиграла',
+  lost: 'Проиграла',
+  void: 'Возврат',
   push: 'Push',
-  cashed_out: 'Cashed out',
-  partial: 'Partial',
-  unknown: 'Unknown',
+  cashed_out: 'Выкуплена',
+  partial: 'Частично',
+  unknown: 'Неизвестно',
 }
 
 export interface ResolvedBetStatus {

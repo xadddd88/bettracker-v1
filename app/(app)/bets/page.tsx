@@ -6,6 +6,7 @@ import {
   BroadcastPanel,
   BroadcastStatus,
 } from '@/components/ui/BroadcastNoir'
+import SectionGuide from '@/components/ui/SectionGuide'
 import { EVENTS } from '@/lib/analytics/events'
 import { PageView } from '@/lib/analytics/PageView'
 import { resolveBetStatus, type BetStatusKey } from '@/lib/bets/bet-status'
@@ -46,50 +47,72 @@ export default async function BetsPage() {
 
       <BroadcastPanel className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div>
-          <p className="editorial-kicker">Tracker · persisted records</p>
+          <p className="editorial-kicker">Ставки · сохранённые записи</p>
           <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">
-            Bets
+            Ставки
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-bn-muted">
-            {bets.length} saved record{bets.length === 1 ? '' : 's'} · {metrics.pendingCount} open · {metrics.settledCount} settled
+            Записей: {bets.length} · открыто: {metrics.pendingCount} · рассчитано: {metrics.settledCount}
           </p>
         </div>
         <div className="grid gap-2 min-[420px]:grid-cols-2">
-          <Link href="/ai" className="bn-button bn-button-secondary">Scan coupon</Link>
-          <Link href="/bets/new" className="bn-button bn-button-primary">Add bet</Link>
+          <Link href="/ai" className="bn-button bn-button-secondary">Скан купона</Link>
+          <Link href="/bets/new" className="bn-button bn-button-primary">Добавить</Link>
         </div>
       </BroadcastPanel>
 
+      <SectionGuide
+        title="Как вести ставки"
+        items={[
+          {
+            title: 'Храните каждую ставку как запись',
+            body: 'Ординар и экспресс отображаются с плечами, коэффициентами и рынками. Это рабочий журнал, а не лента прогнозов.',
+          },
+          {
+            title: 'Закрывайте результат по факту',
+            body: 'Открытые ставки можно быстро рассчитать как выигрыш, проигрыш или возврат. P&L появляется только для поддерживаемых закрытых статусов.',
+          },
+          {
+            title: 'Проверяйте экспрессы по плечам',
+            body: 'Порядок плеч сохраняется, чтобы можно было сверить купон с исходной линией и не потерять отдельный выбор внутри экспресса.',
+          },
+        ]}
+        note={{
+          title: 'Финансовое правило',
+          body: 'Возврат не считается прибылью, а неподдерживаемые или частичные статусы не входят в финансовые метрики до ручной проверки.',
+        }}
+      />
+
       {bets.length > 0 ? (
         <BroadcastPanel className="grid grid-cols-2 overflow-hidden p-0 md:grid-cols-4">
-          <Metric label="Total staked" value={formatMoney(totalStaked, currency)} />
+          <Metric label="Всего поставлено" value={formatMoney(totalStaked, currency)} />
           <Metric label="Win rate" value={metrics.winRate == null ? '—' : `${metrics.winRate.toFixed(0)}%`} />
           <Metric label="ROI" value={metrics.roi == null ? '—' : `${metrics.roi >= 0 ? '+' : ''}${metrics.roi.toFixed(1)}%`} />
-          <Metric label="Net P&L" value={metrics.settledCount ? formatMoney(metrics.netProfit, currency, true) : '—'} />
+          <Metric label="Чистый P&L" value={metrics.settledCount ? formatMoney(metrics.netProfit, currency, true) : '—'} />
         </BroadcastPanel>
       ) : null}
 
       {bets.length === 0 ? (
         <BroadcastPanel className="grid min-h-72 place-items-center p-6 text-center">
           <div className="max-w-md">
-            <BroadcastStatus status="neutral">Empty · no saved bets</BroadcastStatus>
-            <h2 className="mt-5 font-display text-3xl font-black tracking-[-0.04em] text-bn-text">Start with one explicit record</h2>
+            <BroadcastStatus status="neutral">Пусто · ставок пока нет</BroadcastStatus>
+            <h2 className="mt-5 font-display text-3xl font-black tracking-[-0.04em] text-bn-text">Начните с одной точной записи</h2>
             <p className="mt-3 text-sm leading-6 text-bn-muted">
-              Scan a coupon or enter it manually. Nothing is saved until you review the draft and press Save.
+              Отсканируйте купон или внесите ставку вручную. Ничего не сохраняется, пока вы не проверите черновик и не нажмёте сохранение.
             </p>
             <div className="mt-6 grid gap-2 min-[420px]:grid-cols-2">
-              <Link href="/ai" className="bn-button bn-button-secondary">Scan coupon</Link>
-              <Link href="/bets/new" className="bn-button bn-button-primary">Add manually</Link>
+              <Link href="/ai" className="bn-button bn-button-secondary">Скан купона</Link>
+              <Link href="/bets/new" className="bn-button bn-button-primary">Добавить вручную</Link>
             </div>
           </div>
         </BroadcastPanel>
       ) : (
         <BroadcastPanel className="overflow-hidden p-0">
           <div className="flex min-h-14 items-center justify-between gap-4 border-b border-bn-border-strong px-4 py-3 sm:px-6">
-            <h2 className="font-display text-xl font-black tracking-[-0.035em] text-bn-text">Most recent first</h2>
-            <span className="font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-bn-quiet">Ordered legs</span>
+            <h2 className="font-display text-xl font-black tracking-[-0.035em] text-bn-text">Сначала новые</h2>
+            <span className="font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-bn-quiet">Порядок плеч</span>
           </div>
-          <ol aria-label="Tracked bets" className="divide-y divide-bn-border-strong">
+          <ol aria-label="Сохранённые ставки" className="divide-y divide-bn-border-strong">
             {bets.map((bet) => {
               const legs = bet.legs ?? []
               const resolved = resolveBetStatus(bet.status)
@@ -98,27 +121,27 @@ export default async function BetsPage() {
               return (
                 <li key={bet.id}>
                   <Link
-                    aria-label={`Open ${legs.length > 1 ? `${legs.length}-leg Express` : legs[0]?.event_name || 'tracked bet'}`}
+                    aria-label={`Открыть ${legs.length > 1 ? `экспресс на ${legs.length} плеч` : legs[0]?.event_name || 'сохранённую ставку'}`}
                     className="grid gap-4 px-4 py-5 transition-colors hover:bg-bn-raised sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start"
                     href={`/bets/${bet.id}`}
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-[11px] font-black uppercase tracking-[0.1em] text-bn-muted">
-                          {legs.length > 1 ? `Express · ${legs.length} legs` : 'Single'}
+                          {legs.length > 1 ? `Экспресс · плеч: ${legs.length}` : 'Одиночная'}
                         </span>
                         <BroadcastStatus status={statusTone(resolved.key)}>{resolved.label}</BroadcastStatus>
                       </div>
 
                       {legs.length > 0 ? (
-                        <ol aria-label="Coupon legs" className="mt-4 space-y-3">
+                        <ol aria-label="Плечи купона" className="mt-4 space-y-3">
                           {legs.map((leg, index) => (
                             <li className="grid grid-cols-[1.75rem_minmax(0,1fr)_auto] gap-3" key={leg.id}>
                               <span className="font-mono text-[11px] font-bold tabular-nums text-bn-quiet">{String(index + 1).padStart(2, '0')}</span>
                               <span className="min-w-0">
                                 <span className="block break-words text-sm font-bold leading-5 text-bn-text">{leg.event_name}</span>
                                 <span className="mt-1 block break-words text-xs leading-5 text-bn-muted">
-                                  {[leg.market_type, leg.selection].filter(Boolean).join(' · ') || 'Selection not recorded'}
+                                  {[leg.market_type, leg.selection].filter(Boolean).join(' · ') || 'Выбор не записан'}
                                 </span>
                               </span>
                               <BroadcastDataValue className="text-sm font-black">{leg.odds?.toFixed(2) ?? '—'}</BroadcastDataValue>
@@ -126,15 +149,15 @@ export default async function BetsPage() {
                           ))}
                         </ol>
                       ) : (
-                        <p className="mt-4 text-sm text-bn-muted">Leg details were not recorded.</p>
+                        <p className="mt-4 text-sm text-bn-muted">Детали плеч не записаны.</p>
                       )}
                     </div>
 
                     <dl className="grid grid-cols-3 gap-4 border-t border-bn-border-subtle pt-4 lg:min-w-64 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-                      <DataPoint label="Stake" value={formatMoney(bet.stake, currency)} />
-                      <DataPoint label="Total odds" value={totalOdds?.toFixed(2) ?? '—'} />
+                      <DataPoint label="Ставка" value={formatMoney(bet.stake, currency)} />
+                      <DataPoint label="Общий кэф" value={totalOdds?.toFixed(2) ?? '—'} />
                       <DataPoint
-                        label={isSupportedSettlementStatus(bet.status) ? 'P&L' : 'Recorded P&L'}
+                        label={isSupportedSettlementStatus(bet.status) ? 'P&L' : 'Записанный P&L'}
                         value={bet.pnl == null || !isSupportedSettlementStatus(bet.status)
                           ? '—'
                           : formatMoney(bet.pnl, currency, true)}
@@ -182,7 +205,7 @@ function statusTone(status: BetStatusKey): BroadcastNoirStatus {
 
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat('en-GB', {
+  return new Intl.DateTimeFormat('ru-RU', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
