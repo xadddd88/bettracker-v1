@@ -2137,7 +2137,7 @@ Reference: `docs/finished-fixture-result-presence-dry-run-scope-decision-059.md`
 **Date:** 2026-07-15
 **Proposed by:** CPO + Founder
 **Approved by:** Founder (Decision #060 APPROVED)
-**Status:** EXECUTED / VERIFIED / CLOSED 2026-07-16. Migration 024 was applied and its exact catalog contract and authenticated Phase A RPC smoke were verified. Phase B was approved by the CPO, merged via PR #159 as `1926d9a82759cd1e4e97378ca15addf010c0bf28`, deployed READY, and verified by one separately authorized authenticated production API smoke. At closure (2026-07-16), Decision #060 was the highest-numbered CLOSED decision and #061 was the next unreserved number; #061, #062, #064, and #065 have since been occupied and are ACTIVE, #063 is occupied and CLOSED (docs-only), and the current next unreserved decision is #066.
+**Status:** EXECUTED / VERIFIED / CLOSED 2026-07-16. Migration 024 was applied and its exact catalog contract and authenticated Phase A RPC smoke were verified. Phase B was approved by the CPO, merged via PR #159 as `1926d9a82759cd1e4e97378ca15addf010c0bf28`, deployed READY, and verified by one separately authorized authenticated production API smoke. At closure (2026-07-16), Decision #060 was the highest-numbered CLOSED decision and #061 was the next unreserved number; #061, #062, and #064 have since been occupied and are ACTIVE, #063 is occupied and CLOSED (docs-only), #065 is occupied and CLOSED for the Web rollout, and the current next unreserved decision is #066.
 
 **Decision:** Deliver one safe atomic write path and a unified mobile-first tracker form for Single and Express/parlay entries: Scanner → editable ordered legs → Bet, while keeping the legacy `create_quick_bet` function unchanged.
 
@@ -2159,7 +2159,7 @@ Reference: `docs/finished-fixture-result-presence-dry-run-scope-decision-059.md`
 
 **Post-execution boundaries:** migrations / RPC changes in Phase B 0; direct DML on financial tables 0; service_role in the user flow 0; provider calls 0; `create_quick_bet` remains unchanged; Analyst/Scout/pricing/probability/edge/EV untouched. No additional synthetic production smoke is authorized by this record. Decision #056 runtime remains NOT APPROVED / NOT RUN. Results ingestion and automated settlement remain HOLD. Decision #050 SMTP round-trip remains PENDING. CSP Phase B remains NOT APPROVED. FP-001 remains ACTIVE.
 
-**Numbering:** Decision #060 occupied and CLOSED. At closure, #061 was the next unreserved number; #061, #062, #064, and #065 are now occupied and ACTIVE, #063 is occupied and CLOSED (docs-only), and the current next unreserved decision is #066.
+**Numbering:** Decision #060 occupied and CLOSED. At closure, #061 was the next unreserved number; #061, #062, and #064 are now occupied and ACTIVE, #063 is occupied and CLOSED (docs-only), #065 is occupied and CLOSED for the Web rollout, and the current next unreserved decision is #066.
 
 Reference: `docs/coupon-to-tracker-scope-decision-060.md`
 
@@ -2179,7 +2179,7 @@ Reference: `docs/coupon-to-tracker-scope-decision-060.md`
 
 **Boundaries:** 0 production/Supabase/provider calls; 0 migrations, RPC, or schema changes; `create_tracked_bet`, `create_quick_bet`, and `POST /api/bets/tracked` unchanged; Playwright/Supabase-stub harness NOT implemented (deferred); settlement/results HOLD; Decision #056 runtime NOT APPROVED; FP-001 ACTIVE. Phase A1 is merged/deployed, while Decision #061 remains ACTIVE because Phase A2 is DEFERRED / NOT APPROVED.
 
-**Numbering:** Decision #061 occupied and ACTIVE. #062 is occupied and ACTIVE (Mobile); #063 is occupied and CLOSED (docs-only); #064 is occupied and ACTIVE with implementation merged but unapplied; #065 is occupied and ACTIVE in Broadcast Noir Integration Draft PR #202; next unreserved decision #066.
+**Numbering:** Decision #061 occupied and ACTIVE. #062 is occupied and ACTIVE (Mobile); #063 is occupied and CLOSED (docs-only); #064 is occupied and ACTIVE with implementation merged but unapplied; #065 is occupied and CLOSED for the Web rollout; next unreserved decision #066.
 
 Reference: `docs/daily-flow-acceptance-decision-061.md`
 
@@ -2197,7 +2197,7 @@ Reference: `docs/daily-flow-acceptance-decision-061.md`
 
 **Validation and merge checkpoint:** PR #170 reported financial-safety 72/72, rate-limit 12/12, TypeScript and lint passing before merge. PR #171 reported mobile tests 80/80, mobile and root typecheck/lint, Expo dependency/config/export, financial-safety 72/72, and rate-limit 12/12 passing before merge. Both PR records report zero production/Supabase/AI/provider runtime calls and writes during implementation and validation; no EAS Build or EAS Update is recorded. This docs-only reconciliation adds no new runtime evidence.
 
-**Numbering:** Decision #062 occupied and ACTIVE; #063 is occupied and CLOSED (docs-only); #064 is occupied and ACTIVE with implementation merged but unapplied; #065 is occupied and ACTIVE in Broadcast Noir Integration Draft PR #202; next unreserved decision #066.
+**Numbering:** Decision #062 occupied and ACTIVE; #063 is occupied and CLOSED (docs-only); #064 is occupied and ACTIVE with implementation merged but unapplied; #065 is occupied and CLOSED for the Web rollout; next unreserved decision #066.
 
 Reference: `docs/mobile-phase-0-decision-062.md`
 
@@ -2248,7 +2248,7 @@ governance rename.
 
 **Numbering:** Decision #063 occupied and CLOSED (docs-only). Decision #064 is
 occupied and ACTIVE with implementation merged but unapplied. Decision #065 is
-occupied and ACTIVE in Broadcast Noir Integration Draft PR #202; Decision #066 is next unreserved.
+occupied and CLOSED for the Web rollout; Decision #066 is next unreserved.
 
 Reference: `docs/tracked-leg-fixture-lineage-contract-decision-063.md`
 
@@ -2295,7 +2295,7 @@ deployment reached READY. This did not apply migration 025 or create an
 application caller, provider/result/settlement action, or Supabase runtime write.
 
 **Numbering:** Decision #064 is occupied and ACTIVE. Decision #065 is occupied
-and ACTIVE in Broadcast Noir Integration Draft PR #202. Decision #066 is next unreserved.
+and CLOSED for the Web rollout. Decision #066 is next unreserved.
 
 Reference: `docs/tracked-leg-fixture-lineage-foundation-decision-064.md`
 
@@ -2305,7 +2305,7 @@ Reference: `docs/tracked-leg-fixture-lineage-foundation-decision-064.md`
 **Date:** 2026-07-21
 **Proposed by:** Founder + CPO
 **Approved by:** Founder (staged implementation and Draft integration scope)
-**Status:** ACTIVE / INTEGRATION DRAFT PR #202 — verified stages PR A–J, including the full Web rollout. Not Ready, not merged, not production-deployed, and not CLOSED.
+**Status:** WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED — verified stages PR A–J, reconciled in PR #202, then production-hardened through #203 → #224. Mobile release remains unauthorized.
 
 **Decision:** Adopt Broadcast Noir v3.1 as the coordinated visual system for
 responsive Web, iPhone, and Android. Hybrid Cinematic governs expressive versus
@@ -2317,8 +2317,11 @@ Signal Sweep is the state-linked motion language.
 primitives; shell/navigation and native identity; Adaptive Action Home; Scanner;
 Tracker; statistics/Decision surfaces; full cross-platform rollout; corrective
 Scanner/SafeArea/sport/P&L gates; Web accessibility acceptance; and hermetic
-WebSocket preblocking. Integration Draft PR #202 reconciles that exact reviewed
-source without changing the status of Decision #065.
+WebSocket preblocking. PR #202 reconciled that exact reviewed source. Follow-up
+PRs #203 → #224 stabilized hydration, money formatting, AI report contrast, AI
+language/stale-event gates, Russian authenticated UX, production smoke selectors,
+and Russian auth/set-password screens. The final production checkpoint is
+`eb51d91`.
 
 **Mobile boundary:** the included mobile source has only an explicit Review →
 manual Save caller to the existing authenticated `POST /api/bets/tracked` path.
@@ -2326,12 +2329,12 @@ The draft remains editable after Review and no auto-save exists. The server rout
 RPC, schema, migrations, settlement behavior, and financial formulas were not
 changed by Decision #065.
 
-**Web-first and non-authorization:** Web is prepared first. Mobile source in the
+**Web-first and non-authorization:** Web was released first. Mobile source in the
 integration diff is not approval for EAS Build/Update, Android/iPhone builds,
-beta distribution, or app publication. PR #202 is not Ready, not merged, and not
-production-deployed. Production, Supabase/DB writes or migrations, real
-provider/AI runtime calls, Event First activation, and any new financial or
-settlement runtime remain unauthorized.
+beta distribution, or app publication. Supabase/DB writes or migrations, provider
+runtime calls, Event First activation, and any new financial or settlement
+runtime remain unauthorized. CSP enforcement remains separately governed by
+Decision #054 Phase B and is not approved here.
 
 **P3 test/docs hardening:** the local Integration Draft follow-up reruns
 axe/duplicate-ID/document and authenticated shell-scroll-container overflow
@@ -2339,15 +2342,15 @@ checks after interactive states, directly proves bracketed IPv6 loopback
 `[::1]` normalization, and fails closed on every application `console.error`.
 `docs/csp-report-only-observation-receipt-065.md` classifies the authenticated
 Preview telemetry/CSP observations without authorizing CSP enforcement. The
-three P3 items are closed locally; exact-head GitHub CI, Vercel Preview, and
-independent review remain required before any Ready decision.
+three P3 items were closed before production release and remained guarded by
+the later Web hardening PRs.
 
-**Numbering:** Decision #065 is occupied and ACTIVE. Decision #066 is next
+**Numbering:** Decision #065 is occupied and CLOSED. Decision #066 is next
 unreserved.
 
 Reference: `docs/broadcast-noir-cross-platform-rollout-decision-065.md`
 
 ---
 
-*Last updated: 2026-07-22*
+*Last updated: 2026-07-26*
 *Owner: All (each role contributes)*

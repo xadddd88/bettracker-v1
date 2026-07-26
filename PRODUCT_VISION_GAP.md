@@ -44,16 +44,18 @@ tracking or generic AI analysis. The core value is:
 The current production shell at https://btdk.app includes:
 
 - Stable authenticated app shell (Next.js 15, Supabase SSR, dark UI)
+- Broadcast Noir Web rollout with Russian authenticated UX and localized auth screens
 - Scout v1 (LLM-generated candidates — not fixture-driven)
 - AI Analyst v1 (generic analysis — not sport-specific deep models)
 - Coach (pattern analysis of user decisions)
 - Bets / bankroll / manual settle / Quick Settle
 - Analytics (decision metrics, ROI, P&L)
+- Private gated Tennis Live Series Calculator foundation (manual staking tool, not a prediction or bookmaker integration)
 - Security hardening (migrations 010–012, RLS, FK indexes, leaked-password protection)
 - CSP Report-Only header + violation logging
 - Monitoring / daily health-check (Vercel, Sentry, PostHog)
 - Product structure guidance + in-app onboarding
-- Ambient Theme live as-is — Design v2 / premium event skin is parked
+- Offline AI baseline harness and Scale Readiness / AI Economics ADR-011
 
 **This is an engineering-stable shell, not the final product vision.**
 
