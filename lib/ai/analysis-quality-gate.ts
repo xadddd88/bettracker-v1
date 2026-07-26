@@ -15,7 +15,7 @@ export type FixtureStatus =
   | 'not_bettable'
 export type AnalysisActionability = 'actionable' | 'status_unverified' | 'not_actionable' | 'live_not_supported'
 export type LegSupportLevel = 'full' | 'approximate' | 'unsupported'
-export type AnalystTrustLocale = 'en' | 'uk'
+export type AnalystTrustLocale = 'en' | 'uk' | 'ru'
 export type CouponStatusSource = 'coupon' | 'provider' | 'unknown'
 
 export interface AnalysisDataCoverage {
@@ -902,9 +902,118 @@ const TRUST_LABELS = {
       'provider-backed live status': 'підтверджений провайдером live-статус',
     },
   },
+  ru: {
+    riskWarning: 'Предупреждение о риске',
+    dataCoverage: 'Покрытие данных',
+    missingDataChecklist: 'Список недостающих данных',
+    confidence: 'Уверенность',
+    factorAnalysis: 'Факторы риска',
+    downloadPdf: 'Скачать PDF',
+    copyToShare: 'Скопировать',
+    copied: 'Скопировано',
+    watch: 'Наблюдать',
+    skip: 'Пропустить',
+    placeBet: 'Сделать ставку',
+    uiDisclaimer: 'Этот анализ основан только на предоставленной информации и не содержит проверенных данных о травмах, составах, форме команд, движении линии или актуальном статусе событий.',
+    riskDisclaimer: 'Это предупреждение о риске, а не оцененный анализ ставки.',
+    footerDisclaimer: 'Анализ только для информационной поддержки',
+    shareHeader: 'Предупреждение о риске',
+    pdfHeader: 'Анализ BetTracker AI',
+    pdfFooter: 'Анализ только для информационной поддержки',
+    generated: 'Создано',
+    via: 'через BetTracker AI',
+    availableActions: 'Доступные действия',
+    noPrice: 'БЕЗ ОЦЕНКИ',
+    insufficientData: 'НЕДОСТАТОЧНО ДАННЫХ',
+    unsupportedMixedSportParlay: 'неподдерживаемый экспресс из разных видов спорта',
+    unsupportedPartial: 'Ставка не поддерживается или поддерживается частично',
+    liveCoupon: 'LIVE-КУПОН',
+    liveAnalysisUnavailable: 'live-анализ недоступен',
+    notActionable: 'НЕАКТУАЛЬНО',
+    eventStartedOrFinished: 'событие уже началось или завершилось',
+    safeExplanationBlocked: 'Оценка недоступна, потому что по купону не хватает проверенного покрытия данных для каждой ноги.',
+    safeExplanationUnsupported: 'Оценка недоступна, потому что экспресс содержит неподдерживаемые или частично поддерживаемые ноги.',
+    safeExplanationUnverified: 'Оценка недоступна, потому что статус событий не проверен и не хватает обязательных данных по ногам.',
+    safeExplanationNotActionable: 'Купон неактуален, потому что одно или несколько событий уже начались, завершились или недоступны для ставки.',
+    safeExplanationLive: 'Этот купон содержит live-события. Текущий модуль поддерживает только статический pre-match обзор риска; для live-оценки нужны текущий счёт, сет/гейм/минута, движение live-линии и подтверждённый провайдером live-статус.',
+    safeNextSteps: [
+      'Проверить время начала и статус каждого события.',
+      'Добавить актуальные новости команд, травмы, текущую форму и движение линии.',
+      'Подтвердить полную поддержку спортивного модуля для каждой ноги.',
+    ],
+    safeNextStepsLive: [
+      'Использовать провайдерский live-модуль перед оценкой этого купона.',
+      'Добавить текущий счёт, сет/гейм/минуту и движение live-линии для каждой ноги.',
+      'Подтвердить live-статус у надёжного провайдера перед любым расчётом ценности.',
+    ],
+    leg: 'Нога',
+    sport: 'Спорт',
+    event: 'Событие',
+    marketSelection: 'Рынок / выбор',
+    odds: 'Коэффициент',
+    fixtureStatus: 'Статус матча',
+    periodOrPhase: 'Период / фаза',
+    statusSource: 'Источник статуса',
+    statusDetectedFromCoupon: 'статус определён из купона',
+    supportLevel: 'Уровень поддержки',
+    actionability: 'Актуальность',
+    safeFactorCoverage: 'Покрытие данных',
+    safeFactorSupport: 'Поддержка ног',
+    safeFactorActionability: 'Актуальность события',
+    noMissingData: 'Недостающие данные не указаны',
+    sports: {
+      soccer: 'футбол',
+      tennis: 'теннис',
+      cs2: 'CS2',
+      basketball: 'баскетбол',
+      ice_hockey: 'хоккей',
+      mma: 'MMA',
+      other: 'другое',
+    },
+    fixtureStatuses: {
+      scheduled: 'запланировано',
+      unknown: 'статус не проверен',
+      live: 'live',
+      finished: 'завершено',
+      cancelled: 'отменено',
+      abandoned: 'прервано',
+      postponed: 'перенесено',
+      retired: 'снятие',
+      walkover: 'техническая победа',
+      not_bettable: 'недоступно для ставки',
+    },
+    actionabilityLabels: {
+      actionable: 'можно рассматривать',
+      status_unverified: 'статус не проверен',
+      not_actionable: 'неактуально',
+      live_not_supported: 'live-анализ не поддерживается',
+    },
+    supportLabels: {
+      full: 'полная поддержка',
+      approximate: 'приблизительная поддержка',
+      unsupported: 'не поддерживается',
+    },
+    missing: {
+      'live injuries': 'актуальные травмы',
+      'team news': 'новости команд',
+      'recent form updates': 'обновления текущей формы',
+      'current line movement': 'текущее движение линии',
+      'sport-specific support confirmed for this leg': 'подтверждённая поддержка вида спорта для этой ноги',
+      'tennis module unavailable or approximate': 'теннисный модуль недоступен или только приблизительный',
+      'per-leg model probability': 'модельные входные данные для каждой ноги',
+      'actual model inputs backing model probability': 'фактические модельные входные данные',
+      'event start time / fixture status': 'время начала события / статус матча',
+      'event actionability': 'актуальность события для ставки',
+      'current score': 'текущий счёт',
+      'set/game/minute': 'сет/гейм/минута',
+      'live odds movement': 'движение live-линии',
+      'provider-backed live status': 'подтверждённый провайдером live-статус',
+    },
+  },
 } as const
 
 function normalizeTrustLocale(locale: string | null | undefined): AnalystTrustLocale {
+  if (locale === 'ru') return 'ru'
   return locale === 'uk' ? 'uk' : 'en'
 }
 
@@ -935,6 +1044,13 @@ const DECISION_ACTION_LABELS = {
     skipped: 'Пропущено',
     watchlisted: 'Під спостереженням',
     ignored: 'Ігноровано',
+  },
+  ru: {
+    pending: 'Ожидает решения',
+    placed: 'Размещено',
+    skipped: 'Пропущено',
+    watchlisted: 'Под наблюдением',
+    ignored: 'Игнорировано',
   },
 } as const
 
@@ -991,10 +1107,16 @@ function buildFallbackDecisionQualityGate(input: AnalystDecisionSurfaceInput): A
 
 function localizedQualityGateLabel(result: AnalysisQualityGateResult, locale: AnalystTrustLocale): string {
   const labels = TRUST_LABELS[locale]
-  if (result.label === 'PRICED BETTING ANALYSIS') return locale === 'uk' ? 'ОЦІНЕНИЙ АНАЛІЗ СТАВКИ' : 'PRICED BETTING ANALYSIS'
+  if (result.label === 'PRICED BETTING ANALYSIS') {
+    if (locale === 'uk') return 'ОЦІНЕНИЙ АНАЛІЗ СТАВКИ'
+    if (locale === 'ru') return 'ОЦЕНЕННЫЙ АНАЛИЗ СТАВКИ'
+    return 'PRICED BETTING ANALYSIS'
+  }
   if (result.label === 'LIVE COUPON - live analysis unavailable') {
     return locale === 'uk'
       ? 'ЛАЙВ-КУПОН — оцінка недоступна без live-даних'
+      : locale === 'ru'
+      ? 'LIVE-КУПОН — оценка недоступна без live-данных'
       : `${labels.liveCoupon} - ${labels.liveAnalysisUnavailable}`
   }
   if (result.label === 'INSUFFICIENT DATA') return labels.insufficientData
@@ -1009,7 +1131,9 @@ function localizedQualityGateLabel(result: AnalysisQualityGateResult, locale: An
 
 function localizedSupportLabel(result: AnalysisQualityGateResult, locale: AnalystTrustLocale): string {
   if (result.supportLabel === 'Priced betting analysis') {
-    return locale === 'uk' ? 'Оцінений аналіз ставки' : 'Priced betting analysis'
+    if (locale === 'uk') return 'Оцінений аналіз ставки'
+    if (locale === 'ru') return 'Оцененный анализ ставки'
+    return 'Priced betting analysis'
   }
   if (result.label === 'LIVE COUPON - live analysis unavailable') return TRUST_LABELS[locale].liveAnalysisUnavailable
   return TRUST_LABELS[locale].unsupportedPartial
@@ -1047,6 +1171,8 @@ function buildDeterministicFactors(view: Pick<AnalystTrustView, 'locale' | 'data
       score: unsupportedCount === 0 ? 0 : -2,
       detail: view.locale === 'uk'
         ? `Ноги з неповною підтримкою: ${unsupportedCount}.`
+        : view.locale === 'ru'
+        ? `Ног без полной поддержки: ${unsupportedCount}.`
         : `Legs without full support: ${unsupportedCount}.`,
     },
     {
