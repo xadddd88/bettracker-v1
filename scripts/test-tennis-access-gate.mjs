@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Tennis Live Series Calculator — PR-2 access-gate suite (flag + owner gate).
+ * Tennis Live Series Calculator — access-gate suite (flag + private allowlist).
  *
  * Covers lib/flags/tennis-calc.ts:
  *   - the server-only TENNIS_CALC_ENABLED flag is default-OFF and opens only on the
  *     exact literal 'true' (missing / empty / 'TRUE' / '1' / 'yes' / ' true ' all deny)
- *   - the server-only OWNER_USER_ID gate fails closed when unset or malformed
+ *   - the server-only OWNER_USER_ID / TENNIS_CALC_ALLOWED_USER_IDS gate fails
+ *     closed when unset or malformed
  *   - unauthenticated and non-owner callers are denied with distinct typed reasons
  *   - a disabled flag blocks even the correct owner
  *   - no result, error, or exported surface discloses OWNER_USER_ID or any env value
@@ -33,6 +34,7 @@ const gate = require(path.join(buildDir, 'lib/flags/tennis-calc.js'));
 const {
   checkTennisCalcAccess,
   isTennisCalcEnabled,
+  TENNIS_CALC_ALLOWED_USERS_ENV,
   TENNIS_CALC_FLAG_ENV,
   TENNIS_CALC_OWNER_ENV,
 } = gate;
@@ -43,6 +45,8 @@ const MODULE_SRC = readFileSync(path.join(repoRoot, 'lib/flags/tennis-calc.ts'),
 // assertion below is meaningful (an all-digit UUID would make toUpperCase() a no-op).
 const OWNER = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeffff';
 const OTHER = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffaaaa';
+const TESTER = 'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa';
+const SECOND_TESTER = 'dddddddd-eeee-4fff-8aaa-bbbbbbbbbbbb';
 
 let passed = 0;
 let failed = 0;
@@ -52,20 +56,25 @@ function test(name, fn) {
 }
 
 /** Run fn with an exact env snapshot; undefined means "variable absent". */
-function withEnv({ flag, owner }, fn) {
+function withEnv({ flag, owner, allowedUsers }, fn) {
   const prevFlag = process.env[TENNIS_CALC_FLAG_ENV];
   const prevOwner = process.env[TENNIS_CALC_OWNER_ENV];
+  const prevAllowedUsers = process.env[TENNIS_CALC_ALLOWED_USERS_ENV];
   try {
     if (flag === undefined) delete process.env[TENNIS_CALC_FLAG_ENV];
     else process.env[TENNIS_CALC_FLAG_ENV] = flag;
     if (owner === undefined) delete process.env[TENNIS_CALC_OWNER_ENV];
     else process.env[TENNIS_CALC_OWNER_ENV] = owner;
+    if (allowedUsers === undefined) delete process.env[TENNIS_CALC_ALLOWED_USERS_ENV];
+    else process.env[TENNIS_CALC_ALLOWED_USERS_ENV] = allowedUsers;
     return fn();
   } finally {
     if (prevFlag === undefined) delete process.env[TENNIS_CALC_FLAG_ENV];
     else process.env[TENNIS_CALC_FLAG_ENV] = prevFlag;
     if (prevOwner === undefined) delete process.env[TENNIS_CALC_OWNER_ENV];
     else process.env[TENNIS_CALC_OWNER_ENV] = prevOwner;
+    if (prevAllowedUsers === undefined) delete process.env[TENNIS_CALC_ALLOWED_USERS_ENV];
+    else process.env[TENNIS_CALC_ALLOWED_USERS_ENV] = prevAllowedUsers;
   }
 }
 
@@ -80,8 +89,10 @@ console.log('\nTennis access gate — env names');
 test('env names are server-only (no NEXT_PUBLIC_ prefix)', () => {
   assert.equal(TENNIS_CALC_FLAG_ENV, 'TENNIS_CALC_ENABLED');
   assert.equal(TENNIS_CALC_OWNER_ENV, 'OWNER_USER_ID');
+  assert.equal(TENNIS_CALC_ALLOWED_USERS_ENV, 'TENNIS_CALC_ALLOWED_USER_IDS');
   assert.ok(!TENNIS_CALC_FLAG_ENV.startsWith('NEXT_PUBLIC_'));
   assert.ok(!TENNIS_CALC_OWNER_ENV.startsWith('NEXT_PUBLIC_'));
+  assert.ok(!TENNIS_CALC_ALLOWED_USERS_ENV.startsWith('NEXT_PUBLIC_'));
 });
 
 console.log('\nFeature flag — default OFF, exact-value only');
@@ -111,6 +122,9 @@ for (const malformed of ['', ' ', 'not-a-uuid', '1234', OWNER.slice(0, 35), `${O
     denies({ flag: 'true', owner: malformed }, OWNER, 'owner_not_configured');
   });
 }
+test('malformed-only tester allowlist + owner absent → owner_not_configured', () => {
+  denies({ flag: 'true', owner: undefined, allowedUsers: 'not-a-uuid, , 1234' }, OWNER, 'owner_not_configured');
+});
 
 console.log('\nIdentity — unauthenticated vs not_owner');
 for (const [label, userId] of [['null', null], ['undefined', undefined], ['empty string', ''], ['whitespace', ' '], ['malformed uuid', 'not-a-uuid'], ['truncated uuid', OWNER.slice(0, 35)], ['padded uuid', ` ${OWNER} `]]) {
@@ -130,9 +144,27 @@ test('flag enabled + configured owner + exact owner → allowed', () => {
   const r = withEnv({ flag: 'true', owner: OWNER }, () => checkTennisCalcAccess(OWNER));
   assert.deepEqual(r, { allowed: true });
 });
+test('flag enabled + tester allowlist + exact tester → allowed', () => {
+  const r = withEnv(
+    { flag: 'true', owner: OWNER, allowedUsers: `${TESTER},${SECOND_TESTER}` },
+    () => checkTennisCalcAccess(TESTER),
+  );
+  assert.deepEqual(r, { allowed: true });
+});
+test('tester allowlist tolerates spaces and ignores malformed entries', () => {
+  const r = withEnv(
+    { flag: 'true', owner: undefined, allowedUsers: `bad, ${TESTER} , also-bad` },
+    () => checkTennisCalcAccess(TESTER),
+  );
+  assert.deepEqual(r, { allowed: true });
+});
+test('valid tester allowlist does not allow a different authenticated user', () => {
+  denies({ flag: 'true', owner: undefined, allowedUsers: TESTER }, OTHER, 'not_owner');
+});
 test('disabled flag blocks even the correct owner', () => {
   denies({ flag: 'false', owner: OWNER }, OWNER, 'feature_disabled');
   denies({ flag: undefined, owner: OWNER }, OWNER, 'feature_disabled');
+  denies({ flag: 'false', owner: undefined, allowedUsers: TESTER }, TESTER, 'feature_disabled');
 });
 test('flag is evaluated before owner config (denial identical for every caller)', () => {
   const a = withEnv({ flag: 'false', owner: undefined }, () => checkTennisCalcAccess(OWNER));
@@ -145,6 +177,7 @@ console.log('\nSecret discipline — no env value ever disclosed');
 test('no result on any path contains the owner id or flag value', () => {
   const results = [
     withEnv({ flag: 'true', owner: OWNER }, () => checkTennisCalcAccess(OWNER)),
+    withEnv({ flag: 'true', owner: OWNER, allowedUsers: TESTER }, () => checkTennisCalcAccess(TESTER)),
     withEnv({ flag: 'true', owner: OWNER }, () => checkTennisCalcAccess(OTHER)),
     withEnv({ flag: 'true', owner: OWNER }, () => checkTennisCalcAccess(null)),
     withEnv({ flag: 'true', owner: undefined }, () => checkTennisCalcAccess(OWNER)),
@@ -154,6 +187,7 @@ test('no result on any path contains the owner id or flag value', () => {
     const serialized = JSON.stringify(r);
     assert.ok(!serialized.includes(OWNER), `result leaked the owner id: ${serialized}`);
     assert.ok(!serialized.includes(OTHER), `result leaked the caller id: ${serialized}`);
+    assert.ok(!serialized.includes(TESTER), `result leaked the tester id: ${serialized}`);
     const keys = Object.keys(r);
     assert.ok(keys.every((k) => k === 'allowed' || k === 'reason'), `unexpected result keys: ${keys.join(',')}`);
   }
@@ -178,6 +212,7 @@ test('no exported member returns the OWNER_USER_ID value', () => {
     isTennisCalcEnabled(),
   ]);
   assert.ok(!JSON.stringify(out).includes(OWNER));
+  assert.ok(!JSON.stringify(out).includes(TESTER));
 });
 test('module source has no console/log call and no thrown env value', () => {
   assert.ok(!/console\s*\./.test(MODULE_SRC), 'module must not log');
@@ -197,7 +232,7 @@ function sourceFiles(dir, acc = []) {
   return acc;
 }
 const allSources = sourceFiles(repoRoot);
-test('no NEXT_PUBLIC_TENNIS_CALC_ENABLED is read or defined anywhere in the repository', () => {
+test('no NEXT_PUBLIC_TENNIS_CALC env is read or defined anywhere in the repository', () => {
   // Tests the security property (no client-exposed flag in USE), not the mere appearance
   // of the name: the gate module and this suite both document the prohibition in prose.
   const usage = [
