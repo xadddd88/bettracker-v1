@@ -49,8 +49,10 @@ details are not an analytics contract.
 7. Set the owner identifier, optionally set a comma-separated
    `TENNIS_CALC_ALLOWED_USER_IDS` tester allowlist, and then enable
    `TENNIS_CALC_ENABLED=true` only under separate approval.
-8. Run one founder-only canary series with a small isolated limit.
-9. Verify server state, idempotent retries, analytics events, and no raw-value
+8. For two already approved testers, run the founder-controlled private smoke in
+   `docs/tennis/private-smoke-test.md`.
+9. Run one founder-only canary series with a small isolated limit.
+10. Verify server state, idempotent retries, analytics events, and no raw-value
    telemetry before considering any broader rollout.
 
 Turning the feature OFF is the immediate application kill switch. Removing a
