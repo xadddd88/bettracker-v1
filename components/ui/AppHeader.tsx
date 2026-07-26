@@ -9,6 +9,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Bot,
   Brain,
+  Calculator,
   ChevronDown,
   ClipboardList,
   LayoutDashboard,
@@ -35,11 +36,24 @@ const SECONDARY_NAV: { href: string; Icon: LucideIcon; label: string }[] = [
   { href: '/settings', Icon: Settings, label: 'Settings' },
 ]
 
-export default function AppHeader({ user }: { user: User }) {
+export default function AppHeader({
+  user,
+  tennisCalcEnabled,
+}: {
+  user: User
+  tennisCalcEnabled: boolean
+}) {
   const pathname = usePathname()
   const router = useRouter()
   const accountMenuRef = useRef<HTMLDetailsElement>(null)
   const initials = (user.email?.slice(0, 2) || 'BT').toUpperCase()
+  const secondaryNav = tennisCalcEnabled
+    ? [
+        ...SECONDARY_NAV.slice(0, -1),
+        { href: '/tennis-calculator', Icon: Calculator, label: 'Live Series' },
+        SECONDARY_NAV[SECONDARY_NAV.length - 1],
+      ]
+    : SECONDARY_NAV
 
   useEffect(() => {
     accountMenuRef.current?.removeAttribute('open')
@@ -102,7 +116,7 @@ export default function AppHeader({ user }: { user: User }) {
             </div>
 
             <nav className="p-2" aria-label="Tools navigation">
-              {SECONDARY_NAV.map(({ href, Icon, label }) => {
+              {secondaryNav.map(({ href, Icon, label }) => {
                 const active = pathname === href || pathname.startsWith(`${href}/`)
                 return (
                   <Link

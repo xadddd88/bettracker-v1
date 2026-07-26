@@ -8,6 +8,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Bot,
   Brain,
+  Calculator,
   ClipboardList,
   LayoutDashboard,
   LogOut,
@@ -37,13 +38,23 @@ const MORE_LINKS: { href: string; Icon: LucideIcon; label: string }[] = [
 const MORE_ROUTES = MORE_LINKS.map(link => link.href)
 const SHEET_ID = 'mobile-nav-more-sheet'
 
-export default function MobileNav() {
+export default function MobileNav({ tennisCalcEnabled }: { tennisCalcEnabled: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
   const moreButtonRef = useRef<HTMLButtonElement>(null)
-  const moreActive = MORE_ROUTES.some(route => pathname === route || pathname.startsWith(`${route}/`))
+  const moreLinks = tennisCalcEnabled
+    ? [
+        ...MORE_LINKS.slice(0, -1),
+        { href: '/tennis-calculator', Icon: Calculator, label: 'Live Series' },
+        MORE_LINKS[MORE_LINKS.length - 1],
+      ]
+    : MORE_LINKS
+  const moreRoutes = tennisCalcEnabled
+    ? [...MORE_ROUTES, '/tennis-calculator']
+    : MORE_ROUTES
+  const moreActive = moreRoutes.some(route => pathname === route || pathname.startsWith(`${route}/`))
 
   useEffect(() => setOpen(false), [pathname])
 
@@ -157,7 +168,7 @@ export default function MobileNav() {
             <span className="h-2.5 w-2.5 rounded-control bg-[var(--signal)]" aria-hidden />
           </div>
           <div className="flex flex-col">
-            {MORE_LINKS.map(({ href, Icon, label }, index) => {
+            {moreLinks.map(({ href, Icon, label }, index) => {
               const active = pathname === href || pathname.startsWith(`${href}/`)
               return (
                 <Link
