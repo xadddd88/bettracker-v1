@@ -106,7 +106,7 @@ function SessionCard({
         <CalibrationBadge grade={session.calibration_grade} />
       </div>
       {session.calibration_grade && (
-        <p className="-mt-2 text-[10px] text-bn-muted">Калибровка показывает, насколько ваша уверенность совпадала с фактическими результатами.</p>
+        <p className="-mt-2 text-[11px] text-bn-muted">Калибровка показывает, насколько ваша уверенность совпадала с фактическими результатами.</p>
       )}
 
       {/* Summary */}

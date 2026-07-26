@@ -60,8 +60,8 @@ assert.match(mobileNav, /paddingBottom:\s*'env\(safe-area-inset-bottom\)'/)
 assert.match(mobileNav, /bg-\[var\(--signal\)\] text-\[var\(--on-signal\)\]/)
 
 assert.match(loginPage, /<div className="min-w-0">\s*<p className="editorial-kicker">Доступ \/ BetTracker<\/p>/)
-assert.match(loginPage, /text-\[clamp\(2\.7rem,4\.8vw,4rem\)\]/)
-assert.doesNotMatch(loginPage, /text-\[clamp\(2\.7rem,6vw,5rem\)\]/)
+assert.match(loginPage, /text-\[clamp\(2rem,3vw,3\.2rem\)\]/)
+assert.match(loginPage, /max-w-full break-words/)
 
 const mobileTabs = read('apps/mobile/src/app/(app)/_layout.tsx')
 const tabNames = [...mobileTabs.matchAll(/<Tabs\.Screen name="([^"]+)"/g)].map(match => match[1])

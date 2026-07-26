@@ -30,7 +30,9 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
-        display: ['var(--font-space-grotesk)', 'system-ui', 'sans-serif'],
+        // Space Grotesk has no Cyrillic subset. Inter is the deterministic
+        // Cyrillic display fallback instead of an OS-dependent system font.
+        display: ['var(--font-space-grotesk)', 'var(--font-inter)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-jetbrains-mono)', 'Menlo', 'monospace'],
       },
     },

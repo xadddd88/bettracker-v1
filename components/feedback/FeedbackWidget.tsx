@@ -123,7 +123,7 @@ export default function FeedbackWidget() {
       <button
         ref={triggerRef}
         onClick={openModal}
-        className="fixed bottom-20 right-0 z-40 flex min-h-11 items-center gap-2 rounded-l-control border border-bn-border-strong bg-bn-field px-4 font-mono text-[9px] font-black uppercase tracking-[0.12em] text-bn-text transition-colors hover:border-bn-signal hover:bg-bn-raised md:bottom-6"
+        className="fixed bottom-20 right-0 z-40 flex min-h-11 items-center gap-2 rounded-l-control border border-bn-border-strong bg-bn-field px-4 font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text transition-colors hover:border-bn-signal hover:bg-bn-raised md:bottom-6"
         aria-label="Открыть форму обратной связи"
       >
         <span aria-hidden>+</span>

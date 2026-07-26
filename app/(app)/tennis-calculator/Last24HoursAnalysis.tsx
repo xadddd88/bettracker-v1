@@ -60,7 +60,7 @@ function tourCard(
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-bn-border-subtle pt-3">
         <div>
-          <dt className="text-[10px] font-black uppercase tracking-[0.12em] text-bn-quiet">
+          <dt className="text-[11px] font-black uppercase tracking-[0.1em] text-bn-quiet">
             Хотя бы одно 40:40
           </dt>
           <dd className="mt-1 font-mono text-sm font-black text-bn-text">
@@ -68,7 +68,7 @@ function tourCard(
           </dd>
         </div>
         <div>
-          <dt className="text-[10px] font-black uppercase tracking-[0.12em] text-bn-quiet">
+          <dt className="text-[11px] font-black uppercase tracking-[0.1em] text-bn-quiet">
             В среднем за матч
           </dt>
           <dd className="mt-1 font-mono text-sm font-black text-bn-text">
