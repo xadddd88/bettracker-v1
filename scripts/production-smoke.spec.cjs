@@ -42,7 +42,7 @@ test('authenticated Analyst production smoke stays outside financial writes', as
 
   await page.goto('/login', { waitUntil: 'networkidle' })
   await page.getByLabel('Email', { exact: true }).fill(qaEmail)
-  await page.getByLabel('Password', { exact: true }).fill(qaPassword)
+  await page.getByLabel('Пароль', { exact: true }).fill(qaPassword)
 
   const passwordAuthResponsePromise = page.waitForResponse(
     response => {
@@ -56,7 +56,7 @@ test('authenticated Analyst production smoke stays outside financial writes', as
     { timeout: 30_000 },
   )
 
-  await page.getByRole('button', { name: 'Enter workspace', exact: true }).click()
+  await page.getByRole('button', { name: 'Войти в рабочее пространство', exact: true }).click()
   const passwordAuthResponse = await passwordAuthResponsePromise
 
   expect(
