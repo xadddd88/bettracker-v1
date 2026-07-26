@@ -178,6 +178,18 @@ function assertGameCount(games: number): void {
   }
 }
 
+export function targetProfitForGameMinor(baseTargetProfitMinor: bigint, game: number): bigint {
+  assertTargetProfit(baseTargetProfitMinor);
+  assertGameCount(game);
+  const out = baseTargetProfitMinor * BigInt(game);
+  assertOutputBound(out);
+  return out;
+}
+
+export interface GrowingOddsPlan extends FixedOddsPlan {
+  targetProfitsMinor: bigint[];
+}
+
 /**
  * Build the consecutive-loss stake plan for one fixed coefficient.
  *
@@ -251,6 +263,103 @@ export function fixedOddsPlanForBankroll(
     let plan: FixedOddsPlan | null = null;
     try {
       plan = fixedOddsPlan(candidate, oddsScaled, games, stepMinor);
+    } catch (error) {
+      if (!(error instanceof SeriesMathError)
+        || !['aggregate_out_of_range', 'output_out_of_range', 'sanity_bound'].includes(error.code)) {
+        throw error;
+      }
+    }
+
+    if (plan && plan.bankrollRequiredMinor <= bankrollLimitMinor) {
+      best = plan;
+      low = candidate + ONE;
+    } else {
+      high = candidate - ONE;
+    }
+  }
+
+  if (!best) {
+    throw new SeriesMathError('bank_too_small', 'bankroll is too small for this coefficient and game count');
+  }
+  return best;
+}
+
+/**
+ * Build a fixed-odds plan whose net profit target grows by game number.
+ *
+ * The first stake defines the base target profit. Game N targets N × that
+ * base profit, while still recovering every realised loss before that game.
+ */
+export function growingOddsPlan(
+  initialStakeMinor: bigint,
+  oddsScaled: bigint,
+  games: number,
+  stepMinor: bigint = ONE,
+): GrowingOddsPlan {
+  assertMoneyInput(initialStakeMinor);
+  if (initialStakeMinor === ZERO) {
+    throw new SeriesMathError('zero_input', 'initial stake must be greater than zero');
+  }
+  assertOddsInRange(oddsScaled);
+  assertGameCount(games);
+  assertStep(stepMinor);
+
+  const targetProfitMinor = defaultTargetProfitMinor(initialStakeMinor, oddsScaled);
+  if (targetProfitMinor === ZERO) {
+    throw new SeriesMathError('zero_target', 'initial stake is too small for this coefficient');
+  }
+
+  const stakesMinor: bigint[] = [];
+  const targetProfitsMinor: bigint[] = [];
+  let accumulatedLossMinor = ZERO;
+  for (let game = 1; game <= games; game += 1) {
+    const gameTargetProfitMinor = targetProfitForGameMinor(targetProfitMinor, game);
+    const stakeMinor = game === 1
+      ? initialStakeMinor
+      : requiredStakeMinor(accumulatedLossMinor, gameTargetProfitMinor, oddsScaled, stepMinor);
+    stakesMinor.push(stakeMinor);
+    targetProfitsMinor.push(gameTargetProfitMinor);
+    accumulatedLossMinor = checkedAdd(accumulatedLossMinor, stakeMinor);
+  }
+
+  return {
+    bankrollRequiredMinor: accumulatedLossMinor,
+    initialStakeMinor,
+    stakesMinor,
+    targetProfitMinor,
+    targetProfitsMinor,
+  };
+}
+
+/**
+ * Find the largest cent-denominated first stake whose growing-profit plan
+ * fits within the selected isolated bank.
+ */
+export function growingOddsPlanForBankroll(
+  bankrollLimitMinor: bigint,
+  oddsScaled: bigint,
+  games: number,
+  stepMinor: bigint = ONE,
+): GrowingOddsPlan {
+  assertMoneyInput(bankrollLimitMinor);
+  if (bankrollLimitMinor === ZERO) {
+    throw new SeriesMathError('zero_input', 'bankroll must be greater than zero');
+  }
+  assertOddsInRange(oddsScaled);
+  assertGameCount(games);
+  assertStep(stepMinor);
+
+  const gain = oddsMinusOne(oddsScaled);
+  const minimumInitialStake = ceilDivPos(ODDS_SCALE, gain);
+  let low = minimumInitialStake;
+  let high = bankrollLimitMinor;
+  let best: GrowingOddsPlan | null = null;
+
+  while (low <= high) {
+    const candidate = (low + high) / BigInt(2);
+    let plan: GrowingOddsPlan | null = null;
+    try {
+      plan = growingOddsPlan(candidate, oddsScaled, games, stepMinor);
     } catch (error) {
       if (!(error instanceof SeriesMathError)
         || !['aggregate_out_of_range', 'output_out_of_range', 'sanity_bound'].includes(error.code)) {

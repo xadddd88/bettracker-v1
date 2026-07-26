@@ -88,8 +88,9 @@ test('client preview uses the exact BigInt core and never float money math', () 
   assert.ok(calculator.includes('requiredStakeMinor('))
   assert.ok(calculator.includes('actualProfitMinor('))
   assert.ok(calculator.includes('checkOpenBetLimits('))
-  assert.ok(calculator.includes('fixedOddsPlan('))
-  assert.ok(calculator.includes('fixedOddsPlanForBankroll('))
+  assert.ok(calculator.includes('growingOddsPlan('))
+  assert.ok(calculator.includes('growingOddsPlanForBankroll('))
+  assert.ok(calculator.includes('targetProfitForGameMinor('))
   assert.doesNotMatch(calculator, /parseFloat|Math\.round|Math\.ceil/)
 })
 
@@ -129,21 +130,26 @@ test('setup preview itemizes every game, cumulative spend and net profit on a wi
     'Гейм',
     'Ставка',
     'Накопительно поставлено',
+    'Цель прибыли',
     'Прибыль при победе',
     'все предыдущие проигранные ставки и ставку текущего гейма',
     'чистый результат всей серии',
+    'Цель прибыли растёт по номеру гейма',
   ]) {
     assert.ok(calculator.includes(copy), `${copy} is missing from the game table`)
   }
   assert.ok(calculator.includes('createPreview.plan.stakesMinor.map'))
+  assert.ok(calculator.includes('createPreview.plan.targetProfitsMinor[index]'))
   assert.ok(calculator.includes('checkedAdd(accumulatedBeforeMinor, stakeMinor)'))
   assert.ok(calculator.includes('actualProfitMinor(stakeMinor, odds, accumulatedBeforeMinor)'))
   assert.ok(calculator.includes('signedMoney(row.profitOnWinMinor)'))
 })
 
 test('fixed coefficient survives refresh and drives every server-authoritative step', () => {
-  assert.ok(calculator.includes("const FIXED_ODDS_FORMULA = 'v2-fixed-odds:'"))
+  assert.ok(calculator.includes("const GROWING_ODDS_FORMULA = 'v3-growing-odds:'"))
   assert.ok(calculator.includes('fixedOddsFromFormula(initialSeries?.formula_version)'))
+  assert.ok(calculator.includes('usesGrowingProfit(series.formula_version)'))
+  assert.ok(calculator.includes('seriesTargetProfitForStep(series, stepNumber)'))
   assert.ok(calculator.includes('series.steps.length === 0 && series.initial_stake'))
   assert.ok(calculator.includes(': requiredStakeMinor('))
   assert.ok(calculator.includes('accepted_odds: quotedOdds'))

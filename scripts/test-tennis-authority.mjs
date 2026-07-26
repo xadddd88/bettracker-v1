@@ -10,6 +10,10 @@ const migrationPath = path.join(
   repoRoot,
   'supabase/migrations/028_tennis_series_authoritative_confirm.sql',
 )
+const growingMigrationPath = path.join(
+  repoRoot,
+  'supabase/migrations/029_tennis_growing_profit_confirm.sql',
+)
 const rollbackPath = path.join(repoRoot, 'docs/tennis-pr4-authority-rollback.sql')
 const helperPath = path.join(repoRoot, 'lib/tennis/server-write.ts')
 
@@ -24,9 +28,11 @@ function test(name, fn) {
 console.log('\nTennis authoritative confirmation corrective gate')
 
 assert.ok(existsSync(migrationPath), 'migration 028 is missing')
+assert.ok(existsSync(growingMigrationPath), 'migration 029 is missing')
 assert.ok(existsSync(rollbackPath), 'migration 028 rollback is missing')
 
 const migration = readFileSync(migrationPath, 'utf8')
+const growingMigration = readFileSync(growingMigrationPath, 'utf8')
 const rollback = readFileSync(rollbackPath, 'utf8')
 const helper = readFileSync(helperPath, 'utf8')
 
@@ -125,6 +131,22 @@ test('authoritative derived values are validated in the RPC response', () => {
   ]) {
     assert.ok(resultSchemas.includes(expected), `${expected} missing from response contract`)
   }
+})
+
+test('growing-profit confirm keeps the same RPC signature and derives per-step target', () => {
+  const signature = growingMigration.slice(
+    growingMigration.indexOf('CREATE OR REPLACE FUNCTION public.tennis_confirm_step('),
+    growingMigration.indexOf('RETURNS jsonb'),
+  )
+  assert.ok(signature.includes('p_accepted_stake numeric'))
+  assert.ok(!signature.includes('p_target_profit_snapshot'))
+  assert.ok(growingMigration.includes("v_series.formula_version LIKE 'v3-growing-odds:%'"))
+  assert.ok(growingMigration.includes('v_target_minor := v_target_minor * v_next_step'))
+  assert.ok(growingMigration.includes('v_target_profit_snapshot := v_target_minor::numeric * 0.01'))
+  assert.ok(growingMigration.includes("'confirmed', v_loss_before, v_target_profit_snapshot"))
+  assert.ok(growingMigration.includes('SECURITY INVOKER'))
+  assert.ok(growingMigration.includes("SET search_path = ''"))
+  assert.ok(growingMigration.includes('TO service_role;'))
 })
 
 test('migration and rollback refuse non-empty command history', () => {

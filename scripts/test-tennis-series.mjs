@@ -25,7 +25,7 @@ const state = require(path.join(buildDir, 'series-state.js'));
 const vectors = JSON.parse(readFileSync(path.join(repoRoot, 'docs', 'tennis', 'golden-vectors.json'), 'utf8'));
 
 const { parseMoneyMinor, parseOddsScaled, formatMoneyMinor, formatOddsScaled } = contract;
-const { requiredStakeMinorRaw, requiredStakeMinor, roundUpToStep, actualProfitMinor, targetMet, meetsTargetByProduct, defaultTargetProfitMinor, fixedOddsPlan, fixedOddsPlanForBankroll, checkOpenBetLimits } = mathmod;
+const { requiredStakeMinorRaw, requiredStakeMinor, roundUpToStep, actualProfitMinor, targetMet, meetsTargetByProduct, defaultTargetProfitMinor, fixedOddsPlan, fixedOddsPlanForBankroll, growingOddsPlan, growingOddsPlanForBankroll, checkOpenBetLimits } = mathmod;
 const { newSeries, openBet, settleBet, stopSeries, validateSeries, nextGameNumber } = state;
 
 // Raw-injection helpers: prefer the *_minor / *_scaled raw field when present, else parse
@@ -63,6 +63,32 @@ test('bank mode: derives the largest first stake whose full plan fits', () => {
   const plan = fixedOddsPlanForBankroll(bank, parseOddsScaled('3.15'), 15);
   assert.ok(plan.bankrollRequiredMinor <= bank);
   const next = fixedOddsPlan(plan.initialStakeMinor + BigInt(1), parseOddsScaled('3.15'), 15);
+  assert.ok(next.bankrollRequiredMinor > bank);
+});
+
+test('growing plan: bank mode targets rising profit across 10 games', () => {
+  const bank = parseMoneyMinor('5000.00');
+  const odds = parseOddsScaled('3.00');
+  const plan = growingOddsPlanForBankroll(bank, odds, 10);
+  assert.equal(formatMoneyMinor(plan.initialStakeMinor), '15.62');
+  assert.equal(formatMoneyMinor(plan.bankrollRequiredMinor), '4998.47');
+  assert.equal(formatMoneyMinor(plan.targetProfitMinor), '31.24');
+  assert.deepEqual(
+    plan.stakesMinor.map(formatMoneyMinor),
+    ['15.62', '39.05', '74.20', '126.92', '206.00', '324.62', '502.55', '769.44', '1169.78', '1770.29'],
+  );
+  assert.deepEqual(
+    plan.targetProfitsMinor.map(formatMoneyMinor),
+    ['31.24', '62.48', '93.72', '124.96', '156.20', '187.44', '218.68', '249.92', '281.16', '312.40'],
+  );
+
+  let loss = BigInt(0);
+  for (const [index, stake] of plan.stakesMinor.entries()) {
+    assert.ok(actualProfitMinor(stake, odds, loss) >= plan.targetProfitsMinor[index]);
+    loss += stake;
+  }
+
+  const next = growingOddsPlan(plan.initialStakeMinor + BigInt(1), odds, 10);
   assert.ok(next.bankrollRequiredMinor > bank);
 });
 

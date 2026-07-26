@@ -19,10 +19,11 @@ import {
   actualProfitMinor,
   checkOpenBetLimits,
   checkedAdd,
-  fixedOddsPlan,
-  fixedOddsPlanForBankroll,
+  growingOddsPlan,
+  growingOddsPlanForBankroll,
   requiredStakeMinor,
-  type FixedOddsPlan,
+  targetProfitForGameMinor,
+  type GrowingOddsPlan,
 } from '@/lib/tennis/series-math'
 import type {
   TennisSeriesSnapshot,
@@ -42,6 +43,7 @@ type OperationCache = Record<string, { payload: string; id: string }>
 
 const OPEN_STATUSES = new Set(['draft', 'active'])
 const FIXED_ODDS_FORMULA = 'v2-fixed-odds:'
+const GROWING_ODDS_FORMULA = 'v3-growing-odds:'
 
 type CalculationMode = 'initial_stake' | 'maximum_bank'
 
@@ -90,13 +92,14 @@ function parseSignedMoneyMinor(value: string): bigint {
   return -parseMoneyMinor(value.slice(1))
 }
 
-function fixedOddsFormula(odds: string): string {
-  return `${FIXED_ODDS_FORMULA}${formatOddsScaled(parseOddsScaled(odds))}`
-}
-
 function fixedOddsFromFormula(formulaVersion: string | null | undefined): string {
-  if (!formulaVersion?.startsWith(FIXED_ODDS_FORMULA)) return ''
-  const value = formulaVersion.slice(FIXED_ODDS_FORMULA.length)
+  const prefix = formulaVersion?.startsWith(GROWING_ODDS_FORMULA)
+    ? GROWING_ODDS_FORMULA
+    : formulaVersion?.startsWith(FIXED_ODDS_FORMULA)
+      ? FIXED_ODDS_FORMULA
+      : ''
+  if (!formulaVersion || !prefix) return ''
+  const value = formulaVersion.slice(prefix.length)
   try {
     return formatOddsScaled(parseOddsScaled(value))
   } catch {
@@ -104,9 +107,24 @@ function fixedOddsFromFormula(formulaVersion: string | null | undefined): string
   }
 }
 
+function growingOddsFormula(odds: string): string {
+  return `${GROWING_ODDS_FORMULA}${formatOddsScaled(parseOddsScaled(odds))}`
+}
+
+function usesGrowingProfit(formulaVersion: string | null | undefined): boolean {
+  return formulaVersion?.startsWith(GROWING_ODDS_FORMULA) ?? false
+}
+
+function seriesTargetProfitForStep(series: TennisSeriesSnapshot, stepNumber: number): bigint {
+  const baseTargetProfitMinor = parseMoneyMinor(series.target_profit)
+  return usesGrowingProfit(series.formula_version)
+    ? targetProfitForGameMinor(baseTargetProfitMinor, stepNumber)
+    : baseTargetProfitMinor
+}
+
 function buildCreatePlan(create: CreateState): {
   configuredBankMinor: bigint
-  plan: FixedOddsPlan
+  plan: GrowingOddsPlan
 } {
   const games = Number(create.maximumSteps)
   if (!Number.isInteger(games) || games < 1 || games > 15) {
@@ -115,14 +133,14 @@ function buildCreatePlan(create: CreateState): {
 
   const odds = parseOddsScaled(create.calculationOdds)
   if (create.calculationMode === 'initial_stake') {
-    const plan = fixedOddsPlan(parseMoneyMinor(create.initialStake), odds, games)
+    const plan = growingOddsPlan(parseMoneyMinor(create.initialStake), odds, games)
     return { configuredBankMinor: plan.bankrollRequiredMinor, plan }
   }
 
   const configuredBankMinor = parseMoneyMinor(create.bankrollLimit)
   return {
     configuredBankMinor,
-    plan: fixedOddsPlanForBankroll(configuredBankMinor, odds, games),
+    plan: growingOddsPlanForBankroll(configuredBankMinor, odds, games),
   }
 }
 
@@ -232,7 +250,7 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
       maximum_stake: null,
       maximum_steps: Number(create.maximumSteps),
       exposure_limit: formatMoneyMinor(preview.configuredBankMinor),
-      formula_version: fixedOddsFormula(create.calculationOdds),
+      formula_version: growingOddsFormula(create.calculationOdds),
       match_label: create.matchLabel.trim() || null,
     })
   }
@@ -247,11 +265,13 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
   let blockReason: string | null = null
   if (series && isOpen && !pendingStep && quotedOdds) {
     try {
+      const stepNumber = series.steps.length + 1
+      const stepTargetProfitMinor = seriesTargetProfitForStep(series, stepNumber)
       const recommendedMinor = series.steps.length === 0 && series.initial_stake
         ? parseMoneyMinor(series.initial_stake)
         : requiredStakeMinor(
             loss,
-            parseMoneyMinor(series.target_profit),
+            stepTargetProfitMinor,
             parseOddsScaled(quotedOdds),
             parseMoneyMinor(series.stake_increment),
           )
@@ -364,12 +384,14 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
           return createPreview.plan.stakesMinor.map((stakeMinor, index) => {
             const accumulatedWithCurrentMinor = checkedAdd(accumulatedBeforeMinor, stakeMinor)
             const profitOnWinMinor = actualProfitMinor(stakeMinor, odds, accumulatedBeforeMinor)
+            const targetProfitMinor = createPreview.plan.targetProfitsMinor[index]
             accumulatedBeforeMinor = accumulatedWithCurrentMinor
             return {
               game: index + 1,
               stakeMinor,
               accumulatedWithCurrentMinor,
               profitOnWinMinor,
+              targetProfitMinor,
             }
           })
         })()
@@ -533,9 +555,11 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
 
           <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-control border border-bn-border-subtle">
             <div className="border-r border-bn-border-subtle p-4">
-              <span className="stat-label">Прибыль при победе</span>
+              <span className="stat-label">Прибыль 1-й → последний гейм</span>
               <BroadcastDataValue className="mt-2 block text-xl font-black">
-                {createPreview ? formatMoneyMinor(createPreview.plan.targetProfitMinor) : '—'}
+                {createPreview
+                  ? `${formatMoneyMinor(createPreview.plan.targetProfitsMinor[0])} → ${formatMoneyMinor(createPreview.plan.targetProfitsMinor[createPreview.plan.targetProfitsMinor.length - 1])}`
+                  : '—'}
               </BroadcastDataValue>
             </div>
             <div className="p-4">
@@ -556,14 +580,16 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
               <p className="mt-2 text-xs leading-5 text-bn-muted">
                 Накопительно поставлено включает все предыдущие проигранные ставки и ставку текущего гейма.
                 Прибыль — чистый результат всей серии, если 40:40 случится в этом гейме.
+                Цель прибыли растёт по номеру гейма: 1×, 2×, 3× и дальше до выбранного лимита.
               </p>
               <div className="mt-4 overflow-x-auto rounded-control border border-bn-border-subtle">
-                <table className="w-full min-w-[38rem] border-collapse text-sm">
+                <table className="w-full min-w-[44rem] border-collapse text-sm">
                   <thead className="bg-bn-field text-left">
                     <tr className="border-b border-bn-border-strong">
                       <th className="px-4 py-3 font-black text-bn-muted">Гейм</th>
                       <th className="px-4 py-3 text-right font-black text-bn-muted">Ставка</th>
                       <th className="px-4 py-3 text-right font-black text-bn-muted">Накопительно поставлено</th>
+                      <th className="px-4 py-3 text-right font-black text-bn-muted">Цель прибыли</th>
                       <th className="px-4 py-3 text-right font-black text-bn-muted">Прибыль при победе</th>
                     </tr>
                   </thead>
@@ -576,6 +602,9 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
                         </td>
                         <td className="px-4 py-3 text-right font-mono text-bn-text">
                           {formatMoneyMinor(row.accumulatedWithCurrentMinor)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-bn-muted">
+                          {formatMoneyMinor(row.targetProfitMinor)}
                         </td>
                         <td className="px-4 py-3 text-right font-mono font-black text-bn-signal">
                           {signedMoney(row.profitOnWinMinor)}
@@ -638,7 +667,9 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
           </div>
           <div className="border-b border-r border-bn-border-subtle p-4">
             <dt className="stat-label">Прибыль при победе</dt>
-            <dd><BroadcastDataValue className="mt-2 block font-display text-2xl font-black">{series.target_profit}</BroadcastDataValue></dd>
+            <dd><BroadcastDataValue className="mt-2 block font-display text-2xl font-black">
+              {formatMoneyMinor(seriesTargetProfitForStep(series, series.steps.length + 1))}
+            </BroadcastDataValue></dd>
           </div>
           <div className="border-b border-bn-border-subtle p-4">
             <dt className="stat-label">Остаток банка</dt>
