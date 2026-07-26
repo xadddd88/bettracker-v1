@@ -100,6 +100,8 @@ jobs:
         run: npm run test:tennis-authority
       - name: "Tennis server write-path regression"
         run: npm run test:tennis-write-path
+      - name: "Tennis mobile UI gate"
+        run: npm run test:tennis-ui
 
   # PostgreSQL 17 contract gate for the corrective Tennis confirmation RPC.
   # Uses a disposable CI service only; no Supabase or production credentials.

@@ -231,7 +231,7 @@ test('gate module does no Supabase / DB / RPC / migration work', () => {
     assert.ok(!MODULE_SRC.includes(forbidden), `module must not reference ${forbidden}`);
   }
 });
-test('gate is wired only to the PR-4 closed server-write helper', () => {
+test('gate is wired only to the closed server helper and server-rendered PR-5 surfaces', () => {
   const importers = allSources.filter((f) => {
     if (f.endsWith(path.join('lib', 'flags', 'tennis-calc.ts'))) return false;
     if (f.endsWith('test-tennis-access-gate.mjs')) return false;
@@ -239,9 +239,13 @@ test('gate is wired only to the PR-4 closed server-write helper', () => {
     return /flags\/tennis-calc/.test(readFileSync(f, 'utf8'));
   }).map(f => path.relative(repoRoot, f));
   assert.deepEqual(
-    importers,
-    [path.join('lib', 'tennis', 'server-write.ts')],
-    `gate may be imported only by the closed server helper; imported by: ${importers.join(', ')}`,
+    importers.sort(),
+    [
+      path.join('app', '(app)', 'layout.tsx'),
+      path.join('app', '(app)', 'tennis-calculator', 'page.tsx'),
+      path.join('lib', 'tennis', 'server-write.ts'),
+    ].sort(),
+    `gate may be imported only by approved server surfaces; imported by: ${importers.join(', ')}`,
   );
 });
 test('PR-2 adds no page/route/server-action/migration files', () => {

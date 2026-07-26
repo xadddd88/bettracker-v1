@@ -27,6 +27,7 @@ const webRoutes = [
   'app/(app)/decisions/page.tsx',
   'app/(app)/scout/page.tsx',
   'app/(app)/settings/page.tsx',
+  'app/(app)/tennis-calculator/page.tsx',
   'app/(auth)/login/page.tsx',
   'app/auth/set-password/page.tsx',
   'app/page.tsx',
