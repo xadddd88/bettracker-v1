@@ -6,11 +6,6 @@ const API_TENNIS_URL = 'https://api.api-tennis.com/tennis/'
 const API_TENNIS_KEY_PARAM = ['API', 'key'].join('')
 const WINDOW_MS = 24 * 60 * 60 * 1000
 
-const MAIN_TOURS = [
-  { eventTypeKey: '265', eventType: 'atp singles' },
-  { eventTypeKey: '266', eventType: 'wta singles' },
-] as const
-
 type Tour = 'ATP' | 'WTA'
 
 interface ApiTennisEnvelope {
@@ -59,8 +54,8 @@ export interface FortyFortyAnalysis {
     basis: 'scheduled_start_utc'
   }
   scope: {
-    tours: 'ATP/WTA Singles'
-    mainDrawOnly: true
+    tours: 'Men/Women Singles'
+    mainDrawOnly: false
     excludes: string[]
   }
   foundMatches: number
@@ -97,8 +92,21 @@ function isTrue(value: unknown): boolean {
 
 function tourFromType(value: unknown): Tour | null {
   const normalized = stringValue(value)?.toLowerCase()
-  if (normalized === 'atp singles') return 'ATP'
-  if (normalized === 'wta singles') return 'WTA'
+  if (!normalized || !normalized.includes('singles')) return null
+  if (
+    normalized.includes('doubles')
+    || normalized.includes('mixed')
+    || normalized.includes('exhibition')
+    || normalized.includes('boys')
+    || normalized.includes('girls')
+    || normalized.includes('junior')
+  ) {
+    return null
+  }
+  if (normalized.includes('wta') || normalized.includes('women')) return 'WTA'
+  if (normalized.includes('atp') || normalized.includes('men') || normalized.includes('challenger')) {
+    return 'ATP'
+  }
   return null
 }
 
@@ -314,9 +322,9 @@ export function analyzeFortyFortyFixtures(
       basis: 'scheduled_start_utc',
     },
     scope: {
-      tours: 'ATP/WTA Singles',
-      mainDrawOnly: true,
-      excludes: ['qualification', 'doubles', 'challenger', 'ITF', 'exhibition', 'tiebreaks'],
+      tours: 'Men/Women Singles',
+      mainDrawOnly: false,
+      excludes: ['qualification', 'doubles', 'mixed', 'junior', 'exhibition', 'tiebreaks'],
     },
     foundMatches: eligible.length,
     analyzedMatches: matches.length,
@@ -338,8 +346,7 @@ function hasProviderError(body: ApiTennisEnvelope): boolean {
   return Boolean(error && error !== '0')
 }
 
-async function fetchTourFixtures(
-  eventTypeKey: string,
+async function fetchFixturesByDate(
   dateFrom: string,
   dateTo: string,
 ): Promise<unknown[]> {
@@ -349,7 +356,6 @@ async function fetchTourFixtures(
   url.searchParams.set(API_TENNIS_KEY_PARAM, API_TENNIS_KEY)
   url.searchParams.set('date_start', dateFrom)
   url.searchParams.set('date_stop', dateTo)
-  url.searchParams.set('event_type_key', eventTypeKey)
   url.searchParams.set('timezone', 'UTC')
 
   const body = await providerFetch<ApiTennisEnvelope>('api_tennis', url.toString(), {
@@ -366,8 +372,6 @@ export async function fetchLast24HoursFortyForty(
   now = new Date(),
 ): Promise<FortyFortyAnalysis> {
   const from = new Date(now.getTime() - WINDOW_MS)
-  const results = await Promise.all(MAIN_TOURS.map(tour => (
-    fetchTourFixtures(tour.eventTypeKey, utcDate(from), utcDate(now))
-  )))
-  return analyzeFortyFortyFixtures(results.flat(), now)
+  const fixtures = await fetchFixturesByDate(utcDate(from), utcDate(now))
+  return analyzeFortyFortyFixtures(fixtures, now)
 }

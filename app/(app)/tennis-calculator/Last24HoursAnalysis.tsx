@@ -83,12 +83,12 @@ function tourCard(
 function comparisonText(analysis: FortyFortyAnalysis): string {
   const { leader, differencePercentagePoints } = analysis.comparison
   if (leader === 'insufficient_data' || differencePercentagePoints === null) {
-    return 'Для сравнения нужны хотя бы один полностью покрытый матч ATP и один матч WTA.'
+    return 'Для сравнения нужны хотя бы один полностью покрытый мужской и один женский одиночный матч.'
   }
   if (leader === 'equal') {
-    return 'В этой 24-часовой выборке частота 40:40 по геймам у ATP и WTA одинаковая.'
+    return 'В этой 24-часовой выборке частота 40:40 по геймам у мужских и женских одиночных матчей одинаковая.'
   }
-  const category = leader === 'ATP' ? 'мужских ATP-матчах' : 'женских WTA-матчах'
+  const category = leader === 'ATP' ? 'мужских одиночных матчах' : 'женских одиночных матчах'
   return `В этой выборке 40:40 чаще встречалось в ${category}: разница ${differencePercentagePoints.toLocaleString('ru-RU', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -162,8 +162,8 @@ export function Last24HoursAnalysis() {
             Что было за последние 24 часа
           </h2>
           <p className="mt-2 max-w-xl text-xs leading-5 text-bn-muted">
-            Завершённые матчи основного тура, начавшиеся за скользящие 24 часа:
-            ATP Singles и WTA Singles, только основная сетка.
+            Завершённые мужские и женские одиночные матчи, начавшиеся за
+            скользящие 24 часа: ATP/WTA, Challenger и ITF, только основная сетка.
           </p>
         </div>
         <BroadcastButton
@@ -177,7 +177,7 @@ export function Last24HoursAnalysis() {
       </div>
 
       <p className="mt-3 text-[11px] leading-5 text-bn-quiet">
-        Не входят: квалификации, Challenger, ITF, парные и выставочные матчи.
+        Не входят: квалификации, парные, смешанные, юниорские и выставочные матчи.
         Считаются только матчи с полной историей очков; тай-брейки исключены.
       </p>
 
@@ -238,8 +238,8 @@ export function Last24HoursAnalysis() {
           </div>
 
           <div className="mt-5 grid overflow-hidden rounded-control border border-bn-border-subtle bg-bn-border-subtle sm:grid-cols-2">
-            {tourCard('Мужчины · ATP', analysis.men, 'border-b border-bn-border-subtle bg-bn-field sm:border-b-0 sm:border-r')}
-            {tourCard('Женщины · WTA', analysis.women, 'bg-bn-field')}
+            {tourCard('Мужчины · одиночные', analysis.men, 'border-b border-bn-border-subtle bg-bn-field sm:border-b-0 sm:border-r')}
+            {tourCard('Женщины · одиночные', analysis.women, 'bg-bn-field')}
           </div>
 
           <div className="mt-4 border-l-2 border-bn-signal pl-4">
@@ -285,8 +285,9 @@ export function Last24HoursAnalysis() {
             </details>
           ) : (
             <p className="mt-5 text-xs leading-5 text-bn-muted">
-              В этом окне нет завершённых матчей основного тура с полной историей очков.
-              Нулевой результат не означает, что 40:40 не происходило в других категориях.
+              В этом окне нет завершённых одиночных матчей с полной историей очков.
+              Нулевой результат не означает, что 40:40 не происходило в матчах без полной
+              поточечной истории.
             </p>
           )}
 

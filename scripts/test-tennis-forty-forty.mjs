@@ -120,13 +120,13 @@ await test('counts one 40:40 hit per regular game and excludes set tiebreaks', (
   assert.equal(analysis.comparison.differencePercentagePoints, 8.33)
 })
 
-await test('uses a strict rolling window and only finished ATP/WTA singles main draws', () => {
+await test('uses a strict rolling window and only finished adult singles main draws', () => {
   const eligible = fixture({ key: 'eligible', time: '11:59' })
   const analysis = analyzeFortyFortyFixtures([
     eligible,
     { ...fixture({ key: 'duplicate', time: '11:59' }), ...eligible },
     fixture({ key: 'qualifying', qualification: 'True' }),
-    fixture({ key: 'challenger', tour: 'Challenger Men Singles' }),
+    fixture({ key: 'junior', tour: 'Boys Singles' }),
     fixture({ key: 'doubles', tour: 'Atp Doubles' }),
     fixture({ key: 'unfinished', status: 'Set 2' }),
     { ...fixture({ key: 'too-old' }), event_date: '2026-07-25', event_time: '11:59' },
@@ -139,11 +139,32 @@ await test('uses a strict rolling window and only finished ATP/WTA singles main 
   assert.deepEqual(analysis.scope.excludes, [
     'qualification',
     'doubles',
-    'challenger',
-    'ITF',
+    'mixed',
+    'junior',
     'exhibition',
     'tiebreaks',
   ])
+})
+
+await test('covers the full provider singles calendar instead of only ATP/WTA tour keys', () => {
+  const analysis = analyzeFortyFortyFixtures([
+    fixture({ key: 'atp', tour: 'Atp Singles' }),
+    fixture({ key: 'wta', tour: 'Wta Singles' }),
+    fixture({ key: 'challenger-men', tour: 'Challenger Men Singles' }),
+    fixture({ key: 'itf-men', tour: 'Itf Men Singles' }),
+    fixture({ key: 'itf-women', tour: 'Itf Women Singles' }),
+    fixture({ key: 'doubles', tour: 'Atp Doubles' }),
+    fixture({ key: 'mixed', tour: 'Mixed Doubles' }),
+    fixture({ key: 'junior', tour: 'Boys Singles' }),
+    fixture({ key: 'exhibition', tour: 'Exhibition Men Singles' }),
+  ], new Date('2026-07-26T12:00:00Z'))
+
+  assert.equal(analysis.foundMatches, 5)
+  assert.equal(analysis.analyzedMatches, 5)
+  assert.equal(analysis.men.matches, 3)
+  assert.equal(analysis.women.matches, 2)
+  assert.equal(analysis.scope.tours, 'Men/Women Singles')
+  assert.equal(analysis.scope.mainDrawOnly, false)
 })
 
 await test('returns insufficient comparison instead of inventing a women or men percentage', () => {
@@ -158,7 +179,7 @@ await test('returns insufficient comparison instead of inventing a women or men 
   assert.equal(analysis.comparison.differencePercentagePoints, null)
 })
 
-await test('provider requests are server-only, tour-filtered, UTC and cover both window dates', async () => {
+await test('provider request is server-only, unbounded by event_type_key, UTC and covers both window dates', async () => {
   process.env.API_FOOTBALL_KEY = 'dummy-football'
   process.env.SPORTMONKS_TOKEN = 'dummy-sportmonks'
   process.env.API_TENNIS_KEY = 'dummy-tennis'
@@ -181,16 +202,13 @@ await test('provider requests are server-only, tour-filtered, UTC and cover both
     globalThis.fetch = originalFetch
   }
 
-  assert.equal(calls.length, 2)
-  assert.deepEqual(
-    calls.map(url => url.searchParams.get('event_type_key')).sort(),
-    ['265', '266'],
-  )
+  assert.equal(calls.length, 1)
   for (const url of calls) {
     assert.equal(url.searchParams.get('method'), 'get_fixtures')
     assert.equal(url.searchParams.get('date_start'), '2026-07-25')
     assert.equal(url.searchParams.get('date_stop'), '2026-07-26')
     assert.equal(url.searchParams.get('timezone'), 'UTC')
+    assert.equal(url.searchParams.has('event_type_key'), false)
     assert.equal(url.searchParams.get('APIkey'), 'dummy-tennis')
   }
 })
@@ -212,7 +230,7 @@ await test('route repeats owner auth, durable rate limit and never exposes the p
   assert.ok(route.includes("'Cache-Control': 'private, no-store, max-age=0'"))
   assert.ok(route.indexOf('authenticateRequest(req)') < route.indexOf('fetchLast24HoursFortyForty()'))
   assert.ok(client.includes('Анализ за последние 24 часа'))
-  assert.ok(client.includes('ATP Singles и WTA Singles'))
+  assert.ok(client.includes('ATP/WTA, Challenger и ITF, только основная сетка'))
   assert.ok(client.includes('Всего срабатываний 40:40'))
   assert.ok(client.includes('Статистика') || client.includes('не гарантия'))
   assert.ok(!client.includes('API_TENNIS_KEY'))
