@@ -21,6 +21,7 @@ import {
   containsAnalystPricingClaim,
   extractAnalystResearchSources,
   hasUnsupportedLiveAnalystInput,
+  inferCouponEventTimeFixtureStatus,
   resolveAnalystWebSearchTelemetry,
   type AnalystResearchBrief,
 } from '@/lib/ai/analyst-research'
@@ -234,6 +235,37 @@ function normalizeAnalystRaw(raw: unknown): unknown {
   return raw
 }
 
+function analystRouteCopy(locale: z.infer<typeof requestSchema>['output_language']) {
+  if (locale === 'uk') {
+    return {
+      liveUnsupported: 'Live-аналіз недоступний без поточного рахунку, фази матчу, ігрового часу та актуальної live-лінії. Для цього модуля використовуйте лише pre-match купони.',
+      profileUnavailable: 'Не вдалося перевірити налаштування пошуку. Аналіз не запускався — спробуйте ще раз пізніше.',
+      searchConfigurationUnavailable: 'Пошук актуальних джерел недоступний через конфігурацію. Аналіз не збережено.',
+      currentResearchUnavailable: 'Не вдалося підтвердити актуальні дані цитованими джерелами. Аналіз не збережено — спробуйте ще раз пізніше.',
+      sourcedDisclaimer: 'Поточними фактами вважаються лише дослівні уривки в блоці «Цитовані твердження», кожен із яких прив’язаний до конкретного джерела. Решта тексту — умовна логіка ринку. Імовірність, перевага та EV не розраховуються.',
+      fallbackDisclaimer: 'Цей аналіз базується на купоні та наданому контексті; актуальні дані, які не вдалося перевірити, позначені як прогалини.',
+    }
+  }
+  if (locale === 'ru') {
+    return {
+      liveUnsupported: 'Live-анализ недоступен без текущего счёта, фазы матча, игрового времени и актуальной live-линии. Для этого модуля используйте только pre-match купоны.',
+      profileUnavailable: 'Не удалось проверить настройки поиска. Анализ не запускался — попробуйте позже.',
+      searchConfigurationUnavailable: 'Поиск актуальных источников недоступен из-за конфигурации. Анализ не сохранён.',
+      currentResearchUnavailable: 'Не удалось подтвердить актуальные данные цитированными источниками. Анализ не сохранён — попробуйте позже.',
+      sourcedDisclaimer: 'Текущими фактами считаются только дословные фрагменты в блоке «Цитированные утверждения», каждый из которых привязан к конкретному источнику. Остальной текст — условная логика рынка. Вероятность, преимущество и EV не рассчитываются.',
+      fallbackDisclaimer: 'Этот анализ основан на купоне и предоставленном контексте; актуальные данные, которые не удалось проверить, отмечены как пробелы.',
+    }
+  }
+  return {
+    liveUnsupported: 'Live analysis requires the current score, match phase, game clock, and current live odds. This module supports pre-match coupons only.',
+    profileUnavailable: 'Research settings could not be verified. Analysis was not started; please try again later.',
+    searchConfigurationUnavailable: 'Current-source search is unavailable due to configuration. The analysis was not saved.',
+    currentResearchUnavailable: 'Current facts could not be verified with cited sources. The analysis was not saved; please try again later.',
+    sourcedDisclaimer: 'Only verbatim excerpts in Sourced claims are treated as current facts, each bound to a specific citation. All other prose is conditional market logic. Probability, edge, and EV are not calculated.',
+    fallbackDisclaimer: 'This analysis uses the coupon and supplied context; current data that could not be verified is listed as a gap.',
+  }
+}
+
 // ─── Sport modules ────────────────────────────────────────────
 function getSportModule(sport: string): string {
   switch (sport) {
@@ -429,6 +461,8 @@ export async function POST(req: NextRequest) {
       )
     }
     const input = parsed.data
+    const currentUtcIso = new Date().toISOString()
+    const copy = analystRouteCopy(input.output_language)
 
     // Live markets need current score, phase, clock and live-price inputs.
     // This route is intentionally pre-match only, so reject before profile
@@ -442,11 +476,8 @@ export async function POST(req: NextRequest) {
         sport: input.sport,
         error_type: 'live_analysis_not_supported',
       })
-      const error = input.output_language === 'uk'
-        ? 'Live-аналіз недоступний без поточного рахунку, фази матчу, ігрового часу та актуальної live-лінії. Для цього модуля використовуйте лише pre-match купони.'
-        : 'Live analysis requires the current score, match phase, game clock, and current live odds. This module supports pre-match coupons only.'
       return NextResponse.json(
-        { success: false, error, code: 'live_analysis_not_supported' },
+        { success: false, error: copy.liveUnsupported, code: 'live_analysis_not_supported' },
         { status: 422 },
       )
     }
@@ -477,9 +508,7 @@ export async function POST(req: NextRequest) {
       })
       return NextResponse.json({
         success: false,
-        error: input.output_language === 'uk'
-          ? 'Не вдалося перевірити налаштування пошуку. Аналіз не запускався — спробуйте ще раз пізніше.'
-          : 'Research settings could not be verified. Analysis was not started; please try again later.',
+        error: copy.profileUnavailable,
         code: 'current_research_unavailable',
         research: {
           web_search_enabled: false,
@@ -512,7 +541,7 @@ export async function POST(req: NextRequest) {
       notes: input.notes ?? null,
       couponEventTime: input.coupon_event_time ?? null,
       clientTimezone: input.client_timezone ?? null,
-      currentUtcIso: new Date().toISOString(),
+      currentUtcIso,
       legs: input.legs,
     })
 
@@ -557,9 +586,7 @@ export async function POST(req: NextRequest) {
         })
         return NextResponse.json({
           success: false,
-          error: input.output_language === 'uk'
-            ? 'Пошук актуальних джерел недоступний через конфігурацію. Аналіз не збережено.'
-            : 'Current-source search is unavailable due to configuration. The analysis was not saved.',
+          error: copy.searchConfigurationUnavailable,
           code: 'current_research_unavailable',
           research: {
             web_search_enabled: telemetry.enabled,
@@ -626,6 +653,11 @@ export async function POST(req: NextRequest) {
       ? alignAnalystResearchBriefToCoupon(candidateResearchBrief, couponLegs, extractedResearchSources)
       : null
     const researchBrief = alignedResearchBrief ?? buildFallbackResearchBrief(input)
+    const couponTimeStatus = inferCouponEventTimeFixtureStatus({
+      couponEventTime: input.coupon_event_time ?? null,
+      clientTimezone: input.client_timezone ?? null,
+      currentUtcIso,
+    })
     const boundSourceUrls = new Set(researchBrief.sourcedClaims.map(claim => claim.sourceUrl))
     const researchSources = extractedResearchSources.filter(source => boundSourceUrls.has(source.url))
     const webSearchTelemetry = resolveAnalystWebSearchTelemetry({
@@ -653,13 +685,10 @@ export async function POST(req: NextRequest) {
         web_search_attempted: webSearchTelemetry.attempted,
         web_search_failure_reason: webSearchTelemetry.failureReason,
       })
-      const error = input.output_language === 'uk'
-        ? 'Не вдалося підтвердити актуальні дані цитованими джерелами. Аналіз не збережено — спробуйте ще раз пізніше.'
-        : 'Current facts could not be verified with cited sources. The analysis was not saved; please try again later.'
       return NextResponse.json(
         {
           success: false,
-          error,
+          error: copy.currentResearchUnavailable,
           code: 'current_research_unavailable',
           research: {
             web_search_enabled: webSearchTelemetry.enabled,
@@ -685,6 +714,7 @@ export async function POST(req: NextRequest) {
       modelProbability:   analysis.model_probability,
       modelInputsPresent: false,
       sportModuleSupport: getAnalystSportSupport(input.sport),
+      fixtureStatus:      couponTimeStatus.fixtureStatus,
       legs:               input.legs as AnalysisLegQualityInput[] | undefined,
     })
     const gatedPricing = buildAnalystPricingPayload({
@@ -708,12 +738,8 @@ export async function POST(req: NextRequest) {
 
     // 9. Keep sourced qualitative research distinct from pricing/model proof.
     const honestDisclaimer = webSearchActuallyUsed
-      ? (input.output_language === 'uk'
-          ? 'Поточними фактами вважаються лише дослівні уривки в блоці «Цитовані твердження», кожен із яких прив’язаний до конкретного джерела. Решта тексту — умовна логіка ринку. Імовірність, перевага та EV не розраховуються.'
-          : 'Only verbatim excerpts in Sourced claims are treated as current facts, each bound to a specific citation. All other prose is conditional market logic. Probability, edge, and EV are not calculated.')
-      : (input.output_language === 'uk'
-          ? 'Цей аналіз базується на купоні та наданому контексті; актуальні дані, які не вдалося перевірити, позначені як прогалини.'
-          : 'This analysis uses the coupon and supplied context; current data that could not be verified is listed as a gap.')
+      ? copy.sourcedDisclaimer
+      : copy.fallbackDisclaimer
     const safeDisclaimer = qualityGate.pricingAllowed
       ? analysis.disclaimer || honestDisclaimer
       : webSearchActuallyUsed
@@ -733,6 +759,7 @@ export async function POST(req: NextRequest) {
       legs:         input.legs ?? null,
       coupon_event_time: input.coupon_event_time ?? null,
       client_timezone: input.client_timezone ?? null,
+      coupon_time_status: couponTimeStatus,
     }
     const outputJson = {
       model_probability:   gatedPricing.model_probability,

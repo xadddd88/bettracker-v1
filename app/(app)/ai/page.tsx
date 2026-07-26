@@ -52,6 +52,7 @@ type Locale = 'auto' | 'uk' | 'ru' | 'en' | 'es' | 'fr' | 'de' | 'ar'
 type CaptureMode = 'coupon' | 'event'
 type Recommendation = 'bet' | 'skip' | 'watch' | 'no_value'
 type RiskLevel = 'low' | 'medium' | 'high'
+type UiLocale = 'en' | 'uk' | 'ru'
 
 interface Factor { name: string; score: number; detail: string }
 interface Analysis {
@@ -124,6 +125,11 @@ function getAnalysisTrustView(a: Analysis): AnalystTrustView | null {
 }
 
 function localizedRiskLabel(risk: RiskLevel, fallback: string, trustView: AnalystTrustView | null): string {
+  if (trustView?.locale === 'ru') {
+    if (risk === 'high') return 'Высокий риск'
+    if (risk === 'medium') return 'Средний риск'
+    return 'Низкий риск'
+  }
   if (trustView?.locale !== 'uk') return fallback
   if (risk === 'high') return 'Високий ризик'
   if (risk === 'medium') return 'Середній ризик'
@@ -187,6 +193,150 @@ const RISK_CONFIG: Record<RiskLevel, { label: string; status: BroadcastNoirStatu
   medium: { label: 'Medium Risk', status: 'review' },
   high:   { label: 'High Risk', status: 'negative' },
 }
+
+function normalizeAiPageLocale(locale: string | null | undefined): UiLocale {
+  if (locale === 'uk') return 'uk'
+  if (locale === 'ru') return 'ru'
+  return 'en'
+}
+
+const AI_PAGE_COPY = {
+  en: {
+    waitForScan: 'Wait for coupon scanning to finish.',
+    liveBlocked: 'Live analysis requires the current score, match phase, game clock, and current live odds. Use a pre-match coupon.',
+    scanningCoupon: 'Scanning coupon...',
+    couponScanned: 'Coupon scanned - review and analyze',
+    scanError: 'Scan error - try again',
+    eventCapturePending: 'Event capture is not connected yet - image kept for review.',
+    required: 'Required',
+    oddsInvalid: 'Must be > 1.00',
+    analysisFailed: 'Analysis failed. Try again.',
+    networkError: 'Network error - please try again.',
+    analyzing: 'Analyzing...',
+    scanning: 'Scanning...',
+    liveUnavailable: 'Live analysis unavailable',
+    analyze: 'Analyze',
+    webVerified: 'Current research verified',
+    webUnavailable: 'Current research unavailable',
+    webDisabled: 'Web research disabled',
+    webVerifiedDetail: 'cited sources bound to exact claims.',
+    webUnavailableDetail: 'No current claim was accepted without an exact citation. Pricing remains hidden.',
+    webDisabledDetail: 'This run contains conditional market logic only; no current fact is presented as verified.',
+    conditionalMarketReview: 'Conditional market review',
+    trustBoundary: 'Narrative analysis is conditional. Only verbatim excerpts under Cited claims are bound to current sources.',
+    builderCorrelation: 'Bet Builder correlation',
+    conditionalLogic: 'Conditional logic',
+    failureModes: 'Failure modes',
+    noConditionalNote: 'No additional conditional note.',
+    analystVerdict: 'Analyst verdict',
+    stillUnverified: 'Still unverified',
+    citedClaims: 'Cited claims - verbatim source excerpts',
+    priceNotVerified: 'PRICE NOT VERIFIED',
+    priceNotVerifiedSupport: 'Qualitative research is shown above; probability and EV remain withheld.',
+    riskDataCoverage: 'risk warning / data coverage',
+    periodPhase: 'Period / phase',
+    statusSource: 'Status source',
+    odds: 'Odds',
+    confidenceHelpBlocked: 'Cautious confidence without price calculation',
+    confidenceHelpPriced: 'How certain the model is in its estimate',
+    pricingVerification: 'Pricing verification',
+    stake: 'Stake',
+    stakeAmount: 'Stake amount',
+    checkRisk: 'Check Risk',
+    invalidStake: 'Enter a valid stake amount',
+    skipWatchSaved: 'Skipping or watching is a valid decision - it will be saved to your history.',
+  },
+  uk: {
+    waitForScan: 'Дочекайтеся завершення сканування купона.',
+    liveBlocked: 'Live-аналіз недоступний без поточного рахунку, фази матчу, ігрового часу та актуальної live-лінії. Використайте pre-match купон.',
+    scanningCoupon: 'Скануємо купон...',
+    couponScanned: 'Купон розпізнано - перевірте та запустіть аналіз',
+    scanError: 'Помилка сканування - спробуйте ще раз',
+    eventCapturePending: 'Знімок події ще не підключено - зображення збережено для перегляду.',
+    required: 'Обовʼязково',
+    oddsInvalid: 'Має бути > 1.00',
+    analysisFailed: 'Не вдалося виконати аналіз. Спробуйте ще раз.',
+    networkError: 'Помилка мережі - спробуйте ще раз.',
+    analyzing: 'Аналізуємо...',
+    scanning: 'Скануємо...',
+    liveUnavailable: 'Live-аналіз недоступний',
+    analyze: 'Аналізувати',
+    webVerified: 'Актуальні джерела перевірено',
+    webUnavailable: 'Актуальні джерела недоступні',
+    webDisabled: 'Веб-пошук вимкнено',
+    webVerifiedDetail: 'цитованих джерел привʼязано до точних тверджень.',
+    webUnavailableDetail: 'Жодне актуальне твердження не прийнято без точної цитати. Оцінку ціни приховано.',
+    webDisabledDetail: 'Цей запуск містить лише умовну логіку ринку; жоден актуальний факт не подається як перевірений.',
+    conditionalMarketReview: 'Умовний огляд ринку',
+    trustBoundary: 'Наративний аналіз умовний. Лише дослівні уривки в цитованих твердженнях привʼязані до актуальних джерел.',
+    builderCorrelation: 'Кореляція Bet Builder',
+    conditionalLogic: 'Умовна логіка',
+    failureModes: 'Сценарії ризику',
+    noConditionalNote: 'Додаткових умовних нотаток немає.',
+    analystVerdict: 'Висновок аналітика',
+    stillUnverified: 'Ще не перевірено',
+    citedClaims: 'Цитовані твердження - дослівні уривки з джерел',
+    priceNotVerified: 'ЦІНУ НЕ ПІДТВЕРДЖЕНО',
+    priceNotVerifiedSupport: 'Якісний розбір наведено вище; точну ймовірність та EV приховано.',
+    riskDataCoverage: 'попередження про ризик / покриття даних',
+    periodPhase: 'Період / фаза',
+    statusSource: 'Джерело статусу',
+    odds: 'Коефіцієнт',
+    confidenceHelpBlocked: 'Обережна впевненість без розрахунку ціни',
+    confidenceHelpPriced: 'Наскільки модель впевнена в оцінці',
+    pricingVerification: 'Перевірка ціни',
+    stake: 'Сума ставки',
+    stakeAmount: 'Сума ставки',
+    checkRisk: 'Перевірити ризик',
+    invalidStake: 'Введіть коректну суму ставки',
+    skipWatchSaved: 'Пропуск або спостереження буде збережено в історії рішень.',
+  },
+  ru: {
+    waitForScan: 'Дождитесь завершения сканирования купона.',
+    liveBlocked: 'Live-анализ недоступен без текущего счёта, фазы матча, игрового времени и актуальной live-линии. Используйте pre-match купон.',
+    scanningCoupon: 'Сканируем купон...',
+    couponScanned: 'Купон распознан - проверьте и запустите анализ',
+    scanError: 'Ошибка сканирования - попробуйте ещё раз',
+    eventCapturePending: 'Снимок события ещё не подключён - изображение сохранено для просмотра.',
+    required: 'Обязательно',
+    oddsInvalid: 'Должно быть > 1.00',
+    analysisFailed: 'Не удалось выполнить анализ. Попробуйте ещё раз.',
+    networkError: 'Ошибка сети - попробуйте ещё раз.',
+    analyzing: 'Анализируем...',
+    scanning: 'Сканируем...',
+    liveUnavailable: 'Live-анализ недоступен',
+    analyze: 'Анализировать',
+    webVerified: 'Актуальные источники проверены',
+    webUnavailable: 'Актуальные источники недоступны',
+    webDisabled: 'Веб-поиск выключен',
+    webVerifiedDetail: 'цитированных источников привязано к точным утверждениям.',
+    webUnavailableDetail: 'Ни одно актуальное утверждение не принято без точной цитаты. Оценка цены скрыта.',
+    webDisabledDetail: 'Этот запуск содержит только условную логику рынка; ни один актуальный факт не подаётся как проверенный.',
+    conditionalMarketReview: 'Условный обзор рынка',
+    trustBoundary: 'Нарративный анализ условный. Только дословные фрагменты в цитированных утверждениях привязаны к актуальным источникам.',
+    builderCorrelation: 'Корреляция Bet Builder',
+    conditionalLogic: 'Условная логика',
+    failureModes: 'Сценарии риска',
+    noConditionalNote: 'Дополнительных условных заметок нет.',
+    analystVerdict: 'Вывод аналитика',
+    stillUnverified: 'Ещё не проверено',
+    citedClaims: 'Цитированные утверждения - дословные фрагменты источников',
+    priceNotVerified: 'ЦЕНА НЕ ПОДТВЕРЖДЕНА',
+    priceNotVerifiedSupport: 'Качественный разбор показан выше; точная вероятность и EV скрыты.',
+    riskDataCoverage: 'предупреждение о риске / покрытие данных',
+    periodPhase: 'Период / фаза',
+    statusSource: 'Источник статуса',
+    odds: 'Коэффициент',
+    confidenceHelpBlocked: 'Осторожная уверенность без расчёта цены',
+    confidenceHelpPriced: 'Насколько модель уверена в оценке',
+    pricingVerification: 'Проверка цены',
+    stake: 'Сумма ставки',
+    stakeAmount: 'Сумма ставки',
+    checkRisk: 'Проверить риск',
+    invalidStake: 'Введите корректную сумму ставки',
+    skipWatchSaved: 'Пропуск или наблюдение будет сохранено в истории решений.',
+  },
+} as const
 
 function scanStatusTone(message: string, scanning: boolean, mode: CaptureMode): BroadcastNoirStatus {
   if (scanning) return 'neutral'
@@ -287,8 +437,9 @@ export default function AIAnalystPage() {
   // ── Scanner ────────────────────────────────────────────────
   const runScanner = useCallback(async (file: File) => {
     const scanGeneration = scanGenerationGateRef.current.begin()
+    const copy = AI_PAGE_COPY[normalizeAiPageLocale(locale)]
     setScanning(true)
-    setScanMsg('Scanning coupon...')
+    setScanMsg(copy.scanningCoupon)
     try {
       const { data, media_type } = await fileToBase64(file)
       if (!scanGenerationGateRef.current.isCurrent(scanGeneration)) return
@@ -318,15 +469,15 @@ export default function AIAnalystPage() {
         liveEnvelope: snapshot.liveEnvelope,
       })
       setSport(SPORTS_LIST.includes(d.sport) ? d.sport as Sport : 'other')
-      setScanMsg('\u2705 Coupon scanned \u2014 review and analyze')
+      setScanMsg(`\u2705 ${copy.couponScanned}`)
     } catch {
       if (scanGenerationGateRef.current.isCurrent(scanGeneration)) {
-        setScanMsg('Scan error \u2014 try again')
+        setScanMsg(copy.scanError)
       }
     } finally {
       if (scanGenerationGateRef.current.finish(scanGeneration)) setScanning(false)
     }
-  }, [])
+  }, [locale])
 
   const selectCapture = useCallback((file: File) => {
     selectedFileRef.current = file
@@ -337,11 +488,11 @@ export default function AIAnalystPage() {
     setAnalysis(null)
     setRootErr('')
     if (captureMode === 'event') {
-      setScanMsg('Event capture is not connected yet — image kept for review.')
+      setScanMsg(AI_PAGE_COPY[normalizeAiPageLocale(locale)].eventCapturePending)
       return
     }
     void runScanner(file)
-  }, [captureMode, runScanner])
+  }, [captureMode, locale, runScanner])
 
   const removeCapture = useCallback(() => {
     selectedFileRef.current = null
@@ -358,12 +509,12 @@ export default function AIAnalystPage() {
     setCaptureMode(mode)
     setAnalysis(null)
     if (mode === 'event') {
-      setScanMsg(selectedFileRef.current ? 'Event capture is not connected yet — image kept for review.' : '')
+      setScanMsg(selectedFileRef.current ? AI_PAGE_COPY[normalizeAiPageLocale(locale)].eventCapturePending : '')
       return
     }
     if (selectedFileRef.current) void runScanner(selectedFileRef.current)
     else setScanMsg('')
-  }, [captureMode, runScanner, scanning])
+  }, [captureMode, locale, runScanner, scanning])
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const imageItem = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'))
@@ -379,22 +530,21 @@ export default function AIAnalystPage() {
     setErrors({})
     setRootErr('')
     setAnalysis(null)
+    const copy = AI_PAGE_COPY[normalizeAiPageLocale(locale)]
 
     if (scanGenerationGateRef.current.isActive()) {
-      setRootErr(locale === 'uk' ? 'Дочекайтеся завершення сканування купона.' : 'Wait for coupon scanning to finish.')
+      setRootErr(copy.waitForScan)
       return
     }
 
     const newErrors: Record<string, string> = {}
-    if (!form.event_name.trim()) newErrors.event_name = 'Required'
-    if (!form.market_type.trim()) newErrors.market_type = 'Required'
+    if (!form.event_name.trim()) newErrors.event_name = copy.required
+    if (!form.market_type.trim()) newErrors.market_type = copy.required
     const odds = parseFloat(form.odds)
-    if (!form.odds || isNaN(odds) || odds <= 1) newErrors.odds = 'Must be > 1.00'
+    if (!form.odds || isNaN(odds) || odds <= 1) newErrors.odds = copy.oddsInvalid
     if (Object.keys(newErrors).length) { setErrors(newErrors); return }
     if (liveCouponBlocked) {
-      setRootErr(locale === 'uk'
-        ? 'Live-аналіз недоступний без поточного рахунку, фази матчу, ігрового часу та актуальної live-лінії. Використайте pre-match купон.'
-        : 'Live analysis requires the current score, match phase, game clock, and current live odds. Use a pre-match coupon.')
+      setRootErr(copy.liveBlocked)
       return
     }
 
@@ -425,7 +575,7 @@ export default function AIAnalystPage() {
       })
       const json = await res.json()
       if (!res.ok || !json.success) {
-        setRootErr(json.error ?? 'Analysis failed. Try again.')
+        setRootErr(json.error ?? copy.analysisFailed)
         return
       }
       setAnalysis(json.data)
@@ -441,7 +591,7 @@ export default function AIAnalystPage() {
         }).catch(() => {})
       }
     } catch {
-      setRootErr('Network error \u2014 please try again.')
+      setRootErr(copy.networkError)
     } finally {
       setAnalyzing(false)
     }
@@ -458,9 +608,10 @@ export default function AIAnalystPage() {
     }
 
     if (action === 'placed') {
+      const copy = AI_PAGE_COPY[normalizeAiPageLocale(analysis.trust_view?.locale ?? analysis.output_language)]
       const stake = parseFloat(stakeStr)
       if (!stakeStr || isNaN(stake) || stake <= 0) {
-        setRootErr('Enter a valid stake amount')
+        setRootErr(copy.invalidStake)
         return
       }
       setSaving(true)
@@ -540,6 +691,7 @@ export default function AIAnalystPage() {
     if (!analysis) return
     const a = analysis
     const trustView = getAnalysisTrustView(a)
+    const pdfCopy = AI_PAGE_COPY[normalizeAiPageLocale(trustView?.locale ?? a.output_language)]
     const recLabels: Record<string, string> = { bet: 'BET', skip: 'SKIP', watch: 'WATCH', no_value: 'NO VALUE' }
     const showPricing = shouldShowPricingStats({
       qualityGate:        a.quality_gate,
@@ -551,9 +703,9 @@ export default function AIAnalystPage() {
       `<li><strong>${escapeHtml(leg.legLabel)} (${escapeHtml(leg.sportLabel)})</strong><ul>${
         [
           leg.eventName,
-          leg.periodOrPhase ? `${trustView?.locale === 'uk' ? 'Період / фаза' : 'Period / phase'}: ${leg.periodOrPhase}` : null,
-          leg.statusSourceLabel ? `${trustView?.locale === 'uk' ? 'Джерело статусу' : 'Status source'}: ${leg.statusSourceLabel}` : null,
-          leg.odds != null ? `${trustView?.locale === 'uk' ? 'Коефіцієнт' : 'Odds'}: ${leg.odds}` : null,
+          leg.periodOrPhase ? `${pdfCopy.periodPhase}: ${leg.periodOrPhase}` : null,
+          leg.statusSourceLabel ? `${pdfCopy.statusSource}: ${leg.statusSourceLabel}` : null,
+          leg.odds != null ? `${pdfCopy.odds}: ${leg.odds}` : null,
           `${leg.fixtureStatusLabel} · ${leg.supportLabel} · ${leg.actionabilityLabel}`,
           ...leg.missingData,
         ].filter(Boolean).map(item => `<li>${escapeHtml(item)}</li>`).join('')
@@ -595,10 +747,11 @@ export default function AIAnalystPage() {
     ).join('')
     const blockedTrustView = trustView && !showPricing ? trustView : null
     const localizedPdf = blockedTrustView?.locale === 'uk'
+    const russianPdf = blockedTrustView?.locale === 'ru'
     const pdfTitle = blockedTrustView ? blockedTrustView.pdfHeader : 'AI Analysis'
-    const factorHeader = localizedPdf ? 'Фактор' : 'Factor'
-    const scoreHeader = localizedPdf ? 'Бал' : 'Score'
-    const detailHeader = localizedPdf ? 'Деталі' : 'Detail'
+    const factorHeader = localizedPdf ? 'Фактор' : russianPdf ? 'Фактор' : 'Factor'
+    const scoreHeader = localizedPdf ? 'Бал' : russianPdf ? 'Балл' : 'Score'
+    const detailHeader = localizedPdf ? 'Деталі' : russianPdf ? 'Детали' : 'Detail'
     const generatedLabel = blockedTrustView ? blockedTrustView.generatedLabel : 'Generated'
     const footerLabel = blockedTrustView ? blockedTrustView.pdfFooter : 'Analysis is for informational purposes only'
     const metaSport = blockedTrustView ? localizeAnalystTrustSport(a.sport, blockedTrustView.locale) : a.sport.toUpperCase()
@@ -723,6 +876,8 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
   const a = analysis
   const trustView = a ? getAnalysisTrustView(a) : null
+  const uiLocale = normalizeAiPageLocale(trustView?.locale ?? locale)
+  const copy = AI_PAGE_COPY[uiLocale]
   const pricingVisible = a ? shouldShowPricingStats({
     qualityGate:        a.quality_gate,
     modelProbability:   a.model_probability,
@@ -960,9 +1115,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
         {liveCouponBlocked && (
           <BroadcastStatus className="w-full" role="alert" status="review">
-            {locale === 'uk'
-              ? 'LIVE ЗАБЛОКОВАНО: для чесного аналізу потрібні поточний рахунок, фаза, ігровий час та актуальна live-лінія. Цей модуль працює лише з pre-match купонами.'
-              : 'LIVE BLOCKED: a trustworthy analysis needs the current score, phase, game clock, and current live odds. This module supports pre-match coupons only.'}
+            {copy.liveBlocked}
           </BroadcastStatus>
         )}
 
@@ -976,13 +1129,13 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           disabled={analyzing || scanning || liveCouponBlocked}
         >
           {analyzing ? (
-            <>Analyzing…</>
+            <>{copy.analyzing}</>
           ) : scanning ? (
-            <>Scanning…</>
+            <>{copy.scanning}</>
           ) : liveCouponBlocked ? (
-            <>Live analysis unavailable</>
+            <>{copy.liveUnavailable}</>
           ) : (
-            <><Search size={14} strokeWidth={2} /> Analyze</>
+            <><Search size={14} strokeWidth={2} /> {copy.analyze}</>
           )}
         </button>
       </div>
@@ -992,14 +1145,14 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
         <div className="flex flex-col gap-4">
           <section className="rounded-control border border-bn-border-strong bg-bn-field px-5 py-4 text-bn-text" aria-label="Web research status">
             <BroadcastStatus status={a.web_search_used ? 'success' : a.web_search_attempted ? 'review' : 'neutral'}>
-              {a.web_search_used ? 'Current research verified' : a.web_search_attempted ? 'Current research unavailable' : 'Web research disabled'}
+              {a.web_search_used ? copy.webVerified : a.web_search_attempted ? copy.webUnavailable : copy.webDisabled}
             </BroadcastStatus>
             <p className="mt-2 text-sm font-bold leading-5">
               {a.web_search_used
-                ? `${a.research_sources?.length ?? 0} cited source${a.research_sources?.length === 1 ? '' : 's'} bound to exact claims.`
+                ? `${a.research_sources?.length ?? 0} ${copy.webVerifiedDetail}`
                 : a.web_search_attempted
-                  ? 'No current claim was accepted without an exact citation. Pricing remains hidden.'
-                  : 'This run contains conditional market logic only; no current fact is presented as verified.'}
+                  ? copy.webUnavailableDetail
+                  : copy.webDisabledDetail}
             </p>
             {a.web_search_failure_reason && (
               <p className="mt-2 font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-bn-muted">
@@ -1013,7 +1166,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               <div className="border-b border-bn-border-strong bg-bn-night px-5 py-4 text-bn-text">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="font-mono text-[11px] font-black uppercase tracking-[0.14em] text-bn-signal">
-                    Conditional market review
+                    {copy.conditionalMarketReview}
                   </p>
                   <span className="rounded-control border border-bn-border-strong px-2 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-bn-data">
                     {a.research_brief.legs.length} {a.research_brief.legs.length === 1 ? 'leg' : 'legs'}
@@ -1024,13 +1177,13 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 </h2>
                 <p className="mt-4 max-w-3xl text-sm leading-6 text-bn-muted">{a.research_brief.summary}</p>
                 <p className="mt-3 max-w-3xl border-l-2 border-bn-signal pl-3 font-mono text-[11px] font-bold uppercase leading-4 tracking-[0.08em] text-bn-muted">
-                  Narrative analysis is conditional. Only verbatim excerpts under Cited claims are bound to current sources.
+                  {copy.trustBoundary}
                 </p>
               </div>
 
               {a.research_brief.builderRisk && (
                 <div className="border-b border-bn-border-strong bg-bn-raised px-5 py-4">
-                  <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-review">Bet Builder correlation</p>
+                  <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-review">{copy.builderCorrelation}</p>
                   <p className="mt-2 text-sm font-semibold leading-6 text-bn-text">{a.research_brief.builderRisk}</p>
                 </div>
               )}
@@ -1055,15 +1208,15 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
                       <div className="mt-4 grid gap-4 md:grid-cols-2">
                         <div>
-                          <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-muted">Conditional logic</p>
+                          <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-muted">{copy.conditionalLogic}</p>
                           <ul className="mt-2 space-y-1.5 text-sm leading-5 text-bn-muted">
                             {leg.evidence.length > 0
                               ? leg.evidence.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>+ {item}</li>)
-                              : <li>+ No additional conditional note.</li>}
+                              : <li>+ {copy.noConditionalNote}</li>}
                           </ul>
                         </div>
                         <div>
-                          <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-muted">Failure modes</p>
+                          <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-muted">{copy.failureModes}</p>
                           <ul className="mt-2 space-y-1.5 text-sm leading-5 text-bn-muted">
                             {leg.risks.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>− {item}</li>)}
                           </ul>
@@ -1075,11 +1228,11 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               </div>
 
               <div className="border-t border-bn-border-strong px-5 py-5">
-                <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-muted">Analyst verdict</p>
+                <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-muted">{copy.analystVerdict}</p>
                 <p className="mt-2 text-base font-bold leading-6">{a.research_brief.verdict}</p>
                 {a.research_brief.dataGaps.length > 0 && (
                   <div className="mt-4 border-l-4 border-bn-review pl-4">
-                    <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-review">Still unverified</p>
+                    <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-review">{copy.stillUnverified}</p>
                     <ul className="mt-2 space-y-1 text-sm text-bn-muted">
                       {a.research_brief.dataGaps.map((item, itemIndex) => <li key={`${itemIndex}-${item}`}>— {item}</li>)}
                     </ul>
@@ -1089,7 +1242,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
               {a.research_brief.sourcedClaims.length > 0 && a.research_sources && a.research_sources.length > 0 && (
                 <div className="border-t border-bn-border-strong bg-bn-night px-5 py-5">
-                  <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-muted">Cited claims — verbatim source excerpts</p>
+                  <p className="font-mono text-[11px] font-black uppercase tracking-[0.12em] text-bn-muted">{copy.citedClaims}</p>
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
                     {a.research_brief.sourcedClaims.map((claim, claimIndex) => {
                       const source = a.research_sources?.find(item => item.url === claim.sourceUrl)
@@ -1135,19 +1288,15 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               no_value: 'AI does not recommend this market.',
             }
             const disclaimerText = trust && !showPricing ? trust.uiDisclaimer : a.disclaimer
-            const researchedNoPriceLabel = trust?.locale === 'uk' ? 'ЦІНУ НЕ ПІДТВЕРДЖЕНО' : 'PRICE NOT VERIFIED'
-            const researchedNoPriceSupport = trust?.locale === 'uk'
-              ? 'Якісний розбір наведено вище; точну ймовірність та EV приховано.'
-              : 'Qualitative research is shown above; probability and EV remain withheld.'
             return (
               <div className="flex flex-col gap-3 rounded-control border border-bn-border-strong bg-bn-field p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <BroadcastStatus status={showPricing ? rec.status : 'review'}>
-                      {showPricing ? rec.label : a.research_brief ? researchedNoPriceLabel : trust?.label ?? gate?.label ?? 'INSUFFICIENT DATA'}
+                      {showPricing ? rec.label : a.research_brief ? copy.priceNotVerified : trust?.label ?? gate?.label ?? 'INSUFFICIENT DATA'}
                     </BroadcastStatus>
                     <p className="mt-1 text-xs text-bn-muted">
-                      {showPricing ? recDetail[a.recommendation] : a.research_brief ? researchedNoPriceSupport : trust?.supportLabel ?? gate?.supportLabel ?? 'Unsupported / partially supported bet'}
+                      {showPricing ? recDetail[a.recommendation] : a.research_brief ? copy.priceNotVerifiedSupport : trust?.supportLabel ?? gate?.supportLabel ?? 'Unsupported / partially supported bet'}
                     </p>
                   </div>
                   {showPricing ? (
@@ -1158,7 +1307,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                   ) : (
                     <div className="text-right shrink-0">
                       <BroadcastStatus status={risk.status}>{localizedRiskLabel(a.risk_level, risk.label, trust)}</BroadcastStatus>
-                      <p className="mt-1 text-[11px] text-bn-muted">{trust ? `${trust.riskWarningLabel} / ${trust.dataCoverageLabel}` : 'risk warning / data coverage'}</p>
+                      <p className="mt-1 text-[11px] text-bn-muted">{trust ? `${trust.riskWarningLabel} / ${trust.dataCoverageLabel}` : copy.riskDataCoverage}</p>
                     </div>
                   )}
                 </div>
@@ -1209,13 +1358,13 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                               <div className="mt-1 text-bn-muted">{leg.eventName}</div>
                               <div className="text-bn-muted">{leg.marketType}{leg.selection ? ` / ${leg.selection}` : ''}</div>
                               {leg.periodOrPhase && (
-                                <div className="text-bn-muted">{trust.locale === 'uk' ? 'Період / фаза' : 'Period / phase'}: {leg.periodOrPhase}</div>
+                                <div className="text-bn-muted">{copy.periodPhase}: {leg.periodOrPhase}</div>
                               )}
                               {leg.statusSourceLabel && (
-                                <div className="text-bn-muted">{trust.locale === 'uk' ? 'Джерело статусу' : 'Status source'}: {leg.statusSourceLabel}</div>
+                                <div className="text-bn-muted">{copy.statusSource}: {leg.statusSourceLabel}</div>
                               )}
                               {leg.odds != null && (
-                                <div className="text-bn-data">{trust.locale === 'uk' ? 'Коефіцієнт' : 'Odds'}: {leg.odds}</div>
+                                <div className="text-bn-data">{copy.odds}: {leg.odds}</div>
                               )}
                               <div className="mt-1 text-bn-review">{leg.fixtureStatusLabel} · {leg.supportLabel} · {leg.actionabilityLabel}</div>
                               <ul className="mt-1 list-disc pl-4 text-bn-muted">
@@ -1242,9 +1391,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                     />
                   </div>
                   <div className="mt-1 text-[11px] text-bn-muted">
-                    {trust?.locale === 'uk'
-                      ? 'Обережна впевненість без розрахунку ціни'
-                      : 'How certain the model is in its estimate'}
+                    {showPricing ? copy.confidenceHelpPriced : copy.confidenceHelpBlocked}
                   </div>
                 </div>
 
@@ -1263,7 +1410,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           <div className="bn-panel flex flex-col gap-2 p-4">
             <h3 className="mb-1 text-sm font-semibold text-bn-text">
               {a.research_brief && !pricingVisible
-                ? (trustView?.locale === 'uk' ? 'Перевірка ціни' : 'Pricing verification')
+                ? copy.pricingVerification
                 : trustView?.factorAnalysisLabel ?? 'Factor Analysis'}
             </h3>
             {(trustView && !pricingVisible ? trustView.displayFactors : a.factors).map((f, i) => (
@@ -1313,13 +1460,13 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
           {showStake && !showRisk && (
             <div className="grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
               <div>
-                <label className="label" htmlFor="ai-stake">Stake</label>
+                <label className="label" htmlFor="ai-stake">{copy.stake}</label>
                 <input
                   id="ai-stake"
                   type="number"
                   step="0.01"
                   min="0.01"
-                  placeholder="Stake amount"
+                  placeholder={copy.stakeAmount}
                   className="input flex-1"
                   value={stakeStr}
                   onChange={e => { setStakeStr(e.target.value); setRootErr('') }}
@@ -1330,13 +1477,13 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
                 className="btn-primary px-5"
                 onClick={() => {
                   const s = parseFloat(stakeStr)
-                  if (!stakeStr || isNaN(s) || s <= 0) { setRootErr('Enter a valid stake amount'); return }
+                  if (!stakeStr || isNaN(s) || s <= 0) { setRootErr(copy.invalidStake); return }
                   setRootErr('')
                   setShowRisk(true)
                 }}
                 disabled={saving}
               >
-                Check Risk
+                {copy.checkRisk}
               </button>
               <button
                 aria-label="Close stake input"
@@ -1387,9 +1534,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
             </button>
           </div>
           <p className="text-center text-xs text-bn-muted">
-            {trustView?.locale === 'uk'
-              ? 'Пропуск або спостереження буде збережено в історії рішень.'
-              : 'Skipping or watching is a valid decision — it will be saved to your history.'}
+            {copy.skipWatchSaved}
           </p>
         </div>
       )}

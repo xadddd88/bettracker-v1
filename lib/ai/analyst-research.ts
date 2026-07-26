@@ -83,10 +83,139 @@ export type BuildAnalystResearchMessageInput = {
   legs?: AnalystPromptLeg[] | null
 }
 
+export type CouponEventTimeFixtureStatus = {
+  fixtureStatus: FixtureStatus | null
+  reason: 'past_date' | 'past_time' | 'future_time' | 'unparsed'
+}
+
 function cleanPromptValue(value: string | null | undefined): string | null {
   if (!value) return null
   const cleaned = value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim()
   return cleaned || null
+}
+
+function localDateTimeParts(utcIso: string, timeZone: string): {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+} | null {
+  const date = new Date(utcIso)
+  if (Number.isNaN(date.getTime())) return null
+
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+    const parts = Object.fromEntries(formatter.formatToParts(date).map(part => [part.type, part.value]))
+    const year = Number(parts.year)
+    const month = Number(parts.month)
+    const day = Number(parts.day)
+    const hour = Number(parts.hour)
+    const minute = Number(parts.minute)
+    if ([year, month, day, hour, minute].some(value => !Number.isInteger(value))) return null
+    return { year, month, day, hour, minute }
+  } catch {
+    return null
+  }
+}
+
+function compareLocalDateTime(
+  left: { year: number; month: number; day: number; hour: number; minute: number },
+  right: { year: number; month: number; day: number; hour: number; minute: number },
+): number {
+  for (const key of ['year', 'month', 'day', 'hour', 'minute'] as const) {
+    if (left[key] < right[key]) return -1
+    if (left[key] > right[key]) return 1
+  }
+  return 0
+}
+
+function addDays(parts: { year: number; month: number; day: number }, days: number): {
+  year: number
+  month: number
+  day: number
+} {
+  const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days, 12, 0, 0))
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate(),
+  }
+}
+
+function parseCouponEventDate(text: string, today: { year: number; month: number; day: number }): {
+  year: number
+  month: number
+  day: number
+} | null {
+  if (/\b(today)\b|сьогодні|сегодня/iu.test(text)) return today
+  if (/\b(tomorrow)\b|завтра/iu.test(text)) return addDays(today, 1)
+  if (/\b(yesterday)\b|вчора|вчера/iu.test(text)) return addDays(today, -1)
+
+  const iso = text.match(/\b(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})\b/)
+  if (iso) {
+    return {
+      year: Number(iso[1]),
+      month: Number(iso[2]),
+      day: Number(iso[3]),
+    }
+  }
+
+  const dmy = text.match(/\b(\d{1,2})[./-](\d{1,2})(?:[./-](20\d{2}))?\b/)
+  if (!dmy) return null
+  return {
+    day: Number(dmy[1]),
+    month: Number(dmy[2]),
+    year: dmy[3] ? Number(dmy[3]) : today.year,
+  }
+}
+
+function parseCouponEventTime(text: string): { hour: number; minute: number } | null {
+  const time = text.match(/(?:^|[^\d])([01]?\d|2[0-3])[:.hH]([0-5]\d)(?=$|[^\d])/)
+  if (!time) return null
+  return { hour: Number(time[1]), minute: Number(time[2]) }
+}
+
+export function inferCouponEventTimeFixtureStatus(input: {
+  couponEventTime?: string | null
+  clientTimezone?: string | null
+  currentUtcIso: string
+}): CouponEventTimeFixtureStatus {
+  const text = cleanPromptValue(input.couponEventTime)
+  if (!text) return { fixtureStatus: null, reason: 'unparsed' }
+
+  const timeZone = cleanPromptValue(input.clientTimezone) ?? 'UTC'
+  const now = localDateTimeParts(input.currentUtcIso, timeZone)
+  if (!now) return { fixtureStatus: null, reason: 'unparsed' }
+
+  const date = parseCouponEventDate(text, now)
+  if (!date) return { fixtureStatus: null, reason: 'unparsed' }
+
+  const time = parseCouponEventTime(text)
+  const target = {
+    ...date,
+    hour: time?.hour ?? 23,
+    minute: time?.minute ?? 59,
+  }
+  const comparison = compareLocalDateTime(target, now)
+
+  if (!time && compareLocalDateTime({ ...target, hour: 23, minute: 59 }, now) < 0) {
+    return { fixtureStatus: 'finished', reason: 'past_date' }
+  }
+
+  if (time && comparison <= 0) {
+    return { fixtureStatus: 'not_bettable', reason: 'past_time' }
+  }
+
+  return { fixtureStatus: 'scheduled', reason: 'future_time' }
 }
 
 function normalizedIdentity(value: string | null | undefined): string {

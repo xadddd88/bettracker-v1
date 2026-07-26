@@ -52,6 +52,7 @@ const {
   createAnalystScanGenerationGate,
   extractAnalystResearchSources,
   hasUnsupportedLiveAnalystInput,
+  inferCouponEventTimeFixtureStatus,
   parseStoredAnalystResearchBrief,
   parseStoredAnalystResearchSources,
   resolveAnalystWebSearchTelemetry,
@@ -1036,6 +1037,107 @@ test('trust view marks finished or live legs as not actionable and hides Watch',
   assert.equal(view.showSkip, true);
   assert.ok(text.includes('неактуально'));
   assert.ok(text.includes('подія вже почалась або завершилась'));
+});
+
+test('coupon event time marks already-started visible matches as not actionable', () => {
+  const past = inferCouponEventTimeFixtureStatus({
+    couponEventTime: 'Сегодня, 22:10',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: '2026-07-26T20:30:00.000Z',
+  });
+  const future = inferCouponEventTimeFixtureStatus({
+    couponEventTime: 'Сегодня, 22:10',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: '2026-07-26T18:30:00.000Z',
+  });
+  const oldDate = inferCouponEventTimeFixtureStatus({
+    couponEventTime: '25.07.2026',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: '2026-07-26T09:00:00.000Z',
+  });
+
+  assert.deepEqual(past, { fixtureStatus: 'not_bettable', reason: 'past_time' });
+  assert.deepEqual(future, { fixtureStatus: 'scheduled', reason: 'future_time' });
+  assert.deepEqual(oldDate, { fixtureStatus: 'finished', reason: 'past_date' });
+
+  const qualityGate = evaluateAnalysisQuality({
+    sport: 'soccer',
+    eventName: 'Spain - Argentina',
+    marketType: 'Match result',
+    selection: 'Spain',
+    webSearchEnabled: true,
+    modelProbability: 61,
+    modelInputsPresent: true,
+    sportModuleSupport: 'full',
+    fixtureStatus: past.fixtureStatus,
+    dataCoverage: {
+      liveInjuries: true,
+      teamNews: true,
+      recentForm: true,
+      lineMovement: true,
+    },
+  });
+
+  assert.equal(qualityGate.pricingAllowed, false);
+  assert.equal(qualityGate.actionability, 'not_actionable');
+  assert.equal(qualityGate.label, 'NOT ACTIONABLE - event already started or finished');
+  assertMissing(qualityGate, 'event actionability');
+});
+
+test('Russian selected language localizes blocked Analyst trust view without English fallback copy', () => {
+  const qualityGate = evaluateAnalysisQuality({
+    sport: 'soccer',
+    eventName: 'Испания - Аргентина + Alex De Minaur - Zachary Svajda',
+    marketType: 'Экспресс (2 ноги)',
+    selection: 'Испания + Alex De Minaur',
+    webSearchEnabled: false,
+    modelProbability: 28,
+  });
+  const view = buildAnalystTrustView({
+    qualityGate,
+    locale: 'ru',
+    eventName: 'Испания - Аргентина + Alex De Minaur - Zachary Svajda',
+    marketType: 'Экспресс (2 ноги)',
+    selection: 'Испания + Alex De Minaur',
+    rawReasoning: 'NO VALUE because Model probability is 28.0%.',
+    rawFactors: [{ name: 'Factor Analysis', score: -3, detail: 'Negative EV.' }],
+  });
+  const text = [
+    renderAnalystTrustSummaryText(view),
+    renderAnalystTrustShareText(view, {
+      sport: 'soccer',
+      eventName: 'Испания - Аргентина + Alex De Minaur - Zachary Svajda',
+      marketType: 'Экспресс (2 ноги)',
+      selection: 'Испания + Alex De Minaur',
+      offeredOdds: 2.2,
+    }),
+    renderAnalystTrustPdfText(view, {
+      sport: 'soccer',
+      eventName: 'Испания - Аргентина + Alex De Minaur - Zachary Svajda',
+      marketType: 'Экспресс (2 ноги)',
+      selection: 'Испания + Alex De Minaur',
+      offeredOdds: 2.2,
+    }),
+    view.uiDisclaimer,
+    view.watchLabel,
+    view.skipLabel,
+  ].join('\n');
+
+  assert.equal(view.locale, 'ru');
+  assert.equal(view.showRawAiAnalysis, false);
+  assert.equal(view.showPlaceBet, false);
+  assert.ok(text.includes('БЕЗ ОЦЕНКИ'), text);
+  assert.ok(text.includes('Предупреждение о риске'), text);
+  assert.ok(text.includes('Покрытие данных'), text);
+  assert.ok(text.includes('Список недостающих данных'), text);
+  assert.ok(text.includes('Нога 2'), text);
+  assert.ok(text.includes('теннис'), text);
+  assert.ok(text.includes('статус не проверен'), text);
+  assert.ok(text.includes('Наблюдать'), text);
+  assert.ok(text.includes('Пропустить'), text);
+  assert.ok(!text.includes('This analysis is based only'), text);
+  assert.ok(!text.includes('NO VALUE'), text);
+  assertNoForbiddenPricingText(text);
 });
 
 test('blocked Analyst payload replaces raw pricing-like reasoning and factors with safe trust view content', () => {
