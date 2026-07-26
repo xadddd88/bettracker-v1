@@ -123,7 +123,7 @@ Allow new users to sign up: OFF
 The current successful delivery uses the Supabase email service. Custom SMTP is not
 configured and remains a separate scale/readiness follow-up; it does not reopen #050.
 
-## 3. Sports Data Status## 3. Sports Data Status
+## 3. Sports Data Status
 
 ### Football fixtures and enrichment
 
