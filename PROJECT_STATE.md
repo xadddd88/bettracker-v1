@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-26 (production `main` at `9040673`; Decision #065 Web rollout closed and deployed; post-rollout Web audit correction #228 deployed; Decision #066 next unreserved)
+> Last updated: 2026-07-26 (production product-code milestone `9040673`; Decision #065 Web rollout closed and deployed; post-rollout Web audit correction #228 deployed; Decision #066 next unreserved)
 
 ## 1. Executive Status
 
