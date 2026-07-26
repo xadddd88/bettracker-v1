@@ -82,3 +82,13 @@ export function formatMoneyMinor(minor: bigint): string {
   const frac = (abs % MONEY_SCALE).toString().padStart(2, '0');
   return `${neg ? '-' : ''}${whole.toString()}.${frac}`;
 }
+
+/** Format scaled odds back to the canonical three-decimal representation. */
+export function formatOddsScaled(scaled: bigint): string {
+  if (scaled < MIN_ODDS_SCALED || scaled > MAX_ODDS_SCALED) {
+    throw new DomainInputError('odds_out_of_range', 'odds are outside the supported range');
+  }
+  const whole = scaled / ODDS_SCALE;
+  const frac = (scaled % ODDS_SCALE).toString().padStart(3, '0');
+  return `${whole.toString()}.${frac}`;
+}

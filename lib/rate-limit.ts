@@ -103,6 +103,10 @@ export const RATE_LIMITS = {
     { limit: envInt('RATE_LIMIT_TENNIS_SERIES_PER_MINUTE', 30), seconds: 60 },
     { limit: envInt('RATE_LIMIT_TENNIS_SERIES_PER_DAY', 500),   seconds: 86_400 },
   ],
+  tennisFortyFortyAnalysis: (): RateWindow[] => [
+    { limit: envInt('RATE_LIMIT_TENNIS_4040_PER_MINUTE', 6), seconds: 60 },
+    { limit: envInt('RATE_LIMIT_TENNIS_4040_PER_DAY', 60),   seconds: 86_400 },
+  ],
   cspReport: (): RateWindow[] => [
     { limit: envInt('RATE_LIMIT_CSP_REPORT_PER_MINUTE', 60), seconds: 60 },
     { limit: envInt('RATE_LIMIT_CSP_REPORT_PER_HOUR', 500),  seconds: 3_600 },

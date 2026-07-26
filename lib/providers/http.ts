@@ -4,6 +4,7 @@ import { sanitizeProviderError } from './errors'
 const DEFAULT_TIMEOUT_MS = 8000
 
 export interface ProviderRequestOptions {
+  cache?: RequestCache
   headers?: Record<string, string>
   timeoutMs?: number
 }
@@ -17,7 +18,7 @@ export async function providerFetch<T>(
   requestUrl: string,
   options: ProviderRequestOptions = {}
 ): Promise<T> {
-  const { headers = {}, timeoutMs = DEFAULT_TIMEOUT_MS } = options
+  const { cache, headers = {}, timeoutMs = DEFAULT_TIMEOUT_MS } = options
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
 
@@ -29,6 +30,7 @@ export async function providerFetch<T>(
       // redirect: 'error' — following a cross-origin redirect would re-send
       // provider auth headers (e.g. x-apisports-key) to the redirect target.
       response = await fetch(requestUrl, {
+        cache,
         method: 'GET',
         headers,
         redirect: 'error',

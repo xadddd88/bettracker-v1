@@ -24,8 +24,8 @@ const mathmod = require(path.join(buildDir, 'series-math.js'));
 const state = require(path.join(buildDir, 'series-state.js'));
 const vectors = JSON.parse(readFileSync(path.join(repoRoot, 'docs', 'tennis', 'golden-vectors.json'), 'utf8'));
 
-const { parseMoneyMinor, parseOddsScaled, formatMoneyMinor } = contract;
-const { requiredStakeMinorRaw, requiredStakeMinor, roundUpToStep, actualProfitMinor, targetMet, meetsTargetByProduct, defaultTargetProfitMinor, checkOpenBetLimits } = mathmod;
+const { parseMoneyMinor, parseOddsScaled, formatMoneyMinor, formatOddsScaled } = contract;
+const { requiredStakeMinorRaw, requiredStakeMinor, roundUpToStep, actualProfitMinor, targetMet, meetsTargetByProduct, defaultTargetProfitMinor, fixedOddsPlan, fixedOddsPlanForBankroll, checkOpenBetLimits } = mathmod;
 const { newSeries, openBet, settleBet, stopSeries, validateSeries, nextGameNumber } = state;
 
 // Raw-injection helpers: prefer the *_minor / *_scaled raw field when present, else parse
@@ -40,6 +40,47 @@ function test(name, fn) { try { fn(); passed++; } catch (e) { failed++; console.
 // ── default_target ───────────────────────────────────────────────────────────
 for (const v of vectors.default_target) test(`default_target: ${v.name}`, () => {
   assert.equal(formatMoneyMinor(defaultTargetProfitMinor(parseMoneyMinor(v.startingStake), parseOddsScaled(v.openingOdds))), v.expectedDefaultTarget);
+});
+
+test('fixed plan: $20 at 3.15 across 15 games requires the exact isolated bank', () => {
+  const plan = fixedOddsPlan(parseMoneyMinor('20.00'), parseOddsScaled('3.15'), 15);
+  assert.equal(formatMoneyMinor(plan.targetProfitMinor), '43.00');
+  assert.equal(formatMoneyMinor(plan.bankrollRequiredMinor), '13188.91');
+  assert.deepEqual(
+    plan.stakesMinor.map(formatMoneyMinor),
+    ['20.00', '29.31', '42.94', '62.91', '92.17', '135.04', '197.85', '289.87', '424.70', '622.23', '911.64', '1335.66', '1956.90', '2867.08', '4200.61'],
+  );
+  assert.equal(formatOddsScaled(parseOddsScaled('3.15')), '3.150');
+  let loss = BigInt(0);
+  for (const stake of plan.stakesMinor) {
+    assert.ok(actualProfitMinor(stake, parseOddsScaled('3.15'), loss) >= plan.targetProfitMinor);
+    loss += stake;
+  }
+});
+
+test('bank mode: derives the largest first stake whose full plan fits', () => {
+  const bank = parseMoneyMinor('5000.00');
+  const plan = fixedOddsPlanForBankroll(bank, parseOddsScaled('3.15'), 15);
+  assert.ok(plan.bankrollRequiredMinor <= bank);
+  const next = fixedOddsPlan(plan.initialStakeMinor + BigInt(1), parseOddsScaled('3.15'), 15);
+  assert.ok(next.bankrollRequiredMinor > bank);
+});
+
+test('bank mode property: returned first stake is cent-maximal across 100 plans', () => {
+  let seed = 918273n;
+  const rnd = (n) => {
+    seed = (seed * 6364136223846793005n + 1442695040888963407n) & ((1n << 64n) - 1n);
+    return Number(seed % BigInt(n));
+  };
+  for (let i = 0; i < 100; i++) {
+    const bank = BigInt(10000 + rnd(990000)); // $100.00 .. $9,999.99
+    const odds = BigInt(1500 + rnd(6501));    // 1.500 .. 8.000
+    const games = 1 + rnd(15);
+    const plan = fixedOddsPlanForBankroll(bank, odds, games);
+    assert.ok(plan.bankrollRequiredMinor <= bank);
+    const next = fixedOddsPlan(plan.initialStakeMinor + BigInt(1), odds, games);
+    assert.ok(next.bankrollRequiredMinor > bank);
+  }
 });
 
 // ── required_stake (+ product guarantee) ──────────────────────────────────────
