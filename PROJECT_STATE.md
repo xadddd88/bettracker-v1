@@ -108,19 +108,20 @@ trust-blocked AI Decision cannot be placed through UI or RPC
 
 ### Registration
 
-Decision #050 is **DEPLOYED / ROUTE-VERIFIED**, but not fully executed until the founder completes a real SMTP round-trip:
+Decision #050 is **EXECUTED / VERIFIED / CLOSED** as of 2026-07-26.
+
+Verified production evidence:
 
 ```txt
-approve test email
-→ request invite
-→ receive email
-→ click link
-→ set password
-→ dashboard
-→ beta_access: approved → invited → used
+founder-controlled invite: email received → action link → set password → dashboard
+beta_access lifecycle: approved → invited → used; used_by_user_id set; matching Auth user present
+non-allowlisted address: neutral response; 0 beta_access rows; 0 auth.users; no invite-send log
+Supabase Invite template: {{ .ConfirmationURL }}
+Allow new users to sign up: OFF
 ```
 
-Do not mark #050 fully executed before that manual verification.
+The current successful delivery uses the Supabase email service. Custom SMTP is not
+configured and remains a separate scale/readiness follow-up; it does not reopen #050.
 
 ## 3. Sports Data Status
 
@@ -170,14 +171,13 @@ Current safeguards:
 
 External beta remains paused because the product vision is not yet complete. Important open areas:
 
-1. Founder SMTP round-trip for Decision #050.
-2. Decision #054 Report-Only observation period; enforced CSP and nonce/hash Phase B remain unapproved.
-3. Decision #056 structural-presence runtime execution (implementation is merged and deployed; the production provider call remains separately blocked and has not been run).
-4. Odds ingestion/normalization and user-facing trust validation.
-5. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated. Decision #058 unifies the metric formulas (G4) and removes the misleading Void fallback (G12), but adds no new settlement semantics. Tracker legs in production still have no safe relationship to `canonical_fixtures` or `fixture_provider_links`. Closed docs-only Decision #063 defines the contract; active Decision #064 is merged as an unapplied migration/RPC foundation only, with no application caller or matching authority.
-6. Trusted Analyst/Scout v2 using verified provider data rather than ungrounded pricing.
-7. Full i18n UX, including Arabic RTL. Russian Web/auth coverage is improved, but full supported-language coverage is not complete.
-8. Mobile/tablet product polish and closed-beta onboarding.
+1. Decision #054 Report-Only observation period; enforced CSP and nonce/hash Phase B remain unapproved.
+2. Decision #056 structural-presence runtime execution (implementation is merged and deployed; the production provider call remains separately blocked and has not been run).
+3. Odds ingestion/normalization and user-facing trust validation.
+4. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated. Decision #058 unifies the metric formulas (G4) and removes the misleading Void fallback (G12), but adds no new settlement semantics. Tracker legs in production still have no safe relationship to `canonical_fixtures` or `fixture_provider_links`. Closed docs-only Decision #063 defines the contract; active Decision #064 is merged as an unapplied migration/RPC foundation only, with no application caller or matching authority.
+5. Trusted Analyst/Scout v2 using verified provider data rather than ungrounded pricing.
+6. Full i18n UX, including Arabic RTL. Russian Web/auth coverage is improved, but full supported-language coverage is not complete.
+7. Mobile/tablet product polish and closed-beta onboarding.
 
 ## 6. Holds
 
@@ -200,6 +200,7 @@ Decision #065 — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via #202 → #224; no
 
 ## 7. Documentation and Migration Status
 
+- Decision #050 is EXECUTED / VERIFIED / CLOSED after the founder-confirmed production invite lifecycle, negative non-allowlisted check, and Supabase template/signup-control verification recorded on 2026-07-26.
 - Decision #053 reconciled this file, README, the numbering ledger, and the migration inventory.
 - Decision #063 was approved and merged docs-only via PR #183 as `df4723f`.
 - Decision #064 implementation merged via PR #186 as `4fce917701b95b3d3ad98ad9f157d02216323d3e`: additive migration 025, `create_tracked_bet_v2`, lineage constraints/triggers, rollback, and status docs. The migration remains unapplied and no caller/runtime authority exists.

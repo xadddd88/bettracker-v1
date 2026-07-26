@@ -2,11 +2,13 @@
 
 ## Status
 
-PARTIALLY EXECUTED 2026-07-10 — migration 021 applied + verified, PR #133 merged (production
-`60cb28c`), live routes verified server-side. **SMTP email round-trip PENDING founder test.**
-See `docs/registration-invite-flow-execution-record-050.md`.
+EXECUTED / VERIFIED / CLOSED 2026-07-26 — migration 021 applied + verified, PR #133
+merged (production `60cb28c`), live routes verified server-side, founder-controlled
+email round-trip confirmed, negative non-allowlisted path verified, and Supabase Invite
+template/signup controls verified. See
+`docs/registration-invite-flow-execution-record-050.md`.
 
-Last updated: 2026-07-10
+Last updated: 2026-07-26
 
 ## Context
 
@@ -63,20 +65,22 @@ registered → neutral, invalid email 400, rate-limit 429; complete-invite auth-
 consume-on-completion, idempotent same-user, 403 for foreign/revoked; callback open-redirect
 guard; set-password session gate; migration 021 enum.
 
-## Execution requirement (before trusting production)
+## Execution verification (completed 2026-07-26)
 
-`inviteUserByEmail` depends on Supabase SMTP (already configured — magic-link login works).
-A real email round-trip MUST be tested by the founder before this is considered live:
-1. Apply migration 021.
-2. Deploy.
-3. Approve a test email in `beta_access`, request an invite, receive the email, click the
-   link, land on `/auth/set-password`, set a password, reach the dashboard.
-4. Confirm the `beta_access` row moved `approved → invited → used`.
-5. Confirm a non-allowlisted email gets the neutral message and NO email.
+1. Founder confirmed a controlled production invite completed the real mailbox path:
+   invite received → action link opened → password set → dashboard reached.
+2. Read-only production state showed the same lifecycle reached `used`, with
+   `invited_at`, `used_at`, `used_by_user_id`, and the matching Auth user present.
+3. A unique non-allowlisted address received the neutral production response while creating
+   0 `beta_access` rows and 0 `auth.users`; Auth logs showed no invite-send attempt for
+   that address.
+4. Supabase Auth → Email Templates → Invite uses `{{ .ConfirmationURL }}`; the production
+   code supplies `/auth/callback?next=/auth/set-password` as the redirect target.
+5. Supabase Auth keeps "Allow new users to sign up" OFF.
 
-Supabase dashboard follow-up (founder): ensure the invite email template's action link points
-to the site `/auth/callback` (Auth → Email Templates → Invite), and keep "Enable email
-signups" OFF (allowlist is enforced server-side; the invite path uses the service role).
+The verified delivery uses the current Supabase email service. Custom SMTP is not configured
+and remains a separate scale/readiness follow-up before wider beta; it does not block or
+reopen Decision #050.
 
 ## Non-goals
 
