@@ -256,6 +256,7 @@ function clearCompiledModules() {
     'lib/supabase/request-auth.js',
     'lib/supabase/admin.js',
     'lib/rate-limit.js',
+    'lib/analytics/server.js',
   ]
   for (const rel of rels) {
     try {
@@ -312,6 +313,18 @@ function stubCompiledModules() {
       },
     },
   }
+
+  const analyticsPath = path.join(buildDir, 'lib/analytics/server.js')
+  require.cache[require.resolve(analyticsPath)] = {
+    id: analyticsPath,
+    filename: analyticsPath,
+    loaded: true,
+    exports: {
+      trackServerEvent: async (distinctId, event, props) => {
+        current.calls.analytics.push({ distinctId, event, props })
+      },
+    },
+  }
 }
 
 function withCompiledAlias(fn) {
@@ -335,7 +348,7 @@ async function invoke(command, options = {}) {
       rate: options.rate ?? { allowed: true, retryAfter: 0, unavailable: false },
       rpc: options.rpc ?? { data: defaultResults[command], error: null },
       adminThrows: options.adminThrows ?? false,
-      calls: { auth: 0, rate: [], admin: 0, rpc: [] },
+      calls: { auth: 0, rate: [], admin: 0, rpc: [], analytics: [] },
     }
     stubCompiledModules()
 
@@ -488,6 +501,7 @@ await testAsync('unexpected database detail is never returned to the client', as
   const result = await invoke('create', { rpc: { data: null, error: { message: detail } } })
   assert.equal(result.status, 500)
   assert.ok(!JSON.stringify(result.body).includes(detail))
+  assert.equal(result.calls.analytics.length, 0)
 })
 
 await testAsync('malformed RPC success result fails closed', async () => {
@@ -526,6 +540,14 @@ await testAsync('create uses session-derived owner and canonical decimal strings
       p_match_label: 'Gate fixture',
     },
   })
+  assert.deepEqual(result.calls.analytics, [{
+    distinctId: OWNER,
+    event: 'tennis_series_created',
+    props: {
+      replayed: false,
+      resulting_status: 'draft',
+    },
+  }])
 })
 
 await testAsync('confirm delegates only operator-entered values', async () => {
@@ -591,6 +613,15 @@ await testAsync('settle delegates a win with canonical actual_return', async () 
       p_actual_return: '66.80',
     },
   })
+  assert.deepEqual(result.calls.analytics, [{
+    distinctId: OWNER,
+    event: 'tennis_step_settled',
+    props: {
+      replayed: false,
+      resulting_status: 'completed_win',
+      outcome: 'won',
+    },
+  }])
 })
 
 await testAsync('stop delegates exactly once and returns versioned state', async () => {

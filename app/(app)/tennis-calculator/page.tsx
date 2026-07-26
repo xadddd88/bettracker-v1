@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation'
 
 import { BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
+import { EVENTS } from '@/lib/analytics/events'
+import { PageView } from '@/lib/analytics/PageView'
 import { checkTennisCalcAccess } from '@/lib/flags/tennis-calc'
 import { createClient } from '@/lib/supabase/server'
 import type {
@@ -94,6 +96,7 @@ export default async function TennisCalculatorPage() {
 
   return (
     <main className="bn-page mx-auto flex w-full max-w-3xl flex-col gap-4 pb-8">
+      <PageView event={EVENTS.TENNIS_CALCULATOR_VIEWED} />
       <BroadcastPanel className="p-5 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="editorial-kicker">Training tool · manual entry</p>

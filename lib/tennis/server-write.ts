@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { EVENTS } from '@/lib/analytics/events'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { checkTennisCalcAccess } from '@/lib/flags/tennis-calc'
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -153,6 +155,13 @@ const rpcNames = {
   stop: 'tennis_stop_series',
 } as const
 
+const successEvents = {
+  create: EVENTS.TENNIS_SERIES_CREATED,
+  confirm: EVENTS.TENNIS_STEP_CONFIRMED,
+  settle: EVENTS.TENNIS_STEP_SETTLED,
+  stop: EVENTS.TENNIS_SERIES_STOPPED,
+} as const
+
 function rpcArgs(command: TennisCommand, userId: string, input: Record<string, unknown>) {
   const args: Record<string, unknown> = { p_user_id: userId }
   for (const [key, value] of Object.entries(input)) args[`p_${key}`] = value
@@ -266,6 +275,14 @@ export async function runTennisWrite(req: Request, command: TennisCommand): Prom
       console.error(`[tennis-series] ${command} returned a malformed result`)
       return NextResponse.json({ error: 'Transaction failed' }, { status: 500 })
     }
+
+    await trackServerEvent(auth.user.id, successEvents[command], {
+      replayed: validated.data.replayed,
+      resulting_status: validated.data.status,
+      ...(command === 'settle'
+        ? { outcome: (parsed.data as z.infer<typeof settleSchema>).result }
+        : {}),
+    })
 
     return NextResponse.json({ success: true, ...validated.data })
   } catch (error) {
