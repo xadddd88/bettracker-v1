@@ -41,7 +41,7 @@ The verified delivery uses the current Supabase email service. Custom SMTP is no
 and remains a separate scale/readiness follow-up before wider beta; it is not part of this
 closure and does not reopen Decision #050.
 
-## Security properties confirmed server-side## Security properties confirmed server-side
+## Security properties confirmed server-side
 
 - The password path (`createUser({ email_confirm: true, password })`) is gone — no account is
   created from a caller-supplied password.
