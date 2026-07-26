@@ -75,8 +75,8 @@ export default function LoginPage() {
         : 'Войти в рабочее пространство'
 
   return (
-    <main className="web-editorial grid min-h-screen bg-[var(--night)] lg:grid-cols-[minmax(0,1.35fr)_minmax(420px,0.65fr)]">
-      <section className="relative flex min-h-[44vh] flex-col overflow-hidden border-b border-[var(--border-strong)] bg-[var(--night)] p-5 text-[var(--text-primary)] lg:min-h-screen lg:border-b-0 lg:border-r lg:p-10">
+    <main className="web-editorial grid min-h-screen min-w-0 grid-cols-[minmax(0,1fr)] bg-[var(--night)] lg:grid-cols-[minmax(0,1.35fr)_minmax(420px,0.65fr)]">
+      <section className="relative flex min-h-[44vh] min-w-0 flex-col overflow-hidden border-b border-[var(--border-strong)] bg-[var(--night)] p-5 text-[var(--text-primary)] lg:min-h-screen lg:border-b-0 lg:border-r lg:p-10">
         <div className="pointer-events-none absolute -bottom-6 -left-4 select-none font-display text-[clamp(7rem,18vw,18rem)] font-black leading-none tracking-[-0.08em] text-bn-raised/20" aria-hidden>
           BETTRACKER
         </div>
@@ -101,7 +101,7 @@ export default function LoginPage() {
         </div>
       </section>
 
-      <section className="flex items-center bg-[var(--field)] px-5 py-10 text-[var(--text-primary)] md:px-10 lg:px-12">
+      <section className="flex min-w-0 items-center bg-[var(--field)] px-5 py-10 text-[var(--text-primary)] md:px-10 lg:px-12">
         <div className="editorial-page w-full max-w-xl lg:mx-auto">
           <div className="flex items-end justify-between border-b border-[var(--border-strong)] pb-4">
             <div className="min-w-0">
