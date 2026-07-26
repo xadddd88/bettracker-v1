@@ -11,13 +11,19 @@ import {
 } from '@/components/ui/BroadcastNoir'
 import {
   formatMoneyMinor,
+  formatOddsScaled,
   parseMoneyMinor,
   parseOddsScaled,
 } from '@/lib/tennis/contract'
 import {
   actualProfitMinor,
   checkOpenBetLimits,
+  checkedAdd,
+  growingOddsPlan,
+  growingOddsPlanForBankroll,
   requiredStakeMinor,
+  targetProfitForGameMinor,
+  type GrowingOddsPlan,
 } from '@/lib/tennis/series-math'
 import type {
   TennisSeriesSnapshot,
@@ -36,17 +42,27 @@ interface CommandResponse {
 type OperationCache = Record<string, { payload: string; id: string }>
 
 const OPEN_STATUSES = new Set(['draft', 'active'])
+const FIXED_ODDS_FORMULA = 'v2-fixed-odds:'
+const GROWING_ODDS_FORMULA = 'v3-growing-odds:'
 
-const CREATE_INITIAL = {
+type CalculationMode = 'initial_stake' | 'maximum_bank'
+
+interface CreateState {
+  calculationMode: CalculationMode
+  matchLabel: string
+  calculationOdds: string
+  initialStake: string
+  maximumSteps: string
+  bankrollLimit: string
+}
+
+const CREATE_INITIAL: CreateState = {
+  calculationMode: 'initial_stake',
   matchLabel: '',
-  targetProfit: '',
+  calculationOdds: '3.15',
   initialStake: '20.00',
-  stakeIncrement: '0.01',
-  currencyOrUnit: 'USD',
-  bankrollLimit: '',
-  maximumStake: '',
   maximumSteps: '15',
-  exposureLimit: '',
+  bankrollLimit: '5000.00',
 }
 
 function commandOperation(
@@ -76,14 +92,90 @@ function parseSignedMoneyMinor(value: string): bigint {
   return -parseMoneyMinor(value.slice(1))
 }
 
+function fixedOddsFromFormula(formulaVersion: string | null | undefined): string {
+  const prefix = formulaVersion?.startsWith(GROWING_ODDS_FORMULA)
+    ? GROWING_ODDS_FORMULA
+    : formulaVersion?.startsWith(FIXED_ODDS_FORMULA)
+      ? FIXED_ODDS_FORMULA
+      : ''
+  if (!formulaVersion || !prefix) return ''
+  const value = formulaVersion.slice(prefix.length)
+  try {
+    return formatOddsScaled(parseOddsScaled(value))
+  } catch {
+    return ''
+  }
+}
+
+function growingOddsFormula(odds: string): string {
+  return `${GROWING_ODDS_FORMULA}${formatOddsScaled(parseOddsScaled(odds))}`
+}
+
+function usesGrowingProfit(formulaVersion: string | null | undefined): boolean {
+  return formulaVersion?.startsWith(GROWING_ODDS_FORMULA) ?? false
+}
+
+function seriesTargetProfitForStep(series: TennisSeriesSnapshot, stepNumber: number): bigint {
+  const baseTargetProfitMinor = parseMoneyMinor(series.target_profit)
+  return usesGrowingProfit(series.formula_version)
+    ? targetProfitForGameMinor(baseTargetProfitMinor, stepNumber)
+    : baseTargetProfitMinor
+}
+
+function buildCreatePlan(create: CreateState): {
+  configuredBankMinor: bigint
+  plan: GrowingOddsPlan
+} {
+  const games = Number(create.maximumSteps)
+  if (!Number.isInteger(games) || games < 1 || games > 15) {
+    throw new Error('Количество геймов должно быть целым числом от 1 до 15.')
+  }
+
+  const odds = parseOddsScaled(create.calculationOdds)
+  if (create.calculationMode === 'initial_stake') {
+    const plan = growingOddsPlan(parseMoneyMinor(create.initialStake), odds, games)
+    return { configuredBankMinor: plan.bankrollRequiredMinor, plan }
+  }
+
+  const configuredBankMinor = parseMoneyMinor(create.bankrollLimit)
+  return {
+    configuredBankMinor,
+    plan: growingOddsPlanForBankroll(configuredBankMinor, odds, games),
+  }
+}
+
+function createPlanError(error: unknown): string {
+  if (!(error instanceof Error)) return 'Проверьте введённые значения.'
+  if (error.message.includes('odds')) return 'Коэффициент должен быть от 1.01 до 20.00.'
+  if (error.message.includes('money') || error.message.includes('stake')) {
+    return 'Ставка и банк должны быть больше нуля, максимум с двумя знаками после запятой.'
+  }
+  if (error.message.includes('bankroll')) {
+    return 'Этого банка недостаточно для выбранного коэффициента и количества геймов.'
+  }
+  return error.message || 'Проверьте введённые значения.'
+}
+
+function limitReasonLabel(reason: string): string {
+  const labels: Record<string, string> = {
+    required_exceeds_remaining_bank: 'рассчитанная ставка превышает остаток банка',
+    actual_exceeds_remaining_bank: 'ставка превышает остаток банка',
+    required_exceeds_per_bet_limit: 'рассчитанная ставка превышает лимит',
+    actual_exceeds_per_bet_limit: 'ставка превышает лимит',
+    required_exceeds_series_exposure: 'серия превышает максимальный банк',
+    actual_exceeds_series_exposure: 'серия превышает максимальный банк',
+  }
+  return labels[reason] ?? 'проверьте параметры серии'
+}
+
 function statusLabel(status: TennisSeriesSnapshot['status']): string {
   const labels: Record<TennisSeriesSnapshot['status'], string> = {
-    draft: 'Draft',
-    active: 'Active',
-    completed_win: 'Won · closed',
-    stopped: 'Stopped',
-    limit_reached: 'Limit reached',
-    cancelled: 'Cancelled',
+    draft: 'Готова',
+    active: 'Активна',
+    completed_win: 'Выигрыш · завершена',
+    stopped: 'Остановлена',
+    limit_reached: 'Лимит достигнут',
+    cancelled: 'Отменена',
   }
   return labels[status]
 }
@@ -96,17 +188,12 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [showCreate, setShowCreate] = useState(initialSeries === null)
-  const [riskAccepted, setRiskAccepted] = useState(false)
   const [create, setCreate] = useState(CREATE_INITIAL)
 
-  const [quotedOdds, setQuotedOdds] = useState('')
-  const [acceptedOdds, setAcceptedOdds] = useState('')
-  const [acceptedStake, setAcceptedStake] = useState('')
-  const [setNumber, setSetNumber] = useState('')
-  const [gameNumber, setGameNumber] = useState('')
+  const configuredOdds = fixedOddsFromFormula(initialSeries?.formula_version)
+  const [quotedOdds, setQuotedOdds] = useState(configuredOdds)
 
   const [settlement, setSettlement] = useState<'won' | 'lost' | 'void' | ''>('')
-  const [actualReturn, setActualReturn] = useState('')
   const [stopArmed, setStopArmed] = useState(false)
 
   async function submitCommand(
@@ -146,27 +233,24 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
   }
 
   async function createSeries() {
-    if (!riskAccepted) {
-      setMessage('Confirm the training risk notice first.')
-      return
-    }
-
-    const maximumSteps = Number(create.maximumSteps)
-    if (!Number.isInteger(maximumSteps)) {
-      setMessage('Maximum steps must be a whole number.')
+    let preview: ReturnType<typeof buildCreatePlan>
+    try {
+      preview = buildCreatePlan(create)
+    } catch (error) {
+      setMessage(createPlanError(error))
       return
     }
 
     await submitCommand('create', '/api/tennis/series/create', {
-      target_profit: create.targetProfit,
-      initial_stake: create.initialStake || null,
-      stake_increment: create.stakeIncrement,
-      currency_or_unit: create.currencyOrUnit,
-      bankroll_limit: create.bankrollLimit,
-      maximum_stake: create.maximumStake || null,
-      maximum_steps: maximumSteps,
-      exposure_limit: create.exposureLimit,
-      formula_version: 'v1',
+      target_profit: formatMoneyMinor(preview.plan.targetProfitMinor),
+      initial_stake: formatMoneyMinor(preview.plan.initialStakeMinor),
+      stake_increment: '0.01',
+      currency_or_unit: 'USD',
+      bankroll_limit: formatMoneyMinor(preview.configuredBankMinor),
+      maximum_stake: null,
+      maximum_steps: Number(create.maximumSteps),
+      exposure_limit: formatMoneyMinor(preview.configuredBankMinor),
+      formula_version: growingOddsFormula(create.calculationOdds),
       match_label: create.matchLabel.trim() || null,
     })
   }
@@ -181,20 +265,22 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
   let blockReason: string | null = null
   if (series && isOpen && !pendingStep && quotedOdds) {
     try {
+      const stepNumber = series.steps.length + 1
+      const stepTargetProfitMinor = seriesTargetProfitForStep(series, stepNumber)
       const recommendedMinor = series.steps.length === 0 && series.initial_stake
         ? parseMoneyMinor(series.initial_stake)
         : requiredStakeMinor(
             loss,
-            parseMoneyMinor(series.target_profit),
+            stepTargetProfitMinor,
             parseOddsScaled(quotedOdds),
             parseMoneyMinor(series.stake_increment),
           )
       recommendation = formatMoneyMinor(recommendedMinor)
 
-      const actualStakeMinor = parseMoneyMinor(acceptedStake || recommendation)
+      const actualStakeMinor = recommendedMinor
       const remainingBank = parseMoneyMinor(series.bankroll_limit) - loss
       if (remainingBank < BigInt(0)) {
-        blockReason = 'Recorded loss exceeds the isolated series bank.'
+        blockReason = 'текущий минус превышает максимальный банк'
       } else {
         const limit = checkOpenBetLimits({
           requiredStakeMinor: recommendedMinor,
@@ -206,12 +292,12 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
             : parseMoneyMinor(series.bankroll_limit),
           seriesExposureLimitMinor: parseMoneyMinor(series.exposure_limit),
         })
-        if (!limit.ok) blockReason = limit.reason.replaceAll('_', ' ')
+        if (!limit.ok) blockReason = limitReasonLabel(limit.reason)
       }
 
       projected = signedMoney(actualProfitMinor(
         actualStakeMinor,
-        parseOddsScaled(acceptedOdds || quotedOdds),
+        parseOddsScaled(quotedOdds),
         loss,
       ))
     } catch {
@@ -222,35 +308,46 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
 
   async function confirmStep() {
     if (!series || !recommendation || blockReason) {
-      setMessage(blockReason ? 'BLOCKED by the configured series limits.' : 'Enter valid odds and stake.')
+      setMessage(blockReason ? `Лимит: ${blockReason}.` : 'Введите корректный коэффициент.')
       return
     }
     await submitCommand('confirm', '/api/tennis/series/confirm', {
       series_id: series.id,
       expected_version: series.version,
-      set_number: setNumber ? Number(setNumber) : null,
-      game_number: gameNumber ? Number(gameNumber) : null,
+      set_number: null,
+      game_number: null,
       quoted_odds: quotedOdds,
-      accepted_odds: acceptedOdds || quotedOdds,
-      accepted_stake: acceptedStake || recommendation,
+      accepted_odds: quotedOdds,
+      accepted_stake: recommendation,
     })
   }
 
   async function settleStep() {
     if (!series || !pendingStep || !settlement) {
-      setMessage('Choose Win, Loss, or Void.')
+      setMessage('Выберите результат: выигрыш, проигрыш или возврат.')
       return
     }
-    if (settlement === 'won' && !actualReturn) {
-      setMessage('Enter the actual total return for a win.')
+
+    let winReturn: string | null = null
+    try {
+      const stakeMinor = parseMoneyMinor(pendingStep.accepted_stake)
+      winReturn = settlement === 'won'
+        ? formatMoneyMinor(checkedAdd(
+            stakeMinor,
+            actualProfitMinor(stakeMinor, parseOddsScaled(pendingStep.accepted_odds), BigInt(0)),
+          ))
+        : null
+    } catch {
+      setMessage('Не удалось рассчитать выплату. Обновите страницу и попробуйте ещё раз.')
       return
     }
+
     await submitCommand('settle', '/api/tennis/series/settle', {
       series_id: series.id,
       step_id: pendingStep.id,
       expected_version: series.version,
       result: settlement,
-      actual_return: settlement === 'won' ? actualReturn : null,
+      actual_return: winReturn,
     })
   }
 
@@ -262,131 +359,267 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
     })
   }
 
+  let createPreview: ReturnType<typeof buildCreatePlan> | null = null
+  try {
+    createPreview = buildCreatePlan(create)
+  } catch {
+    createPreview = null
+  }
+
   if (!series || showCreate) {
+    const displayedInitialStake = create.calculationMode === 'initial_stake'
+      ? create.initialStake
+      : createPreview
+        ? formatMoneyMinor(createPreview.plan.initialStakeMinor)
+        : ''
+    const displayedMaximumBank = create.calculationMode === 'maximum_bank'
+      ? create.bankrollLimit
+      : createPreview
+        ? formatMoneyMinor(createPreview.configuredBankMinor)
+        : ''
+    const previewRows = createPreview
+      ? (() => {
+          const odds = parseOddsScaled(create.calculationOdds)
+          let accumulatedBeforeMinor = BigInt(0)
+          return createPreview.plan.stakesMinor.map((stakeMinor, index) => {
+            const accumulatedWithCurrentMinor = checkedAdd(accumulatedBeforeMinor, stakeMinor)
+            const profitOnWinMinor = actualProfitMinor(stakeMinor, odds, accumulatedBeforeMinor)
+            const targetProfitMinor = createPreview.plan.targetProfitsMinor[index]
+            accumulatedBeforeMinor = accumulatedWithCurrentMinor
+            return {
+              game: index + 1,
+              stakeMinor,
+              accumulatedWithCurrentMinor,
+              profitOnWinMinor,
+              targetProfitMinor,
+            }
+          })
+        })()
+      : []
+
     return (
       <div className="flex flex-col gap-4">
         <BroadcastPanel className="p-4 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="editorial-kicker">01 · isolated configuration</p>
+              <p className="editorial-kicker">Новая серия</p>
               <h2 className="mt-2 font-display text-3xl font-black tracking-[-0.045em] text-bn-text">
-                New series
+                Параметры расчёта
               </h2>
             </div>
             {series ? (
               <BroadcastButton tone="secondary" onClick={() => setShowCreate(false)}>
-                Back
+                Назад
               </BroadcastButton>
             ) : null}
           </div>
 
+          <p className="mt-6 text-xs font-black uppercase tracking-[0.16em] text-bn-muted">
+            Выберите, что вводите вручную
+          </p>
+          <div className="mt-2 grid grid-cols-2 overflow-hidden rounded-control border border-bn-border-strong">
+            <button
+              type="button"
+              aria-pressed={create.calculationMode === 'initial_stake'}
+              className={`min-h-12 border-r border-bn-border-strong px-3 text-sm font-black transition-colors ${
+                create.calculationMode === 'initial_stake'
+                  ? 'bg-bn-signal text-bn-on-signal'
+                  : 'bg-bn-field text-bn-muted hover:bg-bn-raised hover:text-bn-text'
+              }`}
+              onClick={() => {
+                setCreate(value => ({ ...value, calculationMode: 'initial_stake' }))
+                setMessage('')
+              }}
+            >
+              Ввожу начальную ставку
+            </button>
+            <button
+              type="button"
+              aria-pressed={create.calculationMode === 'maximum_bank'}
+              className={`min-h-12 px-3 text-sm font-black transition-colors ${
+                create.calculationMode === 'maximum_bank'
+                  ? 'bg-bn-signal text-bn-on-signal'
+                  : 'bg-bn-field text-bn-muted hover:bg-bn-raised hover:text-bn-text'
+              }`}
+              onClick={() => {
+                setCreate(value => ({ ...value, calculationMode: 'maximum_bank' }))
+                setMessage('')
+              }}
+            >
+              Ввожу максимальный банк
+            </button>
+          </div>
+          <p className="mt-3 text-xs leading-5 text-bn-muted">
+            {create.calculationMode === 'initial_stake'
+              ? 'Введите начальную ставку — необходимый банк рассчитается автоматически.'
+              : 'Введите максимальный банк — начальная ставка рассчитается автоматически.'}
+          </p>
+
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <label className="sm:col-span-2">
-              <span className="label">Match label · optional</span>
+              <span className="label">Название матча · необязательно</span>
               <input
                 className="input"
                 maxLength={200}
                 value={create.matchLabel}
-                onChange={event => setCreate(value => ({ ...value, matchLabel: event.target.value }))}
-                placeholder="Player A vs Player B"
+                onChange={event => {
+                  setCreate(value => ({ ...value, matchLabel: event.target.value }))
+                  setMessage('')
+                }}
+                placeholder="Кто против кого"
               />
             </label>
             <label>
-              <span className="label">Target series profit</span>
+              <span className="label">Коэффициент для расчёта</span>
               <input
                 className="input font-mono"
                 inputMode="decimal"
-                value={create.targetProfit}
-                onChange={event => setCreate(value => ({ ...value, targetProfit: event.target.value }))}
-                placeholder="5.00"
+                min="1.01"
+                max="20"
+                step="0.001"
+                value={create.calculationOdds}
+                onChange={event => {
+                  setCreate(value => ({ ...value, calculationOdds: event.target.value }))
+                  setMessage('')
+                }}
+                placeholder="3.15"
               />
             </label>
             <label>
-              <span className="label">Game 1 stake · optional</span>
-              <input
-                className="input font-mono"
-                inputMode="decimal"
-                value={create.initialStake}
-                onChange={event => setCreate(value => ({ ...value, initialStake: event.target.value }))}
-                placeholder="20.00"
-              />
-            </label>
-            <label>
-              <span className="label">Isolated series bank</span>
-              <input
-                className="input font-mono"
-                inputMode="decimal"
-                value={create.bankrollLimit}
-                onChange={event => setCreate(value => ({ ...value, bankrollLimit: event.target.value }))}
-                placeholder="500.00"
-              />
-            </label>
-            <label>
-              <span className="label">Total exposure limit</span>
-              <input
-                className="input font-mono"
-                inputMode="decimal"
-                value={create.exposureLimit}
-                onChange={event => setCreate(value => ({ ...value, exposureLimit: event.target.value }))}
-                placeholder="250.00"
-              />
-            </label>
-            <label>
-              <span className="label">Per-step maximum · optional</span>
-              <input
-                className="input font-mono"
-                inputMode="decimal"
-                value={create.maximumStake}
-                onChange={event => setCreate(value => ({ ...value, maximumStake: event.target.value }))}
-                placeholder="100.00"
-              />
-            </label>
-            <label>
-              <span className="label">Stake increment</span>
-              <input
-                className="input font-mono"
-                inputMode="decimal"
-                value={create.stakeIncrement}
-                onChange={event => setCreate(value => ({ ...value, stakeIncrement: event.target.value }))}
-                placeholder="0.01"
-              />
-            </label>
-            <label>
-              <span className="label">Maximum steps</span>
+              <span className="label">Количество геймов</span>
               <input
                 className="input font-mono"
                 inputMode="numeric"
+                min="1"
+                max="15"
+                step="1"
                 value={create.maximumSteps}
-                onChange={event => setCreate(value => ({ ...value, maximumSteps: event.target.value }))}
+                onChange={event => {
+                  setCreate(value => ({ ...value, maximumSteps: event.target.value }))
+                  setMessage('')
+                }}
                 placeholder="15"
               />
             </label>
             <label>
-              <span className="label">Currency or unit</span>
+              <span className="label">
+                Начальная ставка
+                {create.calculationMode === 'maximum_bank' ? ' · рассчитана' : ''}
+              </span>
               <input
-                className="input font-mono uppercase"
-                maxLength={16}
-                value={create.currencyOrUnit}
-                onChange={event => setCreate(value => ({ ...value, currencyOrUnit: event.target.value }))}
-                placeholder="USD"
+                className={`input font-mono ${
+                  create.calculationMode === 'maximum_bank'
+                    ? 'pointer-events-none cursor-default border-dashed bg-bn-night text-bn-data opacity-70'
+                    : ''
+                }`}
+                inputMode="decimal"
+                min="0.01"
+                step="0.01"
+                readOnly={create.calculationMode === 'maximum_bank'}
+                aria-readonly={create.calculationMode === 'maximum_bank'}
+                tabIndex={create.calculationMode === 'maximum_bank' ? -1 : 0}
+                value={displayedInitialStake}
+                onChange={event => {
+                  setCreate(value => ({ ...value, initialStake: event.target.value }))
+                  setMessage('')
+                }}
+                placeholder={create.calculationMode === 'maximum_bank' ? 'Рассчитается автоматически' : '20.00'}
+              />
+            </label>
+            <label>
+              <span className="label">
+                Максимальный банк
+                {create.calculationMode === 'initial_stake' ? ' · рассчитан' : ''}
+              </span>
+              <input
+                className={`input font-mono ${
+                  create.calculationMode === 'initial_stake'
+                    ? 'pointer-events-none cursor-default border-dashed bg-bn-night text-bn-data opacity-70'
+                    : ''
+                }`}
+                inputMode="decimal"
+                min="0.01"
+                step="0.01"
+                readOnly={create.calculationMode === 'initial_stake'}
+                aria-readonly={create.calculationMode === 'initial_stake'}
+                tabIndex={create.calculationMode === 'initial_stake' ? -1 : 0}
+                value={displayedMaximumBank}
+                onChange={event => {
+                  setCreate(value => ({ ...value, bankrollLimit: event.target.value }))
+                  setMessage('')
+                }}
+                placeholder={create.calculationMode === 'initial_stake' ? 'Рассчитается автоматически' : '5000.00'}
               />
             </label>
           </div>
-        </BroadcastPanel>
 
-        <BroadcastPanel className="p-4 sm:p-5">
-          <label className="flex min-h-12 cursor-pointer items-start gap-3">
-            <input
-              className="mt-1 h-5 w-5 shrink-0 [accent-color:var(--signal)]"
-              type="checkbox"
-              checked={riskAccepted}
-              onChange={event => setRiskAccepted(event.target.checked)}
-            />
-            <span className="text-xs leading-5 text-bn-muted">
-              I understand that stake sizing does not increase event probability.
-              A series can lose the full configured limit.
-            </span>
-          </label>
+          <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-control border border-bn-border-subtle">
+            <div className="border-r border-bn-border-subtle p-4">
+              <span className="stat-label">Прибыль 1-й → последний гейм</span>
+              <BroadcastDataValue className="mt-2 block text-xl font-black">
+                {createPreview
+                  ? `${formatMoneyMinor(createPreview.plan.targetProfitsMinor[0])} → ${formatMoneyMinor(createPreview.plan.targetProfitsMinor[createPreview.plan.targetProfitsMinor.length - 1])}`
+                  : '—'}
+              </BroadcastDataValue>
+            </div>
+            <div className="p-4">
+              <span className="stat-label">Последняя ставка</span>
+              <BroadcastDataValue className="mt-2 block text-xl font-black">
+                {createPreview
+                  ? formatMoneyMinor(createPreview.plan.stakesMinor[createPreview.plan.stakesMinor.length - 1])
+                  : '—'}
+              </BroadcastDataValue>
+            </div>
+          </div>
+
+          {previewRows.length > 0 ? (
+            <div className="mt-6 border-t border-bn-border-subtle pt-6">
+              <h3 className="font-display text-xl font-black tracking-[-0.03em] text-bn-text">
+                Расчёт по каждому гейму
+              </h3>
+              <p className="mt-2 text-xs leading-5 text-bn-muted">
+                Накопительно поставлено включает все предыдущие проигранные ставки и ставку текущего гейма.
+                Прибыль — чистый результат всей серии, если 40:40 случится в этом гейме.
+                Цель прибыли растёт по номеру гейма: 1×, 2×, 3× и дальше до выбранного лимита.
+              </p>
+              <div className="mt-4 overflow-x-auto rounded-control border border-bn-border-subtle">
+                <table className="w-full min-w-[44rem] border-collapse text-sm">
+                  <thead className="bg-bn-field text-left">
+                    <tr className="border-b border-bn-border-strong">
+                      <th className="px-4 py-3 font-black text-bn-muted">Гейм</th>
+                      <th className="px-4 py-3 text-right font-black text-bn-muted">Ставка</th>
+                      <th className="px-4 py-3 text-right font-black text-bn-muted">Накопительно поставлено</th>
+                      <th className="px-4 py-3 text-right font-black text-bn-muted">Цель прибыли</th>
+                      <th className="px-4 py-3 text-right font-black text-bn-muted">Прибыль при победе</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-bn-border-subtle">
+                    {previewRows.map(row => (
+                      <tr key={row.game}>
+                        <td className="px-4 py-3 font-mono font-black text-bn-text">{row.game}</td>
+                        <td className="px-4 py-3 text-right font-mono text-bn-data">
+                          {formatMoneyMinor(row.stakeMinor)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-bn-text">
+                          {formatMoneyMinor(row.accumulatedWithCurrentMinor)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-bn-muted">
+                          {formatMoneyMinor(row.targetProfitMinor)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-black text-bn-signal">
+                          {signedMoney(row.profitOnWinMinor)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
+          <p className="mt-4 text-xs leading-5 text-bn-muted">
+            Расчёт размера ставок не повышает вероятность выигрыша. При серии проигрышей можно потерять весь выбранный банк.
+          </p>
         </BroadcastPanel>
 
         {message ? (
@@ -395,7 +628,7 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
           </div>
         ) : null}
         <BroadcastButton className="min-h-12" disabled={busy} onClick={createSeries}>
-          {busy ? 'Creating…' : 'Create isolated series'}
+          {busy ? 'Создаём…' : 'Начать серию'}
         </BroadcastButton>
       </div>
     )
@@ -414,9 +647,9 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
       <BroadcastPanel className="overflow-hidden p-0">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-bn-border-strong p-4 sm:p-5">
           <div>
-            <p className="editorial-kicker">Series · {series.formula_version}</p>
+            <p className="editorial-kicker">Текущая серия</p>
             <h2 className="mt-2 break-words font-display text-2xl font-black tracking-[-0.04em] text-bn-text">
-              {series.match_label || 'Unlabelled training series'}
+              {series.match_label || 'Без названия'}
             </h2>
           </div>
           <BroadcastStatus status={isOpen ? 'review' : series.status === 'completed_win' ? 'success' : 'neutral'}>
@@ -425,19 +658,21 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
         </div>
         <dl className="grid grid-cols-2 sm:grid-cols-4">
           <div className="border-b border-r border-bn-border-subtle p-4">
-            <dt className="stat-label">Step</dt>
+            <dt className="stat-label">Гейм</dt>
             <dd><BroadcastDataValue className="mt-2 block font-display text-2xl font-black">{series.steps.length}/{series.maximum_steps}</BroadcastDataValue></dd>
           </div>
           <div className="border-b border-r border-bn-border-subtle p-4">
-            <dt className="stat-label">Loss</dt>
+            <dt className="stat-label">Текущий минус</dt>
             <dd><BroadcastDataValue className="mt-2 block font-display text-2xl font-black">{formatMoneyMinor(loss)}</BroadcastDataValue></dd>
           </div>
           <div className="border-b border-r border-bn-border-subtle p-4">
-            <dt className="stat-label">Target</dt>
-            <dd><BroadcastDataValue className="mt-2 block font-display text-2xl font-black">{series.target_profit}</BroadcastDataValue></dd>
+            <dt className="stat-label">Прибыль при победе</dt>
+            <dd><BroadcastDataValue className="mt-2 block font-display text-2xl font-black">
+              {formatMoneyMinor(seriesTargetProfitForStep(series, series.steps.length + 1))}
+            </BroadcastDataValue></dd>
           </div>
           <div className="border-b border-bn-border-subtle p-4">
-            <dt className="stat-label">Bank left</dt>
+            <dt className="stat-label">Остаток банка</dt>
             <dd><BroadcastDataValue className="mt-2 block font-display text-2xl font-black">{formatMoneyMinor(remaining)}</BroadcastDataValue></dd>
           </div>
         </dl>
@@ -446,30 +681,30 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
       {!isOpen ? (
         <BroadcastPanel className="p-5 text-center sm:p-7">
           <BroadcastStatus status={series.status === 'completed_win' ? 'success' : 'neutral'}>
-            Series closed
+            Серия завершена
           </BroadcastStatus>
           <h3 className="mt-5 font-display text-3xl font-black tracking-[-0.04em] text-bn-text">
-            {realized === null ? 'Outcome recorded' : `${signedMoney(realized)} ${series.currency_or_unit}`}
+            {realized === null ? 'Результат сохранён' : `${signedMoney(realized)} ${series.currency_or_unit}`}
           </h3>
           <p className="mt-3 text-xs leading-5 text-bn-muted">
-            This is the recorded net series result, not a prediction of future outcomes.
+            Это фактический результат завершённой серии.
           </p>
           <BroadcastButton className="mt-6 min-h-12 w-full" onClick={() => setShowCreate(true)}>
-            Start another series
+            Начать новую серию
           </BroadcastButton>
         </BroadcastPanel>
       ) : pendingStep ? (
         <BroadcastPanel className="p-4 sm:p-6">
-          <p className="editorial-kicker">02 · settle confirmed step</p>
+          <p className="editorial-kicker">Результат гейма {pendingStep.step_number}</p>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div>
-              <span className="stat-label">Accepted</span>
+              <span className="stat-label">Ставка</span>
               <BroadcastDataValue className="mt-1 block text-xl font-black">
                 {pendingStep.accepted_stake} @ {pendingStep.accepted_odds}
               </BroadcastDataValue>
             </div>
             <div>
-              <span className="stat-label">Projected net</span>
+              <span className="stat-label">Итог при выигрыше</span>
               <BroadcastDataValue className="mt-1 block text-xl font-black">
                 {signedMoney(parseSignedMoneyMinor(pendingStep.projected_series_result))}
               </BroadcastDataValue>
@@ -477,7 +712,7 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
           </div>
 
           <fieldset className="mt-6">
-            <legend className="label">Recorded result</legend>
+            <legend className="label">Чем закончился гейм?</legend>
             <div className="grid grid-cols-3 gap-2">
               {(['won', 'lost', 'void'] as const).map(result => (
                 <BroadcastButton
@@ -487,24 +722,11 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
                   aria-pressed={settlement === result}
                   onClick={() => setSettlement(result)}
                 >
-                  {result === 'won' ? 'Win' : result === 'lost' ? 'Loss' : 'Void'}
+                  {result === 'won' ? 'Выигрыш' : result === 'lost' ? 'Проигрыш' : 'Возврат'}
                 </BroadcastButton>
               ))}
             </div>
           </fieldset>
-
-          {settlement === 'won' ? (
-            <label className="mt-4 block">
-              <span className="label">Actual total return</span>
-              <input
-                className="input min-h-12 font-mono"
-                inputMode="decimal"
-                value={actualReturn}
-                onChange={event => setActualReturn(event.target.value)}
-                placeholder="Total payout including stake"
-              />
-            </label>
-          ) : null}
 
           {message ? (
             <div className="mt-4" role="alert" aria-live="assertive">
@@ -512,87 +734,50 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
             </div>
           ) : null}
           <BroadcastButton className="mt-5 min-h-12 w-full" disabled={busy} onClick={settleStep}>
-            {busy ? 'Saving…' : 'Save result'}
+            {busy ? 'Сохраняем…' : 'Сохранить результат'}
           </BroadcastButton>
         </BroadcastPanel>
       ) : (
         <BroadcastPanel className="p-4 sm:p-6">
-          <p className="editorial-kicker">02 · current live step</p>
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <label>
-              <span className="label">Set · optional</span>
-              <input className="input min-h-12 font-mono" inputMode="numeric" value={setNumber} onChange={event => setSetNumber(event.target.value)} />
-            </label>
-            <label>
-              <span className="label">Game · optional</span>
-              <input className="input min-h-12 font-mono" inputMode="numeric" value={gameNumber} onChange={event => setGameNumber(event.target.value)} />
-            </label>
-          </div>
-          <label className="mt-4 block">
-            <span className="label">Current quoted odds</span>
-            <input
-              className="input min-h-14 font-mono text-2xl font-black"
-              inputMode="decimal"
-              value={quotedOdds}
-              onChange={event => setQuotedOdds(event.target.value)}
-              placeholder="3.18"
-            />
-          </label>
+          <p className="editorial-kicker">Следующий гейм · {series.steps.length + 1} из {series.maximum_steps}</p>
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <label>
-              <span className="label">Accepted odds</span>
+          {!configuredOdds ? (
+            <label className="mt-5 block">
+              <span className="label">Коэффициент для расчёта</span>
               <input
                 className="input min-h-12 font-mono"
                 inputMode="decimal"
-                value={acceptedOdds}
-                onChange={event => setAcceptedOdds(event.target.value)}
-                placeholder={quotedOdds || '3.18'}
+                value={quotedOdds}
+                onChange={event => setQuotedOdds(event.target.value)}
+                placeholder="3.15"
               />
             </label>
-            <label>
-              <span className="label">Accepted stake</span>
-              <input
-                className="input min-h-12 font-mono"
-                inputMode="decimal"
-                value={acceptedStake}
-                onChange={event => setAcceptedStake(event.target.value)}
-                placeholder={recommendation ?? '0.00'}
-              />
-            </label>
-          </div>
+          ) : null}
 
-          <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-[var(--radius-control)] border border-bn-border-strong">
-            <div className="border-r border-bn-border-subtle p-4">
-              <span className="stat-label">Recommended</span>
+          <div className="mt-5 grid grid-cols-1 overflow-hidden rounded-[var(--radius-control)] border border-bn-border-strong min-[420px]:grid-cols-3">
+            <div className="border-b border-bn-border-subtle p-4 min-[420px]:border-b-0 min-[420px]:border-r">
+              <span className="stat-label">Коэффициент</span>
+              <BroadcastDataValue className="mt-2 block font-display text-2xl font-black">
+                {quotedOdds || '—'}
+              </BroadcastDataValue>
+            </div>
+            <div className="border-b border-bn-border-subtle p-4 min-[420px]:border-b-0 min-[420px]:border-r">
+              <span className="stat-label">Ставка</span>
               <BroadcastDataValue className="mt-2 block font-display text-3xl font-black">
                 {recommendation ?? '—'}
               </BroadcastDataValue>
             </div>
             <div className="p-4">
-              <span className="stat-label">Series net if win</span>
-              <BroadcastDataValue className="mt-2 block font-display text-3xl font-black">
+              <span className="stat-label">Итог при выигрыше</span>
+              <BroadcastDataValue className="mt-2 block font-display text-2xl font-black">
                 {projected ?? '—'}
               </BroadcastDataValue>
             </div>
           </div>
 
-          {recommendation ? (
-            <BroadcastButton
-              className="mt-3 w-full"
-              tone="secondary"
-              onClick={() => {
-                setAcceptedStake(recommendation)
-                if (!acceptedOdds) setAcceptedOdds(quotedOdds)
-              }}
-            >
-              Use recommendation
-            </BroadcastButton>
-          ) : null}
-
           {blockReason ? (
             <div className="mt-4" role="alert" aria-live="polite">
-              <BroadcastStatus status="negative">BLOCK · {blockReason}</BroadcastStatus>
+              <BroadcastStatus status="negative">Лимит · {blockReason}</BroadcastStatus>
             </div>
           ) : null}
           {message ? (
@@ -606,10 +791,10 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
             disabled={busy || !recommendation || Boolean(blockReason)}
             onClick={confirmStep}
           >
-            {busy ? 'Confirming…' : 'Confirm accepted step'}
+            {busy ? 'Подтверждаем…' : `Подтвердить ставку ${recommendation ?? ''}`}
           </BroadcastButton>
           <p className="mt-3 text-center text-[11px] leading-5 text-bn-quiet">
-            The database recalculates every derived amount. This estimate does not guarantee an outcome.
+            Сервер повторно проверит сумму перед сохранением.
           </p>
         </BroadcastPanel>
       )}
@@ -617,7 +802,7 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
       {series.steps.length > 0 ? (
         <BroadcastPanel className="overflow-hidden p-0">
           <div className="border-b border-bn-border-strong p-4">
-            <p className="editorial-kicker">Journal · server record</p>
+            <p className="editorial-kicker">История серии</p>
           </div>
           <ol className="divide-y divide-bn-border-subtle">
             {series.steps.map(step => (
@@ -630,11 +815,17 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
                     {step.accepted_stake} @ {step.accepted_odds}
                   </span>
                   <span className="mt-1 block text-[11px] text-bn-muted">
-                    Recommended {step.recommended_stake} · projected {signedMoney(parseSignedMoneyMinor(step.projected_series_result))}
+                    Итог при выигрыше {signedMoney(parseSignedMoneyMinor(step.projected_series_result))}
                   </span>
                 </span>
                 <BroadcastStatus status={step.status === 'won' ? 'success' : step.status === 'lost' ? 'negative' : step.status === 'confirmed' ? 'review' : 'neutral'}>
-                  {step.status}
+                  {step.status === 'won'
+                    ? 'Выигрыш'
+                    : step.status === 'lost'
+                      ? 'Проигрыш'
+                      : step.status === 'void'
+                        ? 'Возврат'
+                        : 'Ожидает'}
                 </BroadcastStatus>
               </li>
             ))}
@@ -646,7 +837,7 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
         stopArmed ? (
           <BroadcastPanel className="p-4">
             <p className="text-xs leading-5 text-bn-muted">
-              Stopping closes this series and cannot be undone.
+              После остановки продолжить эту серию будет нельзя.
             </p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <BroadcastButton
@@ -654,16 +845,16 @@ export function SeriesCalculator({ initialSeries }: SeriesCalculatorProps) {
                 disabled={busy}
                 onClick={() => setStopArmed(false)}
               >
-                Keep series
+                Продолжить серию
               </BroadcastButton>
               <BroadcastButton tone="destructive" disabled={busy} onClick={stopSeries}>
-                {busy ? 'Stopping…' : 'Confirm stop'}
+                {busy ? 'Останавливаем…' : 'Остановить'}
               </BroadcastButton>
             </div>
           </BroadcastPanel>
         ) : (
           <BroadcastButton tone="destructive" disabled={busy} onClick={() => setStopArmed(true)}>
-            Stop series
+            Остановить серию
           </BroadcastButton>
         )
       ) : null}

@@ -231,7 +231,7 @@ test('gate module does no Supabase / DB / RPC / migration work', () => {
     assert.ok(!MODULE_SRC.includes(forbidden), `module must not reference ${forbidden}`);
   }
 });
-test('gate is wired only to the closed server helper and server-rendered PR-5 surfaces', () => {
+test('gate is wired only to approved server helpers, routes, and rendered surfaces', () => {
   const importers = allSources.filter((f) => {
     if (f.endsWith(path.join('lib', 'flags', 'tennis-calc.ts'))) return false;
     if (f.endsWith('test-tennis-access-gate.mjs')) return false;
@@ -243,6 +243,7 @@ test('gate is wired only to the closed server helper and server-rendered PR-5 su
     [
       path.join('app', '(app)', 'layout.tsx'),
       path.join('app', '(app)', 'tennis-calculator', 'page.tsx'),
+      path.join('app', 'api', 'tennis', 'forty-forty', 'last-24-hours', 'route.ts'),
       path.join('lib', 'tennis', 'server-write.ts'),
     ].sort(),
     `gate may be imported only by approved server surfaces; imported by: ${importers.join(', ')}`,

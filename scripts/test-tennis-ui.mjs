@@ -60,17 +60,101 @@ test('all database financial numerics cross the RSC boundary as decimal text', (
   }
 })
 
+test('page explains the 40:40 series and labels the historical sample precisely', () => {
+  for (const copy of [
+    'Серия на 40:40',
+    'будет ли в выбранном гейме счёт 40:40 — да',
+    'Как работает серия',
+    'Ставка на один гейм',
+    'Откуда берётся прибыль',
+    'Мужские матчи · ATP',
+    'Женские матчи · WTA',
+    '22,65%',
+    '32,07%',
+    'До 15-го гейма',
+    'Статистика, а не гарантия',
+  ]) {
+    assert.ok(page.includes(copy), `missing 40:40 guide copy: ${copy}`)
+  }
+
+  assert.match(page, /men:\s*\{[\s\S]*?games: 234,[\s\S]*?hits: 53,/)
+  assert.match(page, /women:\s*\{[\s\S]*?games: 290,[\s\S]*?hits: 93,/)
+  assert.ok(page.includes('завершённые одиночные ATP/WTA-матчи'))
+  assert.ok(page.includes('тай-брейки не считались обычными геймами'))
+  assert.ok(page.includes('не делает исход более вероятным'))
+})
+
 test('client preview uses the exact BigInt core and never float money math', () => {
   assert.ok(calculator.includes('requiredStakeMinor('))
   assert.ok(calculator.includes('actualProfitMinor('))
   assert.ok(calculator.includes('checkOpenBetLimits('))
+  assert.ok(calculator.includes('growingOddsPlan('))
+  assert.ok(calculator.includes('growingOddsPlanForBankroll('))
+  assert.ok(calculator.includes('targetProfitForGameMinor('))
   assert.doesNotMatch(calculator, /parseFloat|Math\.round|Math\.ceil/)
 })
 
-test('first-step seed and later dynamic recommendation are visibly distinct', () => {
+test('five-field setup has two explicit calculation modes and no legacy technical inputs', () => {
+  for (const copy of [
+    'Название матча · необязательно',
+    'Коэффициент для расчёта',
+    'Количество геймов',
+    'Начальная ставка',
+    'Максимальный банк',
+    'Выберите, что вводите вручную',
+    'Ввожу начальную ставку',
+    'Ввожу максимальный банк',
+  ]) {
+    assert.ok(calculator.includes(copy), `${copy} is missing`)
+  }
+  for (const removedCopy of [
+    'Target series profit',
+    'Total exposure limit',
+    'Per-step maximum',
+    'Stake increment',
+    'Currency or unit',
+  ]) {
+    assert.ok(!calculator.includes(removedCopy), `${removedCopy} must stay hidden`)
+  }
+  assert.ok(calculator.includes("stake_increment: '0.01'"))
+  assert.ok(calculator.includes("currency_or_unit: 'USD'"))
+  assert.ok(calculator.includes('exposure_limit: formatMoneyMinor(preview.configuredBankMinor)'))
+  assert.ok(calculator.includes('maximum_stake: null'))
+  assert.ok(calculator.includes("tabIndex={create.calculationMode === 'maximum_bank' ? -1 : 0}"))
+  assert.ok(calculator.includes("tabIndex={create.calculationMode === 'initial_stake' ? -1 : 0}"))
+})
+
+test('setup preview itemizes every game, cumulative spend and net profit on a win', () => {
+  for (const copy of [
+    'Расчёт по каждому гейму',
+    'Гейм',
+    'Ставка',
+    'Накопительно поставлено',
+    'Цель прибыли',
+    'Прибыль при победе',
+    'все предыдущие проигранные ставки и ставку текущего гейма',
+    'чистый результат всей серии',
+    'Цель прибыли растёт по номеру гейма',
+  ]) {
+    assert.ok(calculator.includes(copy), `${copy} is missing from the game table`)
+  }
+  assert.ok(calculator.includes('createPreview.plan.stakesMinor.map'))
+  assert.ok(calculator.includes('createPreview.plan.targetProfitsMinor[index]'))
+  assert.ok(calculator.includes('checkedAdd(accumulatedBeforeMinor, stakeMinor)'))
+  assert.ok(calculator.includes('actualProfitMinor(stakeMinor, odds, accumulatedBeforeMinor)'))
+  assert.ok(calculator.includes('signedMoney(row.profitOnWinMinor)'))
+})
+
+test('fixed coefficient survives refresh and drives every server-authoritative step', () => {
+  assert.ok(calculator.includes("const GROWING_ODDS_FORMULA = 'v3-growing-odds:'"))
+  assert.ok(calculator.includes('fixedOddsFromFormula(initialSeries?.formula_version)'))
+  assert.ok(calculator.includes('usesGrowingProfit(series.formula_version)'))
+  assert.ok(calculator.includes('seriesTargetProfitForStep(series, stepNumber)'))
   assert.ok(calculator.includes('series.steps.length === 0 && series.initial_stake'))
   assert.ok(calculator.includes(': requiredStakeMinor('))
-  assert.ok(calculator.includes('Use recommendation'))
+  assert.ok(calculator.includes('accepted_odds: quotedOdds'))
+  assert.ok(calculator.includes('accepted_stake: recommendation'))
+  assert.ok(!calculator.includes('Use recommendation'))
 })
 
 test('commands are double-tap guarded and retries keep payload-bound operation ids', () => {
@@ -82,20 +166,20 @@ test('commands are double-tap guarded and retries keep payload-bound operation i
 
 test('manual workflow exposes create, confirm, Win/Loss/Void, stop and journal states', () => {
   for (const copy of [
-    'Create isolated series',
-    'Confirm accepted step',
-    'Save result',
-    'Stop series',
-    'Journal · server record',
-    'BLOCK ·',
+    'Начать серию',
+    'Подтвердить ставку',
+    'Сохранить результат',
+    'Остановить серию',
+    'История серии',
+    'Лимит ·',
   ]) {
     assert.ok(calculator.includes(copy), `${copy} is missing`)
   }
   for (const result of ["'won'", "'lost'", "'void'"]) {
     assert.ok(calculator.includes(result), `${result} settlement is missing`)
   }
-  assert.ok(calculator.includes('Stopping closes this series and cannot be undone.'))
-  assert.ok(calculator.includes('Confirm stop'))
+  assert.ok(calculator.includes('После остановки продолжить эту серию будет нельзя.'))
+  assert.ok(calculator.includes('Остановить'))
 })
 
 test('mobile interaction and risk copy stay accessible and outcome-neutral', () => {
@@ -103,7 +187,7 @@ test('mobile interaction and risk copy stay accessible and outcome-neutral', () 
   assert.ok(calculator.includes('min-h-12'))
   assert.ok(calculator.includes('role="alert"'))
   assert.ok(calculator.includes('aria-live="assertive"'))
-  assert.ok(calculator.includes('does not guarantee an outcome'))
+  assert.ok(calculator.includes('не повышает вероятность выигрыша'))
   assert.doesNotMatch(calculator, /guaranteed profit|guarantees? profit|risk[- ]free/i)
   assert.doesNotMatch(calculator, /bookmaker login|scrap(?:e|ing)|auto[- ]bet/i)
 })
