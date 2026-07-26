@@ -82,12 +82,12 @@ export default function LoginPage() {
         </div>
         <header className="relative z-10 flex min-h-12 items-center border-y border-bn-border-strong">
           <div className="font-display text-xl font-black tracking-[-0.045em] text-[var(--text-primary)]">BETTRACKER</div>
-          <div className="ml-4 flex-1 font-mono text-[11px] font-bold tracking-[0.1em] text-[var(--text-quiet)]">ЕДИНАЯ ВИЗУАЛЬНАЯ СИСТЕМА / V3.1</div>
+          <div className="ml-4 min-w-0 flex-1 truncate font-mono text-[11px] font-bold tracking-[0.1em] text-[var(--text-quiet)]">ЕДИНАЯ ВИЗУАЛЬНАЯ СИСТЕМА / V3.1</div>
           <div className="h-2.5 w-2.5 rounded-control bg-[var(--signal)]" aria-hidden />
         </header>
         <div className="relative z-10 my-auto py-12 lg:py-20">
           <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--signal)]">Приватная система решений</p>
-          <h1 className="mt-6 max-w-4xl font-display text-[clamp(3.2rem,7vw,8rem)] font-black uppercase leading-[0.8] tracking-[-0.075em] text-bn-text">
+          <h1 className="mt-6 max-w-4xl font-display text-[clamp(2.75rem,7vw,8rem)] font-black uppercase leading-[0.8] tracking-[-0.065em] text-bn-text">
             Факты<br />перед<br />действием
           </h1>
           <p className="mt-8 max-w-md text-sm leading-6 text-bn-muted">
