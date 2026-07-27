@@ -142,7 +142,9 @@ guards, the no-abort rule, and the untouched Phase B write-path surface.
 
 **Phase A1 evidence limit:** a browser-level proof that overflow→Save
 produces zero network requests in a running DOM did not run in Phase A1.
-Phase A2 adds that proof without changing the production implementation.
+Phase A2 adds that proof. The running-DOM axe pass exposed one pre-existing
+semantic defect on the populated `/bets` path, and the Founder-approved scope
+includes only the minimal `<dt>/<dd>` correction recorded below.
 
 ## Phase A2 — hermetic Founder Daily Flow browser E2E
 
@@ -213,9 +215,13 @@ implementation under review — not an execution or closure receipt.
 
 ## Boundaries (Phase A2)
 
-- Runtime code, schemas, migrations, RPCs, env, and production configuration are
+- Runtime scope is limited to `app/(app)/bets/page.tsx`: the existing date
+  inside the populated-list `<dl>` is represented by a visually neutral,
+  accessible `<dt>/<dd>` group. There is no behavior or financial/data-flow
+  change.
+- The only other executable change is the hermetic browser acceptance harness.
+- Schemas, migrations, RPCs, API routes, env, and production configuration are
   unchanged.
-- The only executable change is the hermetic browser acceptance harness.
 - Scanner and tracked-bet success responses are browser-local stubs; the real
   API routes are not invoked.
 - Supabase is localhost-only and read-only; non-GET/HEAD requests fail closed.
