@@ -163,7 +163,8 @@ export default async function BetsPage() {
                           : formatMoney(bet.pnl, currency, true)}
                       />
                       <div className="col-span-3 font-mono text-[11px] text-bn-quiet">
-                        {formatDate(bet.placed_at)}
+                        <dt className="sr-only">Дата ставки</dt>
+                        <dd>{formatDate(bet.placed_at)}</dd>
                       </div>
                     </dl>
                   </Link>

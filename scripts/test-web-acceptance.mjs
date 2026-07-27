@@ -17,7 +17,9 @@ const BLOCKED_WEBSOCKET_CODE = 1008
 const BLOCKED_WEBSOCKET_REASON = 'External WebSocket blocked by Web acceptance'
 const TEST_USER_ID = '00000000-0000-4000-8000-000000000001'
 const TEST_BET_ID = '00000000-0000-4000-8000-000000000005'
+const FOUNDER_FLOW_BET_ID = '00000000-0000-4000-8000-000000000007'
 const TEST_SETTLED_AT = '2026-07-22T23:30:00.000Z'
+const FOUNDER_FLOW_PLACED_AT = '2026-07-27T14:00:00.000Z'
 const TEST_USER = {
   id: TEST_USER_ID,
   aud: 'authenticated',
@@ -40,7 +42,36 @@ const VIEWPORTS = [
   { width: 1024, height: 900 },
   { width: 1440, height: 1000 },
 ]
+const FOUNDER_FLOW_VIEWPORTS = [
+  { width: 320, height: 800 },
+  { width: 375, height: 812 },
+  { width: 1280, height: 900 },
+]
 const ROUTES = ['/dashboard', '/ai', '/bets/new', `/bets/${TEST_BET_ID}`, '/bankroll', '/coach']
+const SETTLED_TEST_BET = {
+  id: TEST_BET_ID,
+  user_id: TEST_USER_ID,
+  status: 'void',
+  stake: 100,
+  total_odds: 2.14,
+  pnl: 0,
+  bookmaker: 'Acceptance',
+  source: 'acceptance',
+  notes: null,
+  placed_at: '2026-07-22T20:00:00.000Z',
+  settled_at: TEST_SETTLED_AT,
+  archived_at: null,
+  legs: [{
+    id: '00000000-0000-4000-8000-000000000006',
+    bet_id: TEST_BET_ID,
+    leg_index: 0,
+    event_name: 'Acceptance fixture',
+    market_type: 'Match winner',
+    selection: 'Home',
+    odds: 2.14,
+    sport: 'football',
+  }],
+}
 
 function normalizeHostname(urlValue) {
   try {
@@ -89,6 +120,12 @@ async function reservePort() {
   const port = await listen(server)
   await new Promise(resolve => server.close(resolve))
   return port
+}
+
+function deferred() {
+  let resolve
+  const promise = new Promise(done => { resolve = done })
+  return { promise, resolve }
 }
 
 function sessionCookieValue() {
@@ -452,11 +489,245 @@ async function assertExternalWebSocketPreblocked(context, forbiddenWebSocketAtte
   await page.close()
 }
 
+async function installHermeticContextGuards(context, {
+  externalRequests,
+  feedbackStubs,
+  forbiddenWebSocketAttempts,
+  localApiHandler,
+  nextOrigin,
+}) {
+  await context.routeWebSocket(/.*/, async webSocketRoute => {
+    const url = webSocketRoute.url()
+    if (isLoopback(url)) {
+      webSocketRoute.connectToServer()
+      return
+    }
+    forbiddenWebSocketAttempts.push(url)
+    await webSocketRoute.close({ code: BLOCKED_WEBSOCKET_CODE, reason: BLOCKED_WEBSOCKET_REASON })
+  })
+  await context.route('**/*', async route => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (localApiHandler && await localApiHandler(route, url)) return
+    if (url.origin === nextOrigin && url.pathname === '/api/feedback' && request.method() === 'POST') {
+      feedbackStubs.count += 1
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) })
+      return
+    }
+    if (url.origin === nextOrigin && url.pathname === '/api/csp-report' && request.method() === 'POST') {
+      await route.fulfill({ status: 204, body: '' })
+      return
+    }
+    if (!isLoopback(request.url())) {
+      externalRequests.push(`${request.method()} ${request.url()}`)
+      await route.abort('blockedbyclient')
+      return
+    }
+    await route.continue()
+  })
+}
+
+function makeFounderFlowBet(payload) {
+  return {
+    id: FOUNDER_FLOW_BET_ID,
+    user_id: TEST_USER_ID,
+    bet_type: payload.legs.length === 1 ? 'single' : 'parlay',
+    status: 'pending',
+    stake: payload.stake,
+    total_odds: payload.total_odds ?? payload.legs[0]?.odds ?? null,
+    pnl: null,
+    bookmaker: payload.bookmaker,
+    source: payload.source,
+    notes: payload.notes,
+    placed_at: FOUNDER_FLOW_PLACED_AT,
+    settled_at: null,
+    archived_at: null,
+    created_at: FOUNDER_FLOW_PLACED_AT,
+    updated_at: FOUNDER_FLOW_PLACED_AT,
+    legs: payload.legs.map((leg, index) => ({
+      id: `00000000-0000-4000-8000-${String(index + 8).padStart(12, '0')}`,
+      bet_id: FOUNDER_FLOW_BET_ID,
+      leg_index: index,
+      leg_status: 'pending',
+      created_at: FOUNDER_FLOW_PLACED_AT,
+      updated_at: FOUNDER_FLOW_PLACED_AT,
+      ...leg,
+    })),
+  }
+}
+
+function oversizedScannerResponse() {
+  return {
+    success: true,
+    data: {
+      odds: 12.34,
+      stake: 999,
+      bookmaker: 'Must not import',
+      legs: Array.from({ length: 21 }, (_, index) => ({
+        eventName: `Oversized fixture ${index + 1}`,
+        marketType: 'Match winner',
+        selection: 'Home',
+        odds: 1.1,
+        sport: 'soccer',
+      })),
+    },
+  }
+}
+
+async function assertFounderDailyFlow(page, viewport, flow) {
+  const label = `Founder Daily Flow at ${viewport.width}px`
+  const eventName = `Founder flow fixture ${viewport.width}`
+  const notes = `Manual review after refused scan ${viewport.width}`
+
+  await page.addInitScript(() => {
+    const originalRandomUUID = window.crypto.randomUUID.bind(window.crypto)
+    window.__founderRandomUUIDCalls = 0
+    Object.defineProperty(window.crypto, 'randomUUID', {
+      configurable: true,
+      value: () => {
+        window.__founderRandomUUIDCalls += 1
+        return originalRandomUUID()
+      },
+    })
+  })
+  await page.addInitScript({ content: axe.source })
+
+  const response = await page.goto(`${flow.nextOrigin}/bets/new`, { waitUntil: 'networkidle', timeout: 120_000 })
+  assert.equal(response?.status(), 200, `${label} tracker must return 200`)
+  await assertBaseAcceptance(page, '/bets/new', viewport)
+
+  await page.locator('#tracker-leg-0-event').fill(eventName)
+  await page.locator('#tracker-leg-0-market').fill('Победитель матча')
+  await page.locator('#tracker-leg-0-selection').fill('Хозяева')
+  await page.locator('#tracker-leg-0-odds').fill('2.15')
+  await page.locator('#tracker-stake').fill('25')
+  await page.locator('#tracker-bookmaker').selectOption('Pinnacle')
+  await page.locator('#tracker-notes').fill('Previous valid draft')
+
+  const scannerRequestPromise = page.waitForRequest(request => (
+    new URL(request.url()).pathname === '/api/ai/scanner' && request.method() === 'POST'
+  ))
+  await page.locator('#coupon-image').setInputFiles({
+    name: 'oversized-coupon.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('hermetic-founder-flow'),
+  })
+  await scannerRequestPromise
+
+  const fieldset = page.locator('form fieldset')
+  const saveButton = page.locator('form button[type="submit"]')
+  const cancelButton = page.getByRole('button', { name: 'Отмена' })
+  assert.equal(await saveButton.count(), 1, `${label} must expose exactly one stable Save control`)
+  await page.waitForFunction(() => document.querySelector('form fieldset')?.disabled === true)
+  assert.equal(await fieldset.evaluate(element => element.disabled), true, `${label} scan must lock the complete form`)
+  assert.equal(await page.locator('#coupon-image').isDisabled(), true, `${label} scan must lock the scanner input`)
+  assert.equal(await saveButton.isDisabled(), true, `${label} scan must lock Save`)
+  assert.equal(await cancelButton.isDisabled(), true, `${label} scan must lock Cancel`)
+
+  flow.scannerGate.resolve()
+  await page.getByText('В купоне больше 20 плеч, поэтому он не импортирован.').waitFor()
+  await page.waitForFunction(() => document.querySelector('#coupon-image')?.disabled === false)
+  assert.equal(await page.locator('#tracker-leg-0-event').inputValue(), eventName, `${label} overflow must preserve the previous draft`)
+  assert.equal(await page.locator('#tracker-stake').inputValue(), '25', `${label} overflow must not import scanner stake`)
+  assert.equal(await page.locator('#tracker-bookmaker').inputValue(), 'Pinnacle', `${label} overflow must not import scanner bookmaker`)
+
+  const overflowUuidBaseline = await page.evaluate(() => window.__founderRandomUUIDCalls)
+  await saveButton.click()
+  await page.waitForTimeout(150)
+  assert.equal(flow.trackedRequests, 0, `${label} overflow Save must send zero tracked-bet requests`)
+  assert.equal(
+    await page.evaluate(() => window.__founderRandomUUIDCalls),
+    overflowUuidBaseline,
+    `${label} overflow Save must mint zero idempotency UUIDs`,
+  )
+
+  await page.locator('#tracker-notes').fill(notes)
+  assert.equal(
+    await page.getByText('В купоне больше 20 плеч, поэтому он не импортирован.').count(),
+    0,
+    `${label} a deliberate manual edit must clear the overflow refusal`,
+  )
+
+  const trackedRequestPromise = page.waitForRequest(request => (
+    new URL(request.url()).pathname === '/api/bets/tracked' && request.method() === 'POST'
+  ))
+  const submitUuidBaseline = await page.evaluate(() => window.__founderRandomUUIDCalls)
+  await saveButton.evaluate(button => button.click())
+  const trackedRequest = await trackedRequestPromise
+  const payload = trackedRequest.postDataJSON()
+
+  await page.waitForFunction(() => document.querySelector('form fieldset')?.disabled === true)
+  assert.equal(await fieldset.evaluate(element => element.disabled), true, `${label} submit must lock the complete form`)
+  assert.equal(await page.locator('#coupon-image').isDisabled(), true, `${label} submit must lock the scanner input`)
+  assert.equal(await saveButton.isDisabled(), true, `${label} submit must lock Save`)
+  assert.equal(await cancelButton.isDisabled(), true, `${label} submit must lock Cancel`)
+  await saveButton.evaluate(button => button.click())
+  await page.waitForTimeout(100)
+  assert.equal(flow.trackedRequests, 1, `${label} in-flight double click must not send a second request`)
+  assert.equal(
+    await page.evaluate(baseline => window.__founderRandomUUIDCalls - baseline, submitUuidBaseline),
+    1,
+    `${label} successful intent must mint exactly one idempotency UUID`,
+  )
+  assert.deepEqual(
+    { ...payload, idempotency_key: '<uuid>' },
+    {
+      legs: [{
+        sport: 'soccer',
+        event_name: eventName,
+        market_type: 'Победитель матча',
+        selection: 'Хозяева',
+        odds: 2.15,
+      }],
+      total_odds: null,
+      stake: 25,
+      bookmaker: 'Pinnacle',
+      notes,
+      source: 'manual',
+      idempotency_key: '<uuid>',
+    },
+    `${label} manual ownership must submit the reviewed allowlisted payload`,
+  )
+  assert.match(
+    payload.idempotency_key,
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    `${label} must submit one UUIDv4 idempotency key`,
+  )
+
+  flow.trackedGate.resolve()
+  await page.waitForURL(`${flow.nextOrigin}/bets/${FOUNDER_FLOW_BET_ID}`, { timeout: 120_000 })
+  await page.waitForLoadState('networkidle')
+  await page.locator('main').evaluate(async element => {
+    await Promise.all(element.getAnimations().map(animation => animation.finished))
+  })
+  await assertBaseAcceptance(page, `/bets/${FOUNDER_FLOW_BET_ID}`, viewport)
+  await page.getByRole('heading', { name: eventName }).waitFor()
+  await page.getByText('Победитель матча · Хозяева').waitFor()
+  await page.getByText('Pinnacle', { exact: true }).waitFor()
+  assert.equal(
+    await page.locator('dt', { hasText: 'Источник' }).locator('xpath=following-sibling::dd[1]').textContent(),
+    'manual',
+    `${label} detail must preserve manual ownership after overflow unlock`,
+  )
+
+  await page.goto(`${flow.nextOrigin}/bets`, { waitUntil: 'networkidle', timeout: 120_000 })
+  await assertBaseAcceptance(page, '/bets', viewport)
+  await page.getByText('Записей: 1 · открыто: 1 · рассчитано: 0').waitFor()
+  await page.getByText(eventName, { exact: true }).waitFor()
+
+  await page.goto(`${flow.nextOrigin}/dashboard`, { waitUntil: 'networkidle', timeout: 120_000 })
+  await assertBaseAcceptance(page, '/dashboard', viewport)
+  await page.getByText(eventName, { exact: true }).waitFor()
+  await page.getByText('1 открыто', { exact: true }).first().waitFor()
+  await assertInteractiveAcceptance(page, `${label} dashboard after saved-record navigation`)
+}
+
 await assertSourceOnlyControls()
 
 const forbiddenStubRequests = []
 const unexpectedStubRequests = []
 const stubRequests = []
+let founderFlowBet = null
 const supabaseStub = createServer((request, response) => {
   const url = new URL(request.url, 'http://127.0.0.1')
   stubRequests.push(`${request.method} ${url.pathname}`)
@@ -481,33 +752,15 @@ const supabaseStub = createServer((request, response) => {
   }
   if (url.pathname === '/rest/v1/bets') {
     if (url.searchParams.get('id') === `eq.${TEST_BET_ID}`) {
-      jsonResponse(response, 200, {
-        id: TEST_BET_ID,
-        user_id: TEST_USER_ID,
-        status: 'void',
-        stake: 100,
-        total_odds: 2.14,
-        pnl: 0,
-        bookmaker: 'Acceptance',
-        source: 'acceptance',
-        notes: null,
-        placed_at: '2026-07-22T20:00:00.000Z',
-        settled_at: TEST_SETTLED_AT,
-        archived_at: null,
-        legs: [{
-          id: '00000000-0000-4000-8000-000000000006',
-          bet_id: TEST_BET_ID,
-          leg_index: 0,
-          event_name: 'Acceptance fixture',
-          market_type: 'Match winner',
-          selection: 'Home',
-          odds: 2.14,
-          sport: 'football',
-        }],
-      }, { 'content-range': '0-0/1' })
+      jsonResponse(response, 200, SETTLED_TEST_BET, { 'content-range': '0-0/1' })
       return
     }
-    jsonResponse(response, 200, [], { 'content-range': '*/0' })
+    if (url.searchParams.get('id') === `eq.${FOUNDER_FLOW_BET_ID}` && founderFlowBet) {
+      jsonResponse(response, 200, founderFlowBet, { 'content-range': '0-0/1' })
+      return
+    }
+    const bets = founderFlowBet ? [founderFlowBet] : []
+    jsonResponse(response, 200, bets, { 'content-range': bets.length ? '0-0/1' : '*/0' })
     return
   }
   if (url.pathname === '/rest/v1/bankrolls') {
@@ -583,33 +836,11 @@ try {
       timezoneId: 'Europe/Kyiv',
       viewport,
     })
-    await context.routeWebSocket(/.*/, async webSocketRoute => {
-      const url = webSocketRoute.url()
-      if (isLoopback(url)) {
-        webSocketRoute.connectToServer()
-        return
-      }
-      forbiddenWebSocketAttempts.push(url)
-      await webSocketRoute.close({ code: BLOCKED_WEBSOCKET_CODE, reason: BLOCKED_WEBSOCKET_REASON })
-    })
-    await context.route('**/*', async route => {
-      const request = route.request()
-      const url = new URL(request.url())
-      if (url.origin === nextOrigin && url.pathname === '/api/feedback' && request.method() === 'POST') {
-        feedbackStubs.count += 1
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) })
-        return
-      }
-      if (url.origin === nextOrigin && url.pathname === '/api/csp-report' && request.method() === 'POST') {
-        await route.fulfill({ status: 204, body: '' })
-        return
-      }
-      if (!isLoopback(request.url())) {
-        externalRequests.push(`${request.method()} ${request.url()}`)
-        await route.abort('blockedbyclient')
-        return
-      }
-      await route.continue()
+    await installHermeticContextGuards(context, {
+      externalRequests,
+      feedbackStubs,
+      forbiddenWebSocketAttempts,
+      nextOrigin,
     })
 
     const loginPage = await context.newPage()
@@ -666,6 +897,94 @@ try {
     await context.close()
   }
 
+  for (const viewport of FOUNDER_FLOW_VIEWPORTS) {
+    founderFlowBet = null
+    const scannerGate = deferred()
+    const trackedGate = deferred()
+    const flow = {
+      nextOrigin,
+      scannerGate,
+      scannerRequests: 0,
+      trackedGate,
+      trackedRequests: 0,
+    }
+    const context = await browser.newContext({
+      locale: 'uk-UA',
+      serviceWorkers: 'block',
+      timezoneId: 'Europe/Kyiv',
+      viewport,
+    })
+    await installHermeticContextGuards(context, {
+      externalRequests,
+      feedbackStubs,
+      forbiddenWebSocketAttempts,
+      nextOrigin,
+      localApiHandler: async (route, url) => {
+        const request = route.request()
+        if (url.origin === nextOrigin && url.pathname === '/api/ai/scanner' && request.method() === 'POST') {
+          flow.scannerRequests += 1
+          await scannerGate.promise
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(oversizedScannerResponse()),
+          })
+          return true
+        }
+        if (url.origin === nextOrigin && url.pathname === '/api/bets/tracked' && request.method() === 'POST') {
+          flow.trackedRequests += 1
+          founderFlowBet = makeFounderFlowBet(request.postDataJSON())
+          await trackedGate.promise
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              success: true,
+              bet_id: FOUNDER_FLOW_BET_ID,
+              balance: 975,
+              replayed: false,
+            }),
+          })
+          return true
+        }
+        return false
+      },
+    })
+    await context.addCookies([{
+      name: 'sb-127-auth-token',
+      value: sessionCookieValue(),
+      domain: '127.0.0.1',
+      path: '/',
+      httpOnly: false,
+      secure: false,
+      sameSite: 'Lax',
+    }])
+
+    const page = await context.newPage()
+    page.on('pageerror', error => browserErrors.push(`Founder Daily Flow at ${viewport.width}px: ${error.message}`))
+    page.on('console', message => {
+      if (message.type() !== 'error') return
+      const location = message.location()
+      const source = location.url ? ` (${location.url}:${location.lineNumber ?? 0}:${location.columnNumber ?? 0})` : ''
+      browserConsoleErrors.push(`Founder Daily Flow at ${viewport.width}px: ${message.text()}${source}`)
+    })
+    page.on('websocket', socket => {
+      if (!isLoopback(socket.url())) observedExternalWebSockets.push(socket.url())
+    })
+
+    try {
+      await assertFounderDailyFlow(page, viewport, flow)
+      assert.equal(flow.scannerRequests, 1, `Founder Daily Flow at ${viewport.width}px must use one local scanner stub`)
+      assert.equal(flow.trackedRequests, 1, `Founder Daily Flow at ${viewport.width}px must use one local tracked-bet stub`)
+    } finally {
+      scannerGate.resolve()
+      trackedGate.resolve()
+      await page.close()
+      await context.close()
+      founderFlowBet = null
+    }
+  }
+
   assert.deepEqual(externalRequests, [], 'Browser must not attempt production/provider/AI/external requests')
   assert.deepEqual(
     forbiddenWebSocketAttempts,
@@ -685,7 +1004,7 @@ try {
   assert.ok(stubRequests.some(request => request === 'GET /rest/v1/bets'), 'Dashboard acceptance must exercise local data reads')
   assert.ok(stubRequests.some(request => request === 'GET /rest/v1/coaching_sessions'), 'Coach acceptance must exercise local session reads')
   assert.ok(stubRequests.some(request => request === 'GET /rest/v1/bankroll_transactions'), 'Bankroll acceptance must exercise local transaction reads')
-  console.log(`Web acceptance passed: ${VIEWPORTS.length} viewports × (1 public + ${ROUTES.length} authenticated routes); zero external requests and zero writes.`)
+  console.log(`Web acceptance passed: ${VIEWPORTS.length} viewports × (1 public + ${ROUTES.length} authenticated routes) + ${FOUNDER_FLOW_VIEWPORTS.length} hermetic Founder Daily Flows; zero external requests and zero Supabase writes.`)
 } catch (error) {
   console.error(error)
   console.error('\nHermetic Next log tail:\n', nextOutput)
