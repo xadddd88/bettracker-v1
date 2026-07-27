@@ -180,6 +180,31 @@ jobs:
       - name: Run migration 030 odds view security verifier
         run: bash scripts/verify-migration-030.sh postgresql://postgres:postgres@localhost:5432/postgres
 
+  # ── Job: Decision #067 public API privileges on PostgreSQL 17 ─────────────
+  public-api-privileges:
+    name: Decision 067 public API PostgreSQL 17
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Run migration 031 public API privilege verifier
+        run: bash scripts/verify-migration-031.sh postgresql://postgres:postgres@localhost:5432/postgres
+
   # ── Job: Cross-platform design-system compile gate ─────────────────────────
   design-system:
     name: Broadcast Noir Web & mobile primitives

@@ -3,9 +3,9 @@
 **Date:** 2026-07-27  
 **Proposed by:** CPO  
 **Authorized by:** Founder  
-**Status:** ACTIVE / IMPLEMENTATION DRAFT — migration 030 is review-only and
-unapplied. No Supabase write, production migration, provider call, odds
-ingestion, application caller, environment change, or deployment is authorized.
+**Status:** EXECUTED / VERIFIED / CLOSED — implementation merged via PR #232 as
+`8ce79df4444c366b07a3585fde3de8554f431b4a`; migration 030 applied once as
+`20260727093233_odds_snapshots_public_security_invoker_030` and verified.
 
 ## Problem
 
@@ -64,7 +64,7 @@ The hermetic PostgreSQL 17 verifier must prove:
 - `service_role` retains access to internal fields;
 - migration lock and statement timeouts are present.
 
-## Boundaries
+## Initial Draft Boundaries
 
 - Migration 030 is not applied by this implementation PR.
 - `main`, production Supabase, production migration ledger, env, Vercel, and
@@ -73,9 +73,16 @@ The hermetic PostgreSQL 17 verifier must prove:
 - No frontend, mobile, language, skin, typography, or design work is included.
 - Merge and production apply require separate founder approvals.
 
-## Roll-forward / recovery
+## Execution receipt — 2026-07-27
 
-Before any future apply, repeat a production catalog/ACL/RLS preflight and verify
-that migration 030 still matches the live view definition. On apply failure,
-stop without retry. Any reversal of `security_invoker`, base-column grants, or
-the RLS policy requires a separately reviewed recovery action.
+- PR #232 merged as `8ce79df4444c366b07a3585fde3de8554f431b4a` after all nine repository jobs, including the PostgreSQL 17 verifier, passed.
+- Migration 030 applied successfully on the first and only attempt as `20260727093233_odds_snapshots_public_security_invoker_030`.
+- Read-only verification confirmed `security_invoker=true`, one exact authenticated-only RLS policy, 9/9 safe columns accessible, 0/5 internal columns accessible, zero `anon` and DML access, and unchanged `service_role` access.
+- The table remained at zero rows; both related Security Advisor findings cleared; the public login health smoke passed without first-party console errors.
+- No retry or rollback ran, and application callers, provider/odds ingestion, env, and Vercel were unchanged by the apply action.
+
+## Recovery
+
+Any reversal of `security_invoker`, base-column grants, or the RLS policy requires
+a separately reviewed and founder-approved migration. No automatic rollback is
+authorized by this closed record.
