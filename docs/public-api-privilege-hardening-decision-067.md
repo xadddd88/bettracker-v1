@@ -3,9 +3,9 @@
 **Date:** 2026-07-27  
 **Proposed by:** CPO  
 **Authorized by:** Founder  
-**Status:** ACTIVE / IMPLEMENTATION DRAFT — migration 031 is review-only and
-unapplied. No production migration, Supabase write, runtime caller change,
-environment change, merge, or deployment is authorized.
+**Status:** EXECUTED / VERIFIED / CLOSED — PR #233 merged as
+`9211c7e5450ce1854a7621ab0a5fa3284decef82`; migration 031 applied once as
+`20260727123510_public_api_privilege_hardening_031` and was verified read-only.
 
 ## Problem
 
@@ -27,7 +27,7 @@ Two authenticated RPCs no longer have a runtime caller:
 
 ## Decision
 
-Migration 031 will harden the existing contract without adding a new client
+Migration 031 hardens the existing contract without adding a new client
 capability.
 
 ### Internal tables
@@ -123,20 +123,72 @@ The hermetic verifier must prove:
   `service_role` access;
 - lock and statement timeouts are present.
 
-## Boundaries
+## Execution record
 
-- Migration 031 is not applied by this implementation PR.
-- `main`, production Supabase, the production migration ledger, env, Vercel,
-  production aliases, and runtime application callers remain unchanged.
-- No production table rows are read or modified by implementation or CI.
+### Repository and CI
+
+- Draft PR #233 used head
+  `f114c96e547cd63ec45048cc065e098ffdb4b5af` on base
+  `8ce79df4444c366b07a3585fde3de8554f431b4a`.
+- All 10 CI jobs passed, including the 12/12 hermetic PostgreSQL 17 verifier.
+- PR #233 merged as
+  `9211c7e5450ce1854a7621ab0a5fa3284decef82`; the automatic Vercel production
+  deployment reached READY.
+
+### Production preflight and apply
+
+The separately authorized read-only preflight confirmed:
+
+- `main` and the READY production deployment were both on `9211c7e5`;
+- Supabase `ybbdkwjtytokrpbvgbmq` was `ACTIVE_HEALTHY` on PostgreSQL 17.6;
+- migration 031 was absent from the production ledger;
+- all seven tables existed with RLS enabled and no conflicting policies;
+- all nine affected function signatures and both retired RPC boundaries matched;
+- active transactions and locks on the target objects were both zero.
+
+The founder-approved exact migration from `main` applied successfully on the
+first attempt as:
+
+`20260727123510_public_api_privilege_hardening_031`
+
+### Read-only verification
+
+Catalog-only verification confirmed:
+
+- 7/7 target tables remained RLS-enabled;
+- 7/7 restrictive deny-policies were exact;
+- `PUBLIC`, `anon`, and `authenticated` had zero target-table ACLs while
+  `service_role` access was preserved;
+- 11/11 function boundaries were present;
+- 9/9 affected functions recorded `search_path = public, pg_temp`;
+- both retired RPCs became service-role-only;
+- all nine intentional authenticated RPCs remained callable;
+- future `postgres`-owned public tables and functions became client-deny by
+  default while retaining `service_role`.
+
+Security Advisor no longer reported the seven missing-policy INFO findings or
+the two retired authenticated RPCs. It retained exactly the nine documented
+intentional RPC warnings. Performance Advisor retained only 17 informational
+items: 16 unused-index notices and the Auth DB-connections setting.
+
+Public GET smoke loaded `/login`, and `/` redirected to `/login`. No RPC
+was invoked, no user data was read, and no retry or rollback ran.
+
+## Initial implementation boundaries
+
+The implementation Draft changed repository artifacts only. Migration apply,
+production DB writes, merge, and production deployment required separate founder
+approvals, which were later granted and are recorded above. Implementation and
+CI read or modified no production table rows.
+
+## Post-execution boundaries
+
+- The apply changed only the reviewed table ACL/RLS policies, function
+  `search_path` and EXECUTE grants, and future-object default privileges.
 - No financial function body, formula, settlement rule, RLS ownership rule,
-  provider integration, frontend, mobile, language, design, or feature flag is
-  changed.
-- Merge and production apply require separate founder approvals.
-
-## Roll-forward / recovery
-
-Before any future apply, repeat a production catalog preflight for all exact
-table, policy, function-signature, owner, ACL, `search_path`, and default-ACL
-preconditions. On an apply error, stop without retry. Rollback or restoration of
-any client privilege requires a separate reviewed and founder-approved action.
+  runtime caller, provider integration, frontend, mobile, language, design,
+  feature flag, env, or Vercel configuration changed.
+- The nine retained authenticated RPCs remain documented intentional exceptions;
+  their bodies or client contracts are not broadened by this decision.
+- Any future restoration of client privileges or rollback requires a separate
+  reviewed and founder-approved action. No rollback was required.
