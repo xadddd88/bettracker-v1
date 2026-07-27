@@ -1,6 +1,6 @@
 # Decision Ledger / Numbering Governance
 
-Status: Decision #066 is EXECUTED / VERIFIED / CLOSED after PR #232 and production migration `20260727093233_odds_snapshots_public_security_invoker_030`. Decision #067 is occupied and ACTIVE for public API privilege hardening; migration 031 is review-only and unapplied. #068 is next unreserved.
+Status: Decision #067 is EXECUTED / VERIFIED / CLOSED after PR #233 and production migration `20260727123510_public_api_privilege_hardening_031`. #068 is next unreserved.
 Last updated: 2026-07-27
 
 ## Purpose
@@ -17,9 +17,9 @@ Occupied / closed: #063 — Tracked-Leg Fixture Lineage Contract (docs-only; mer
 Occupied / closed: #064 — Tracked-Leg Fixture Lineage Foundation (Gate 3 merged via PR #231; migration 025 applied and verified)
 Occupied / closed: #065 — Broadcast Noir Cross-Platform Rollout (Web rollout production-deployed via #202 → #224; mobile release unauthorized)
 Occupied / closed: #066 — odds_snapshots_public Security-Invoker Hardening (PR #232 merged; migration 030 applied and verified)
-Highest-numbered closed: #066 — odds_snapshots_public Security-Invoker Hardening
-Active approved: #067 — Public API Privilege Hardening (migration 031 + PostgreSQL 17 verifier in Draft PR; unapplied)
-                 #061 — Founder Daily Flow Acceptance (Phase A1 fail-closed tracker input lifecycle;
+Occupied / closed: #067 — Public API Privilege Hardening (PR #233 merged; migration 031 applied and verified)
+Highest-numbered closed: #067 — Public API Privilege Hardening
+Active approved: #061 — Founder Daily Flow Acceptance (Phase A1 fail-closed tracker input lifecycle;
                  Playwright/Supabase-stub harness deferred)
                  #062 — Mobile Founder client (0/1B/1C merged; 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171)
                  #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run
@@ -54,7 +54,7 @@ Next unreserved: #068
 | #064 | Tracked-Leg Fixture Lineage Foundation — EXECUTED / VERIFIED / CLOSED; Gate 3 merged via PR #231; migration 025 applied as `20260727060234_tracked_leg_fixture_lineage_025`; v2 remains service-role-only with no caller |
 | #065 | Broadcast Noir Cross-Platform Rollout — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via PR #202 and hardening #203 → #224; no mobile release authority |
 | #066 | `odds_snapshots_public` Security-Invoker Hardening — EXECUTED / VERIFIED / CLOSED; PR #232 merged as `8ce79df4`; migration 030 applied as `20260727093233_odds_snapshots_public_security_invoker_030` |
-| #067 | Public API Privilege Hardening — ACTIVE / IMPLEMENTATION DRAFT; migration 031 unapplied |
+| #067 | Public API Privilege Hardening — EXECUTED / VERIFIED / CLOSED; PR #233 merged as `9211c7e5`; migration 031 applied as `20260727123510_public_api_privilege_hardening_031` |
 
 ## Retired / Superseded Tracks
 
@@ -86,7 +86,7 @@ Decision numbering does not grant runtime authority.
 - Decision #065 Web rollout is CLOSED and production-deployed via PR #202 followed by #203 → #224; its mobile source still has only explicit Review → manual Save through the existing tracked-bet endpoint and no auto-save.
 - Decision #065 did not change the server route, RPC, schema, migrations, settlement behavior, financial formulas, provider/runtime authority, CSP enforcement, EAS/device builds, beta distribution, or app publication.
 - Decision #066 is EXECUTED / VERIFIED / CLOSED: PR #232 merged as `8ce79df4`; migration 030 was applied once and its view, RLS, ACL, internal-field denial, Advisor, and web-health contracts were verified read-only.
-- Decision #067 is ACTIVE / IMPLEMENTATION DRAFT. Migration 031, production DB writes, runtime caller changes, env changes, merge, and deployment remain unauthorized.
+- Decision #067 is EXECUTED / VERIFIED / CLOSED. PR #233 merged as `9211c7e5`; migration 031 applied once as `20260727123510_public_api_privilege_hardening_031` and its table-policy, ACL, function, default-privilege, Advisor, and web-health contracts were verified read-only. No further privilege, RPC, runtime, env, or deployment action is authorized by closure.
 - Decision #061 remains ACTIVE because Phase A2 browser E2E is deferred / not approved. Phase A1 was merged via PR #162 as `a6d4ebb` and deployed READY with 0 post-deployment runtime errors; it performed no production smoke and no scanner/API/Supabase runtime call or write. Phase A1 authorizes no further runtime, no migrations, and no RPC or schema changes.
 - FP-001 remains active. Decision #054 Phase B is not approved. Decision #050 is EXECUTED / VERIFIED / CLOSED; custom SMTP scale/readiness is a separate follow-up.
 
@@ -109,4 +109,6 @@ Decision numbering does not grant runtime authority.
 - Migration 025 was applied once as `20260727060234_tracked_leg_fixture_lineage_025` and its catalog contract was verified read-only. No bet was created and no application caller was added.
 - PR #232 merged Decision #066 as `8ce79df4444c366b07a3585fde3de8554f431b4a`; all PostgreSQL 17 and repository CI gates passed.
 - Migration 030 was applied once as `20260727093233_odds_snapshots_public_security_invoker_030`; catalog/ACL/RLS verification and Security Advisor confirmed the contract, and no odds rows were created or changed.
-- Decision #067 is now occupied by Public API Privilege Hardening. Migration 031 remains review-only and unapplied; #068 is next unreserved.
+- PR #233 merged Decision #067 as `9211c7e5450ce1854a7621ab0a5fa3284decef82`; all 10 CI jobs passed, including the 12/12 PostgreSQL 17 verifier, and the automatic production deployment reached READY.
+- Migration 031 was applied once as `20260727123510_public_api_privilege_hardening_031`. Catalog-only verification confirmed 7/7 RLS tables and restrictive deny-policies, zero client table ACLs, preserved `service_role`, 11/11 function boundaries, 9/9 protected `search_path` values, two retired RPCs service-only, nine intentional authenticated RPCs retained, and client-deny future-object defaults.
+- Security Advisor retained only the nine documented intentional RPC warnings; web health passed. No RPC, user-data read, retry, or rollback ran. Decision #067 is CLOSED; #068 is next unreserved.
