@@ -697,6 +697,9 @@ async function assertFounderDailyFlow(page, viewport, flow) {
   flow.trackedGate.resolve()
   await page.waitForURL(`${flow.nextOrigin}/bets/${FOUNDER_FLOW_BET_ID}`, { timeout: 120_000 })
   await page.waitForLoadState('networkidle')
+  await page.locator('main').evaluate(async element => {
+    await Promise.all(element.getAnimations().map(animation => animation.finished))
+  })
   await assertBaseAcceptance(page, `/bets/${FOUNDER_FLOW_BET_ID}`, viewport)
   await page.getByRole('heading', { name: eventName }).waitFor()
   await page.getByText('Победитель матча · Хозяева').waitFor()
