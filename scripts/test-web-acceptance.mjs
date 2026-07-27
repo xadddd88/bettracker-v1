@@ -615,8 +615,9 @@ async function assertFounderDailyFlow(page, viewport, flow) {
   await scannerRequestPromise
 
   const fieldset = page.locator('form fieldset')
-  const saveButton = page.getByRole('button', { name: 'Сохранить ставку' })
+  const saveButton = page.locator('form button[type="submit"]')
   const cancelButton = page.getByRole('button', { name: 'Отмена' })
+  assert.equal(await saveButton.count(), 1, `${label} must expose exactly one stable Save control`)
   await page.waitForFunction(() => document.querySelector('form fieldset')?.disabled === true)
   assert.equal(await fieldset.evaluate(element => element.disabled), true, `${label} scan must lock the complete form`)
   assert.equal(await page.locator('#coupon-image').isDisabled(), true, `${label} scan must lock the scanner input`)
