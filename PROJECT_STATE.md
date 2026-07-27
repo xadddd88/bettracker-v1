@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-27 (production product-code milestone `9040673`; Decision #066 migration 030 applied and verified; Decision #067 public API hardening in Draft PR)
+> Last updated: 2026-07-27 (production product-code milestone `9040673`; current `main` / production deployment `9211c7e5`; Decision #067 migration 031 applied and verified)
 
 ## 1. Executive Status
 
@@ -13,9 +13,9 @@
 | Production | `https://btdk.app` |
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
-| Latest completed operational milestone | **Decision #066 — PR #232 merged as `8ce79df4`; migration 030 applied as `20260727093233_odds_snapshots_public_security_invoker_030` and catalog/ACL/RLS verified** |
-| Highest-numbered closed decision | **#066 — `odds_snapshots_public` Security-Invoker Hardening (migration 030 applied and verified)** |
-| Active decisions | **#067 — Public API Privilege Hardening (migration 031 + PostgreSQL 17 verifier in Draft PR; unapplied)**; **#062 — Mobile Founder client (Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171; Event analysis remains deferred and Tracker Save remains manual after Review)**; **#061 — Founder Daily Flow Acceptance**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
+| Latest completed operational milestone | **Decision #067 — PR #233 merged as `9211c7e5`; migration 031 applied as `20260727123510_public_api_privilege_hardening_031` and catalog/ACL/RLS/default-privilege/function boundaries verified** |
+| Highest-numbered closed decision | **#067 — Public API Privilege Hardening (migration 031 applied and verified)** |
+| Active decisions | **#062 — Mobile Founder client (Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171; Event analysis remains deferred and Tracker Save remains manual after Review)**; **#061 — Founder Daily Flow Acceptance**; **#056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (implementation merged/deployed; runtime provider call not approved / not run)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
 | Next unreserved decision | **#068** |
 
@@ -196,7 +196,7 @@ Decision #060 — EXECUTED / VERIFIED / CLOSED; no further synthetic runtime smo
 Decision #061 — Playwright / Supabase-stub E2E harness — DEFERRED, NOT APPROVED
 Decision #064 — migration 025 / create_tracked_bet_v2 — EXECUTED / VERIFIED / CLOSED; RPC service-role-only; no application caller
 Decision #066 — migration 030 security-invoker hardening — EXECUTED / VERIFIED / CLOSED
-Decision #067 — migration 031 public API privilege hardening — IMPLEMENTATION DRAFT, UNAPPLIED
+Decision #067 — migration 031 public API privilege hardening — EXECUTED / VERIFIED / CLOSED
 Decision #065 — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via #202 → #224; no mobile release authority
 ```
 
@@ -207,11 +207,12 @@ Decision #065 — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via #202 → #224; no
 - Decision #063 was approved and merged docs-only via PR #183 as `df4723f`.
 - Decision #064 implementation merged via PR #186 as `4fce917701b95b3d3ad98ad9f157d02216323d3e`; Gate 3 merged via PR #231 as `f5f17385d711ccd1df323cd71be3448dd3e08d85`. Migration 025 was applied once as `20260727060234_tracked_leg_fixture_lineage_025`; 12/12 columns, 3/3 constraints, 2/2 indexes, 2/2 triggers, 3/3 functions, and service-role-only v2 ACL were verified. No application caller was added.
 - Decision #066 merged via PR #232 as `8ce79df4444c366b07a3585fde3de8554f431b4a`. Migration 030 was applied once as `20260727093233_odds_snapshots_public_security_invoker_030`; `security_invoker`, the exact authenticated-only policy, 9/9 safe-column access, 0/5 internal-column access, zero `anon`/DML access, and service-role continuity were verified. Both related Advisor findings were cleared and the table remained at 0 rows.
+- Decision #067 merged via PR #233 as `9211c7e5450ce1854a7621ab0a5fa3284decef82` after 10/10 CI jobs and a 12/12 PostgreSQL 17 verifier. Migration 031 was applied once as `20260727123510_public_api_privilege_hardening_031`; read-only verification confirmed 7/7 RLS tables and restrictive deny-policies, zero `anon`/`authenticated` table ACLs, preserved `service_role`, 11/11 function boundaries, 9/9 protected `search_path` values, service-only retired RPCs, client-deny future-object defaults, only nine intentional RPC Advisor warnings, and healthy public web routing. No RPC, user-data read, retry, or rollback ran.
 - Decision #065 Web rollout is closed and production-deployed via PR #202 followed by #203 → #224, ending at `eb51d91`. Mobile source remains present but authorizes only Review → manual Save through the existing tracked-bet endpoint; no auto-save, EAS/device build, beta, publication, Supabase/provider runtime, server/RPC/schema/migration, settlement, or financial-formula change is authorized. #068 is next unreserved.
 - Post-rollout corrective PR #228 merged as `9040673` and deployed READY after exact-head green CI, Vercel READY, and Chrome re-verification. It changes Web typography, control sizing, and browser acceptance coverage only; it does not consume Decision #066 or expand any runtime authority.
 - PR #182 merged as `d103947f` and deployed the fail-closed grading foundation without production provider calls, result writes, scheduling, or automatic settlement.
 - PR #181 applied production migration `20260721152711_cancel_pending_bet`, merged as `d5ebb87d`, and deployed READY. Its emergency kill switch is `docs/cancel-pending-bet-rollback.sql`; the executable SQL is unchanged by the governance rename.
-- `supabase/migrations` contains numbered files through 031, with no 008 file. Migration 025 is applied as `20260727060234_tracked_leg_fixture_lineage_025`. Migration 030 is applied as `20260727093233_odds_snapshots_public_security_invoker_030`. Migration 031 is review-only and unapplied. Decision #060 is **EXECUTED / VERIFIED / CLOSED**. Migration 024 production version: `20260716142736_create_tracked_bet_024`; Phase B added no migrations.
+- `supabase/migrations` contains numbered files through 031, with no 008 file. Migration 025 is applied as `20260727060234_tracked_leg_fixture_lineage_025`. Migration 030 is applied as `20260727093233_odds_snapshots_public_security_invoker_030`. Migration 031 is applied as `20260727123510_public_api_privilege_hardening_031`. Decision #060 is **EXECUTED / VERIFIED / CLOSED**. Migration 024 production version: `20260716142736_create_tracked_bet_024`; Phase B added no migrations.
 - Production's timestamped migration ledger does not represent all earlier manually applied history.
 - A fresh-database bootstrap is **not yet certified**; see `docs/migration-state-reconciliation-053.md`.
 - Never run `001_initial_schema.sql` against production as a general setup command.
@@ -234,7 +235,7 @@ Decision #065 — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via #202 → #224; no
 #064 — Tracked-Leg Fixture Lineage Foundation — EXECUTED / VERIFIED / CLOSED; Gate 3 merged via PR #231; migration 025 applied and catalog-verified; v2 remains service-role-only with no caller
 #065 — Broadcast Noir Cross-Platform Rollout — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via #202 → #224; mobile release remains unauthorized
 #066 — odds_snapshots_public Security-Invoker Hardening — EXECUTED / VERIFIED / CLOSED; PR #232 merged; migration 030 applied and verified
-#067 — Public API Privilege Hardening — ACTIVE / IMPLEMENTATION DRAFT; migration 031 unapplied
+#067 — Public API Privilege Hardening — EXECUTED / VERIFIED / CLOSED; PR #233 merged; migration 031 applied and verified
 #068 — next unreserved decision
 ```
 
