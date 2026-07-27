@@ -220,8 +220,9 @@ This section is the execution and closure receipt.
 - Playwright / Supabase-stub E2E harness NOT implemented (deferred).
 - Settlement/results remain HOLD; Decision #056 runtime remains NOT
   APPROVED; FP-001 remains ACTIVE.
-- Phase A1 merged via PR #162 as `a6d4ebb` and was deployed READY. Decision
-  Phase A1 left #061 ACTIVE pending the separately authorized Phase A2; the closure receipt below resolves that gate.
+- Phase A1 merged via PR #162 as `a6d4ebb` and was deployed READY. It left
+  #061 ACTIVE pending the separately authorized Phase A2; the closure receipt
+  below resolves that gate.
 
 ## Boundaries (Phase A2)
 
