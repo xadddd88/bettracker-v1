@@ -1,6 +1,6 @@
 # Decision Ledger / Numbering Governance
 
-Status: Decision #064 is EXECUTED / VERIFIED / CLOSED after PR #231 and production migration `20260727060234_tracked_leg_fixture_lineage_025`. Decision #065 remains CLOSED for the Web rollout. Decision #066 is occupied and ACTIVE for `odds_snapshots_public` security-invoker hardening; migration 030 is review-only and unapplied. #067 is next unreserved.
+Status: Decision #066 is EXECUTED / VERIFIED / CLOSED after PR #232 and production migration `20260727093233_odds_snapshots_public_security_invoker_030`. Decision #067 is occupied and ACTIVE for public API privilege hardening; migration 031 is review-only and unapplied. #068 is next unreserved.
 Last updated: 2026-07-27
 
 ## Purpose
@@ -10,20 +10,21 @@ This file prevents decision-number collisions. Historical numbers are immutable:
 ## Current Number Map
 
 ```txt
-Occupied: #001-#019, #021-#031, #033-#065
+Occupied: #001-#019, #021-#031, #033-#067
 Do not reuse: #020
 Retired reservation / do not reuse: #032
 Occupied / closed: #063 — Tracked-Leg Fixture Lineage Contract (docs-only; merged via PR #183 as `df4723f`)
 Occupied / closed: #064 — Tracked-Leg Fixture Lineage Foundation (Gate 3 merged via PR #231; migration 025 applied and verified)
 Occupied / closed: #065 — Broadcast Noir Cross-Platform Rollout (Web rollout production-deployed via #202 → #224; mobile release unauthorized)
-Highest-numbered closed: #065 — Broadcast Noir Cross-Platform Rollout
-Active approved: #066 — odds_snapshots_public Security-Invoker Hardening (migration 030 + PostgreSQL 17 verifier in Draft PR; unapplied)
+Occupied / closed: #066 — odds_snapshots_public Security-Invoker Hardening (PR #232 merged; migration 030 applied and verified)
+Highest-numbered closed: #066 — odds_snapshots_public Security-Invoker Hardening
+Active approved: #067 — Public API Privilege Hardening (migration 031 + PostgreSQL 17 verifier in Draft PR; unapplied)
                  #061 — Founder Daily Flow Acceptance (Phase A1 fail-closed tracker input lifecycle;
                  Playwright/Supabase-stub harness deferred)
                  #062 — Mobile Founder client (0/1B/1C merged; 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171)
                  #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run
                  (implementation merged/deployed; runtime provider call not approved / not run)
-Next unreserved: #067
+Next unreserved: #068
 ```
 
 ## Recent Decisions
@@ -52,13 +53,14 @@ Next unreserved: #067
 | #063 | Tracked-Leg Fixture Lineage Contract — EXECUTED / CLOSED, DOCS-ONLY; Founder-approved; merged via PR #183 as `df4723f`; no runtime authority |
 | #064 | Tracked-Leg Fixture Lineage Foundation — EXECUTED / VERIFIED / CLOSED; Gate 3 merged via PR #231; migration 025 applied as `20260727060234_tracked_leg_fixture_lineage_025`; v2 remains service-role-only with no caller |
 | #065 | Broadcast Noir Cross-Platform Rollout — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via PR #202 and hardening #203 → #224; no mobile release authority |
-| #066 | `odds_snapshots_public` Security-Invoker Hardening — ACTIVE / IMPLEMENTATION DRAFT; migration 030 unapplied |
+| #066 | `odds_snapshots_public` Security-Invoker Hardening — EXECUTED / VERIFIED / CLOSED; PR #232 merged as `8ce79df4`; migration 030 applied as `20260727093233_odds_snapshots_public_security_invoker_030` |
+| #067 | Public API Privilege Hardening — ACTIVE / IMPLEMENTATION DRAFT; migration 031 unapplied |
 
 ## Retired / Superseded Tracks
 
 - **#020:** never reuse. PR #90 tried to claim it for Third-Party Manual Context Policy, but that PR is closed without merge and the policy is not adopted.
 - **#032:** the old M1.3 filter-evidence reservation is retired after PR #106 was superseded. Keep the number unused to preserve audit history.
-- A revived third-party manual-context policy must use **#067 or later** in a fresh PR.
+- A revived third-party manual-context policy must use **#068 or later** in a fresh PR.
 
 ## Rules
 
@@ -83,6 +85,8 @@ Decision numbering does not grant runtime authority.
 - Decision #064 is EXECUTED / VERIFIED / CLOSED: Gate 3 merged via PR #231 and migration 025 was applied once as `20260727060234_tracked_leg_fixture_lineage_025`; `create_tracked_bet_v2` remains service-role-only with no application caller.
 - Decision #065 Web rollout is CLOSED and production-deployed via PR #202 followed by #203 → #224; its mobile source still has only explicit Review → manual Save through the existing tracked-bet endpoint and no auto-save.
 - Decision #065 did not change the server route, RPC, schema, migrations, settlement behavior, financial formulas, provider/runtime authority, CSP enforcement, EAS/device builds, beta distribution, or app publication.
+- Decision #066 is EXECUTED / VERIFIED / CLOSED: PR #232 merged as `8ce79df4`; migration 030 was applied once and its view, RLS, ACL, internal-field denial, Advisor, and web-health contracts were verified read-only.
+- Decision #067 is ACTIVE / IMPLEMENTATION DRAFT. Migration 031, production DB writes, runtime caller changes, env changes, merge, and deployment remain unauthorized.
 - Decision #061 remains ACTIVE because Phase A2 browser E2E is deferred / not approved. Phase A1 was merged via PR #162 as `a6d4ebb` and deployed READY with 0 post-deployment runtime errors; it performed no production smoke and no scanner/API/Supabase runtime call or write. Phase A1 authorizes no further runtime, no migrations, and no RPC or schema changes.
 - FP-001 remains active. Decision #054 Phase B is not approved. Decision #050 is EXECUTED / VERIFIED / CLOSED; custom SMTP scale/readiness is a separate follow-up.
 
@@ -103,4 +107,6 @@ Decision numbering does not grant runtime authority.
 
 - PR #231 merged Decision #064 Gate 3 as `f5f17385d711ccd1df323cd71be3448dd3e08d85`; all PostgreSQL 17 and repository CI gates passed.
 - Migration 025 was applied once as `20260727060234_tracked_leg_fixture_lineage_025` and its catalog contract was verified read-only. No bet was created and no application caller was added.
-- Decision #066 is now occupied by `odds_snapshots_public` security-invoker hardening. Migration 030 remains review-only and unapplied; #067 is next unreserved.
+- PR #232 merged Decision #066 as `8ce79df4444c366b07a3585fde3de8554f431b4a`; all PostgreSQL 17 and repository CI gates passed.
+- Migration 030 was applied once as `20260727093233_odds_snapshots_public_security_invoker_030`; catalog/ACL/RLS verification and Security Advisor confirmed the contract, and no odds rows were created or changed.
+- Decision #067 is now occupied by Public API Privilege Hardening. Migration 031 remains review-only and unapplied; #068 is next unreserved.
