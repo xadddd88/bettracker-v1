@@ -630,12 +630,13 @@ async function assertFounderDailyFlow(page, viewport, flow) {
   assert.equal(await page.locator('#tracker-stake').inputValue(), '25', `${label} overflow must not import scanner stake`)
   assert.equal(await page.locator('#tracker-bookmaker').inputValue(), 'Pinnacle', `${label} overflow must not import scanner bookmaker`)
 
+  const overflowUuidBaseline = await page.evaluate(() => window.__founderRandomUUIDCalls)
   await saveButton.click()
   await page.waitForTimeout(150)
   assert.equal(flow.trackedRequests, 0, `${label} overflow Save must send zero tracked-bet requests`)
   assert.equal(
     await page.evaluate(() => window.__founderRandomUUIDCalls),
-    0,
+    overflowUuidBaseline,
     `${label} overflow Save must mint zero idempotency UUIDs`,
   )
 
@@ -649,6 +650,7 @@ async function assertFounderDailyFlow(page, viewport, flow) {
   const trackedRequestPromise = page.waitForRequest(request => (
     new URL(request.url()).pathname === '/api/bets/tracked' && request.method() === 'POST'
   ))
+  const submitUuidBaseline = await page.evaluate(() => window.__founderRandomUUIDCalls)
   await saveButton.evaluate(button => button.click())
   const trackedRequest = await trackedRequestPromise
   const payload = trackedRequest.postDataJSON()
@@ -662,7 +664,7 @@ async function assertFounderDailyFlow(page, viewport, flow) {
   await page.waitForTimeout(100)
   assert.equal(flow.trackedRequests, 1, `${label} in-flight double click must not send a second request`)
   assert.equal(
-    await page.evaluate(() => window.__founderRandomUUIDCalls),
+    await page.evaluate(baseline => window.__founderRandomUUIDCalls - baseline, submitUuidBaseline),
     1,
     `${label} successful intent must mint exactly one idempotency UUID`,
   )
