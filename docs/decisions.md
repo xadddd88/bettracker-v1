@@ -2137,7 +2137,7 @@ Reference: `docs/finished-fixture-result-presence-dry-run-scope-decision-059.md`
 **Date:** 2026-07-15
 **Proposed by:** CPO + Founder
 **Approved by:** Founder (Decision #060 APPROVED)
-**Status:** EXECUTED / VERIFIED / CLOSED 2026-07-16. Migration 024 was applied and its exact catalog contract and authenticated Phase A RPC smoke were verified. Phase B was approved by the CPO, merged via PR #159 as `1926d9a82759cd1e4e97378ca15addf010c0bf28`, deployed READY, and verified by one separately authorized authenticated production API smoke. At closure (2026-07-16), Decision #060 was the highest-numbered CLOSED decision and #061 was the next unreserved number; #061 and #062 are now ACTIVE, #063, #064, #065, and #066 are occupied and CLOSED, #067 is occupied and ACTIVE, and the current next unreserved decision is #068.
+**Status:** EXECUTED / VERIFIED / CLOSED 2026-07-16. Migration 024 was applied and its exact catalog contract and authenticated Phase A RPC smoke were verified. Phase B was approved by the CPO, merged via PR #159 as `1926d9a82759cd1e4e97378ca15addf010c0bf28`, deployed READY, and verified by one separately authorized authenticated production API smoke. At closure (2026-07-16), Decision #060 was the highest-numbered CLOSED decision and #061 was the next unreserved number; #061 and #062 are now ACTIVE, #063, #064, #065, and #066 are occupied and CLOSED, #067 is occupied and CLOSED, and the current next unreserved decision is #068.
 
 **Decision:** Deliver one safe atomic write path and a unified mobile-first tracker form for Single and Express/parlay entries: Scanner → editable ordered legs → Bet, while keeping the legacy `create_quick_bet` function unchanged.
 
@@ -2159,7 +2159,7 @@ Reference: `docs/finished-fixture-result-presence-dry-run-scope-decision-059.md`
 
 **Post-execution boundaries:** migrations / RPC changes in Phase B 0; direct DML on financial tables 0; service_role in the user flow 0; provider calls 0; `create_quick_bet` remains unchanged; Analyst/Scout/pricing/probability/edge/EV untouched. No additional synthetic production smoke is authorized by this record. Decision #056 runtime remains NOT APPROVED / NOT RUN. Results ingestion and automated settlement remain HOLD. Decision #050 SMTP round-trip remains PENDING. CSP Phase B remains NOT APPROVED. FP-001 remains ACTIVE.
 
-**Numbering:** Decision #060 occupied and CLOSED. At closure, #061 was the next unreserved number; #061 and #062 are now ACTIVE, #063, #064, #065, and #066 are occupied and CLOSED, #067 is occupied and ACTIVE, and the current next unreserved decision is #068.
+**Numbering:** Decision #060 occupied and CLOSED. At closure, #061 was the next unreserved number; #061 and #062 are now ACTIVE, #063, #064, #065, and #066 are occupied and CLOSED, #067 is occupied and CLOSED, and the current next unreserved decision is #068.
 
 Reference: `docs/coupon-to-tracker-scope-decision-060.md`
 
@@ -2179,7 +2179,7 @@ Reference: `docs/coupon-to-tracker-scope-decision-060.md`
 
 **Boundaries:** 0 production/Supabase/provider calls; 0 migrations, RPC, or schema changes; `create_tracked_bet`, `create_quick_bet`, and `POST /api/bets/tracked` unchanged; Playwright/Supabase-stub harness NOT implemented (deferred); settlement/results HOLD; Decision #056 runtime NOT APPROVED; FP-001 ACTIVE. Phase A1 is merged/deployed, while Decision #061 remains ACTIVE because Phase A2 is DEFERRED / NOT APPROVED.
 
-**Numbering:** Decision #061 and #062 are occupied and ACTIVE; #063, #064, #065, and #066 are occupied and CLOSED; #067 is occupied and ACTIVE; next unreserved decision #068.
+**Numbering:** Decision #061 and #062 are occupied and ACTIVE; #063, #064, #065, and #066 are occupied and CLOSED; #067 is occupied and CLOSED; next unreserved decision #068.
 
 Reference: `docs/daily-flow-acceptance-decision-061.md`
 
@@ -2197,7 +2197,7 @@ Reference: `docs/daily-flow-acceptance-decision-061.md`
 
 **Validation and merge checkpoint:** PR #170 reported financial-safety 72/72, rate-limit 12/12, TypeScript and lint passing before merge. PR #171 reported mobile tests 80/80, mobile and root typecheck/lint, Expo dependency/config/export, financial-safety 72/72, and rate-limit 12/12 passing before merge. Both PR records report zero production/Supabase/AI/provider runtime calls and writes during implementation and validation; no EAS Build or EAS Update is recorded. This docs-only reconciliation adds no new runtime evidence.
 
-**Numbering:** Decision #062 is occupied and ACTIVE; #063, #064, #065, and #066 are occupied and CLOSED; #067 is occupied and ACTIVE; next unreserved decision #068.
+**Numbering:** Decision #062 is occupied and ACTIVE; #063, #064, #065, and #066 are occupied and CLOSED; #067 is occupied and CLOSED; next unreserved decision #068.
 
 Reference: `docs/mobile-phase-0-decision-062.md`
 
@@ -2247,7 +2247,7 @@ unnumbered operational correction: it does not consume or reassign Decision
 governance rename.
 
 **Numbering:** Decision #063, #064, #065, and #066 are occupied and CLOSED.
-Decision #067 is occupied and ACTIVE; Decision #068 is next unreserved.
+Decision #067 is occupied and CLOSED; Decision #068 is next unreserved.
 
 Reference: `docs/tracked-leg-fixture-lineage-contract-decision-063.md`
 
@@ -2291,7 +2291,7 @@ holds remain active.
 
 **Execution checkpoint:** PR #186 was squash-merged and its automatic Vercel deployment reached READY without applying migration 025. Gate 3 then merged via PR #231, and migration 025 was applied once as `20260727060234_tracked_leg_fixture_lineage_025`. Read-only catalog verification confirmed 12/12 columns, 3/3 constraints, 2/2 indexes, 2/2 triggers, 3/3 functions, and service-role-only v2 ACL. No bet was created and no application caller, provider/result/settlement action, env change, or additional deployment was authorized by the apply gate.
 
-**Numbering:** Decision #064 is occupied and CLOSED. Decision #065 is occupied and CLOSED for the Web rollout. Decision #066 is occupied and CLOSED after migration 030 verification. Decision #067 is occupied and ACTIVE for public API privilege hardening; Decision #068 is next unreserved.
+**Numbering:** Decision #064 is occupied and CLOSED. Decision #065 is occupied and CLOSED for the Web rollout. Decision #066 is occupied and CLOSED after migration 030 verification. Decision #067 is occupied and CLOSED for public API privilege hardening; Decision #068 is next unreserved.
 
 Reference: `docs/tracked-leg-fixture-lineage-foundation-decision-064.md`
 
@@ -2342,7 +2342,7 @@ three P3 items were closed before production release and remained guarded by
 the later Web hardening PRs.
 
 **Numbering:** Decision #065 is occupied and CLOSED. Decision #066 is occupied
-and CLOSED; Decision #067 is occupied and ACTIVE; Decision #068 is next
+and CLOSED; Decision #067 is occupied and CLOSED; Decision #068 is next
 unreserved.
 
 Reference: `docs/broadcast-noir-cross-platform-rollout-decision-065.md`
@@ -2365,7 +2365,7 @@ Reference: `docs/broadcast-noir-cross-platform-rollout-decision-065.md`
 
 **Execution checkpoint:** All nine repository CI jobs passed, including the PostgreSQL 17 verifier. Migration 030 applied successfully on the first attempt. Read-only verification confirmed `security_invoker=true`, one exact authenticated-only RLS policy, 9/9 safe columns accessible, 0/5 internal columns accessible, zero `anon` and DML access, unchanged `service_role` access, zero odds rows, and removal of both related Security Advisor findings. No retry or rollback ran.
 
-**Numbering:** Decision #066 is occupied and CLOSED. Decision #067 is occupied and ACTIVE for public API privilege hardening; Decision #068 is next unreserved.
+**Numbering:** Decision #066 is occupied and CLOSED. Decision #067 is occupied and CLOSED for public API privilege hardening; Decision #068 is next unreserved.
 
 Reference: `docs/odds-snapshots-security-invoker-decision-066.md`
 
@@ -2375,7 +2375,7 @@ Reference: `docs/odds-snapshots-security-invoker-decision-066.md`
 **Date:** 2026-07-27
 **Proposed by:** CPO
 **Approved by:** Founder (Draft PR scope only)
-**Status:** ACTIVE / IMPLEMENTATION DRAFT — migration 031 is review-only and unapplied.
+**Status:** EXECUTED / VERIFIED / CLOSED — PR #233 merged as `9211c7e5450ce1854a7621ab0a5fa3284decef82`; migration 031 applied once as `20260727123510_public_api_privilege_hardening_031` and was verified read-only.
 
 **Decision:** Remove inherited client ACLs from seven intentionally closed internal tables and add restrictive constant-false client policies; pin `pg_temp` last on nine affected `SECURITY DEFINER` functions; revoke authenticated execution of unused `create_quick_bet` and `set_user_currency` while preserving `service_role`; and make future `postgres`-owned public tables/functions client-deny by default.
 
@@ -2383,9 +2383,11 @@ Reference: `docs/odds-snapshots-security-invoker-decision-066.md`
 
 **Verification:** A hermetic PostgreSQL 17 job proves exact deny-policy shape, removal of table ACLs, behavioral resistance to temporary-object shadowing, retired and retained RPC ACLs, `service_role` continuity, safe future-object defaults, and bounded DDL timeouts.
 
-**Non-authorization:** migration apply, production DB writes, function-body or financial-logic changes, runtime caller changes, env changes, Vercel actions, merge, and production deployment remain outside this Draft approval.
+**Execution checkpoint:** PR #233 passed all 10 CI jobs, including the 12/12 PostgreSQL 17 verifier, and merged as `9211c7e5450ce1854a7621ab0a5fa3284decef82`; the automatic production deployment reached READY. After a read-only production preflight, migration 031 applied successfully on the first attempt as `20260727123510_public_api_privilege_hardening_031`. Catalog-only verification confirmed 7/7 RLS tables and exact restrictive deny-policies, zero `anon`/`authenticated` table ACLs, preserved `service_role`, 11/11 function boundaries, 9/9 protected `search_path` values, two retired RPCs service-only, nine intentional authenticated RPCs retained, and client-deny future-object defaults. The prior seven no-policy INFO findings and two retired-RPC warnings disappeared; only nine documented intentional RPC warnings remain. `/login` loaded and `/` redirected to `/login`. No RPC, user-data read, retry, or rollback ran.
 
-**Numbering:** Decision #067 is occupied and ACTIVE. Decision #068 is next unreserved.
+**Initial Draft boundary:** migration apply, production DB writes, function-body or financial-logic changes, runtime caller changes, env changes, Vercel actions, merge, and production deployment were outside the implementation Draft approval and required separate founder gates. The completed apply changed none of `main`, env, Vercel configuration, function bodies, financial logic, or runtime callers.
+
+**Numbering:** Decision #067 is occupied and CLOSED. Decision #068 is next unreserved.
 
 Reference: `docs/public-api-privilege-hardening-decision-067.md`
 
