@@ -2,9 +2,10 @@
 
 Status: ACTIVE — Phase A read-only assessment delivered 2026-07-17; Phase A1
 (fail-closed tracker input lifecycle) merged via PR #162 as
-`a6d4ebbefcf49af71729c64cd33886d0592cf1fd` and deployed READY. Phase A2
-browser E2E remains DEFERRED / NOT APPROVED. Owner: CPO + Founder.
-Implementation: Claude.
+`a6d4ebbefcf49af71729c64cd33886d0592cf1fd` and deployed READY. Founder
+authorized Phase A2 on 2026-07-27; its hermetic browser E2E implementation is
+UNDER REVIEW and is not yet merged or executed. Owner: CPO + Founder.
+Implementation: Codex.
 
 ## Purpose
 
@@ -24,7 +25,9 @@ defects in the tracker input lifecycle (below). The report also proposed a
 hermetic local E2E verification harness (Playwright against a local
 Supabase stub at 320/375/1280 px). **The harness is DEFERRED by CPO
 verdict — Playwright and the Supabase stub are NOT to be implemented in
-Phase A1.** No code changed in Phase A.
+Phase A1.** No code changed in Phase A. That Phase A1 deferral was lifted by
+the Founder on 2026-07-27 for the separately bounded Phase A2 implementation
+below.
 
 ## Phase A1 — fail-closed tracker input lifecycle (this change)
 
@@ -137,12 +140,47 @@ site, exactly two unlock sites, 7 payload-edit call sites through
 fieldset/aria-busy/button lock, the three synchronous entry-point
 guards, the no-abort rule, and the untouched Phase B write-path surface.
 
-**Not executed:** a browser-level proof that overflow→Save produces zero
-network requests in a running DOM (real click on Save after a refused
-oversized scan) requires the E2E harness and is DEFERRED to Phase A2. No
-such run happened in Phase A1; the gate's runtime behavior is currently
-evidenced only by the static ordering assertions above and the
-behavioral adapter tests.
+**Phase A1 evidence limit:** a browser-level proof that overflow→Save
+produces zero network requests in a running DOM did not run in Phase A1.
+Phase A2 adds that proof without changing the production implementation.
+
+## Phase A2 — hermetic Founder Daily Flow browser E2E
+
+Founder verdict on 2026-07-27: IMPLEMENT. This is a continuation of Decision
+#061, not a new decision-number reservation. Decision #068 remains unreserved.
+
+The implementation extends the existing trusted
+`scripts/test-web-acceptance.mjs` harness. It uses a local Next server, a
+localhost-only Supabase read stub, Playwright, and synthetic API responses at
+320/375/1280 px. The browser scenario:
+
+1. opens authenticated `/bets/new` and enters a valid manual Single draft;
+2. holds a local 21-leg scanner response in flight and proves the scanner input,
+   complete form fieldset, Save, and Cancel are disabled;
+3. releases the oversized response, proves the prior draft was preserved, then
+   clicks Save and observes **0 tracked-bet requests and 0 UUID mints**;
+4. makes one deliberate manual edit, proving the refusal clears and ownership
+   switches to `source='manual'`;
+5. holds the local tracked-bet response in flight, proves the same complete
+   busy lock, and proves an in-flight second click creates no second request or
+   UUID;
+6. verifies the exact allowlisted Single payload and one UUIDv4 idempotency key;
+7. releases the synthetic success, follows the real router transition to
+   `/bets/<bet_id>`, then verifies the same synthetic record and pending totals
+   on `/bets` and the dashboard.
+
+The scanner and tracked-bet responses are intercepted inside the browser
+context. The tracked-bet application route, RPC, rate limiter, Supabase write
+path, and production services are not called by this test. The in-memory record
+becomes visible to server components only through the local Supabase GET stub.
+The existing process-level and browser-level network guards still fail closed
+on non-loopback traffic; the Supabase stub still rejects every non-GET/HEAD
+request.
+
+Phase A2 is accepted only when the exact branch passes the trusted GitHub
+`Hermetic Web acceptance` job plus the existing repository regression suite.
+Until that CI result and a separate merge approval, this section records an
+implementation under review — not an execution or closure receipt.
 
 ## Merge and deployment checkpoint
 
@@ -153,8 +191,9 @@ behavioral adapter tests.
 - Runtime errors after deployment: 0.
 - Phase A1 performed no production smoke and no scanner/API/Supabase runtime
   calls or writes.
-- Browser-level verification was not performed. Phase A2 remains DEFERRED /
-  NOT APPROVED.
+- Browser-level verification was not performed in Phase A1.
+- Phase A2 is authorized and implemented on a review branch; no Phase A2 merge,
+  production deployment, or production runtime verification is recorded here.
 
 ## Boundaries (Phase A1)
 
@@ -170,9 +209,23 @@ behavioral adapter tests.
 - Settlement/results remain HOLD; Decision #056 runtime remains NOT
   APPROVED; FP-001 remains ACTIVE.
 - Phase A1 merged via PR #162 as `a6d4ebb` and was deployed READY. Decision
-  #061 remains ACTIVE because Phase A2 browser E2E is deferred / not approved.
+  #061 remains ACTIVE pending Phase A2 review and merge.
+
+## Boundaries (Phase A2)
+
+- Runtime code, schemas, migrations, RPCs, env, and production configuration are
+  unchanged.
+- The only executable change is the hermetic browser acceptance harness.
+- Scanner and tracked-bet success responses are browser-local stubs; the real
+  API routes are not invoked.
+- Supabase is localhost-only and read-only; non-GET/HEAD requests fail closed.
+- 0 production, provider, AI, Supabase, settlement, or financial writes are
+  authorized or performed.
+- Decision #056 runtime, result ingestion, automated settlement, CSP
+  enforcement, and external beta remain HOLD.
 
 ## Governance
 
-Decision #061 is ACTIVE (Phase A1). The highest-numbered closed decision
-remains #060. Decision #062 is now occupied and ACTIVE (Mobile Phase 0); the next unreserved decision number is **#063**.
+Decision #061 is ACTIVE (Phase A1 merged; Phase A2 under review). The
+highest-numbered closed decision is #067. Decision #062 remains occupied and
+ACTIVE; the next unreserved decision number remains **#068**.
