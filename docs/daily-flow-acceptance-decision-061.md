@@ -1,10 +1,12 @@
 # Decision #061 — Founder Daily Flow Acceptance
 
-Status: ACTIVE — Phase A read-only assessment delivered 2026-07-17; Phase A1
-(fail-closed tracker input lifecycle) merged via PR #162 as
+Status: EXECUTED / VERIFIED / CLOSED — Phase A1 (fail-closed tracker input
+lifecycle) merged via PR #162 as
 `a6d4ebbefcf49af71729c64cd33886d0592cf1fd` and deployed READY. Founder
-authorized Phase A2 on 2026-07-27; its hermetic browser E2E implementation is
-UNDER REVIEW and is not yet merged or executed. Owner: CPO + Founder.
+authorized Phase A2 on 2026-07-27; exact head
+`b14168a246cfb76f0d566cd795eed758805f4e48` passed all 10 CI jobs and PR
+#235 merged it as `2fb83250cc648d990f844bbb8edc73ae81dc5a17`. The automatic
+Vercel production deployment reported success. Owner: CPO + Founder.
 Implementation: Codex.
 
 ## Purpose
@@ -179,10 +181,12 @@ The existing process-level and browser-level network guards still fail closed
 on non-loopback traffic; the Supabase stub still rejects every non-GET/HEAD
 request.
 
-Phase A2 is accepted only when the exact branch passes the trusted GitHub
-`Hermetic Web acceptance` job plus the existing repository regression suite.
-Until that CI result and a separate merge approval, this section records an
-implementation under review — not an execution or closure receipt.
+Phase A2 acceptance is satisfied. Exact head
+`b14168a246cfb76f0d566cd795eed758805f4e48` passed Preview Tests run #389
+with all 10 jobs successful, including `Hermetic Web acceptance` and the
+existing repository regression suite. The separate merge gate was approved,
+and PR #235 merged as `2fb83250cc648d990f844bbb8edc73ae81dc5a17`.
+This section is the execution and closure receipt.
 
 ## Merge and deployment checkpoint
 
@@ -194,8 +198,14 @@ implementation under review — not an execution or closure receipt.
 - Phase A1 performed no production smoke and no scanner/API/Supabase runtime
   calls or writes.
 - Browser-level verification was not performed in Phase A1.
-- Phase A2 is authorized and implemented on a review branch; no Phase A2 merge,
-  production deployment, or production runtime verification is recorded here.
+- Phase A2 exact head `b14168a246cfb76f0d566cd795eed758805f4e48`
+  passed Preview Tests run #389 with 10/10 jobs successful, including
+  `Hermetic Web acceptance` at 320/375/1280 px.
+- PR #235 merged Phase A2 as
+  `2fb83250cc648d990f844bbb8edc73ae81dc5a17`.
+- The automatic Vercel production deployment reported success.
+- Phase A2 performed no production smoke and no real scanner, tracked-bet,
+  Supabase, provider, AI, settlement, or financial call/write.
 
 ## Boundaries (Phase A1)
 
@@ -211,7 +221,7 @@ implementation under review — not an execution or closure receipt.
 - Settlement/results remain HOLD; Decision #056 runtime remains NOT
   APPROVED; FP-001 remains ACTIVE.
 - Phase A1 merged via PR #162 as `a6d4ebb` and was deployed READY. Decision
-  #061 remains ACTIVE pending Phase A2 review and merge.
+  Phase A1 left #061 ACTIVE pending the separately authorized Phase A2; the closure receipt below resolves that gate.
 
 ## Boundaries (Phase A2)
 
@@ -232,6 +242,7 @@ implementation under review — not an execution or closure receipt.
 
 ## Governance
 
-Decision #061 is ACTIVE (Phase A1 merged; Phase A2 under review). The
-highest-numbered closed decision is #067. Decision #062 remains occupied and
-ACTIVE; the next unreserved decision number remains **#068**.
+Decision #061 is EXECUTED / VERIFIED / CLOSED (Phase A1 merged via PR #162;
+Phase A2 passed 10/10 CI and merged via PR #235 as `2fb83250`). The
+highest-numbered closed decision remains #067. Decision #062 remains occupied
+and ACTIVE; the next unreserved decision number remains **#068**.
