@@ -1,6 +1,6 @@
 # Decision Ledger / Numbering Governance
 
-Status: Decision #067 is EXECUTED / VERIFIED / CLOSED after PR #233 and production migration `20260727123510_public_api_privilege_hardening_031`. #068 is next unreserved.
+Status: Decision #061 is EXECUTED / VERIFIED / CLOSED after PR #235 merged as `2fb83250`; the highest-numbered closed decision remains #067 after migration 031 verification. #068 is next unreserved.
 Last updated: 2026-07-27
 
 ## Purpose
@@ -13,15 +13,14 @@ This file prevents decision-number collisions. Historical numbers are immutable:
 Occupied: #001-#019, #021-#031, #033-#067
 Do not reuse: #020
 Retired reservation / do not reuse: #032
+Occupied / closed: #061 — Founder Daily Flow Acceptance (Phase A1 via PR #162; Phase A2 via PR #235 as `2fb83250`)
 Occupied / closed: #063 — Tracked-Leg Fixture Lineage Contract (docs-only; merged via PR #183 as `df4723f`)
 Occupied / closed: #064 — Tracked-Leg Fixture Lineage Foundation (Gate 3 merged via PR #231; migration 025 applied and verified)
 Occupied / closed: #065 — Broadcast Noir Cross-Platform Rollout (Web rollout production-deployed via #202 → #224; mobile release unauthorized)
 Occupied / closed: #066 — odds_snapshots_public Security-Invoker Hardening (PR #232 merged; migration 030 applied and verified)
 Occupied / closed: #067 — Public API Privilege Hardening (PR #233 merged; migration 031 applied and verified)
 Highest-numbered closed: #067 — Public API Privilege Hardening
-Active approved: #061 — Founder Daily Flow Acceptance (Phase A1 fail-closed tracker input lifecycle;
-                 Phase A2 hermetic browser E2E authorized 2026-07-27 and under review)
-                 #062 — Mobile Founder client (0/1B/1C merged; 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171)
+Active approved: #062 — Mobile Founder client (0/1B/1C merged; 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171)
                  #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run
                  (implementation merged/deployed; runtime provider call not approved / not run)
 Next unreserved: #068
@@ -48,7 +47,7 @@ Next unreserved: #068
 | #058 | Settlement Metrics & Status Presentation Reconciliation (G4+G12) — EXECUTED / CLOSED by merge |
 | #059 | Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY; eligibility BLOCKED |
 | #060 | Founder-First Coupon-to-Tracker — EXECUTED / VERIFIED / CLOSED 2026-07-16; Phase A + Phase B production API smoke verified |
-| #061 | Founder Daily Flow Acceptance — ACTIVE; Phase A1 merged via PR #162 as `a6d4ebb`, deployed READY; Phase A2 hermetic browser E2E authorized 2026-07-27 and under review; not yet merged/executed |
+| #061 | Founder Daily Flow Acceptance — EXECUTED / VERIFIED / CLOSED; Phase A1 merged via PR #162 as `a6d4ebb`; Phase A2 exact head `b14168a2` passed 10/10 CI and merged via PR #235 as `2fb83250`; automatic production deployment succeeded; loopback-only verification, no production smoke or real service write |
 | #062 | Mobile Founder client — ACTIVE; Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170 as `5ef838d5`; authenticated Coupon Scanner merged via PR #171 as `43a6ee7f`; no production mobile smoke recorded |
 | #063 | Tracked-Leg Fixture Lineage Contract — EXECUTED / CLOSED, DOCS-ONLY; Founder-approved; merged via PR #183 as `df4723f`; no runtime authority |
 | #064 | Tracked-Leg Fixture Lineage Foundation — EXECUTED / VERIFIED / CLOSED; Gate 3 merged via PR #231; migration 025 applied as `20260727060234_tracked_leg_fixture_lineage_025`; v2 remains service-role-only with no caller |
@@ -87,7 +86,7 @@ Decision numbering does not grant runtime authority.
 - Decision #065 did not change the server route, RPC, schema, migrations, settlement behavior, financial formulas, provider/runtime authority, CSP enforcement, EAS/device builds, beta distribution, or app publication.
 - Decision #066 is EXECUTED / VERIFIED / CLOSED: PR #232 merged as `8ce79df4`; migration 030 was applied once and its view, RLS, ACL, internal-field denial, Advisor, and web-health contracts were verified read-only.
 - Decision #067 is EXECUTED / VERIFIED / CLOSED. PR #233 merged as `9211c7e5`; migration 031 applied once as `20260727123510_public_api_privilege_hardening_031` and its table-policy, ACL, function, default-privilege, Advisor, and web-health contracts were verified read-only. No further privilege, RPC, runtime, env, or deployment action is authorized by closure.
-- Decision #061 remains ACTIVE. Phase A1 was merged via PR #162 as `a6d4ebb` and deployed READY with 0 post-deployment runtime errors. Founder authorized Phase A2 on 2026-07-27; its localhost-only Playwright/Supabase-stub implementation is under review, with runtime scope limited to a semantic `<dt>/<dd>` correction for the populated `/bets` date. It has no production-call, migration, RPC, schema, provider, settlement, or financial-write authority. #068 remains unreserved.
+- Decision #061 is EXECUTED / VERIFIED / CLOSED. Phase A1 merged via PR #162 as `a6d4ebb` and deployed READY. Phase A2 exact head `b14168a2` passed all 10 CI jobs, including Hermetic Web acceptance at 320/375/1280 px, and merged via PR #235 as `2fb83250`; the automatic production deployment succeeded. The browser proof remained loopback-only; no production smoke or real scanner/tracked-bet/Supabase/provider/AI call, settlement action, or financial write ran. Runtime scope was limited to the semantic `<dt>/<dd>` correction for the populated `/bets` date. Closure grants no new runtime authority; #068 remains unreserved.
 - FP-001 remains active. Decision #054 Phase B is not approved. Decision #050 is EXECUTED / VERIFIED / CLOSED; custom SMTP scale/readiness is a separate follow-up.
 
 ## Reconciliation Receipt — 2026-07-22
@@ -112,3 +111,5 @@ Decision numbering does not grant runtime authority.
 - PR #233 merged Decision #067 as `9211c7e5450ce1854a7621ab0a5fa3284decef82`; all 10 CI jobs passed, including the 12/12 PostgreSQL 17 verifier, and the automatic production deployment reached READY.
 - Migration 031 was applied once as `20260727123510_public_api_privilege_hardening_031`. Catalog-only verification confirmed 7/7 RLS tables and restrictive deny-policies, zero client table ACLs, preserved `service_role`, 11/11 function boundaries, 9/9 protected `search_path` values, two retired RPCs service-only, nine intentional authenticated RPCs retained, and client-deny future-object defaults.
 - Security Advisor retained only the nine documented intentional RPC warnings; web health passed. No RPC, user-data read, retry, or rollback ran. Decision #067 is CLOSED; #068 is next unreserved.
+- PR #235 merged Decision #061 Phase A2 as `2fb83250cc648d990f844bbb8edc73ae81dc5a17`; exact head `b14168a246cfb76f0d566cd795eed758805f4e48` passed all 10 Preview Tests jobs, including Hermetic Web acceptance at 320/375/1280 px, and the automatic production deployment succeeded.
+- Decision #061 Phase A2 used only browser-local responses and a loopback read-only Supabase stub. No production smoke, provider/AI/Supabase call, settlement action, or financial write ran. Decision #061 is CLOSED; #068 remains next unreserved.
