@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-27 (production product-code milestone `9040673`; current `main` / production deployment `9211c7e5`; Decision #067 migration 031 applied and verified)
+> Last updated: 2026-07-27 (production product-code milestone `9040673`; Decision #067 merge / production checkpoint `9211c7e5`; migration 031 applied and verified)
 
 ## 1. Executive Status
 
