@@ -2258,7 +2258,7 @@ Reference: `docs/tracked-leg-fixture-lineage-contract-decision-063.md`
 **Date:** 2026-07-21
 **Proposed by:** CPO
 **Approved by:** Founder (Draft PR scope only)
-**Status:** ACTIVE / IMPLEMENTATION MERGED — PR #186 merged as `4fce917701b95b3d3ad98ad9f157d02216323d3e`. Migration 025 and `create_tracked_bet_v2` remain unapplied. No application caller or runtime/production authority.
+**Status:** EXECUTED / VERIFIED / CLOSED — PR #186 merged the foundation, PR #231 merged PostgreSQL 17 Gate 3 as `f5f17385d711ccd1df323cd71be3448dd3e08d85`, and migration 025 was applied once as `20260727060234_tracked_leg_fixture_lineage_025`. `create_tracked_bet_v2` remains service-role-only with no application caller.
 
 **Decision:** Implement step 2 of the closed Decision #063 contract as an
 additive, unapplied schema/RPC foundation. Existing and v1-created legs remain
@@ -2279,23 +2279,20 @@ Exact replay therefore returns the original stored snapshot even after a later
 canonical/provider update; any changed lineage reference conflicts with zero
 writes.
 
-**Draft artifacts:** `supabase/migrations/025_tracked_leg_fixture_lineage.sql`,
+**Artifacts:** `supabase/migrations/025_tracked_leg_fixture_lineage.sql`,
 `docs/decision-064-rollback.sql`, and Decision/status documentation. The rollback
 refuses to remove the foundation if any non-legacy lineage row exists.
 
-**Non-authorization:** migration apply, catalog/runtime smoke, tests gate,
+**Initial Draft non-authorization:** migration apply, catalog/runtime smoke, tests gate,
 application/API/web/mobile caller, fixture picker, Supabase operations, provider
 calls, result matching/writes, grading caller, scheduler, settlement, payout,
 refund, bankroll runtime change, Ready, merge, production deployment, and
 production smoke are all outside this Draft approval. Decision #057 and FP-001
 holds remain active.
 
-**Merge checkpoint:** PR #186 was squash-merged and its automatic Vercel
-deployment reached READY. This did not apply migration 025 or create an
-application caller, provider/result/settlement action, or Supabase runtime write.
+**Execution checkpoint:** PR #186 was squash-merged and its automatic Vercel deployment reached READY without applying migration 025. Gate 3 then merged via PR #231, and migration 025 was applied once as `20260727060234_tracked_leg_fixture_lineage_025`. Read-only catalog verification confirmed 12/12 columns, 3/3 constraints, 2/2 indexes, 2/2 triggers, 3/3 functions, and service-role-only v2 ACL. No bet was created and no application caller, provider/result/settlement action, env change, or additional deployment was authorized by the apply gate.
 
-**Numbering:** Decision #064 is occupied and ACTIVE. Decision #065 is occupied
-and CLOSED for the Web rollout. Decision #066 is next unreserved.
+**Numbering:** Decision #064 is occupied and CLOSED. Decision #065 is occupied and CLOSED for the Web rollout. Decision #066 is occupied and ACTIVE for the odds-view hardening; Decision #067 is next unreserved.
 
 Reference: `docs/tracked-leg-fixture-lineage-foundation-decision-064.md`
 
@@ -2352,5 +2349,25 @@ Reference: `docs/broadcast-noir-cross-platform-rollout-decision-065.md`
 
 ---
 
-*Last updated: 2026-07-26*
+## Decision #066 — `odds_snapshots_public` Security-Invoker Hardening
+**Date:** 2026-07-27
+**Proposed by:** CPO
+**Approved by:** Founder (Draft PR scope only)
+**Status:** ACTIVE / IMPLEMENTATION DRAFT — migration 030 is review-only and unapplied.
+
+**Decision:** Preserve the intentional nine-column authenticated odds projection while removing owner-privileged RLS bypass. Migration 030 sets `security_invoker=true`, grants `authenticated` column-level `SELECT` on exactly the projected fields, adds an authenticated-only global sports-data read policy, and reasserts zero `anon` and zero DML access.
+
+**Security boundary:** `provider`, `raw_market_name`, `raw_provider_payload`, `sync_run_id`, and `created_at` remain inaccessible to authenticated callers. `service_role` internal access remains unchanged.
+
+**Verification:** A hermetic PostgreSQL 17 job proves view options, RLS policy shape, column ACLs, authenticated reads, internal-field denials, anon/DML denials, service-role continuity, and bounded DDL timeouts.
+
+**Non-authorization:** migration apply, production DB writes, odds ingestion, provider calls, application callers, env changes, Vercel actions, merge, and production deployment remain outside this Draft approval.
+
+**Numbering:** Decision #066 is occupied and ACTIVE. Decision #067 is next unreserved.
+
+Reference: `docs/odds-snapshots-security-invoker-decision-066.md`
+
+---
+
+*Last updated: 2026-07-27*
 *Owner: All (each role contributes)*
