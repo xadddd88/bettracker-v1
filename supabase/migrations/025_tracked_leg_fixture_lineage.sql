@@ -20,6 +20,11 @@
 
 BEGIN;
 
+-- Fail quickly instead of queueing application traffic behind DDL locks.
+-- These transaction-local limits do not change any database-wide setting.
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '60s';
+
 -- ── 1. Additive lineage storage ─────────────────────────────
 -- Defaults make every existing row, and every future row created by the
 -- unchanged v1 RPC, an explicit legacy unresolved row. Identity fields
@@ -775,6 +780,8 @@ BEGIN
 END;
 $$;
 
+-- No application caller uses v2 yet. Keep the unapplied foundation
+-- service-only until a separately reviewed adapter/runtime gate opens it.
 REVOKE EXECUTE ON FUNCTION public.create_tracked_bet_v2(
   jsonb,
   numeric,
@@ -783,7 +790,7 @@ REVOKE EXECUTE ON FUNCTION public.create_tracked_bet_v2(
   text,
   text,
   text
-) FROM PUBLIC, anon;
+) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.create_tracked_bet_v2(
   jsonb,
@@ -793,7 +800,7 @@ GRANT EXECUTE ON FUNCTION public.create_tracked_bet_v2(
   text,
   text,
   text
-) TO authenticated, service_role;
+) TO service_role;
 
 -- Catalog verification and authenticated smoke are intentionally excluded
 -- from this review-only migration. They require the next separately approved
