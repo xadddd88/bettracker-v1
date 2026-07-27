@@ -1,7 +1,7 @@
 # Decision Ledger / Numbering Governance
 
-Status: Decision #064 is occupied and ACTIVE with implementation merged but migration 025 unapplied. Decision #065 is CLOSED for the Web rollout and production-deployed via PR #202 followed by #203 → #224. Decision #065 is the highest-numbered CLOSED decision; #066 is next unreserved.
-Last updated: 2026-07-26
+Status: Decision #064 is EXECUTED / VERIFIED / CLOSED after PR #231 and production migration `20260727060234_tracked_leg_fixture_lineage_025`. Decision #065 remains CLOSED for the Web rollout. Decision #066 is occupied and ACTIVE for `odds_snapshots_public` security-invoker hardening; migration 030 is review-only and unapplied. #067 is next unreserved.
+Last updated: 2026-07-27
 
 ## Purpose
 
@@ -14,16 +14,16 @@ Occupied: #001-#019, #021-#031, #033-#065
 Do not reuse: #020
 Retired reservation / do not reuse: #032
 Occupied / closed: #063 — Tracked-Leg Fixture Lineage Contract (docs-only; merged via PR #183 as `df4723f`)
-Occupied / active: #064 — Tracked-Leg Fixture Lineage Foundation (implementation merged via PR #186; migration 025 unapplied)
+Occupied / closed: #064 — Tracked-Leg Fixture Lineage Foundation (Gate 3 merged via PR #231; migration 025 applied and verified)
 Occupied / closed: #065 — Broadcast Noir Cross-Platform Rollout (Web rollout production-deployed via #202 → #224; mobile release unauthorized)
 Highest-numbered closed: #065 — Broadcast Noir Cross-Platform Rollout
-Active approved: #064 — Tracked-Leg Fixture Lineage Foundation (implementation merged; migration/RPC unapplied; no caller)
+Active approved: #066 — odds_snapshots_public Security-Invoker Hardening (migration 030 + PostgreSQL 17 verifier in Draft PR; unapplied)
                  #061 — Founder Daily Flow Acceptance (Phase A1 fail-closed tracker input lifecycle;
                  Playwright/Supabase-stub harness deferred)
                  #062 — Mobile Founder client (0/1B/1C merged; 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171)
                  #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run
                  (implementation merged/deployed; runtime provider call not approved / not run)
-Next unreserved: #066
+Next unreserved: #067
 ```
 
 ## Recent Decisions
@@ -50,14 +50,15 @@ Next unreserved: #066
 | #061 | Founder Daily Flow Acceptance — ACTIVE; Phase A read-only assessment delivered; Phase A1 merged via PR #162 as `a6d4ebb`, deployed READY; Phase A2 browser E2E deferred / not approved |
 | #062 | Mobile Founder client — ACTIVE; Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170 as `5ef838d5`; authenticated Coupon Scanner merged via PR #171 as `43a6ee7f`; no production mobile smoke recorded |
 | #063 | Tracked-Leg Fixture Lineage Contract — EXECUTED / CLOSED, DOCS-ONLY; Founder-approved; merged via PR #183 as `df4723f`; no runtime authority |
-| #064 | Tracked-Leg Fixture Lineage Foundation — ACTIVE / IMPLEMENTATION MERGED via PR #186; migration 025 and `create_tracked_bet_v2` unapplied; no caller/runtime authority |
+| #064 | Tracked-Leg Fixture Lineage Foundation — EXECUTED / VERIFIED / CLOSED; Gate 3 merged via PR #231; migration 025 applied as `20260727060234_tracked_leg_fixture_lineage_025`; v2 remains service-role-only with no caller |
 | #065 | Broadcast Noir Cross-Platform Rollout — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via PR #202 and hardening #203 → #224; no mobile release authority |
+| #066 | `odds_snapshots_public` Security-Invoker Hardening — ACTIVE / IMPLEMENTATION DRAFT; migration 030 unapplied |
 
 ## Retired / Superseded Tracks
 
 - **#020:** never reuse. PR #90 tried to claim it for Third-Party Manual Context Policy, but that PR is closed without merge and the policy is not adopted.
 - **#032:** the old M1.3 filter-evidence reservation is retired after PR #106 was superseded. Keep the number unused to preserve audit history.
-- A revived third-party manual-context policy must use **#066 or later** in a fresh PR.
+- A revived third-party manual-context policy must use **#067 or later** in a fresh PR.
 
 ## Rules
 
@@ -79,7 +80,7 @@ Decision numbering does not grant runtime authority.
 - Decision #058 reconciled reporting metrics and status presentation only — it changed no payout/settlement calculation, settlement outcome, write path, or provider work.
 - Decision #059 recorded a BLOCKED eligibility verdict and a future dry-run contract only — the result-presence dry-run has no implementation and no runtime authorization.
 - Decision #060 is EXECUTED / VERIFIED / CLOSED. Phase A migration 024, exact catalog verification, and its authenticated RPC smoke are verified. Phase B was merged via PR #159 and deployed READY; one separately authorized authenticated production API smoke made exactly one `POST /api/bets/tracked`, returned HTTP 200, verified 1 bet / 1 ordered leg / 1 stake transaction / 0 Decision rows, signed out, and finished with zero rows across all temporary identity and financial tables. No additional synthetic production smoke is authorized by that record.
-- Decision #064 implementation is merged via PR #186, but migration 025 and `create_tracked_bet_v2` remain unapplied, have no application caller, and authorize no Supabase/provider/result/settlement/production action.
+- Decision #064 is EXECUTED / VERIFIED / CLOSED: Gate 3 merged via PR #231 and migration 025 was applied once as `20260727060234_tracked_leg_fixture_lineage_025`; `create_tracked_bet_v2` remains service-role-only with no application caller.
 - Decision #065 Web rollout is CLOSED and production-deployed via PR #202 followed by #203 → #224; its mobile source still has only explicit Review → manual Save through the existing tracked-bet endpoint and no auto-save.
 - Decision #065 did not change the server route, RPC, schema, migrations, settlement behavior, financial formulas, provider/runtime authority, CSP enforcement, EAS/device builds, beta distribution, or app publication.
 - Decision #061 remains ACTIVE because Phase A2 browser E2E is deferred / not approved. Phase A1 was merged via PR #162 as `a6d4ebb` and deployed READY with 0 post-deployment runtime errors; it performed no production smoke and no scanner/API/Supabase runtime call or write. Phase A1 authorizes no further runtime, no migrations, and no RPC or schema changes.
@@ -96,3 +97,10 @@ Decision numbering does not grant runtime authority.
 - PR #182 merged as `d103947f9193891589cda1c5f1073e3004d84307`; its fail-closed grading foundation does not authorize production provider calls, result writes, scheduling, or automatic settlement.
 - PR #181 applied production migration `20260721152711_cancel_pending_bet`, merged as `d5ebb87d891169b5e3c7959381d4a5011e10e07e`, and deployed READY. It is an unnumbered tracker/cancellation correction and does not consume Decision #062.
 - Decision #062 remains the Mobile Founder client. The cancellation kill switch was renamed to `docs/cancel-pending-bet-rollback.sql`; its executable SQL is unchanged.
+
+
+## Reconciliation Receipt — 2026-07-27
+
+- PR #231 merged Decision #064 Gate 3 as `f5f17385d711ccd1df323cd71be3448dd3e08d85`; all PostgreSQL 17 and repository CI gates passed.
+- Migration 025 was applied once as `20260727060234_tracked_leg_fixture_lineage_025` and its catalog contract was verified read-only. No bet was created and no application caller was added.
+- Decision #066 is now occupied by `odds_snapshots_public` security-invoker hardening. Migration 030 remains review-only and unapplied; #067 is next unreserved.

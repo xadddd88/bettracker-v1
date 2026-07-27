@@ -3,10 +3,7 @@
 **Date:** 2026-07-21  
 **Proposed by:** CPO  
 **Authorized by:** Founder  
-**Status:** ACTIVE / IMPLEMENTATION DRAFT — Draft PR only. Migration 025 is
-review-only and unapplied. No application caller, Supabase action, provider
-call, production deployment, result write, grading caller, settlement, payout,
-refund, or other financial runtime action is authorized.
+**Status:** EXECUTED / VERIFIED / CLOSED — implementation merged via PR #186, PostgreSQL 17 Gate 3 merged via PR #231, and migration 025 applied once as `20260727060234_tracked_leg_fixture_lineage_025`. `create_tracked_bet_v2` remains service-role-only with no application caller.
 
 ## Purpose
 
@@ -15,8 +12,7 @@ foundation that can preserve trusted fixture lineage on newly created Tracker
 legs without changing the current application path.
 
 The existing `create_tracked_bet` RPC remains the only application caller.
-Decision #064 adds `create_tracked_bet_v2` for review and later controlled
-adoption; the Draft PR itself does not call it.
+Decision #064 adds `create_tracked_bet_v2` for later controlled adoption; the application still does not call it.
 
 ## Baseline
 
@@ -132,22 +128,19 @@ Server-derived snapshots are excluded from the hash. Therefore:
 
 ## Validation Boundary
 
-This Draft PR is step 2 of the Decision #063 small-PR sequence. The following
-remain separate future gates:
+Decision #064 completed step 2 of the Decision #063 small-PR sequence. Financial/domain adversarial tests and migration apply/catalog verification are complete. The following remain separate future gates:
 
-1. financial/domain adversarial tests;
-2. migration apply and catalog verification;
-3. authenticated non-provider smoke;
-4. shared DTO/Zod and versioned API adapter;
-5. fixture picker;
-6. mobile adoption;
-7. legacy manual resolution;
-8. result ingestion/grading;
-9. settlement and financial production validation.
+1. authenticated non-provider smoke;
+2. shared DTO/Zod and versioned API adapter;
+3. fixture picker;
+4. mobile adoption;
+5. legacy manual resolution;
+6. result ingestion/grading;
+7. settlement and financial production validation.
 
-## Non-Authorization
+## Initial Draft Non-Authorization
 
-This Decision/Draft performs or authorizes:
+The initial Decision/Draft performed or authorized:
 
 ```txt
 Supabase migration apply: 0
@@ -164,3 +157,11 @@ production deployment or smoke: 0
 ```
 
 Decision #057 result/settlement holds and FP-001 remain active.
+
+
+## Execution Receipt — 2026-07-27
+
+- PR #231 merged Gate 3 as `f5f17385d711ccd1df323cd71be3448dd3e08d85`; the hermetic PostgreSQL 17 verifier and all repository CI jobs passed.
+- Migration 025 applied successfully on the first attempt as `20260727060234_tracked_leg_fixture_lineage_025`.
+- Read-only verification confirmed 12/12 columns, 3/3 validated constraints, 2/2 indexes, 2/2 enabled triggers, 3/3 functions, and `create_tracked_bet_v2` EXECUTE only for `service_role`.
+- No bet was created, no rollback or retry ran, and env, application callers, provider/result/settlement paths, and production DB data were unchanged.
