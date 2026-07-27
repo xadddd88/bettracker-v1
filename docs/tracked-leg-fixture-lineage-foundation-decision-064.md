@@ -131,12 +131,12 @@ Server-derived snapshots are excluded from the hash. Therefore:
 Decision #064 completed step 2 of the Decision #063 small-PR sequence. Financial/domain adversarial tests and migration apply/catalog verification are complete. The following remain separate future gates:
 
 1. authenticated non-provider smoke;
-4. shared DTO/Zod and versioned API adapter;
-5. fixture picker;
-6. mobile adoption;
-7. legacy manual resolution;
-8. result ingestion/grading;
-9. settlement and financial production validation.
+2. shared DTO/Zod and versioned API adapter;
+3. fixture picker;
+4. mobile adoption;
+5. legacy manual resolution;
+6. result ingestion/grading;
+7. settlement and financial production validation.
 
 ## Initial Draft Non-Authorization
 
