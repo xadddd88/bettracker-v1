@@ -130,6 +130,31 @@ jobs:
       - name: Run migration 028 authority verifier
         run: bash scripts/verify-migration-028.sh postgresql://postgres:postgres@localhost:5432/postgres
 
+  # PostgreSQL 17 adversarial gate for Decision #064. This job uses only a
+  # disposable localhost service and never receives Supabase credentials.
+  decision-064-postgres:
+    name: Decision 064 lineage PostgreSQL 17
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Run migration 025 lineage verifier
+        run: bash scripts/verify-migration-025.sh postgresql://postgres:postgres@localhost:5432/postgres
+
   # ── Job: Cross-platform design-system compile gate ─────────────────────────
   design-system:
     name: Broadcast Noir Web & mobile primitives
