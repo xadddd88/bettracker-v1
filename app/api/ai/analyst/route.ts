@@ -19,7 +19,9 @@ import {
   buildAnalystResearchMessage,
   completePausedAnthropicTurn,
   containsAnalystPricingClaim,
+  deriveAnalystConfidenceContract,
   extractAnalystResearchSources,
+  getAnalystLegCitationCoverage,
   hasUnsupportedLiveAnalystInput,
   inferCouponEventTimeFixtureStatus,
   resolveAnalystWebSearchTelemetry,
@@ -89,6 +91,7 @@ const researchBriefSchema = z.object({
   sourced_claims: z.array(z.object({
     claim: z.string().min(2).max(400),
     source_url: z.string().min(1).max(2_000),
+    leg_numbers: z.array(z.number().int().min(1).max(20)).min(1).max(20),
   })).max(12),
   legs: z.array(z.object({
     leg_number: z.number().int().min(1).max(20),
@@ -128,6 +131,7 @@ function toResearchBrief(value: ResearchBriefOutput): AnalystResearchBrief {
     sourcedClaims: value.sourced_claims.map(claim => ({
       text: claim.claim,
       sourceUrl: claim.source_url,
+      legNumbers: claim.leg_numbers,
     })),
     legs: value.legs.map(leg => ({
       legNumber: leg.leg_number,
@@ -327,7 +331,9 @@ Be explicit when data is limited.`
 }
 
 function getAnalystSportSupport(sport: string): SportModuleSupport {
-  return ['soccer', 'tennis', 'cs2'].includes(sport) ? 'full' : 'none'
+  // A prompt checklist is not a calibrated sport model. `full` is reserved
+  // for a future verified engine with actual model inputs.
+  return ['soccer', 'tennis', 'cs2'].includes(sport) ? 'approximate' : 'none'
 }
 
 // ─── System prompt ────────────────────────────────────────────
@@ -380,7 +386,7 @@ Return ONLY a valid JSON object matching this exact schema (no markdown, no expl
   "model_probability": null,
   "implied_probability": null,
   "edge_percent": null,
-  "confidence_score": <number 0-100, your confidence in this analysis>,
+  "confidence_score": <number 0-100; compatibility field only — the server discards it and derives analysis-quality confidence from verified coverage>,
   "risk_level": <"low" | "medium" | "high">,
   "recommendation": <"bet" | "skip" | "watch" | "no_value">,
   "reasoning": <string, 2-4 sentences in user's language explaining the recommendation>,
@@ -397,7 +403,8 @@ Return ONLY a valid JSON object matching this exact schema (no markdown, no expl
     "sourced_claims": [
       {
         "claim": <copy the citation's cited_text verbatim; no paraphrase>,
-        "source_url": <the exact HTTPS URL from that same citation>
+        "source_url": <the exact HTTPS URL from that same citation>,
+        "leg_numbers": [<every 1-based coupon leg this exact claim supports>]
       }
     ],
     "legs": [
@@ -423,6 +430,7 @@ Return ONLY a valid JSON object matching this exact schema (no markdown, no expl
 }
 
 Every supplied coupon leg must appear exactly once in research_brief.legs, in the original order.
+Every coupon leg must be covered by at least one exactly bound sourced claim when current-evidence research is enabled.
 Do not collapse a Bet Builder into a single generic market. Analyze its legs separately, then their correlation.`
 }
 
@@ -576,6 +584,8 @@ export async function POST(req: NextRequest) {
           researchContractAccepted: false,
           citedSourceCount: 0,
           boundClaimCount: 0,
+          totalLegs: input.legs?.length || 1,
+          coveredLegs: 0,
         })
         await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, {
           sport: input.sport,
@@ -660,6 +670,10 @@ export async function POST(req: NextRequest) {
     })
     const boundSourceUrls = new Set(researchBrief.sourcedClaims.map(claim => claim.sourceUrl))
     const researchSources = extractedResearchSources.filter(source => boundSourceUrls.has(source.url))
+    const citationCoverage = getAnalystLegCitationCoverage(
+      researchBrief.sourcedClaims,
+      couponLegs.length,
+    )
     const webSearchTelemetry = resolveAnalystWebSearchTelemetry({
       globalEnabled: globalWebSearchEnabled,
       profileEnabled: profileWebSearchEnabled,
@@ -669,6 +683,8 @@ export async function POST(req: NextRequest) {
       researchContractAccepted: alignedResearchBrief !== null,
       citedSourceCount: extractedResearchSources.length,
       boundClaimCount: researchBrief.sourcedClaims.length,
+      totalLegs: citationCoverage.totalLegs,
+      coveredLegs: citationCoverage.coveredLegs,
     })
     const webSearchActuallyUsed = webSearchTelemetry.used
 
@@ -717,6 +733,14 @@ export async function POST(req: NextRequest) {
       fixtureStatus:      couponTimeStatus.fixtureStatus,
       legs:               input.legs as AnalysisLegQualityInput[] | undefined,
     })
+    const confidenceContract = deriveAnalystConfidenceContract({
+      researchContractAccepted: alignedResearchBrief !== null,
+      sourcedClaims: researchBrief.sourcedClaims,
+      totalLegs: couponLegs.length,
+      fixtureStatus: couponTimeStatus.fixtureStatus,
+      qualityGateCoverageScore: qualityGate.dataCoverageScore,
+    })
+    const confidenceScore = confidenceContract.score
     const gatedPricing = buildAnalystPricingPayload({
       qualityGate,
       // This route has no calibrated probability model. The placeholder is
@@ -765,7 +789,8 @@ export async function POST(req: NextRequest) {
       model_probability:   gatedPricing.model_probability,
       implied_probability: gatedPricing.implied_probability,
       edge_percent:        gatedPricing.edge_percent,
-      confidence_score:    analysis.confidence_score,
+      confidence_score:    confidenceScore,
+      confidence_contract: confidenceContract,
       risk_level:          gatedPricing.risk_level,
       recommendation:      gatedPricing.recommendation,
       reasoning:           trustPayload.reasoning,
@@ -801,7 +826,7 @@ export async function POST(req: NextRequest) {
       p_model_probability:   gatedPricing.model_probability,
       p_implied_probability: gatedPricing.implied_probability,
       p_edge_percent:        gatedPricing.edge_percent,
-      p_confidence_score:    analysis.confidence_score,
+      p_confidence_score:    confidenceScore,
       p_risk_level:          gatedPricing.risk_level,
       p_recommendation:      gatedPricing.recommendation,
       p_reasoning:           trustPayload.reasoning,
@@ -840,7 +865,7 @@ export async function POST(req: NextRequest) {
         recommendation:    gatedPricing.recommendation,
         risk_level:        gatedPricing.risk_level,
         edge_bucket:       gatedPricing.edge_bucket,
-        confidence_bucket: bucketConfidence(analysis.confidence_score),
+        confidence_bucket: bucketConfidence(confidenceScore),
         odds_bucket:       bucketOdds(input.offered_odds),
         decision_id:       decisionId,
         web_search_enabled: webSearchTelemetry.enabled,
@@ -865,7 +890,8 @@ export async function POST(req: NextRequest) {
         model_probability:   gatedPricing.model_probability,
         implied_probability: gatedPricing.implied_probability,
         edge_percent:        gatedPricing.edge_percent,
-        confidence_score:    analysis.confidence_score,
+        confidence_score:    confidenceScore,
+        confidence_contract: confidenceContract,
         risk_level:          gatedPricing.risk_level,
         recommendation:      gatedPricing.recommendation,
         reasoning:           trustPayload.reasoning,

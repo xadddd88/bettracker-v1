@@ -253,7 +253,9 @@ export interface AnalystDecisionSurfaceView {
   actionLabel: string
 }
 
-const SUPPORTED_SPORT_MODULES = new Set(['soccer', 'tennis', 'cs2'])
+// These sports have prompt checklists only. Prompt coverage is approximate;
+// `full` must be supplied explicitly by a verified sport-specific engine.
+const PROMPT_MODULE_SPORTS = new Set(['soccer', 'tennis', 'cs2'])
 const NOT_ACTIONABLE_FIXTURE_STATUSES = new Set<FixtureStatus>([
   'live',
   'finished',
@@ -500,7 +502,7 @@ function resolveSportSupport(
 ): SportModuleSupport {
   if (explicit) return explicit
   if (legSport !== primarySport) return 'approximate'
-  return SUPPORTED_SPORT_MODULES.has(legSport) ? 'full' : 'none'
+  return PROMPT_MODULE_SPORTS.has(legSport) ? 'approximate' : 'none'
 }
 
 function supportLevelFromSportSupport(support: SportModuleSupport): LegSupportLevel {

@@ -50,7 +50,9 @@ const {
   containsAnalystPricingClaim,
   clearAnalystScannerLegsAfterManualEdit,
   createAnalystScanGenerationGate,
+  deriveAnalystConfidenceContract,
   extractAnalystResearchSources,
+  getAnalystLegCitationCoverage,
   hasUnsupportedLiveAnalystInput,
   inferCouponEventTimeFixtureStatus,
   parseStoredAnalystResearchBrief,
@@ -710,6 +712,7 @@ test('blocks model probability and edge when live data and model inputs are miss
     selection: 'Germany',
     webSearchEnabled: false,
     modelProbability: 54,
+    sportModuleSupport: 'full',
   });
 
   assert.equal(result.status, 'insufficient_data');
@@ -835,6 +838,29 @@ test('allows priced betting analysis only when required coverage and model input
   assert.equal(result.analysisType, 'priced_betting_analysis');
   assert.equal(result.dataCoverageScore, 100);
   assert.deepEqual(result.suppressedPricingFields, []);
+});
+
+test('prompt-only sport modules are approximate unless a verified engine explicitly declares full support', () => {
+  const result = evaluateAnalysisQuality({
+    sport: 'soccer',
+    eventName: 'Germany vs Netherlands',
+    marketType: 'Match Winner',
+    selection: 'Germany',
+    webSearchEnabled: true,
+    modelProbability: 54,
+    modelInputsPresent: true,
+    fixtureStatus: 'scheduled',
+    dataCoverage: {
+      liveInjuries: true,
+      teamNews: true,
+      recentForm: true,
+      lineMovement: true,
+    },
+  });
+
+  assert.equal(result.pricingAllowed, false);
+  assert.equal(result.status, 'unsupported');
+  assertMissing(result, 'sport-specific support confirmed for this leg');
 });
 
 test('summary text distinguishes risk warning from priced betting analysis', () => {
@@ -1428,9 +1454,9 @@ test('Analyst rejects duplicate numbers and mismatched leg identity instead of s
 test('Analyst binds only verbatim claims to their exact citation URL', () => {
   const brief = exactBuilderResearchBrief();
   brief.sourcedClaims = [
-    { text: 'Spain confirmed the squad on Friday.', sourceUrl: 'https://example.com/report' },
-    { text: 'Paraphrased claim not present in the citation.', sourceUrl: 'https://example.com/report' },
-    { text: 'Unrelated source.', sourceUrl: 'https://example.org/uncited' },
+    { text: 'Spain confirmed the squad on Friday.', sourceUrl: 'https://example.com/report', legNumbers: [1, 2] },
+    { text: 'Paraphrased claim not present in the citation.', sourceUrl: 'https://example.com/report', legNumbers: [1] },
+    { text: 'Unrelated source.', sourceUrl: 'https://example.org/uncited', legNumbers: [2] },
   ];
   const aligned = alignAnalystResearchBriefToCoupon(brief, [
     { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5' },
@@ -1445,6 +1471,7 @@ test('Analyst binds only verbatim claims to their exact citation URL', () => {
   assert.deepEqual(aligned.sourcedClaims, [{
     text: 'Spain confirmed the squad on Friday.',
     sourceUrl: 'https://example.com/report',
+    legNumbers: [1, 2],
   }]);
 
   const prefix = 'x'.repeat(400);
@@ -1465,13 +1492,81 @@ test('Analyst binds only verbatim claims to their exact citation URL', () => {
   }]);
 
   const prefixOnly = exactBuilderResearchBrief();
-  prefixOnly.sourcedClaims = [{ text: prefix, sourceUrl: 'https://example.com/long-report' }];
+  prefixOnly.sourcedClaims = [{ text: prefix, sourceUrl: 'https://example.com/long-report', legNumbers: [1] }];
   const rejectedPrefix = alignAnalystResearchBriefToCoupon(prefixOnly, [
     { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5' },
     { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5' },
   ], longCitationSources);
   assert.ok(rejectedPrefix);
   assert.deepEqual(rejectedPrefix.sourcedClaims, []);
+});
+
+test('Analysis Quality Contract v2 requires exact citation coverage for every coupon leg', () => {
+  const claims = [
+    { text: 'Leg one fact.', sourceUrl: 'https://example.com/one', legNumbers: [1] },
+    { text: 'Shared fixture fact.', sourceUrl: 'https://example.com/shared', legNumbers: [1, 2] },
+  ];
+  assert.deepEqual(getAnalystLegCitationCoverage(claims.slice(0, 1), 2), {
+    totalLegs: 2,
+    coveredLegs: 1,
+    coveredLegNumbers: [1],
+    ratio: 0.5,
+    complete: false,
+  });
+  assert.deepEqual(getAnalystLegCitationCoverage(claims, 2), {
+    totalLegs: 2,
+    coveredLegs: 2,
+    coveredLegNumbers: [1, 2],
+    ratio: 1,
+    complete: true,
+  });
+
+  assert.deepEqual(resolveAnalystWebSearchTelemetry({
+    globalEnabled: true,
+    profileEnabled: true,
+    profileReadFailed: false,
+    attempted: true,
+    configurationRejected: false,
+    researchContractAccepted: true,
+    citedSourceCount: 1,
+    boundClaimCount: 1,
+    totalLegs: 2,
+    coveredLegs: 1,
+  }), {
+    enabled: true,
+    attempted: true,
+    used: false,
+    failureReason: 'partial_leg_citation_coverage',
+  });
+});
+
+test('Analysis confidence is deterministic, server-owned, and capped by citation coverage', () => {
+  const base = {
+    researchContractAccepted: true,
+    totalLegs: 2,
+    fixtureStatus: 'scheduled',
+    qualityGateCoverageScore: 100,
+  };
+  const partial = deriveAnalystConfidenceContract({
+    ...base,
+    sourcedClaims: [{ text: 'Fact.', sourceUrl: 'https://example.com/one', legNumbers: [1] }],
+  });
+  const complete = deriveAnalystConfidenceContract({
+    ...base,
+    sourcedClaims: [{ text: 'Fact.', sourceUrl: 'https://example.com/all', legNumbers: [1, 2] }],
+  });
+  const rejected = deriveAnalystConfidenceContract({
+    ...base,
+    researchContractAccepted: false,
+    sourcedClaims: [{ text: 'Fact.', sourceUrl: 'https://example.com/all', legNumbers: [1, 2] }],
+  });
+
+  assert.equal(partial.ceiling, 45);
+  assert.equal(partial.score, 45);
+  assert.equal(complete.ceiling, 70);
+  assert.equal(complete.score, 70);
+  assert.equal(rejected.ceiling, 20);
+  assert.equal(rejected.score, 20);
 });
 
 test('Analyst research source extraction keeps only cited public HTTPS sources', () => {
@@ -1552,6 +1647,8 @@ test('Analyst web-search telemetry is explicit and fail-closed', () => {
     researchContractAccepted: true,
     citedSourceCount: 1,
     boundClaimCount: 1,
+    totalLegs: 1,
+    coveredLegs: 1,
   }), { enabled: false, attempted: false, used: false, failureReason: 'global_disabled' });
 
   assert.deepEqual(resolveAnalystWebSearchTelemetry({
@@ -1563,6 +1660,8 @@ test('Analyst web-search telemetry is explicit and fail-closed', () => {
     researchContractAccepted: true,
     citedSourceCount: 0,
     boundClaimCount: 0,
+    totalLegs: 1,
+    coveredLegs: 0,
   }), { enabled: true, attempted: true, used: false, failureReason: 'provider_no_cited_results' });
 
   assert.deepEqual(resolveAnalystWebSearchTelemetry({
@@ -1574,6 +1673,8 @@ test('Analyst web-search telemetry is explicit and fail-closed', () => {
     researchContractAccepted: true,
     citedSourceCount: 1,
     boundClaimCount: 1,
+    totalLegs: 1,
+    coveredLegs: 1,
   }), { enabled: true, attempted: true, used: true, failureReason: null });
 });
 
@@ -1626,6 +1727,7 @@ test('Broadcast Noir canonical controls explicitly retain semantic foreground te
 
 test('web Analyst transports coupon legs and time into the research pipeline', () => {
   const routeSource = readFileSync(path.join(repoRoot, 'app/api/ai/analyst/route.ts'), 'utf8');
+  const coachRouteSource = readFileSync(path.join(repoRoot, 'app/api/coach/route.ts'), 'utf8');
   const scannerRouteSource = readFileSync(path.join(repoRoot, 'app/api/ai/scanner/route.ts'), 'utf8');
   const pageSource = readFileSync(path.join(repoRoot, 'app/(app)/ai/page.tsx'), 'utf8');
   const decisionDetailSource = readFileSync(path.join(repoRoot, 'app/(app)/decisions/[id]/page.tsx'), 'utf8');
@@ -1636,6 +1738,14 @@ test('web Analyst transports coupon legs and time into the research pipeline', (
   assert.match(routeSource, /research_sources:\s*researchSources/);
   assert.match(routeSource, /offered_odds:\s*input\.offered_odds/);
   assert.match(routeSource, /boundClaimCount:\s*researchBrief\.sourcedClaims\.length/);
+  assert.match(routeSource, /coveredLegs:\s*citationCoverage\.coveredLegs/);
+  assert.match(routeSource, /const confidenceScore = confidenceContract\.score/);
+  assert.match(routeSource, /p_confidence_score:\s*confidenceScore/);
+  assert.doesNotMatch(routeSource, /p_confidence_score:\s*analysis\.confidence_score/);
+  assert.match(routeSource, /return \['soccer', 'tennis', 'cs2'\]\.includes\(sport\) \? 'approximate' : 'none'/);
+  assert.match(coachRouteSource, /const confidence_buckets:[^=]+=\s*\[\]/);
+  assert.match(coachRouteSource, /const output = \{ \.\.\.validated\.data, calibration_grade: null \}/);
+  assert.doesNotMatch(coachRouteSource, /conf >= 80/);
   assert.match(routeSource, /couponIsLive:\s*input\.coupon_is_live/);
   assert.match(routeSource, /couponStatusText:\s*input\.coupon_status_text/);
   assert.doesNotMatch(routeSource, /if \(false\s*&&\s*hasUnsupportedLiveAnalystInput/);
