@@ -21,6 +21,11 @@ export type LooseScannerLeg = {
   rawText?: string | null
   eventName?: string | null
   event_name?: string | null
+  competition?: string | null
+  eventStartText?: string | null
+  event_start_text?: string | null
+  eventTimezone?: string | null
+  event_timezone?: string | null
   marketType?: string | null
   market_type?: string | null
   selection?: string | null
@@ -63,6 +68,9 @@ export type LooseCouponExtraction = {
 export type NormalizedScannerLeg = {
   rawText?: string | null
   eventName: string | null
+  competition: string | null
+  eventStartText: string | null
+  eventTimezone: string | null
   marketType: string | null
   selection: string | null
   odds: number | null
@@ -187,6 +195,9 @@ function normalizeProvidedLeg(leg: LooseScannerLeg): NormalizedScannerLeg {
   return {
     rawText,
     eventName,
+    competition: cleanString(leg.competition),
+    eventStartText: cleanString(leg.eventStartText ?? leg.event_start_text),
+    eventTimezone: cleanString(leg.eventTimezone ?? leg.event_timezone),
     marketType: cleanString(leg.marketType ?? leg.market_type),
     selection: cleanString(leg.selection),
     odds: toNumber(leg.odds),
@@ -228,6 +239,9 @@ function parseLegsFromRawText(rawText: string): NormalizedScannerLeg[] {
     legs.push({
       rawText: [markerLine, eventLine, marketLine, selectionLine, oddsLine].filter(Boolean).join('\n'),
       eventName,
+      competition: null,
+      eventStartText: null,
+      eventTimezone: null,
       marketType: cleanString(marketLine),
       selection: cleanString(selectionLine),
       odds,
@@ -264,6 +278,9 @@ function parseLegsFromFlattenedFields(input: LooseCouponExtraction): NormalizedS
     return {
       rawText: [eventPart, marketType, selection].filter(Boolean).join('\n'),
       eventName,
+      competition: null,
+      eventStartText: null,
+      eventTimezone: null,
       marketType,
       selection,
       odds: null,
