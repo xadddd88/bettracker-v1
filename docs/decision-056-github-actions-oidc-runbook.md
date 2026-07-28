@@ -6,7 +6,8 @@ This runbook covers only the authorization path for the already implemented Deci
 
 The OIDC pull request:
 
-- adds no migration, Supabase write, provider write, environment value, or secret;
+- adds one reviewed migration for an append-only Supabase execution ledger;
+- adds no production Supabase change, provider write, environment value, or secret by itself;
 - does not call Vercel, Supabase, BetTracker production, or SportMonks;
 - does not merge or deploy itself;
 - removes the static operator-token fallback only from the Decision #056 route;
@@ -42,6 +43,20 @@ The verifier also requires an `RS256` JWT with `typ: JWT`, a bounded non-empty `
 
 The pinned subject is the repository's legacy environment subject. If GitHub changes this repository to immutable or customized subject claims, authorization intentionally fails closed until a separately reviewed code change pins the observed replacement.
 
+## Durable One-Time Ledger
+
+After the OIDC signature and all pinned claims pass, the endpoint atomically inserts the immutable key `decision-056:sportmonks-structural-presence-dry-run` into `public.decision_056_execution_ledger`.
+
+- the primary key permits exactly one successful claim across all Vercel instances and all future dispatches;
+- only `service_role` receives `INSERT`; it receives no `SELECT`, `UPDATE`, or `DELETE`;
+- `anon`, `authenticated`, and `PUBLIC` receive no table privileges and RLS has no client policies;
+- only a SHA-256 digest of the token `jti` is stored;
+- duplicate claims return `401`;
+- missing configuration, storage errors, or malformed storage results fail closed with `503`;
+- the claim occurs before request-body parsing, Supabase fixture preflight, provider-token loading, and the SportMonks request.
+
+Once a valid production OIDC token reaches the ledger claim, the one-call authorization is consumed even if the body is invalid or later work is blocked, fails, or times out. Ordinary rollback must never delete or update the ledger row. Reopening Decision #056 requires a new Founder decision and a separately reviewed data change.
+
 ## Required GitHub Environment Configuration
 
 Before any merge or runtime execution is authorized, create or verify the GitHub Environment `decision-056-production` with all of these rules:
@@ -61,8 +76,9 @@ This pull request must remain draft until:
 1. the code and negative authorization tests are reviewed;
 2. all hermetic PR checks pass;
 3. the exact GitHub Environment protection rules above are verified;
-4. Founder separately authorizes merge;
-5. Founder separately authorizes production deployment.
+4. the ledger migration and its disposable PostgreSQL 17 concurrency gate pass;
+5. Founder separately authorizes merge;
+6. Founder separately authorizes production deployment.
 
 An automatic preview check created by repository integrations is not authority to run the workflow or call production. The endpoint additionally rejects OIDC on non-production Vercel environments.
 
@@ -80,11 +96,17 @@ For a future separately authorized run:
 
 The workflow obtains one GitHub OIDC token and sends one POST. It has no retry path. Any HTTP response, timeout, authentication failure, or provider failure consumes the one-call authorization.
 
-## Replay Boundary
+The workflow succeeds only when the endpoint returns HTTP `200`, `success: true`, `report.responseStatus: "ok"`, `report.requestCount: 1`, `report.maxProviderRequests: 1`, the pinned provider, and `writes: "none"`. A blocked or structurally malformed JSON response fails the job.
 
-The endpoint consumes each observed `jti` in an in-memory TTL cache. This blocks replay on the same warm application instance.
+## Verification
 
-The cache is not durable across Vercel instances or cold starts. Full cross-instance replay prevention would require a short durable security-ledger write, which is outside this PR's zero-write authorization. The remaining short-window replay risk must be explicitly accepted or replaced by a separately approved durable ledger before runtime execution.
+- `npm run test:decision-056-oidc`
+- `bash scripts/verify-decision-056-ledger.sh postgresql://postgres:postgres@localhost:5432/postgres`
+- `npm run test:provider-safety`
+- `npx tsc --noEmit`
+- `npm run lint`
+
+The PostgreSQL verifier accepts only a disposable localhost URL. It checks privileges, RLS, append-only behavior, the fixed execution scope, and twelve concurrent claims producing exactly one winner.
 
 ## References
 

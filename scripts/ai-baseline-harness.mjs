@@ -243,6 +243,7 @@ function analystOutput(fixture, cited = false) {
       sourced_claims: [{
         claim,
         source_url: 'https://baseline.example.com/research',
+        leg_numbers: [1],
       }],
       legs: [{
         leg_number: 1,
@@ -767,6 +768,8 @@ function requestBody(flow, fixture) {
     return {
       sport: fixture.sport,
       ...fixture.input,
+      coupon_event_time: fixture.input.coupon_event_time ?? 'Tomorrow, 22:10',
+      client_timezone: fixture.input.client_timezone ?? 'UTC',
       output_language: fixture.language,
     };
   }

@@ -5,6 +5,13 @@ import {
   type JWTPayload,
   type JWTVerifyOptions,
 } from 'jose'
+import {
+  claimDecision056Execution,
+  DECISION_056_EXECUTION_KEY,
+  type Decision056ExecutionClaimFunction,
+} from './decision-056-execution-ledger'
+
+export { DECISION_056_EXECUTION_KEY }
 
 export const DECISION_056_GITHUB_OIDC_ISSUER = 'https://token.actions.githubusercontent.com'
 export const DECISION_056_GITHUB_OIDC_AUDIENCE = 'urn:btdk:decision-056:production'
@@ -27,7 +34,6 @@ const GITHUB_ACTIONS_JWKS_URL = new URL(
 const CLOCK_TOLERANCE_SECONDS = 30
 const MAX_TOKEN_LIFETIME_SECONDS = 10 * 60
 const MAX_JTI_LENGTH = 256
-const MAX_REPLAY_CACHE_ENTRIES = 1_024
 const SHA_PATTERN = /^[0-9a-f]{40}$/
 
 const githubActionsJwks = createRemoteJWKSet(GITHUB_ACTIONS_JWKS_URL, {
@@ -69,13 +75,12 @@ export interface Decision056OidcAuthorizationOptions {
   vercelEnvironment?: string
   currentDate?: Date
   verificationKey?: VerificationKey
+  claimExecution?: Decision056ExecutionClaimFunction
 }
 
 export type Decision056OidcAuthorizationResult =
   | { ok: true }
   | { ok: false; status: 401 | 503 }
-
-const consumedJtis = new Map<string, number>()
 
 function claimEquals(value: unknown, expected: string): boolean {
   return typeof value === 'string' && value === expected
@@ -83,25 +88,6 @@ function claimEquals(value: unknown, expected: string): boolean {
 
 function runAttemptIsOne(value: unknown): boolean {
   return value === '1' || value === 1
-}
-
-function pruneReplayCache(nowSeconds: number): void {
-  for (const [jti, expiresAt] of consumedJtis) {
-    if (expiresAt + CLOCK_TOLERANCE_SECONDS < nowSeconds) consumedJtis.delete(jti)
-  }
-
-  while (consumedJtis.size > MAX_REPLAY_CACHE_ENTRIES) {
-    const oldest = consumedJtis.keys().next().value
-    if (typeof oldest !== 'string') break
-    consumedJtis.delete(oldest)
-  }
-}
-
-function consumeJti(jti: string, expiresAt: number, nowSeconds: number): boolean {
-  pruneReplayCache(nowSeconds)
-  if (consumedJtis.has(jti)) return false
-  consumedJtis.set(jti, expiresAt)
-  return true
 }
 
 function bearerToken(headers: Pick<Headers, 'get'>): string | null {
@@ -226,18 +212,30 @@ export async function authorizeDecision056GitHubOidcRequest(
   const token = bearerToken(headers)
   if (!token) return { ok: false, status: 401 }
 
+  let verified: { jti: string; expiresAt: number }
   try {
-    const verified = await verifyDecision056GitHubOidcToken(token, {
+    verified = await verifyDecision056GitHubOidcToken(token, {
       deploymentSha,
       currentDate: options.currentDate,
       verificationKey: options.verificationKey,
     })
-    const nowSeconds = Math.floor((options.currentDate?.getTime() ?? Date.now()) / 1_000)
-    if (!consumeJti(verified.jti, verified.expiresAt, nowSeconds)) {
-      return { ok: false, status: 401 }
-    }
-    return { ok: true }
   } catch {
     return { ok: false, status: 401 }
+  }
+
+  const claimExecution = options.claimExecution ?? claimDecision056Execution
+  try {
+    const claim = await claimExecution({
+      executionKey: DECISION_056_EXECUTION_KEY,
+      jti: verified.jti,
+      deploymentSha,
+    })
+    if (claim.claimed) return { ok: true }
+    return {
+      ok: false,
+      status: claim.reason === 'already-claimed' ? 401 : 503,
+    }
+  } catch {
+    return { ok: false, status: 503 }
   }
 }

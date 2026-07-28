@@ -50,12 +50,16 @@ const {
   containsAnalystPricingClaim,
   clearAnalystScannerLegsAfterManualEdit,
   createAnalystScanGenerationGate,
+  deriveAnalystConfidenceContract,
+  evaluateAnalystEventIdentityGate,
   extractAnalystResearchSources,
+  getAnalystLegCitationCoverage,
   hasUnsupportedLiveAnalystInput,
   inferCouponEventTimeFixtureStatus,
   parseStoredAnalystResearchBrief,
   parseStoredAnalystResearchSources,
   resolveAnalystWebSearchTelemetry,
+  resolveCouponEventTime,
   usedSuccessfulWebSearch,
 } = researchModule;
 
@@ -501,8 +505,24 @@ test('scanner preserves the exact coupon date and time for fixture research', ()
     totalOdds: 2.91,
     sport: 'soccer',
     legs: [
-      { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5', sport: 'soccer' },
-      { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5', sport: 'soccer' },
+      {
+        eventName: 'Іспанія - Аргентина',
+        competition: 'International Friendly',
+        eventStartText: '31.07.2026 22:10',
+        eventTimezone: 'Europe/Kyiv',
+        marketType: 'Тотал',
+        selection: 'Більше 2.5',
+        sport: 'soccer',
+      },
+      {
+        eventName: 'Іспанія - Аргентина',
+        competition: 'International Friendly',
+        eventStartText: '31.07.2026 22:10',
+        eventTimezone: 'Europe/Kyiv',
+        marketType: 'Кутові. Тотал',
+        selection: 'Більше 6.5',
+        sport: 'soccer',
+      },
     ],
   });
   assert.equal(explicit.event_start_text, 'Сьогодні, 22:10');
@@ -511,6 +531,9 @@ test('scanner preserves the exact coupon date and time for fixture research', ()
   assert.deepEqual(explicit.legs.map(leg => leg.eventName), ['Іспанія - Аргентина', 'Іспанія - Аргентина']);
   assert.deepEqual(explicit.legs.map(leg => leg.marketType), ['Тотал', 'Кутові. Тотал']);
   assert.deepEqual(explicit.legs.map(leg => leg.selection), ['Більше 2.5', 'Більше 6.5']);
+  assert.deepEqual(explicit.legs.map(leg => leg.competition), ['International Friendly', 'International Friendly']);
+  assert.deepEqual(explicit.legs.map(leg => leg.eventStartText), ['31.07.2026 22:10', '31.07.2026 22:10']);
+  assert.deepEqual(explicit.legs.map(leg => leg.eventTimezone), ['Europe/Kyiv', 'Europe/Kyiv']);
 
   const fromRawText = normalizeLooseCouponExtraction({
     rawText: 'Сьогодні, 22:10\nІспанія - Аргентина',
@@ -630,12 +653,187 @@ await asyncTest('Analyst route rejects every positive live signal before profile
     assert.equal(calls.rpc, 0);
 
     const scheduledResponse = await POST(analystRequest({
+      coupon_event_time: '2099-07-31 22:10',
+      client_timezone: 'Europe/Kyiv',
       coupon_status_text: 'Scheduled',
       legs: [{ isLive: false, periodOrPhase: null, statusText: 'Scheduled', scoreText: null }],
     }));
     assert.notEqual(scheduledResponse.status, 422, 'a scheduled coupon must pass the live preflight');
     assert.equal(calls.profile, 0);
     assert.equal(calls.provider, 1, 'scheduled input should reach the next provider stage');
+    assert.equal(calls.admin, 0);
+    assert.equal(calls.rpc, 0);
+  });
+});
+
+await asyncTest('Analyst route rejects stale or ambiguous per-leg identity before profile, provider or persistence', async () => {
+  await withAnalystRouteHarness(async ({ POST, calls }) => {
+    const blockedInputs = [
+      {},
+      {
+        coupon_event_time: '2020-07-31 22:10',
+        client_timezone: 'Europe/Kyiv',
+      },
+      {
+        coupon_event_time: '31.07 22:10',
+        client_timezone: 'Europe/Kyiv',
+      },
+      {
+        coupon_event_time: '2099-07-31 22:10',
+        client_timezone: 'Invalid/Timezone',
+      },
+      {
+        coupon_event_time: '2099-07-31 22:10',
+        client_timezone: 'Europe/Kyiv',
+        legs: [
+          { eventName: 'Spain - Argentina', statusText: 'Scheduled' },
+          { eventName: 'France - Germany', statusText: 'Scheduled' },
+        ],
+      },
+      {
+        legs: [{
+          eventName: 'Spain - Argentina',
+          eventStartText: '2099-07-31 22:10',
+          eventTimezone: 'Europe/Kyiv',
+          statusText: 'Finished',
+        }],
+      },
+    ];
+
+    for (const input of blockedInputs) {
+      const response = await POST(analystRequest(input));
+      const body = await response.json();
+      assert.equal(response.status, 422, JSON.stringify(input));
+      assert.ok(
+        ['event_identity_unverified', 'event_not_pre_match'].includes(body.code),
+        JSON.stringify(body),
+      );
+      assert.equal(body.event_identity_gate.allowed, false);
+    }
+
+    assert.equal(calls.profile, 0);
+    assert.equal(calls.provider, 0);
+    assert.equal(calls.admin, 0);
+    assert.equal(calls.rpc, 0);
+  });
+});
+
+await asyncTest('Analyst route shares coupon time only for a confirmed one-fixture Bet Builder', async () => {
+  await withAnalystRouteHarness(async ({ POST, calls }) => {
+    const legs = [
+      {
+        eventName: 'Spain - Argentina',
+        competition: 'International Friendly',
+        marketType: 'Total',
+        statusText: 'Scheduled',
+      },
+      {
+        eventName: 'Spain - Argentina',
+        competition: 'International Friendly',
+        marketType: 'Corners total',
+        statusText: 'Scheduled',
+      },
+    ];
+    const common = {
+      event_name: 'Spain - Argentina',
+      competition: 'International Friendly',
+      coupon_event_time: '2099-07-31 22:10',
+      client_timezone: 'Europe/Kyiv',
+      legs,
+    };
+
+    for (const market_type of ['Match result', 'Express (2 legs)', 'Parlay']) {
+      const response = await POST(analystRequest({ ...common, market_type }));
+      const body = await response.json();
+      assert.equal(response.status, 422, market_type);
+      assert.equal(body.code, 'event_identity_unverified', market_type);
+      assert.deepEqual(
+        body.event_identity_gate.legs.map(leg => leg.blockingReasons),
+        [['event_time_missing'], ['event_time_missing']],
+        market_type,
+      );
+    }
+
+    const missingCompetition = await POST(analystRequest({
+      ...common,
+      competition: null,
+      market_type: 'Bet Builder',
+      legs: legs.map(({ competition: _competition, ...leg }) => leg),
+    }));
+    const missingCompetitionBody = await missingCompetition.json();
+    assert.equal(missingCompetition.status, 422);
+    assert.equal(missingCompetitionBody.code, 'event_identity_unverified');
+
+    assert.equal(calls.profile, 0);
+    assert.equal(calls.provider, 0);
+    assert.equal(calls.admin, 0);
+    assert.equal(calls.rpc, 0);
+
+    const confirmed = await POST(analystRequest({
+      ...common,
+      market_type: 'Bet Builder',
+    }));
+    assert.notEqual(confirmed.status, 422);
+    assert.equal(calls.profile, 0);
+    assert.equal(calls.provider, 1, 'confirmed Bet Builder should reach the next provider stage');
+    assert.equal(calls.admin, 0);
+    assert.equal(calls.rpc, 0);
+  });
+});
+
+await asyncTest('Analyst route localizes both stale-gate errors in every selected language', async () => {
+  const expected = {
+    uk: {
+      event_identity_unverified: 'Для кожної події потрібні однозначна ідентифікація матчу, точні майбутні дата й час та коректний часовий пояс.',
+      event_not_pre_match: 'Щонайменше одна подія вже почалася, завершилася або наразі недоступна для ставки.',
+    },
+    ru: {
+      event_identity_unverified: 'Для каждого события нужны однозначная идентификация матча, точные будущие дата и время и корректный часовой пояс.',
+      event_not_pre_match: 'Как минимум одно событие уже началось, завершилось или сейчас недоступно для ставки.',
+    },
+    en: {
+      event_identity_unverified: 'Every event needs an unambiguous fixture identity, exact future date/time, and valid timezone.',
+      event_not_pre_match: 'At least one event has already started, finished, or is not currently bettable.',
+    },
+    es: {
+      event_identity_unverified: 'Cada evento necesita una identidad de partido inequívoca, una fecha y hora futuras exactas y una zona horaria válida.',
+      event_not_pre_match: 'Al menos un evento ya ha comenzado, ha finalizado o no está disponible actualmente para apostar.',
+    },
+    fr: {
+      event_identity_unverified: 'Chaque événement nécessite une identité de match sans ambiguïté, une date et une heure futures exactes et un fuseau horaire valide.',
+      event_not_pre_match: 'Au moins un événement a déjà commencé, est terminé ou n’est actuellement pas disponible pour les paris.',
+    },
+    de: {
+      event_identity_unverified: 'Für jedes Ereignis sind eine eindeutige Spielidentität, ein genaues zukünftiges Datum mit Uhrzeit und eine gültige Zeitzone erforderlich.',
+      event_not_pre_match: 'Mindestens ein Ereignis hat bereits begonnen, ist beendet oder kann derzeit nicht bewettet werden.',
+    },
+    ar: {
+      event_identity_unverified: 'يتطلب كل حدث هوية مباراة واضحة وتاريخًا ووقتًا دقيقين في المستقبل ومنطقة زمنية صالحة.',
+      event_not_pre_match: 'بدأ حدث واحد على الأقل بالفعل أو انتهى أو أنه غير متاح حاليًا للمراهنة.',
+    },
+  };
+
+  await withAnalystRouteHarness(async ({ POST, calls }) => {
+    for (const [output_language, copy] of Object.entries(expected)) {
+      const ambiguous = await POST(analystRequest({ output_language }));
+      const ambiguousBody = await ambiguous.json();
+      assert.equal(ambiguous.status, 422, output_language);
+      assert.equal(ambiguousBody.code, 'event_identity_unverified');
+      assert.equal(ambiguousBody.error, copy.event_identity_unverified);
+
+      const stale = await POST(analystRequest({
+        output_language,
+        coupon_event_time: '2020-07-31 22:10',
+        client_timezone: 'Europe/Kyiv',
+      }));
+      const staleBody = await stale.json();
+      assert.equal(stale.status, 422, output_language);
+      assert.equal(staleBody.code, 'event_not_pre_match');
+      assert.equal(staleBody.error, copy.event_not_pre_match);
+    }
+
+    assert.equal(calls.profile, 0);
+    assert.equal(calls.provider, 0);
     assert.equal(calls.admin, 0);
     assert.equal(calls.rpc, 0);
   });
@@ -710,6 +908,7 @@ test('blocks model probability and edge when live data and model inputs are miss
     selection: 'Germany',
     webSearchEnabled: false,
     modelProbability: 54,
+    sportModuleSupport: 'full',
   });
 
   assert.equal(result.status, 'insufficient_data');
@@ -835,6 +1034,29 @@ test('allows priced betting analysis only when required coverage and model input
   assert.equal(result.analysisType, 'priced_betting_analysis');
   assert.equal(result.dataCoverageScore, 100);
   assert.deepEqual(result.suppressedPricingFields, []);
+});
+
+test('prompt-only sport modules are approximate unless a verified engine explicitly declares full support', () => {
+  const result = evaluateAnalysisQuality({
+    sport: 'soccer',
+    eventName: 'Germany vs Netherlands',
+    marketType: 'Match Winner',
+    selection: 'Germany',
+    webSearchEnabled: true,
+    modelProbability: 54,
+    modelInputsPresent: true,
+    fixtureStatus: 'scheduled',
+    dataCoverage: {
+      liveInjuries: true,
+      teamNews: true,
+      recentForm: true,
+      lineMovement: true,
+    },
+  });
+
+  assert.equal(result.pricingAllowed, false);
+  assert.equal(result.status, 'unsupported');
+  assertMissing(result, 'sport-specific support confirmed for this leg');
 });
 
 test('summary text distinguishes risk warning from priced betting analysis', () => {
@@ -1039,7 +1261,7 @@ test('trust view marks finished or live legs as not actionable and hides Watch',
   assert.ok(text.includes('подія вже почалась або завершилась'));
 });
 
-test('coupon event time marks already-started visible matches as not actionable', () => {
+test('strict coupon event time rejects missing year/time and resolves future or past instants', () => {
   const past = inferCouponEventTimeFixtureStatus({
     couponEventTime: 'Сегодня, 22:10',
     clientTimezone: 'Europe/Kyiv',
@@ -1058,7 +1280,46 @@ test('coupon event time marks already-started visible matches as not actionable'
 
   assert.deepEqual(past, { fixtureStatus: 'not_bettable', reason: 'past_time' });
   assert.deepEqual(future, { fixtureStatus: 'scheduled', reason: 'future_time' });
-  assert.deepEqual(oldDate, { fixtureStatus: 'finished', reason: 'past_date' });
+  assert.deepEqual(oldDate, { fixtureStatus: null, reason: 'unparsed' });
+
+  assert.equal(resolveCouponEventTime({
+    couponEventTime: '31.07 22:10',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: '2026-07-26T18:30:00.000Z',
+  }).reason, 'missing_year');
+  assert.equal(resolveCouponEventTime({
+    couponEventTime: '08/09/2026 22:10',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: '2026-07-26T18:30:00.000Z',
+  }).reason, 'ambiguous_date');
+  assert.equal(resolveCouponEventTime({
+    couponEventTime: '31.07.2026 22:10',
+    clientTimezone: 'Invalid/Timezone',
+    currentUtcIso: '2026-07-26T18:30:00.000Z',
+  }).reason, 'invalid_timezone');
+  assert.equal(resolveCouponEventTime({
+    couponEventTime: '2026-10-25 02:30',
+    clientTimezone: 'Europe/Berlin',
+    currentUtcIso: '2026-07-26T18:30:00.000Z',
+  }).reason, 'ambiguous_local_time');
+  assert.equal(resolveCouponEventTime({
+    couponEventTime: '2026-03-29 02:30',
+    clientTimezone: 'Europe/Berlin',
+    currentUtcIso: '2026-01-26T18:30:00.000Z',
+  }).reason, 'nonexistent_local_time');
+  const explicitOffset = resolveCouponEventTime({
+    couponEventTime: '2026-07-31T22:10:00+03:00',
+    currentUtcIso: '2026-07-26T18:30:00.000Z',
+  });
+  assert.equal(explicitOffset.fixtureStatus, 'scheduled');
+  assert.equal(explicitOffset.scheduledStartUtc, '2026-07-31T19:10:00.000Z');
+  for (const localizedToday of ['Hoy, 22:10', "Aujourd'hui, 22:10", 'Heute, 22:10', 'اليوم، 22:10']) {
+    assert.equal(resolveCouponEventTime({
+      couponEventTime: localizedToday,
+      clientTimezone: 'Europe/Kyiv',
+      currentUtcIso: '2026-07-26T18:30:00.000Z',
+    }).fixtureStatus, 'scheduled', localizedToday);
+  }
 
   const qualityGate = evaluateAnalysisQuality({
     sport: 'soccer',
@@ -1082,6 +1343,181 @@ test('coupon event time marks already-started visible matches as not actionable'
   assert.equal(qualityGate.actionability, 'not_actionable');
   assert.equal(qualityGate.label, 'NOT ACTIONABLE - event already started or finished');
   assertMissing(qualityGate, 'event actionability');
+});
+
+test('per-leg identity gate shares time only within one fixture and fingerprints every scheduled leg', () => {
+  const now = '2026-07-28T09:00:00.000Z';
+  const builder = evaluateAnalystEventIdentityGate({
+    sport: 'soccer',
+    eventName: 'Spain - Argentina',
+    competition: 'International Friendly',
+    marketType: 'Bet Builder',
+    couponEventTime: '31.07.2026 22:10',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: now,
+    legs: [
+      { eventName: 'Spain - Argentina', marketType: 'Total' },
+      { eventName: 'Spain - Argentina', marketType: 'Corners total' },
+    ],
+  });
+  assert.equal(builder.allowed, true);
+  assert.equal(builder.code, 'ok');
+  assert.equal(builder.legs[0].fixtureFingerprint, builder.legs[1].fixtureFingerprint);
+  assert.equal(builder.legs[0].scheduledStartUtc, '2026-07-31T19:10:00.000Z');
+
+  const sameParticipantsDifferentCompetitions = evaluateAnalystEventIdentityGate({
+    sport: 'soccer',
+    eventName: 'Spain - Argentina',
+    couponEventTime: '31.07.2026 22:10',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: now,
+    legs: [
+      { eventName: 'Spain - Argentina', competition: 'International Friendly' },
+      { eventName: 'Spain - Argentina', competition: 'World Cup' },
+    ],
+  });
+  assert.equal(sameParticipantsDifferentCompetitions.allowed, false);
+  assert.equal(sameParticipantsDifferentCompetitions.code, 'event_identity_unverified');
+  assert.deepEqual(
+    sameParticipantsDifferentCompetitions.legs.map(leg => leg.blockingReasons),
+    [['event_time_missing'], ['event_time_missing']],
+  );
+
+  const ambiguousExpress = evaluateAnalystEventIdentityGate({
+    sport: 'soccer',
+    eventName: 'Spain - Argentina + France - Germany',
+    couponEventTime: '31.07.2026 22:10',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: now,
+    legs: [
+      { eventName: 'Spain - Argentina' },
+      { eventName: 'France - Germany' },
+    ],
+  });
+  assert.equal(ambiguousExpress.allowed, false);
+  assert.equal(ambiguousExpress.code, 'event_identity_unverified');
+  assert.deepEqual(
+    ambiguousExpress.legs.map(leg => leg.blockingReasons),
+    [['event_time_missing'], ['event_time_missing']],
+  );
+
+  const scheduledExpress = evaluateAnalystEventIdentityGate({
+    sport: 'soccer',
+    eventName: 'Spain - Argentina + France - Germany',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: now,
+    legs: [
+      {
+        eventName: 'Spain - Argentina',
+        competition: 'International Friendly',
+        eventStartText: '31.07.2026 22:10',
+      },
+      {
+        eventName: 'France - Germany',
+        competition: 'UEFA Nations League',
+        eventStartText: '01.08.2026 20:45',
+      },
+    ],
+  });
+  assert.equal(scheduledExpress.allowed, true);
+  assert.notEqual(
+    scheduledExpress.legs[0].fixtureFingerprint,
+    scheduledExpress.legs[1].fixtureFingerprint,
+  );
+});
+
+test('shared coupon time requires an explicit Bet Builder with one complete fixture identity', () => {
+  const common = {
+    sport: 'soccer',
+    eventName: 'Spain - Argentina',
+    couponEventTime: '31.07.2026 22:10',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: '2026-07-28T09:00:00.000Z',
+  };
+  const sameFixtureLegs = [
+    {
+      eventName: 'Spain - Argentina',
+      competition: 'International Friendly',
+      marketType: 'Total',
+    },
+    {
+      eventName: 'Spain - Argentina',
+      competition: 'International Friendly',
+      marketType: 'Corners total',
+    },
+  ];
+
+  for (const marketType of [undefined, 'Express (2 legs)', 'Parlay', 'Not a Bet Builder']) {
+    const result = evaluateAnalystEventIdentityGate({
+      ...common,
+      marketType,
+      legs: sameFixtureLegs,
+    });
+    assert.equal(result.allowed, false, String(marketType));
+    assert.deepEqual(
+      result.legs.map(leg => leg.blockingReasons),
+      [['event_time_missing'], ['event_time_missing']],
+      String(marketType),
+    );
+  }
+
+  const missingCompetition = evaluateAnalystEventIdentityGate({
+    ...common,
+    marketType: 'Bet Builder',
+    legs: [
+      { eventName: 'Spain - Argentina', marketType: 'Total' },
+      { eventName: 'Spain - Argentina', marketType: 'Corners total' },
+    ],
+  });
+  assert.equal(missingCompetition.allowed, false);
+  assert.deepEqual(
+    missingCompetition.legs.map(leg => leg.blockingReasons),
+    [['event_time_missing'], ['event_time_missing']],
+  );
+
+  for (const marketType of ['Bet Builder', 'Same Game Parlay', 'SGP']) {
+    const confirmed = evaluateAnalystEventIdentityGate({
+      ...common,
+      marketType,
+      legs: sameFixtureLegs,
+    });
+    assert.equal(confirmed.allowed, true, marketType);
+    assert.equal(confirmed.legs[0].fixtureFingerprint, confirmed.legs[1].fixtureFingerprint);
+  }
+});
+
+test('per-leg identity gate fails closed for ambiguous participants, time and terminal status', () => {
+  const now = '2026-07-28T09:00:00.000Z';
+  const ambiguous = evaluateAnalystEventIdentityGate({
+    sport: 'tennis',
+    eventName: 'Unknown event',
+    couponEventTime: '31.07 22:10',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: now,
+  });
+  assert.equal(ambiguous.allowed, false);
+  assert.deepEqual(
+    ambiguous.legs[0].blockingReasons,
+    ['participants_ambiguous', 'event_time_unverified'],
+  );
+  assert.equal(ambiguous.legs[0].timeResolutionReason, 'missing_year');
+  assert.equal(ambiguous.legs[0].fixtureFingerprint, null);
+
+  const finished = evaluateAnalystEventIdentityGate({
+    sport: 'soccer',
+    eventName: 'Spain - Argentina',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: now,
+    legs: [{
+      eventName: 'Spain - Argentina',
+      eventStartText: '31.07.2026 22:10',
+      statusText: 'Finished',
+    }],
+  });
+  assert.equal(finished.allowed, false);
+  assert.equal(finished.code, 'event_not_pre_match');
+  assert.equal(finished.legs[0].fixtureStatus, 'finished');
+  assert.deepEqual(finished.legs[0].blockingReasons, ['event_status_not_actionable']);
 });
 
 test('Russian selected language localizes blocked Analyst trust view without English fallback copy', () => {
@@ -1338,6 +1774,7 @@ test('Analyst research message preserves Bet Builder legs and coupon time contex
   const message = buildAnalystResearchMessage({
     sport: 'soccer',
     eventName: 'Іспанія - Аргентина',
+    competition: 'International Friendly',
     marketType: 'Bet Builder',
     selection: 'Більше 2.5 + Більше 6.5',
     offeredOdds: 2.91,
@@ -1345,8 +1782,24 @@ test('Analyst research message preserves Bet Builder legs and coupon time contex
     clientTimezone: 'Europe/Kyiv',
     currentUtcIso: '2026-07-19T19:00:00.000Z',
     legs: [
-      { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5', sport: 'soccer' },
-      { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5', sport: 'soccer' },
+      {
+        eventName: 'Іспанія - Аргентина',
+        competition: 'International Friendly',
+        eventStartText: '31.07.2026 22:10',
+        eventTimezone: 'Europe/Kyiv',
+        marketType: 'Тотал',
+        selection: 'Більше 2.5',
+        sport: 'soccer',
+      },
+      {
+        eventName: 'Іспанія - Аргентина',
+        competition: 'International Friendly',
+        eventStartText: '31.07.2026 22:10',
+        eventTimezone: 'Europe/Kyiv',
+        marketType: 'Кутові. Тотал',
+        selection: 'Більше 6.5',
+        sport: 'soccer',
+      },
     ],
   });
 
@@ -1355,8 +1808,9 @@ test('Analyst research message preserves Bet Builder legs and coupon time contex
   assert.ok(message.includes('Offered total odds: 2.91'), message);
   assert.ok(!message.includes('bookmaker implied probability'), message);
   assert.ok(message.includes('not evidence of fair price, probability, edge, or EV'), message);
-  assert.ok(message.includes('Leg 1: event=Іспанія - Аргентина | market=Тотал | selection=Більше 2.5'), message);
-  assert.ok(message.includes('Leg 2: event=Іспанія - Аргентина | market=Кутові. Тотал | selection=Більше 6.5'), message);
+  assert.ok(message.includes('Competition: International Friendly'), message);
+  assert.ok(message.includes('Leg 1: event=Іспанія - Аргентина | competition=International Friendly | event_time=31.07.2026 22:10 | event_timezone=Europe/Kyiv | market=Тотал | selection=Більше 2.5'), message);
+  assert.ok(message.includes('Leg 2: event=Іспанія - Аргентина | competition=International Friendly | event_time=31.07.2026 22:10 | event_timezone=Europe/Kyiv | market=Кутові. Тотал | selection=Більше 6.5'), message);
   assert.ok(message.includes('correlation'), message);
 });
 
@@ -1428,9 +1882,9 @@ test('Analyst rejects duplicate numbers and mismatched leg identity instead of s
 test('Analyst binds only verbatim claims to their exact citation URL', () => {
   const brief = exactBuilderResearchBrief();
   brief.sourcedClaims = [
-    { text: 'Spain confirmed the squad on Friday.', sourceUrl: 'https://example.com/report' },
-    { text: 'Paraphrased claim not present in the citation.', sourceUrl: 'https://example.com/report' },
-    { text: 'Unrelated source.', sourceUrl: 'https://example.org/uncited' },
+    { text: 'Spain confirmed the squad on Friday.', sourceUrl: 'https://example.com/report', legNumbers: [1, 2] },
+    { text: 'Paraphrased claim not present in the citation.', sourceUrl: 'https://example.com/report', legNumbers: [1] },
+    { text: 'Unrelated source.', sourceUrl: 'https://example.org/uncited', legNumbers: [2] },
   ];
   const aligned = alignAnalystResearchBriefToCoupon(brief, [
     { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5' },
@@ -1445,6 +1899,7 @@ test('Analyst binds only verbatim claims to their exact citation URL', () => {
   assert.deepEqual(aligned.sourcedClaims, [{
     text: 'Spain confirmed the squad on Friday.',
     sourceUrl: 'https://example.com/report',
+    legNumbers: [1, 2],
   }]);
 
   const prefix = 'x'.repeat(400);
@@ -1465,13 +1920,81 @@ test('Analyst binds only verbatim claims to their exact citation URL', () => {
   }]);
 
   const prefixOnly = exactBuilderResearchBrief();
-  prefixOnly.sourcedClaims = [{ text: prefix, sourceUrl: 'https://example.com/long-report' }];
+  prefixOnly.sourcedClaims = [{ text: prefix, sourceUrl: 'https://example.com/long-report', legNumbers: [1] }];
   const rejectedPrefix = alignAnalystResearchBriefToCoupon(prefixOnly, [
     { eventName: 'Іспанія - Аргентина', marketType: 'Тотал', selection: 'Більше 2.5' },
     { eventName: 'Іспанія - Аргентина', marketType: 'Кутові. Тотал', selection: 'Більше 6.5' },
   ], longCitationSources);
   assert.ok(rejectedPrefix);
   assert.deepEqual(rejectedPrefix.sourcedClaims, []);
+});
+
+test('Analysis Quality Contract v2 requires exact citation coverage for every coupon leg', () => {
+  const claims = [
+    { text: 'Leg one fact.', sourceUrl: 'https://example.com/one', legNumbers: [1] },
+    { text: 'Shared fixture fact.', sourceUrl: 'https://example.com/shared', legNumbers: [1, 2] },
+  ];
+  assert.deepEqual(getAnalystLegCitationCoverage(claims.slice(0, 1), 2), {
+    totalLegs: 2,
+    coveredLegs: 1,
+    coveredLegNumbers: [1],
+    ratio: 0.5,
+    complete: false,
+  });
+  assert.deepEqual(getAnalystLegCitationCoverage(claims, 2), {
+    totalLegs: 2,
+    coveredLegs: 2,
+    coveredLegNumbers: [1, 2],
+    ratio: 1,
+    complete: true,
+  });
+
+  assert.deepEqual(resolveAnalystWebSearchTelemetry({
+    globalEnabled: true,
+    profileEnabled: true,
+    profileReadFailed: false,
+    attempted: true,
+    configurationRejected: false,
+    researchContractAccepted: true,
+    citedSourceCount: 1,
+    boundClaimCount: 1,
+    totalLegs: 2,
+    coveredLegs: 1,
+  }), {
+    enabled: true,
+    attempted: true,
+    used: false,
+    failureReason: 'partial_leg_citation_coverage',
+  });
+});
+
+test('Analysis confidence is deterministic, server-owned, and capped by citation coverage', () => {
+  const base = {
+    researchContractAccepted: true,
+    totalLegs: 2,
+    fixtureStatus: 'scheduled',
+    qualityGateCoverageScore: 100,
+  };
+  const partial = deriveAnalystConfidenceContract({
+    ...base,
+    sourcedClaims: [{ text: 'Fact.', sourceUrl: 'https://example.com/one', legNumbers: [1] }],
+  });
+  const complete = deriveAnalystConfidenceContract({
+    ...base,
+    sourcedClaims: [{ text: 'Fact.', sourceUrl: 'https://example.com/all', legNumbers: [1, 2] }],
+  });
+  const rejected = deriveAnalystConfidenceContract({
+    ...base,
+    researchContractAccepted: false,
+    sourcedClaims: [{ text: 'Fact.', sourceUrl: 'https://example.com/all', legNumbers: [1, 2] }],
+  });
+
+  assert.equal(partial.ceiling, 45);
+  assert.equal(partial.score, 45);
+  assert.equal(complete.ceiling, 70);
+  assert.equal(complete.score, 70);
+  assert.equal(rejected.ceiling, 20);
+  assert.equal(rejected.score, 20);
 });
 
 test('Analyst research source extraction keeps only cited public HTTPS sources', () => {
@@ -1552,6 +2075,8 @@ test('Analyst web-search telemetry is explicit and fail-closed', () => {
     researchContractAccepted: true,
     citedSourceCount: 1,
     boundClaimCount: 1,
+    totalLegs: 1,
+    coveredLegs: 1,
   }), { enabled: false, attempted: false, used: false, failureReason: 'global_disabled' });
 
   assert.deepEqual(resolveAnalystWebSearchTelemetry({
@@ -1563,6 +2088,8 @@ test('Analyst web-search telemetry is explicit and fail-closed', () => {
     researchContractAccepted: true,
     citedSourceCount: 0,
     boundClaimCount: 0,
+    totalLegs: 1,
+    coveredLegs: 0,
   }), { enabled: true, attempted: true, used: false, failureReason: 'provider_no_cited_results' });
 
   assert.deepEqual(resolveAnalystWebSearchTelemetry({
@@ -1574,6 +2101,8 @@ test('Analyst web-search telemetry is explicit and fail-closed', () => {
     researchContractAccepted: true,
     citedSourceCount: 1,
     boundClaimCount: 1,
+    totalLegs: 1,
+    coveredLegs: 1,
   }), { enabled: true, attempted: true, used: true, failureReason: null });
 });
 
@@ -1626,6 +2155,7 @@ test('Broadcast Noir canonical controls explicitly retain semantic foreground te
 
 test('web Analyst transports coupon legs and time into the research pipeline', () => {
   const routeSource = readFileSync(path.join(repoRoot, 'app/api/ai/analyst/route.ts'), 'utf8');
+  const coachRouteSource = readFileSync(path.join(repoRoot, 'app/api/coach/route.ts'), 'utf8');
   const scannerRouteSource = readFileSync(path.join(repoRoot, 'app/api/ai/scanner/route.ts'), 'utf8');
   const pageSource = readFileSync(path.join(repoRoot, 'app/(app)/ai/page.tsx'), 'utf8');
   const decisionDetailSource = readFileSync(path.join(repoRoot, 'app/(app)/decisions/[id]/page.tsx'), 'utf8');
@@ -1636,12 +2166,34 @@ test('web Analyst transports coupon legs and time into the research pipeline', (
   assert.match(routeSource, /research_sources:\s*researchSources/);
   assert.match(routeSource, /offered_odds:\s*input\.offered_odds/);
   assert.match(routeSource, /boundClaimCount:\s*researchBrief\.sourcedClaims\.length/);
+  assert.match(routeSource, /coveredLegs:\s*citationCoverage\.coveredLegs/);
+  assert.match(routeSource, /const confidenceScore = confidenceContract\.score/);
+  assert.match(routeSource, /p_confidence_score:\s*confidenceScore/);
+  assert.doesNotMatch(routeSource, /p_confidence_score:\s*analysis\.confidence_score/);
+  assert.match(routeSource, /return \['soccer', 'tennis', 'cs2'\]\.includes\(sport\) \? 'approximate' : 'none'/);
+  assert.match(coachRouteSource, /const confidence_buckets:[^=]+=\s*\[\]/);
+  assert.match(coachRouteSource, /const output = \{ \.\.\.validated\.data, calibration_grade: null \}/);
+  assert.doesNotMatch(coachRouteSource, /conf >= 80/);
   assert.match(routeSource, /couponIsLive:\s*input\.coupon_is_live/);
   assert.match(routeSource, /couponStatusText:\s*input\.coupon_status_text/);
+  assert.match(routeSource, /const eventIdentityGate = evaluateAnalystEventIdentityGate\(/);
+  assert.match(routeSource, /code:\s*eventIdentityGate\.code/);
+  assert.match(routeSource, /event_identity_gate:\s*eventIdentityGate/);
+  assert.match(routeSource, /fixtureFingerprint:\s*identity\.fixtureFingerprint/);
   assert.doesNotMatch(routeSource, /if \(false\s*&&\s*hasUnsupportedLiveAnalystInput/);
   assert.ok(
     routeSource.indexOf('if (hasUnsupportedLiveAnalystInput({') < routeSource.indexOf('new Anthropic('),
     'live guard must run before the provider client/call',
+  );
+  assert.ok(
+    routeSource.indexOf('const eventIdentityGate = evaluateAnalystEventIdentityGate({') <
+      routeSource.indexOf("process.env.ANTHROPIC_WEB_SEARCH_ENABLED"),
+    'per-leg identity gate must run before profile/research gating',
+  );
+  assert.ok(
+    routeSource.indexOf('const eventIdentityGate = evaluateAnalystEventIdentityGate({') <
+      routeSource.indexOf('new Anthropic('),
+    'per-leg identity gate must run before the provider client/call',
   );
   assert.match(routeSource, /code:\s*'live_analysis_not_supported'/);
   assert.match(routeSource, /web_search_enabled:\s*webSearchTelemetry\.enabled/);
@@ -1650,6 +2202,8 @@ test('web Analyst transports coupon legs and time into the research pipeline', (
   assert.match(routeSource, /if \(webSearchEnabled && !webSearchActuallyUsed\)/);
   assert.doesNotMatch(routeSource, /callAnalystClaude\([^\n]*buildCallParams\(false\)/);
   assert.match(scannerRouteSource, /For a Bet Builder on one event, every visible component row is a separate leg/);
+  assert.match(scannerRouteSource, /preserve each leg's own competition and eventStartText/);
+  assert.match(scannerRouteSource, /Never copy one leg's date\/time to another leg/);
   assert.doesNotMatch(pageSource, /Current-source research/);
   assert.doesNotMatch(decisionDetailSource, /Current-source research/);
   assert.match(pageSource, /coupon_event_time:\s*form\.event_time/);

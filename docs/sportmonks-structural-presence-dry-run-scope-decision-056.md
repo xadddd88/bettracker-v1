@@ -8,7 +8,7 @@ Founder approval: `APPROVE #056`.
 
 The original decision permitted a reviewed implementation PR for a new read-only admin dry-run. On 2026-07-28, Founder separately approved exactly one production POST, but the call could not be authenticated through the existing Vercel Sensitive operator token and was not sent. The authorization remains unconsumed.
 
-The GitHub Actions OIDC hardening PR does not authorize merge, deployment, workflow dispatch, production execution, provider quota use, persistence, migrations, environment changes, or downstream consumption.
+The GitHub Actions OIDC hardening PR includes a reviewed durable execution-ledger migration, but does not authorize merge, deployment, migration application, workflow dispatch, production execution, provider quota use, environment changes, or downstream consumption.
 
 ## Objective
 
@@ -76,7 +76,7 @@ The admin route accepts only this exact shape and ordered tuple:
 }
 ```
 
-Any missing, reordered, widened, or additional field returns `400` before DB preflight, provider-token loading, or provider fetch.
+Any missing, reordered, widened, or additional field returns `400` before fixture DB preflight, provider-token loading, or provider fetch. A cryptographically valid production OIDC authorization is durably consumed before body parsing.
 
 ## GitHub Actions OIDC Authorization and Preflight
 
@@ -91,13 +91,13 @@ The Decision #056 route accepts only a short-lived GitHub Actions OIDC bearer to
 - maximum token lifetime ten minutes and clock tolerance 30 seconds;
 - missing production deployment identity → `503`;
 - missing, invalid, expired, replayed, or mismatched bearer → `401`;
-- both paths cause zero DB reads and zero provider calls.
+- invalid OIDC paths cause zero ledger writes, fixture DB reads, and provider calls.
 
 There is no static operator-token or `x-bettracker-sync-token` fallback on this route. Other admin routes remain unchanged.
 
 The manual workflow uses the protected GitHub Environment `decision-056-production`, accepts only the exact approved production SHA and confirmation string, requests one OIDC token, and contains one POST with no retry.
 
-The endpoint keeps a best-effort in-memory `jti` replay cache. This cannot prevent replay across Vercel instances or cold starts. A durable security ledger would require a separately approved write; until then, the remaining short-window replay risk must be explicitly accepted before runtime execution.
+After OIDC verification, the endpoint atomically claims the fixed key `decision-056:sportmonks-structural-presence-dry-run` in the Supabase execution ledger before parsing the body. The primary key blocks the same JWT, a new JWT, a new dispatch, a cold start, and another Vercel instance. Duplicate claims return `401`; ledger unavailability returns `503`. Only `service_role` may insert, and no application role may read, update, or delete the row.
 
 After authorization and body validation, a read-only Supabase preflight must pass before the SportMonks token is loaded:
 
@@ -169,9 +169,13 @@ If a non-approved relationship family appears despite the pinned request, the ru
 
 - `lib/providers/sportmonks-structural-presence-dry-run.ts`
 - `lib/security/github-actions-oidc.ts`
+- `lib/security/decision-056-execution-ledger.ts`
 - `app/api/admin/sports/enrichment/sportmonks-structural-presence-dry-run/route.ts`
+- `supabase/migrations/*_decision_056_execution_ledger.sql`
 - `.github/workflows/decision-056-production.yml`
+- `.github/workflows/preview-tests.yml`
 - `scripts/test-decision-056-oidc.mjs`
+- `scripts/verify-decision-056-ledger.sh`
 - `scripts/test-provider-safety.mjs`
 - `tsconfig.scripts.json`
 - decision/state/numbering documentation
@@ -184,29 +188,35 @@ Provider-safety coverage must prove:
 
 1. missing/unavailable/wrong OIDC authorization causes zero provider calls;
 2. wrong issuer, audience, subject, repository, repository ID, owner ID, actor, environment, event, ref, workflow, deployment SHA, workflow SHA, run attempt, runner, expiry, lifetime, or `jti` fails closed;
-3. every body widening, include omission, or include reordering is rejected;
-4. every preflight failure causes zero provider calls;
-5. the approved path makes exactly one request to the exact include URL with header auth;
-6. output/logs contain no provider content or tokens;
-7. absent relationships stay absence-only evidence;
-8. invalid shape, excessive count, invalid/duplicate ID, and reference mismatch fail closed;
-9. an unexpected Class B/C relationship fails without content echo;
-10. missing or present-invalid fixture identity fields fail closed;
-11. missing provider configuration blocks before any request;
-12. a provider failure is sanitized and never retried.
+3. twelve concurrent ledger claims produce exactly one winner;
+4. a new dispatch/JTI cannot bypass the immutable execution key;
+5. ledger unavailability fails closed before parsing or provider work;
+6. the workflow requires `success: true`, `responseStatus: "ok"`, and exactly one provider request;
+7. every body widening, include omission, or include reordering is rejected;
+8. every preflight failure causes zero provider calls;
+9. the approved path makes exactly one request to the exact include URL with header auth;
+10. output/logs contain no provider content or tokens;
+11. absent relationships stay absence-only evidence;
+12. invalid shape, excessive count, invalid/duplicate ID, and reference mismatch fail closed;
+13. an unexpected Class B/C relationship fails without content echo;
+14. missing or present-invalid fixture identity fields fail closed;
+15. missing provider configuration blocks before any request;
+16. a provider failure is sanitized and never retried.
 
 All existing FP-001, financial, domain-boundary, agent-boundary, auth, quarantine, rate-limit, CSP, parser, typecheck, lint, and build gates must remain green.
 
 ## Runtime Boundary
 
-The 2026-07-28 approval permits exactly one future production POST and remains unconsumed because no POST was sent. This OIDC PR does not authorize merge, deployment, workflow dispatch, or execution. Those steps remain separately gated. Any eventual response — success, blocked, failed, timeout, `401`, `429`, or `5xx` — consumes the authorization and forbids a retry without a new approval.
+The 2026-07-28 approval permits exactly one future production POST and remains unconsumed because no POST was sent and the ledger migration has not been applied. This OIDC PR does not authorize merge, migration application, deployment, workflow dispatch, or execution. Those steps remain separately gated. Once a valid production OIDC token claims the ledger key, every eventual outcome — invalid body, success, blocked, failed, timeout, `401`, `429`, or `5xx` — consumes the authorization and forbids a retry without a new approval.
 
 ## Non-Use
 
 ```text
 provider call during implementation/testing: 0
-Supabase writes: 0
-migrations: 0
+production Supabase writes: 0
+execution-ledger production writes: 0
+migrations authored: 1
+migrations applied to production: 0
 environment changes: 0
 structural persistence: 0
 football_enrichment writes: 0

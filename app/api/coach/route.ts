@@ -89,10 +89,6 @@ function groupStats(bets: DbBet[]) {
   }
 }
 
-function bucketWinRate(bets: DbBet[]): number | null {
-  return round1(calcSettlementMetrics(bets).winRate)
-}
-
 function buildAggregatedStats(
   bets: DbBet[],
   decisionsCount: number,
@@ -151,22 +147,12 @@ function buildAggregatedStats(
     .map(([source, bs]) => ({ source, ...groupStats(bs) }))
     .sort((a, b) => b.bets - a.bets)
 
-  // Confidence calibration buckets (settled bets with decision data)
-  const confBuckets: Record<string, DbBet[]> = { '80-100': [], '60-79': [], '40-59': [], '<40': [] }
-  for (const bet of settled) {
-    const conf = bet.legs?.[0]?.decisions?.confidence_score
-    if (conf == null) continue
-    if (conf >= 80)      confBuckets['80-100'].push(bet)
-    else if (conf >= 60) confBuckets['60-79'].push(bet)
-    else if (conf >= 40) confBuckets['40-59'].push(bet)
-    else                 confBuckets['<40'].push(bet)
-  }
-  const betsWithConf = Object.values(confBuckets).reduce((s, bs) => s + bs.length, 0)
-  const confidence_buckets = Object.entries(confBuckets).map(([bucket, bs]) => ({
-    bucket,
-    bets: bs.length,
-    win_rate: bucketWinRate(bs),
-  }))
+  // Analysis confidence describes evidence/contract quality, not the
+  // probability of a winning outcome. Outcome calibration is therefore
+  // deliberately disabled until a separately validated probability field
+  // exists. Historical confidence values are not bucketed or compared to wins.
+  const betsWithConf = 0
+  const confidence_buckets: Array<{ bucket: string; bets: number; win_rate: number | null }> = []
 
   // Edge accuracy buckets — FP-001 gate: intentionally empty. Every non-null
   // decisions.edge_percent in the database predates the analysis quality gate
@@ -263,7 +249,7 @@ ABSOLUTE GUARDRAILS — any violation means the output is rejected:
 - Never suggest chasing losses or trying to recover money.
 - Never use: "guaranteed", "sure bet", "lock", "must bet", "all-in", "chase", "recover", "free money"
 - If bets_analysed < 20: explicitly caveat every pattern claim as preliminary due to small sample.
-- calibration_grade: only assign if >= 10 bets had confidence scores recorded. Otherwise MUST be null.
+- calibration_grade MUST always be null. Analysis confidence measures evidence quality, not outcome probability, so it cannot be calibrated against win rate.
 - Recommendations must be specific and actionable. "Be more selective" is not acceptable.
 - disclaimer must honestly state that past performance does not predict future results.
 
@@ -289,12 +275,6 @@ weaknesses: 0-5 items. Return [] if too little data.
 recommendations: 1-5 items, ordered high priority first.
 patterns: flexible — use keys like best_sport, worst_bet_type, calibration_note as applicable.
 
-CALIBRATION GRADING (only if >= 10 bets with confidence scores):
-- excellent: high-confidence (60+) bets win noticeably more than low-confidence (<40), consistently
-- good: high-confidence generally outperforms with minor inconsistencies
-- fair: some correlation but significant inconsistencies
-- poor: no meaningful correlation or inverse correlation
-
 INTERPRETATION GUIDE:
 - ROI = net profit / stake (void excluded). Positive = profitable.
 - Win rate alone is insufficient — must consider average odds.
@@ -315,8 +295,7 @@ function buildUserMessage(
   periodLabel: string,
 ): string {
   const { period, overall, by_bet_type, by_sport, by_market_type, by_source,
-          confidence_buckets, edge_buckets, stake_buckets, streak, scout_funnel,
-          recent_form, bets_with_confidence } = stats
+          edge_buckets, stake_buckets, streak, scout_funnel, recent_form } = stats
 
   const fmtPct = (v: number | null) => v != null ? `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` : 'N/A'
   const fmtNum = (v: number | null, dp = 2) => v != null ? v.toFixed(dp) : 'N/A'
@@ -337,12 +316,8 @@ function buildUserMessage(
     ? by_source.map(s => `  ${s.source}: ${s.bets} bets | WR: ${fmtPct(s.win_rate)} | ROI: ${fmtPct(s.roi)}`).join('\n')
     : '  No data'
 
-  const confNote = bets_with_confidence < 10
-    ? ` (only ${bets_with_confidence} bets with confidence scores — calibration_grade MUST be null)`
-    : ` (${bets_with_confidence} bets with confidence scores)`
-  const confLines = confidence_buckets.filter(b => b.bets > 0).length > 0
-    ? confidence_buckets.filter(b => b.bets > 0).map(b => `  ${b.bucket}: ${b.bets} bets | WR: ${fmtPct(b.win_rate)}`).join('\n')
-    : '  No AI Analyst bets with confidence scores in this period'
+  const confNote = ' (disabled — analysis quality is not outcome probability)'
+  const confLines = '  Outcome calibration unavailable until a validated model-probability field exists'
 
   const edgeLines = edge_buckets.filter(b => b.bets > 0).length > 0
     ? edge_buckets.filter(b => b.bets > 0).map(b => `  ${b.bucket}: ${b.bets} bets | WR: ${fmtPct(b.win_rate)}`).join('\n')
@@ -540,7 +515,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const output = validated.data
+    // Fail closed even if the model ignores the prompt. There is currently no
+    // outcome-probability field that Coach may calibrate against win rate.
+    const output = { ...validated.data, calibration_grade: null }
 
     // 12. Persist session
     const row = {

@@ -121,10 +121,11 @@ jobs:
           fi
 
           jq -e '
-            (.success | type == "boolean") and
+            (.success == true) and
+            (.report.responseStatus == "ok") and
             (.report.provider == "sportmonks") and
             (.report.maxProviderRequests == 1) and
-            (.report.requestCount == 0 or .report.requestCount == 1) and
+            (.report.requestCount == 1) and
             (.report.writes == "none")
           ' "$RESPONSE_FILE" >/dev/null
 

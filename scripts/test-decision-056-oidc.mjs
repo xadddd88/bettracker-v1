@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { generateKeyPair, SignJWT } from 'jose'
@@ -9,11 +9,21 @@ const compiledModulePath = path.join(
   repoRoot,
   'build/provider-smoke/lib/security/github-actions-oidc.js'
 )
+const compiledLedgerPath = path.join(
+  repoRoot,
+  'build/provider-smoke/lib/security/decision-056-execution-ledger.js'
+)
 const routeSourcePath = path.join(
   repoRoot,
   'app/api/admin/sports/enrichment/sportmonks-structural-presence-dry-run/route.ts'
 )
+const ledgerSourcePath = path.join(repoRoot, 'lib/security/decision-056-execution-ledger.ts')
 const workflowPath = path.join(repoRoot, '.github/workflows/decision-056-production.yml')
+const migrationName = readdirSync(path.join(repoRoot, 'supabase/migrations')).find((name) =>
+  name.endsWith('_decision_056_execution_ledger.sql')
+)
+assert.ok(migrationName, 'Decision #056 execution-ledger migration is missing')
+const migrationPath = path.join(repoRoot, 'supabase/migrations', migrationName)
 
 const {
   DECISION_056_GITHUB_ACTOR,
@@ -28,9 +38,11 @@ const {
   DECISION_056_GITHUB_SUBJECT,
   DECISION_056_GITHUB_WORKFLOW,
   DECISION_056_GITHUB_WORKFLOW_REF,
+  DECISION_056_EXECUTION_KEY,
   authorizeDecision056GitHubOidcRequest,
   verifyDecision056GitHubOidcToken,
 } = await import(compiledModulePath)
+const { claimDecision056Execution } = await import(compiledLedgerPath)
 
 const DEPLOYMENT_SHA = '0123456789abcdef0123456789abcdef01234567'
 const NOW_SECONDS = 1_785_254_400
@@ -161,15 +173,159 @@ assert.deepEqual(
   { ok: false, status: 401 }
 )
 
-const replayToken = await sign(
-  approvedClaims({ jti: '99999999-8888-7777-6666-555555555555' })
+function ledgerClient(result, calls) {
+  return {
+    from(table) {
+      calls.push({ table })
+      return {
+        async insert(values) {
+          calls.at(-1).values = values
+          if (result instanceof Error) throw result
+          return result
+        },
+      }
+    },
+  }
+}
+
+const directClaimCalls = []
+assert.deepEqual(
+  await claimDecision056Execution(
+    {
+      executionKey: DECISION_056_EXECUTION_KEY,
+      jti: 'direct-ledger-jti',
+      deploymentSha: DEPLOYMENT_SHA,
+    },
+    {
+      createClient: () => ledgerClient({ error: null }, directClaimCalls),
+    }
+  ),
+  { claimed: true }
+)
+assert.equal(directClaimCalls.length, 1)
+assert.equal(directClaimCalls[0].table, 'decision_056_execution_ledger')
+assert.equal(directClaimCalls[0].values.execution_key, DECISION_056_EXECUTION_KEY)
+assert.equal(directClaimCalls[0].values.deployment_sha, DEPLOYMENT_SHA)
+assert.match(directClaimCalls[0].values.token_jti_sha256, /^[0-9a-f]{64}$/)
+assert.notEqual(directClaimCalls[0].values.token_jti_sha256, 'direct-ledger-jti')
+
+for (const [error, expected] of [
+  [{ code: '23505' }, { claimed: false, reason: 'already-claimed' }],
+  [{ code: '08006' }, { claimed: false, reason: 'unavailable' }],
+  [new Error('client unavailable'), { claimed: false, reason: 'unavailable' }],
+]) {
+  assert.deepEqual(
+    await claimDecision056Execution(
+      {
+        executionKey: DECISION_056_EXECUTION_KEY,
+        jti: 'direct-ledger-jti',
+        deploymentSha: DEPLOYMENT_SHA,
+      },
+      {
+        createClient: () => ledgerClient({ error }, []),
+      }
+    ),
+    expected
+  )
+}
+
+let invalidInputClientCreated = false
+assert.deepEqual(
+  await claimDecision056Execution(
+    {
+      executionKey: 'decision-056:widened',
+      jti: 'direct-ledger-jti',
+      deploymentSha: DEPLOYMENT_SHA,
+    },
+    {
+      createClient: () => {
+        invalidInputClientCreated = true
+        return ledgerClient({ error: null }, [])
+      },
+    }
+  ),
+  { claimed: false, reason: 'unavailable' }
+)
+assert.equal(invalidInputClientCreated, false)
+
+function makeDurableLedger() {
+  const calls = []
+  let claimed = false
+
+  return {
+    calls,
+    async claimExecution(input) {
+      calls.push(input)
+      if (claimed) return { claimed: false, reason: 'already-claimed' }
+      claimed = true
+      return { claimed: true }
+    },
+  }
+}
+
+const sharedLedger = makeDurableLedger()
+const firstDispatchToken = await sign(
+  approvedClaims({ jti: 'aaaaaaaa-1111-2222-3333-444444444444' })
+)
+const secondDispatchToken = await sign(
+  approvedClaims({ jti: 'bbbbbbbb-1111-2222-3333-444444444444' })
 )
 assert.deepEqual(
-  await authorizeDecision056GitHubOidcRequest(headers(replayToken), authorizationOptions),
+  await authorizeDecision056GitHubOidcRequest(headers(firstDispatchToken), {
+    ...authorizationOptions,
+    claimExecution: sharedLedger.claimExecution,
+  }),
   { ok: true }
 )
 assert.deepEqual(
-  await authorizeDecision056GitHubOidcRequest(headers(replayToken), authorizationOptions),
+  await authorizeDecision056GitHubOidcRequest(headers(secondDispatchToken), {
+    ...authorizationOptions,
+    claimExecution: sharedLedger.claimExecution,
+  }),
+  { ok: false, status: 401 },
+  'a new dispatch/JTI must not bypass the immutable Decision #056 execution key'
+)
+assert.equal(sharedLedger.calls.length, 2)
+assert.deepEqual(
+  sharedLedger.calls.map(({ executionKey }) => executionKey),
+  [DECISION_056_EXECUTION_KEY, DECISION_056_EXECUTION_KEY]
+)
+assert.deepEqual(
+  sharedLedger.calls.map(({ jti }) => jti),
+  [
+    'aaaaaaaa-1111-2222-3333-444444444444',
+    'bbbbbbbb-1111-2222-3333-444444444444',
+  ]
+)
+
+const unavailableToken = await sign(
+  approvedClaims({ jti: 'cccccccc-1111-2222-3333-444444444444' })
+)
+assert.deepEqual(
+  await authorizeDecision056GitHubOidcRequest(headers(unavailableToken), {
+    ...authorizationOptions,
+    claimExecution: async () => ({ claimed: false, reason: 'unavailable' }),
+  }),
+  { ok: false, status: 503 },
+  'ledger errors must fail closed as unavailable'
+)
+
+const replayToken = await sign(
+  approvedClaims({ jti: '99999999-8888-7777-6666-555555555555' })
+)
+const replayLedger = makeDurableLedger()
+assert.deepEqual(
+  await authorizeDecision056GitHubOidcRequest(headers(replayToken), {
+    ...authorizationOptions,
+    claimExecution: replayLedger.claimExecution,
+  }),
+  { ok: true }
+)
+assert.deepEqual(
+  await authorizeDecision056GitHubOidcRequest(headers(replayToken), {
+    ...authorizationOptions,
+    claimExecution: replayLedger.claimExecution,
+  }),
   { ok: false, status: 401 }
 )
 
@@ -177,12 +333,49 @@ const routeSource = readFileSync(routeSourcePath, 'utf8')
 assert.match(routeSource, /authorizeDecision056GitHubOidcRequest/)
 assert.doesNotMatch(routeSource, /SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN/)
 assert.doesNotMatch(routeSource, /x-bettracker-sync-token/)
+assert.ok(
+  routeSource.indexOf('authorizeDecision056GitHubOidcRequest') <
+    routeSource.indexOf('req.json()'),
+  'durable authorization must be consumed before body parsing'
+)
+
+const oidcSource = readFileSync(
+  path.join(repoRoot, 'lib/security/github-actions-oidc.ts'),
+  'utf8'
+)
+assert.doesNotMatch(oidcSource, /consumedJtis|new Map/)
+assert.match(oidcSource, /claimDecision056Execution/)
+
+const ledgerSource = readFileSync(ledgerSourcePath, 'utf8')
+assert.match(ledgerSource, /createAdminClient/)
+assert.match(ledgerSource, /decision_056_execution_ledger/)
+assert.match(ledgerSource, /createHash\('sha256'\)/)
+assert.doesNotMatch(ledgerSource, /\.select\(/)
+
+const migrationSource = readFileSync(migrationPath, 'utf8')
+assert.match(migrationSource, /CREATE TABLE public\.decision_056_execution_ledger/)
+assert.match(migrationSource, /execution_key\s+text\s+PRIMARY KEY/)
+assert.match(migrationSource, /ENABLE ROW LEVEL SECURITY/)
+assert.match(
+  migrationSource,
+  /REVOKE ALL ON TABLE public\.decision_056_execution_ledger\s+FROM PUBLIC, anon, authenticated, service_role/
+)
+assert.match(
+  migrationSource,
+  /GRANT INSERT ON TABLE public\.decision_056_execution_ledger TO service_role/
+)
+assert.doesNotMatch(migrationSource, /GRANT\s+(SELECT|UPDATE|DELETE|ALL)/)
 
 const workflowSource = readFileSync(workflowPath, 'utf8')
 assert.match(workflowSource, /^\s*workflow_dispatch:/m)
 assert.match(workflowSource, /^\s*id-token: write$/m)
 assert.match(workflowSource, /^\s*environment: decision-056-production$/m)
 assert.match(workflowSource, /github\.run_attempt == 1/)
+assert.match(workflowSource, /\.success == true/)
+assert.match(workflowSource, /\.report\.responseStatus == "ok"/)
+assert.match(workflowSource, /\.report\.requestCount == 1/)
+assert.doesNotMatch(workflowSource, /\.success \| type == "boolean"/)
+assert.doesNotMatch(workflowSource, /requestCount == 0/)
 assert.doesNotMatch(workflowSource, /^\s*(push|pull_request|schedule):/m)
 assert.doesNotMatch(workflowSource, /retry/)
 

@@ -38,6 +38,9 @@ Prefer this loose extraction contract. The server will normalize it deterministi
     {
       "rawText": "exact visible text for this leg",
       "eventName": "team/player names for this leg without the live phase prefix",
+      "competition": "exact visible league/tournament for this leg, or null",
+      "eventStartText": "exact visible date and time for this leg, including year when shown, or null",
+      "eventTimezone": "exact visible timezone for this leg, or null",
       "marketType": "market shown for this leg, or null",
       "selection": "selected outcome for this leg",
       "odds": 1.19,
@@ -67,6 +70,9 @@ Required format:
     {
       "rawText": "exact text for this leg",
       "eventName": "team/player names for this leg without the live phase prefix",
+      "competition": "exact visible league/tournament for this leg, or null",
+      "eventStartText": "exact visible date and time for this leg, including year when shown, or null",
+      "eventTimezone": "exact visible timezone for this leg, or null",
       "marketType": "market shown for this leg, or null",
       "selection": "selected outcome for this leg",
       "odds": 1.19,
@@ -88,6 +94,8 @@ Rules:
 - stake is usually not printed on coupons — return null unless clearly visible
 - Return null for any field not clearly visible
 - Preserve the exact visible event date/time line in eventStartText. Do not resolve words such as Today/Tomorrow to a date.
+- For an express/parlay, preserve each leg's own competition and eventStartText. Never copy one leg's date/time to another leg.
+- Return a competition or timezone only when it is explicitly visible; do not infer either from team names.
 - sport should reflect the dominant sport on the coupon
 - For express/parlay coupons, preserve every leg in legs[] instead of only flattening the event and selection
 - For a Bet Builder on one event, every visible component row is a separate leg in the original top-to-bottom order. Keep the displayed combined coefficient only in totalOdds/odds; never replace it with a component coefficient or collapse the component rows.
@@ -117,6 +125,9 @@ Use this exact shape:
     {
       "rawText": "visible text for this card",
       "eventName": "event names without phase prefix",
+      "competition": "exact visible league/tournament for this card, or null",
+      "eventStartText": "exact visible date and time for this card, or null",
+      "eventTimezone": "exact visible timezone for this card, or null",
       "marketType": "market line",
       "selection": "selected outcome",
       "odds": 1.19,
@@ -230,6 +241,9 @@ const scanOutputSchema = z.object({
   legs: z.array(z.object({
     rawText:          z.string().nullable().optional(),
     eventName:        z.string().nullable().optional(),
+    competition:      z.string().max(300).nullable().optional(),
+    eventStartText:   z.string().max(120).nullable().optional(),
+    eventTimezone:    z.string().max(80).nullable().optional(),
     marketType:       z.string().nullable().optional(),
     selection:        z.string().nullable().optional(),
     odds:             z.number().nullable().optional(),
