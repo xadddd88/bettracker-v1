@@ -1,0 +1,139 @@
+name: Decision 056 Production Dry Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      approved_production_sha:
+        description: Exact 40-character production commit SHA approved for the one Decision #056 call
+        required: true
+        type: string
+      confirmation:
+        description: Type RUN_SPORTMONKS_STRUCTURAL_PRESENCE_DRY_RUN_D056
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: decision-056-production
+  cancel-in-progress: false
+
+jobs:
+  structural-presence-dry-run:
+    name: One approved read-only SportMonks request
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && github.run_attempt == 1
+    environment: decision-056-production
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Fail closed unless the exact production revision was approved
+        shell: bash
+        env:
+          ACTOR: ${{ github.actor }}
+          ACTOR_ID: ${{ github.actor_id }}
+          APPROVED_PRODUCTION_SHA: ${{ inputs.approved_production_sha }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$ACTOR" = "xadddd88"
+          test "$ACTOR_ID" = "295055646"
+          test "$REPOSITORY" = "xadddd88/bettracker-v1"
+          test "$REPOSITORY_ID" = "1280991721"
+          test "$EVENT_NAME" = "workflow_dispatch"
+          test "$REF" = "refs/heads/main"
+          test "$RUN_ATTEMPT" = "1"
+          test "$APPROVED_PRODUCTION_SHA" = "$SHA"
+          test "$CONFIRMATION" = "RUN_SPORTMONKS_STRUCTURAL_PRESENCE_DRY_RUN_D056"
+
+      - name: Request one GitHub OIDC token and make one Decision #056 POST
+        shell: bash
+        env:
+          OIDC_AUDIENCE: urn:btdk:decision-056:production
+          DECISION_056_URL: https://btdk.app/api/admin/sports/enrichment/sportmonks-structural-presence-dry-run
+        run: |
+          set -euo pipefail
+
+          OIDC_RESPONSE="$(
+            curl \
+              --silent \
+              --show-error \
+              --fail \
+              --get \
+              --max-time 15 \
+              --proto '=https' \
+              --tlsv1.2 \
+              --header "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+              --header "Accept: application/json; api-version=2.0" \
+              --data-urlencode "audience=${OIDC_AUDIENCE}" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}"
+          )"
+          OIDC_TOKEN="$(jq -er '.value | select(type == "string" and length > 0)' <<<"$OIDC_RESPONSE")"
+          echo "::add-mask::${OIDC_TOKEN}"
+          unset OIDC_RESPONSE
+
+          RESPONSE_FILE="${RUNNER_TEMP}/decision-056-response.json"
+          HTTP_STATUS="$(
+            curl \
+              --silent \
+              --show-error \
+              --output "$RESPONSE_FILE" \
+              --write-out '%{http_code}' \
+              --connect-timeout 10 \
+              --max-time 25 \
+              --max-redirs 0 \
+              --proto '=https' \
+              --tlsv1.2 \
+              --request POST \
+              --header "Authorization: Bearer ${OIDC_TOKEN}" \
+              --header "Content-Type: application/json" \
+              --data-binary '{
+                "dryRun": true,
+                "provider": "sportmonks",
+                "canonicalFixtureId": "92afd570-399a-48b9-915a-e1ffaf52a71c",
+                "sportmonksFixtureId": "19722203",
+                "requestedIncludeSet": [
+                  "participants",
+                  "league",
+                  "season",
+                  "round",
+                  "venue",
+                  "state"
+                ],
+                "maxProviderRequests": 1,
+                "operatorConfirm": "RUN_SPORTMONKS_STRUCTURAL_PRESENCE_DRY_RUN_D056"
+              }' \
+              "$DECISION_056_URL"
+          )"
+          unset OIDC_TOKEN
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::error::Decision #056 returned HTTP ${HTTP_STATUS}; authorization is consumed and this workflow must not be retried."
+            exit 1
+          fi
+
+          jq -e '
+            (.success | type == "boolean") and
+            (.report.provider == "sportmonks") and
+            (.report.maxProviderRequests == 1) and
+            (.report.requestCount == 0 or .report.requestCount == 1) and
+            (.report.writes == "none")
+          ' "$RESPONSE_FILE" >/dev/null
+
+          jq '{
+            success,
+            report: {
+              responseStatus: .report.responseStatus,
+              requestCount: .report.requestCount,
+              writes: .report.writes,
+              warnings: .report.warnings
+            }
+          }' "$RESPONSE_FILE"

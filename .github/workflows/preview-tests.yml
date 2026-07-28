@@ -76,6 +76,8 @@ jobs:
         run: npm ci
       - name: Provider safety suite
         run: npm run test:provider-safety
+      - name: "Decision #056 GitHub OIDC authorization"
+        run: npm run test:decision-056-oidc
       - name: Analysis quality gate (FP-001) suite
         run: npm run test:analysis-quality-gate
       - name: "Financial safety suite (Decision #047)"
