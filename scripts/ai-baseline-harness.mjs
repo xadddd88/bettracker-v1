@@ -768,6 +768,8 @@ function requestBody(flow, fixture) {
     return {
       sport: fixture.sport,
       ...fixture.input,
+      coupon_event_time: fixture.input.coupon_event_time ?? 'Tomorrow, 22:10',
+      client_timezone: fixture.input.client_timezone ?? 'UTC',
       output_language: fixture.language,
     };
   }

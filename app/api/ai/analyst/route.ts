@@ -20,10 +20,10 @@ import {
   completePausedAnthropicTurn,
   containsAnalystPricingClaim,
   deriveAnalystConfidenceContract,
+  evaluateAnalystEventIdentityGate,
   extractAnalystResearchSources,
   getAnalystLegCitationCoverage,
   hasUnsupportedLiveAnalystInput,
-  inferCouponEventTimeFixtureStatus,
   resolveAnalystWebSearchTelemetry,
   type AnalystResearchBrief,
 } from '@/lib/ai/analyst-research'
@@ -37,6 +37,7 @@ const LOCALES = ['auto', 'uk', 'ru', 'en', 'es', 'fr', 'de', 'ar'] as const
 const requestSchema = z.object({
   sport:           z.enum(SPORTS),
   event_name:      z.string().min(1).max(500),
+  competition:     z.string().max(300).nullable().optional(),
   market_type:     z.string().min(1).max(500),
   selection:       z.string().max(200).optional(),
   line:            z.number().optional(),
@@ -51,6 +52,9 @@ const requestSchema = z.object({
   legs: z.array(z.object({
     rawText:          z.string().max(500).nullable().optional(),
     eventName:        z.string().max(500).nullable().optional(),
+    competition:      z.string().max(300).nullable().optional(),
+    eventStartText:   z.string().max(120).nullable().optional(),
+    eventTimezone:    z.string().max(80).nullable().optional(),
     marketType:       z.string().max(500).nullable().optional(),
     selection:        z.string().max(200).nullable().optional(),
     odds:             z.number().min(1.01).max(1000).nullable().optional(),
@@ -490,6 +494,38 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Resolve every fixture before any profile read, web research, model call
+    // or persistence. A shared coupon time is valid only for one fixture
+    // (including a same-fixture Bet Builder); distinct fixtures require their
+    // own exact date/time. Invalid timezone/year/DST input fails closed.
+    const eventIdentityGate = evaluateAnalystEventIdentityGate({
+      sport: input.sport,
+      eventName: input.event_name,
+      competition: input.competition ?? null,
+      couponEventTime: input.coupon_event_time ?? null,
+      clientTimezone: input.client_timezone ?? null,
+      currentUtcIso,
+      legs: input.legs,
+    })
+    if (!eventIdentityGate.allowed) {
+      await trackServerEvent(user.id, EVENTS.AI_ANALYSIS_FAILED, {
+        sport: input.sport,
+        error_type: eventIdentityGate.code,
+        blocked_legs: eventIdentityGate.legs.filter(leg => leg.blockingReasons.length > 0).length,
+      })
+      return NextResponse.json(
+        {
+          success: false,
+          error: eventIdentityGate.code === 'event_not_pre_match'
+            ? 'At least one event has already started, finished, or is not currently bettable.'
+            : 'Every event needs an unambiguous fixture identity, exact future date/time, and valid timezone.',
+          code: eventIdentityGate.code,
+          event_identity_gate: eventIdentityGate,
+        },
+        { status: 422 },
+      )
+    }
+
     // 4. Use the same explicit global + per-user search gate as Scout. A
     // failed profile read disables search; it never widens access.
     const globalWebSearchEnabled = process.env.ANTHROPIC_WEB_SEARCH_ENABLED === 'true'
@@ -541,6 +577,7 @@ export async function POST(req: NextRequest) {
     const userMessage = buildAnalystResearchMessage({
       sport: input.sport,
       eventName: input.event_name,
+      competition: input.competition ?? null,
       marketType: input.market_type,
       selection: input.selection ?? null,
       line: input.line ?? null,
@@ -659,15 +696,28 @@ export async function POST(req: NextRequest) {
     const candidateResearchBrief = analysis.research_brief
       ? toResearchBrief(analysis.research_brief)
       : null
-    const alignedResearchBrief = candidateResearchBrief && !containsAnalystPricingClaim(candidateResearchBrief)
+    const modelAlignedResearchBrief = candidateResearchBrief && !containsAnalystPricingClaim(candidateResearchBrief)
       ? alignAnalystResearchBriefToCoupon(candidateResearchBrief, couponLegs, extractedResearchSources)
       : null
-    const researchBrief = alignedResearchBrief ?? buildFallbackResearchBrief(input)
-    const couponTimeStatus = inferCouponEventTimeFixtureStatus({
-      couponEventTime: input.coupon_event_time ?? null,
-      clientTimezone: input.client_timezone ?? null,
-      currentUtcIso,
-    })
+    const alignedResearchBrief = modelAlignedResearchBrief
+      ? {
+          ...modelAlignedResearchBrief,
+          // Fixture status is server-owned. Model-declared status never
+          // overrides the pre-AI per-leg identity/stale gate.
+          legs: modelAlignedResearchBrief.legs.map((leg, index) => ({
+            ...leg,
+            fixtureStatus: eventIdentityGate.legs[index]?.fixtureStatus ?? 'unknown',
+          })),
+        }
+      : null
+    const researchBriefBase = alignedResearchBrief ?? buildFallbackResearchBrief(input)
+    const researchBrief = {
+      ...researchBriefBase,
+      legs: researchBriefBase.legs.map((leg, index) => ({
+        ...leg,
+        fixtureStatus: eventIdentityGate.legs[index]?.fixtureStatus ?? 'unknown',
+      })),
+    }
     const boundSourceUrls = new Set(researchBrief.sourcedClaims.map(claim => claim.sourceUrl))
     const researchSources = extractedResearchSources.filter(source => boundSourceUrls.has(source.url))
     const citationCoverage = getAnalystLegCitationCoverage(
@@ -718,6 +768,22 @@ export async function POST(req: NextRequest) {
     }
 
     // 8. Server owns pricing, but the quality gate can suppress it entirely.
+    const qualityLegs: AnalysisLegQualityInput[] = eventIdentityGate.legs.map((identity, index) => {
+      const leg = input.legs?.[index]
+      return {
+        ...(leg ?? {
+          eventName: input.event_name,
+          marketType: input.market_type,
+          selection: input.selection ?? null,
+          sport: input.sport,
+        }),
+        competition: identity.competition,
+        eventStartText: identity.eventStartText,
+        eventTimezone: identity.eventTimezone,
+        fixtureFingerprint: identity.fixtureFingerprint,
+        fixtureStatus: identity.fixtureStatus,
+      }
+    })
     const qualityGate = evaluateAnalysisQuality({
       sport:              input.sport,
       eventName:          input.event_name,
@@ -730,14 +796,14 @@ export async function POST(req: NextRequest) {
       modelProbability:   analysis.model_probability,
       modelInputsPresent: false,
       sportModuleSupport: getAnalystSportSupport(input.sport),
-      fixtureStatus:      couponTimeStatus.fixtureStatus,
-      legs:               input.legs as AnalysisLegQualityInput[] | undefined,
+      fixtureStatus:      eventIdentityGate.aggregateFixtureStatus,
+      legs:               qualityLegs,
     })
     const confidenceContract = deriveAnalystConfidenceContract({
       researchContractAccepted: alignedResearchBrief !== null,
       sourcedClaims: researchBrief.sourcedClaims,
       totalLegs: couponLegs.length,
-      fixtureStatus: couponTimeStatus.fixtureStatus,
+      fixtureStatus: eventIdentityGate.aggregateFixtureStatus,
       qualityGateCoverageScore: qualityGate.dataCoverageScore,
     })
     const confidenceScore = confidenceContract.score
@@ -781,9 +847,10 @@ export async function POST(req: NextRequest) {
       offered_odds: input.offered_odds,
       bookmaker:    input.bookmaker ?? null,
       legs:         input.legs ?? null,
+      competition:  input.competition ?? null,
       coupon_event_time: input.coupon_event_time ?? null,
       client_timezone: input.client_timezone ?? null,
-      coupon_time_status: couponTimeStatus,
+      event_identity_gate: eventIdentityGate,
     }
     const outputJson = {
       model_probability:   gatedPricing.model_probability,
@@ -800,6 +867,7 @@ export async function POST(req: NextRequest) {
       trust_view:          trustPayload.trust_view,
       research_brief:      researchBrief,
       research_sources:    researchSources,
+      event_identity_gate: eventIdentityGate,
       web_search_enabled:  webSearchTelemetry.enabled,
       web_search_attempted: webSearchTelemetry.attempted,
       web_search_used:      webSearchActuallyUsed,
@@ -901,6 +969,7 @@ export async function POST(req: NextRequest) {
         trust_view:          trustPayload.trust_view,
         research_brief:      researchBrief,
         research_sources:    researchSources,
+        event_identity_gate: eventIdentityGate,
         web_search_enabled:  webSearchTelemetry.enabled,
         web_search_attempted: webSearchTelemetry.attempted,
         web_search_used:     webSearchActuallyUsed,

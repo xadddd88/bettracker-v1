@@ -30,6 +30,10 @@ export interface AnalysisLegQualityInput {
   rawText?: string | null
   sport?: string | null
   eventName?: string | null
+  competition?: string | null
+  eventStartText?: string | null
+  eventTimezone?: string | null
+  fixtureFingerprint?: string | null
   marketType?: string | null
   selection?: string | null
   odds?: number | null

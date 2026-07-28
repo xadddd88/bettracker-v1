@@ -43,6 +43,9 @@ export type AnalystCouponLegIdentity = {
 
 export type AnalystPromptLeg = {
   eventName?: string | null
+  competition?: string | null
+  eventStartText?: string | null
+  eventTimezone?: string | null
   marketType?: string | null
   selection?: string | null
   odds?: number | null
@@ -73,6 +76,7 @@ export type AnalystWebSearchTelemetry = {
 export type BuildAnalystResearchMessageInput = {
   sport: string
   eventName: string
+  competition?: string | null
   marketType: string
   selection?: string | null
   line?: number | null
@@ -88,6 +92,58 @@ export type BuildAnalystResearchMessageInput = {
 export type CouponEventTimeFixtureStatus = {
   fixtureStatus: FixtureStatus | null
   reason: 'past_date' | 'past_time' | 'future_time' | 'unparsed'
+}
+
+export type CouponEventTimeResolutionReason =
+  | 'missing'
+  | 'invalid_current_time'
+  | 'invalid_timezone'
+  | 'missing_year'
+  | 'ambiguous_date'
+  | 'invalid_date'
+  | 'missing_time'
+  | 'invalid_time'
+  | 'ambiguous_local_time'
+  | 'nonexistent_local_time'
+  | 'past_time'
+  | 'future_time'
+
+export type CouponEventTimeResolution = {
+  fixtureStatus: FixtureStatus | null
+  reason: CouponEventTimeResolutionReason
+  scheduledStartUtc: string | null
+  localDate: string | null
+  timeZone: string | null
+}
+
+export type AnalystEventIdentityBlockReason =
+  | 'event_name_missing'
+  | 'participants_ambiguous'
+  | 'event_time_missing'
+  | 'event_time_unverified'
+  | 'event_already_started'
+  | 'event_status_not_actionable'
+
+export type AnalystEventIdentityLeg = {
+  legNumber: number
+  eventName: string | null
+  participants: [string, string] | null
+  competition: string | null
+  eventStartText: string | null
+  eventTimezone: string | null
+  scheduledStartUtc: string | null
+  localDate: string | null
+  fixtureStatus: FixtureStatus
+  timeResolutionReason: CouponEventTimeResolutionReason
+  fixtureFingerprint: string | null
+  blockingReasons: AnalystEventIdentityBlockReason[]
+}
+
+export type AnalystEventIdentityGate = {
+  allowed: boolean
+  code: 'ok' | 'event_identity_unverified' | 'event_not_pre_match'
+  aggregateFixtureStatus: FixtureStatus
+  legs: AnalystEventIdentityLeg[]
 }
 
 function cleanPromptValue(value: string | null | undefined): string | null {
@@ -116,6 +172,23 @@ function localDateTimeParts(utcIso: string, timeZone: string): {
       minute: '2-digit',
       hourCycle: 'h23',
     })
+    return formattedDateTimeParts(date, formatter)
+  } catch {
+    return null
+  }
+}
+
+function formattedDateTimeParts(
+  date: Date,
+  formatter: Intl.DateTimeFormat,
+): {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+} | null {
+  try {
     const parts = Object.fromEntries(formatter.formatToParts(date).map(part => [part.type, part.value]))
     const year = Number(parts.year)
     const month = Number(parts.month)
@@ -153,31 +226,58 @@ function addDays(parts: { year: number; month: number; day: number }, days: numb
   }
 }
 
-function parseCouponEventDate(text: string, today: { year: number; month: number; day: number }): {
-  year: number
-  month: number
-  day: number
-} | null {
-  if (/\b(today)\b|сьогодні|сегодня/iu.test(text)) return today
-  if (/\b(tomorrow)\b|завтра/iu.test(text)) return addDays(today, 1)
-  if (/\b(yesterday)\b|вчора|вчера/iu.test(text)) return addDays(today, -1)
+function isValidCalendarDate(date: { year: number; month: number; day: number }): boolean {
+  const value = new Date(Date.UTC(date.year, date.month - 1, date.day, 12, 0, 0))
+  return (
+    value.getUTCFullYear() === date.year &&
+    value.getUTCMonth() + 1 === date.month &&
+    value.getUTCDate() === date.day
+  )
+}
 
-  const iso = text.match(/\b(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})\b/)
+function parseCouponEventDateStrict(
+  text: string,
+  today: { year: number; month: number; day: number },
+): {
+  value: { year: number; month: number; day: number } | null
+  reason: Extract<CouponEventTimeResolutionReason, 'missing_year' | 'ambiguous_date' | 'invalid_date'> | null
+} {
+  if (/\btoday\b|сьогодні|сегодня|\bhoy\b|aujourd['’]hui|\bheute\b|اليوم/iu.test(text)) {
+    return { value: today, reason: null }
+  }
+  if (/\btomorrow\b|завтра|\bmañana\b|\bdemain\b|\bmorgen\b|غد[اً]*/iu.test(text)) {
+    return { value: addDays(today, 1), reason: null }
+  }
+  if (/\byesterday\b|вчора|вчера|\bayer\b|\bhier\b|\bgestern\b|أمس/iu.test(text)) {
+    return { value: addDays(today, -1), reason: null }
+  }
+
+  const iso = text.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/)
   if (iso) {
-    return {
+    const value = {
       year: Number(iso[1]),
       month: Number(iso[2]),
       day: Number(iso[3]),
     }
+    return { value: isValidCalendarDate(value) ? value : null, reason: isValidCalendarDate(value) ? null : 'invalid_date' }
   }
 
-  const dmy = text.match(/\b(\d{1,2})[./-](\d{1,2})(?:[./-](20\d{2}))?\b/)
-  if (!dmy) return null
-  return {
-    day: Number(dmy[1]),
-    month: Number(dmy[2]),
-    year: dmy[3] ? Number(dmy[3]) : today.year,
+  const yearless = text.match(/\b(\d{1,2})[./-](\d{1,2})\b(?![./-]\d)/)
+  if (yearless) return { value: null, reason: 'missing_year' }
+
+  const dmy = text.match(/\b(\d{1,2})([./-])(\d{1,2})\2(20\d{2})\b/)
+  if (!dmy) return { value: null, reason: 'invalid_date' }
+  const day = Number(dmy[1])
+  const month = Number(dmy[3])
+  if (dmy[2] === '/' && day <= 12 && month <= 12) {
+    return { value: null, reason: 'ambiguous_date' }
   }
+  const value = {
+    day: Number(dmy[1]),
+    month: Number(dmy[3]),
+    year: Number(dmy[4]),
+  }
+  return { value: isValidCalendarDate(value) ? value : null, reason: isValidCalendarDate(value) ? null : 'invalid_date' }
 }
 
 function parseCouponEventTime(text: string): { hour: number; minute: number } | null {
@@ -186,38 +286,188 @@ function parseCouponEventTime(text: string): { hour: number; minute: number } | 
   return { hour: Number(time[1]), minute: Number(time[2]) }
 }
 
+function isValidTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone }).format(new Date(0))
+    return true
+  } catch {
+    return false
+  }
+}
+
+function localDateTimeCandidates(
+  parts: { year: number; month: number; day: number; hour: number; minute: number },
+  timeZone: string,
+): number[] {
+  const naiveUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, 0, 0)
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  })
+  const offsets = new Set<number>()
+  for (const sampleHours of [-36, -24, -12, 0, 12, 24, 36]) {
+    const sample = naiveUtc + sampleHours * 60 * 60_000
+    const local = formattedDateTimeParts(new Date(sample), formatter)
+    if (!local) continue
+    const representedAsUtc = Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute)
+    offsets.add(representedAsUtc - sample)
+  }
+  const candidates = [...offsets].map(offset => naiveUtc - offset).filter(candidate => {
+    const formatted = formattedDateTimeParts(new Date(candidate), formatter)
+    return formatted !== null && compareLocalDateTime(formatted, parts) === 0
+  })
+  return [...new Set(candidates)].sort((left, right) => left - right)
+}
+
+export function resolveCouponEventTime(input: {
+  couponEventTime?: string | null
+  clientTimezone?: string | null
+  currentUtcIso: string
+}): CouponEventTimeResolution {
+  const text = cleanPromptValue(input.couponEventTime)
+  if (!text) {
+    return {
+      fixtureStatus: null,
+      reason: 'missing',
+      scheduledStartUtc: null,
+      localDate: null,
+      timeZone: null,
+    }
+  }
+
+  const currentMs = Date.parse(input.currentUtcIso)
+  if (!Number.isFinite(currentMs)) {
+    return {
+      fixtureStatus: null,
+      reason: 'invalid_current_time',
+      scheduledStartUtc: null,
+      localDate: null,
+      timeZone: null,
+    }
+  }
+
+  const explicitInstant = text.match(
+    /\b(20\d{2})-(\d{2})-(\d{2})[T\s]+([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?(Z|[+-](?:0\d|1[0-4]):[0-5]\d)\b/i,
+  )
+  if (explicitInstant) {
+    const date = {
+      year: Number(explicitInstant[1]),
+      month: Number(explicitInstant[2]),
+      day: Number(explicitInstant[3]),
+    }
+    const parsedMs = Date.parse(
+      `${explicitInstant[1]}-${explicitInstant[2]}-${explicitInstant[3]}T${explicitInstant[4]}:${explicitInstant[5]}:${explicitInstant[6] ?? '00'}${explicitInstant[7]}`,
+    )
+    if (!isValidCalendarDate(date) || !Number.isFinite(parsedMs)) {
+      return {
+        fixtureStatus: null,
+        reason: 'invalid_date',
+        scheduledStartUtc: null,
+        localDate: null,
+        timeZone: explicitInstant[7],
+      }
+    }
+    return {
+      fixtureStatus: parsedMs <= currentMs ? 'not_bettable' : 'scheduled',
+      reason: parsedMs <= currentMs ? 'past_time' : 'future_time',
+      scheduledStartUtc: new Date(parsedMs).toISOString(),
+      localDate: `${explicitInstant[1]}-${explicitInstant[2]}-${explicitInstant[3]}`,
+      timeZone: explicitInstant[7].toUpperCase(),
+    }
+  }
+
+  const timeZone = cleanPromptValue(input.clientTimezone)
+  if (!timeZone || !isValidTimeZone(timeZone)) {
+    return {
+      fixtureStatus: null,
+      reason: 'invalid_timezone',
+      scheduledStartUtc: null,
+      localDate: null,
+      timeZone,
+    }
+  }
+  const now = localDateTimeParts(input.currentUtcIso, timeZone)
+  if (!now) {
+    return {
+      fixtureStatus: null,
+      reason: 'invalid_current_time',
+      scheduledStartUtc: null,
+      localDate: null,
+      timeZone,
+    }
+  }
+
+  const parsedDate = parseCouponEventDateStrict(text, now)
+  if (!parsedDate.value) {
+    return {
+      fixtureStatus: null,
+      reason: parsedDate.reason ?? 'invalid_date',
+      scheduledStartUtc: null,
+      localDate: null,
+      timeZone,
+    }
+  }
+  const time = parseCouponEventTime(text)
+  if (!time) {
+    return {
+      fixtureStatus: null,
+      reason: /\b\d{1,2}[:.hH]\d{1,2}\b/.test(text) ? 'invalid_time' : 'missing_time',
+      scheduledStartUtc: null,
+      localDate: null,
+      timeZone,
+    }
+  }
+
+  const localParts = { ...parsedDate.value, ...time }
+  const candidates = localDateTimeCandidates(localParts, timeZone)
+  const localDate = [
+    String(localParts.year).padStart(4, '0'),
+    String(localParts.month).padStart(2, '0'),
+    String(localParts.day).padStart(2, '0'),
+  ].join('-')
+  if (candidates.length === 0) {
+    return {
+      fixtureStatus: null,
+      reason: 'nonexistent_local_time',
+      scheduledStartUtc: null,
+      localDate,
+      timeZone,
+    }
+  }
+  if (candidates.length > 1) {
+    return {
+      fixtureStatus: null,
+      reason: 'ambiguous_local_time',
+      scheduledStartUtc: null,
+      localDate,
+      timeZone,
+    }
+  }
+
+  const scheduledStartMs = candidates[0]
+  return {
+    fixtureStatus: scheduledStartMs <= currentMs ? 'not_bettable' : 'scheduled',
+    reason: scheduledStartMs <= currentMs ? 'past_time' : 'future_time',
+    scheduledStartUtc: new Date(scheduledStartMs).toISOString(),
+    localDate,
+    timeZone,
+  }
+}
+
 export function inferCouponEventTimeFixtureStatus(input: {
   couponEventTime?: string | null
   clientTimezone?: string | null
   currentUtcIso: string
 }): CouponEventTimeFixtureStatus {
-  const text = cleanPromptValue(input.couponEventTime)
-  if (!text) return { fixtureStatus: null, reason: 'unparsed' }
-
-  const timeZone = cleanPromptValue(input.clientTimezone) ?? 'UTC'
-  const now = localDateTimeParts(input.currentUtcIso, timeZone)
-  if (!now) return { fixtureStatus: null, reason: 'unparsed' }
-
-  const date = parseCouponEventDate(text, now)
-  if (!date) return { fixtureStatus: null, reason: 'unparsed' }
-
-  const time = parseCouponEventTime(text)
-  const target = {
-    ...date,
-    hour: time?.hour ?? 23,
-    minute: time?.minute ?? 59,
-  }
-  const comparison = compareLocalDateTime(target, now)
-
-  if (!time && compareLocalDateTime({ ...target, hour: 23, minute: 59 }, now) < 0) {
-    return { fixtureStatus: 'finished', reason: 'past_date' }
-  }
-
-  if (time && comparison <= 0) {
-    return { fixtureStatus: 'not_bettable', reason: 'past_time' }
-  }
-
-  return { fixtureStatus: 'scheduled', reason: 'future_time' }
+  const resolved = resolveCouponEventTime(input)
+  if (resolved.reason === 'past_time') return { fixtureStatus: 'not_bettable', reason: 'past_time' }
+  if (resolved.reason === 'future_time') return { fixtureStatus: 'scheduled', reason: 'future_time' }
+  return { fixtureStatus: null, reason: 'unparsed' }
 }
 
 function normalizedIdentity(value: string | null | undefined): string {
@@ -226,6 +476,123 @@ function normalizedIdentity(value: string | null | undefined): string {
 
 function sameIdentity(left: string | null | undefined, right: string | null | undefined): boolean {
   return normalizedIdentity(left) === normalizedIdentity(right)
+}
+
+function parseParticipants(eventName: string | null): [string, string] | null {
+  if (!eventName) return null
+  const parts = eventName
+    .split(/\s+(?:vs?\.?|versus|@|[-–—])\s+/iu)
+    .map(part => cleanPromptValue(part))
+    .filter((part): part is string => part !== null)
+  return parts.length === 2 ? [parts[0], parts[1]] : null
+}
+
+function fingerprintHash(value: string): string {
+  let left = 0x811c9dc5
+  let right = 0x9e3779b9
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index)
+    left ^= code
+    left = Math.imul(left, 0x01000193)
+    right ^= code
+    right = Math.imul(right, 0x85ebca6b)
+    right ^= right >>> 13
+  }
+  return [left, right].map(hash => (hash >>> 0).toString(16).padStart(8, '0')).join('')
+}
+
+function fixtureStatusFromText(value: string | null | undefined): FixtureStatus | null {
+  const text = cleanPromptValue(value)
+  if (!text) return null
+  if (/(?:finished|final|full[- ]?time|заверш|закінч|окончен|\bft\b)/iu.test(text)) return 'finished'
+  if (/(?:cancelled|canceled|скасован|отмен)/iu.test(text)) return 'cancelled'
+  if (/(?:abandoned|перерван|прерван)/iu.test(text)) return 'abandoned'
+  if (/(?:postponed|відклад|перенес)/iu.test(text)) return 'postponed'
+  if (/(?:retired|ret\.|відмова|отказ)/iu.test(text)) return 'retired'
+  if (/(?:walkover|w\/o|без гри|без игры)/iu.test(text)) return 'walkover'
+  return null
+}
+
+export function evaluateAnalystEventIdentityGate(input: {
+  sport: string
+  eventName: string
+  competition?: string | null
+  couponEventTime?: string | null
+  clientTimezone?: string | null
+  currentUtcIso: string
+  legs?: AnalystPromptLeg[] | null
+}): AnalystEventIdentityGate {
+  const suppliedLegs = input.legs?.length ? input.legs : [{
+    eventName: input.eventName,
+    competition: input.competition ?? null,
+    eventStartText: input.couponEventTime ?? null,
+    eventTimezone: input.clientTimezone ?? null,
+    sport: input.sport,
+  }]
+  const eventKeys = new Set(suppliedLegs.map(leg => normalizedIdentity(leg.eventName ?? input.eventName)))
+  const canShareCouponTime = suppliedLegs.length === 1 || eventKeys.size === 1
+
+  const legs = suppliedLegs.map((leg, index): AnalystEventIdentityLeg => {
+    const eventName = cleanPromptValue(leg.eventName ?? input.eventName)
+    const participants = parseParticipants(eventName)
+    const competition = cleanPromptValue(leg.competition ?? input.competition)
+    const eventStartText = cleanPromptValue(
+      leg.eventStartText ?? (canShareCouponTime ? input.couponEventTime : null),
+    )
+    const eventTimezone = cleanPromptValue(leg.eventTimezone ?? input.clientTimezone)
+    const timeResolution = resolveCouponEventTime({
+      couponEventTime: eventStartText,
+      clientTimezone: eventTimezone,
+      currentUtcIso: input.currentUtcIso,
+    })
+    const explicitStatus = fixtureStatusFromText(leg.statusText)
+    const fixtureStatus = explicitStatus ?? timeResolution.fixtureStatus ?? 'unknown'
+    const blockingReasons: AnalystEventIdentityBlockReason[] = []
+    if (!eventName) blockingReasons.push('event_name_missing')
+    if (!participants) blockingReasons.push('participants_ambiguous')
+    if (!eventStartText) blockingReasons.push('event_time_missing')
+    else if (!timeResolution.fixtureStatus) blockingReasons.push('event_time_unverified')
+    if (timeResolution.fixtureStatus === 'not_bettable') blockingReasons.push('event_already_started')
+    if (explicitStatus && explicitStatus !== 'scheduled') blockingReasons.push('event_status_not_actionable')
+
+    const fingerprintBasis = participants && timeResolution.localDate
+      ? [
+          normalizedIdentity(leg.sport ?? input.sport),
+          normalizedIdentity(participants[0]),
+          normalizedIdentity(participants[1]),
+          normalizedIdentity(competition ?? 'competition-unknown'),
+          timeResolution.localDate,
+          timeResolution.scheduledStartUtc ?? 'start-unknown',
+        ].join('|')
+      : null
+
+    return {
+      legNumber: index + 1,
+      eventName,
+      participants,
+      competition,
+      eventStartText,
+      eventTimezone: timeResolution.timeZone ?? eventTimezone,
+      scheduledStartUtc: timeResolution.scheduledStartUtc,
+      localDate: timeResolution.localDate,
+      fixtureStatus,
+      timeResolutionReason: timeResolution.reason,
+      fixtureFingerprint: fingerprintBasis ? `fixture-v1-${fingerprintHash(fingerprintBasis)}` : null,
+      blockingReasons: [...new Set(blockingReasons)],
+    }
+  })
+
+  const notPreMatch = legs.some(leg => (
+    leg.blockingReasons.includes('event_already_started') ||
+    leg.blockingReasons.includes('event_status_not_actionable')
+  ))
+  const allowed = legs.every(leg => leg.blockingReasons.length === 0 && leg.fixtureStatus === 'scheduled')
+  return {
+    allowed,
+    code: allowed ? 'ok' : notPreMatch ? 'event_not_pre_match' : 'event_identity_unverified',
+    aggregateFixtureStatus: allowed ? 'scheduled' : notPreMatch ? 'not_bettable' : 'unknown',
+    legs,
+  }
 }
 
 const EMPTY_COVERAGE: AnalysisDataCoverage = {
@@ -401,6 +768,9 @@ export function formatCouponLegsForResearch(legs: AnalystPromptLeg[] | null | un
   return legs.map((leg, index) => {
     const details = [
       `event=${cleanPromptValue(leg.eventName) ?? 'unknown'}`,
+      `competition=${cleanPromptValue(leg.competition) ?? 'not shown'}`,
+      `event_time=${cleanPromptValue(leg.eventStartText) ?? 'not shown'}`,
+      `event_timezone=${cleanPromptValue(leg.eventTimezone) ?? 'not shown'}`,
       `market=${cleanPromptValue(leg.marketType) ?? 'unknown'}`,
       `selection=${cleanPromptValue(leg.selection) ?? 'unknown'}`,
       `odds=${typeof leg.odds === 'number' && Number.isFinite(leg.odds) ? leg.odds : 'not shown'}`,
@@ -426,6 +796,7 @@ CURRENT-TIME CONTEXT
 COUPON SUMMARY
 - Sport: ${input.sport}
 - Event: ${input.eventName}
+- Competition: ${cleanPromptValue(input.competition) ?? 'not shown'}
 - Market: ${input.marketType}
 - Selection: ${cleanPromptValue(input.selection) ?? 'not shown'}
 - Offered total odds: ${input.offeredOdds} (context only; this is not evidence of fair price, probability, edge, or EV)
