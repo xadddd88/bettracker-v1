@@ -517,6 +517,7 @@ export function evaluateAnalystEventIdentityGate(input: {
   sport: string
   eventName: string
   competition?: string | null
+  marketType?: string | null
   couponEventTime?: string | null
   clientTimezone?: string | null
   currentUtcIso: string
@@ -529,12 +530,31 @@ export function evaluateAnalystEventIdentityGate(input: {
     eventTimezone: input.clientTimezone ?? null,
     sport: input.sport,
   }]
-  const fixtureIdentityKeys = new Set(suppliedLegs.map(leg => [
+  const confirmedBetBuilderMarket = new Set([
+    'bet builder',
+    'betbuilder',
+    'same game parlay',
+    'same-game parlay',
+    'same event parlay',
+    'same-event parlay',
+    'sgp',
+    'конструктор ставок',
+    'конструктор ставки',
+    'білдер ставок',
+    'билдер ставок',
+  ]).has(normalizedIdentity(input.marketType))
+  const fixtureIdentityParts = suppliedLegs.map(leg => [
     normalizedIdentity(leg.sport ?? input.sport),
     normalizedIdentity(leg.eventName ?? input.eventName),
     normalizedIdentity(leg.competition ?? input.competition),
-  ].join('|')))
-  const canShareCouponTime = suppliedLegs.length === 1 || fixtureIdentityKeys.size === 1
+  ])
+  const completeFixtureIdentities = fixtureIdentityParts.every(parts => parts.every(Boolean))
+  const fixtureIdentityKeys = new Set(fixtureIdentityParts.map(parts => parts.join('|')))
+  const canShareCouponTime = suppliedLegs.length === 1 || (
+    confirmedBetBuilderMarket &&
+    completeFixtureIdentities &&
+    fixtureIdentityKeys.size === 1
+  )
 
   const legs = suppliedLegs.map((leg, index): AnalystEventIdentityLeg => {
     const eventName = cleanPromptValue(leg.eventName ?? input.eventName)

@@ -537,13 +537,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Resolve every fixture before any profile read, web research, model call
-    // or persistence. A shared coupon time is valid only for one fixture
-    // (including a same-fixture Bet Builder); distinct fixtures require their
-    // own exact date/time. Invalid timezone/year/DST input fails closed.
+    // or persistence. A shared coupon time is valid only for an explicitly
+    // identified Bet Builder whose legs have the same complete fixture
+    // identity; every other multi-leg coupon requires per-leg date/time.
+    // Invalid timezone/year/DST input fails closed.
     const eventIdentityGate = evaluateAnalystEventIdentityGate({
       sport: input.sport,
       eventName: input.event_name,
       competition: input.competition ?? null,
+      marketType: input.market_type,
       couponEventTime: input.coupon_event_time ?? null,
       clientTimezone: input.client_timezone ?? null,
       currentUtcIso,

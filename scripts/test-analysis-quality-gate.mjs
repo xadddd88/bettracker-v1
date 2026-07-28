@@ -718,6 +718,69 @@ await asyncTest('Analyst route rejects stale or ambiguous per-leg identity befor
   });
 });
 
+await asyncTest('Analyst route shares coupon time only for a confirmed one-fixture Bet Builder', async () => {
+  await withAnalystRouteHarness(async ({ POST, calls }) => {
+    const legs = [
+      {
+        eventName: 'Spain - Argentina',
+        competition: 'International Friendly',
+        marketType: 'Total',
+        statusText: 'Scheduled',
+      },
+      {
+        eventName: 'Spain - Argentina',
+        competition: 'International Friendly',
+        marketType: 'Corners total',
+        statusText: 'Scheduled',
+      },
+    ];
+    const common = {
+      event_name: 'Spain - Argentina',
+      competition: 'International Friendly',
+      coupon_event_time: '2099-07-31 22:10',
+      client_timezone: 'Europe/Kyiv',
+      legs,
+    };
+
+    for (const market_type of ['Match result', 'Express (2 legs)', 'Parlay']) {
+      const response = await POST(analystRequest({ ...common, market_type }));
+      const body = await response.json();
+      assert.equal(response.status, 422, market_type);
+      assert.equal(body.code, 'event_identity_unverified', market_type);
+      assert.deepEqual(
+        body.event_identity_gate.legs.map(leg => leg.blockingReasons),
+        [['event_time_missing'], ['event_time_missing']],
+        market_type,
+      );
+    }
+
+    const missingCompetition = await POST(analystRequest({
+      ...common,
+      competition: null,
+      market_type: 'Bet Builder',
+      legs: legs.map(({ competition: _competition, ...leg }) => leg),
+    }));
+    const missingCompetitionBody = await missingCompetition.json();
+    assert.equal(missingCompetition.status, 422);
+    assert.equal(missingCompetitionBody.code, 'event_identity_unverified');
+
+    assert.equal(calls.profile, 0);
+    assert.equal(calls.provider, 0);
+    assert.equal(calls.admin, 0);
+    assert.equal(calls.rpc, 0);
+
+    const confirmed = await POST(analystRequest({
+      ...common,
+      market_type: 'Bet Builder',
+    }));
+    assert.notEqual(confirmed.status, 422);
+    assert.equal(calls.profile, 0);
+    assert.equal(calls.provider, 1, 'confirmed Bet Builder should reach the next provider stage');
+    assert.equal(calls.admin, 0);
+    assert.equal(calls.rpc, 0);
+  });
+});
+
 await asyncTest('Analyst route localizes both stale-gate errors in every selected language', async () => {
   const expected = {
     uk: {
@@ -1288,6 +1351,7 @@ test('per-leg identity gate shares time only within one fixture and fingerprints
     sport: 'soccer',
     eventName: 'Spain - Argentina',
     competition: 'International Friendly',
+    marketType: 'Bet Builder',
     couponEventTime: '31.07.2026 22:10',
     clientTimezone: 'Europe/Kyiv',
     currentUtcIso: now,
@@ -1360,6 +1424,66 @@ test('per-leg identity gate shares time only within one fixture and fingerprints
     scheduledExpress.legs[0].fixtureFingerprint,
     scheduledExpress.legs[1].fixtureFingerprint,
   );
+});
+
+test('shared coupon time requires an explicit Bet Builder with one complete fixture identity', () => {
+  const common = {
+    sport: 'soccer',
+    eventName: 'Spain - Argentina',
+    couponEventTime: '31.07.2026 22:10',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: '2026-07-28T09:00:00.000Z',
+  };
+  const sameFixtureLegs = [
+    {
+      eventName: 'Spain - Argentina',
+      competition: 'International Friendly',
+      marketType: 'Total',
+    },
+    {
+      eventName: 'Spain - Argentina',
+      competition: 'International Friendly',
+      marketType: 'Corners total',
+    },
+  ];
+
+  for (const marketType of [undefined, 'Express (2 legs)', 'Parlay', 'Not a Bet Builder']) {
+    const result = evaluateAnalystEventIdentityGate({
+      ...common,
+      marketType,
+      legs: sameFixtureLegs,
+    });
+    assert.equal(result.allowed, false, String(marketType));
+    assert.deepEqual(
+      result.legs.map(leg => leg.blockingReasons),
+      [['event_time_missing'], ['event_time_missing']],
+      String(marketType),
+    );
+  }
+
+  const missingCompetition = evaluateAnalystEventIdentityGate({
+    ...common,
+    marketType: 'Bet Builder',
+    legs: [
+      { eventName: 'Spain - Argentina', marketType: 'Total' },
+      { eventName: 'Spain - Argentina', marketType: 'Corners total' },
+    ],
+  });
+  assert.equal(missingCompetition.allowed, false);
+  assert.deepEqual(
+    missingCompetition.legs.map(leg => leg.blockingReasons),
+    [['event_time_missing'], ['event_time_missing']],
+  );
+
+  for (const marketType of ['Bet Builder', 'Same Game Parlay', 'SGP']) {
+    const confirmed = evaluateAnalystEventIdentityGate({
+      ...common,
+      marketType,
+      legs: sameFixtureLegs,
+    });
+    assert.equal(confirmed.allowed, true, marketType);
+    assert.equal(confirmed.legs[0].fixtureFingerprint, confirmed.legs[1].fixtureFingerprint);
+  }
 });
 
 test('per-leg identity gate fails closed for ambiguous participants, time and terminal status', () => {
