@@ -243,6 +243,7 @@ function analystOutput(fixture, cited = false) {
       sourced_claims: [{
         claim,
         source_url: 'https://baseline.example.com/research',
+        leg_numbers: [1],
       }],
       legs: [{
         leg_number: 1,

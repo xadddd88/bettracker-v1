@@ -9,6 +9,7 @@ export type AnalystResearchSource = {
 export type AnalystSourcedClaim = {
   text: string
   sourceUrl: string
+  legNumbers: number[]
 }
 
 export type AnalystResearchLeg = {
@@ -60,6 +61,7 @@ export type AnalystWebSearchFailureReason =
   | 'provider_no_cited_results'
   | 'research_contract_rejected'
   | 'claim_source_binding_failed'
+  | 'partial_leg_citation_coverage'
 
 export type AnalystWebSearchTelemetry = {
   enabled: boolean
@@ -236,6 +238,7 @@ const EMPTY_COVERAGE: AnalysisDataCoverage = {
 export function bindAnalystSourcedClaims(
   claims: AnalystSourcedClaim[],
   citedSources: AnalystResearchSource[],
+  legCount?: number,
 ): AnalystSourcedClaim[] {
   const citedByUrl = new Map(citedSources.map(source => [source.url, source]))
   const sourcedClaims: AnalystSourcedClaim[] = []
@@ -246,13 +249,100 @@ export function bindAnalystSourcedClaims(
     const claimText = claim.text.replace(/\s+/g, ' ').trim()
     const citedText = source.citedText.replace(/\s+/g, ' ').trim()
     if (!claimText || claimText !== citedText) continue
-    const key = `${source.url}\n${claimText}`
+    const legNumbers = [...new Set(
+      (Array.isArray(claim.legNumbers) ? claim.legNumbers : [])
+        .filter(value => Number.isInteger(value) && value >= 1 && value <= (legCount ?? 20)),
+    )].sort((left, right) => left - right)
+    if (legCount !== undefined && legNumbers.length === 0) continue
+    const key = `${source.url}\n${claimText}\n${legNumbers.join(',')}`
     if (seenClaims.has(key)) continue
     seenClaims.add(key)
-    sourcedClaims.push({ text: claimText, sourceUrl: source.url })
+    sourcedClaims.push({ text: claimText, sourceUrl: source.url, legNumbers })
     if (sourcedClaims.length === 12) break
   }
   return sourcedClaims
+}
+
+export type AnalystLegCitationCoverage = {
+  totalLegs: number
+  coveredLegs: number
+  coveredLegNumbers: number[]
+  ratio: number
+  complete: boolean
+}
+
+export function getAnalystLegCitationCoverage(
+  claims: AnalystSourcedClaim[],
+  totalLegs: number,
+): AnalystLegCitationCoverage {
+  if (!Number.isInteger(totalLegs) || totalLegs < 1 || totalLegs > 20) {
+    return { totalLegs: 0, coveredLegs: 0, coveredLegNumbers: [], ratio: 0, complete: false }
+  }
+
+  const covered = new Set<number>()
+  for (const claim of claims) {
+    for (const legNumber of claim.legNumbers) {
+      if (Number.isInteger(legNumber) && legNumber >= 1 && legNumber <= totalLegs) {
+        covered.add(legNumber)
+      }
+    }
+  }
+  const coveredLegNumbers = [...covered].sort((left, right) => left - right)
+  const coveredLegs = coveredLegNumbers.length
+  return {
+    totalLegs,
+    coveredLegs,
+    coveredLegNumbers,
+    ratio: coveredLegs / totalLegs,
+    complete: coveredLegs === totalLegs,
+  }
+}
+
+export type AnalystConfidenceContract = {
+  score: number
+  ceiling: number
+  researchContractAccepted: boolean
+  citationCoverage: AnalystLegCitationCoverage
+  fixtureStatusVerified: boolean
+  qualityGateCoverageScore: number
+}
+
+/**
+ * Confidence is analysis-quality confidence, never outcome probability.
+ * The server owns it and caps it by verified per-leg citation coverage.
+ */
+export function deriveAnalystConfidenceContract(input: {
+  researchContractAccepted: boolean
+  sourcedClaims: AnalystSourcedClaim[]
+  totalLegs: number
+  fixtureStatus: FixtureStatus | null
+  qualityGateCoverageScore: number
+}): AnalystConfidenceContract {
+  const citationCoverage = getAnalystLegCitationCoverage(input.sourcedClaims, input.totalLegs)
+  const qualityGateCoverageScore = Math.max(0, Math.min(100, Math.round(input.qualityGateCoverageScore)))
+  const fixtureStatusVerified = input.fixtureStatus !== null && input.fixtureStatus !== 'unknown'
+  const ceiling = !input.researchContractAccepted
+    ? 20
+    : citationCoverage.complete
+      ? 70
+      : citationCoverage.coveredLegs > 0
+        ? 45
+        : 25
+  const rawScore =
+    15 +
+    (input.researchContractAccepted ? 15 : 0) +
+    Math.round(citationCoverage.ratio * 30) +
+    (fixtureStatusVerified ? 15 : 0) +
+    Math.round(qualityGateCoverageScore * 0.25)
+
+  return {
+    score: Math.min(ceiling, rawScore),
+    ceiling,
+    researchContractAccepted: input.researchContractAccepted,
+    citationCoverage,
+    fixtureStatusVerified,
+    qualityGateCoverageScore,
+  }
 }
 
 /**
@@ -300,7 +390,7 @@ export function alignAnalystResearchBriefToCoupon(
 
   return {
     ...brief,
-    sourcedClaims: bindAnalystSourcedClaims(brief.sourcedClaims, citedSources),
+    sourcedClaims: bindAnalystSourcedClaims(brief.sourcedClaims, citedSources, couponLegs.length),
     legs: aligned,
   }
 }
@@ -491,6 +581,8 @@ export function resolveAnalystWebSearchTelemetry(input: {
   researchContractAccepted: boolean
   citedSourceCount: number
   boundClaimCount: number
+  totalLegs: number
+  coveredLegs: number
 }): AnalystWebSearchTelemetry {
   const enabled = input.globalEnabled && !input.profileReadFailed && input.profileEnabled
   const attempted = enabled && input.attempted
@@ -502,6 +594,9 @@ export function resolveAnalystWebSearchTelemetry(input: {
   if (!input.researchContractAccepted) return { enabled, attempted, used: false, failureReason: 'research_contract_rejected' }
   if (input.citedSourceCount < 1) return { enabled, attempted, used: false, failureReason: 'provider_no_cited_results' }
   if (input.boundClaimCount < 1) return { enabled, attempted, used: false, failureReason: 'claim_source_binding_failed' }
+  if (input.totalLegs < 1 || input.coveredLegs !== input.totalLegs) {
+    return { enabled, attempted, used: false, failureReason: 'partial_leg_citation_coverage' }
+  }
   return { enabled, attempted, used: true, failureReason: null }
 }
 
@@ -661,7 +756,16 @@ export function parseStoredAnalystResearchBrief(value: unknown): AnalystResearch
     const text = boundedString(item.text, 2, 400)
     const sourceUrl = safeHttpUrl(item.sourceUrl)
     if (!text || !sourceUrl) return null
-    sourcedClaims.push({ text, sourceUrl })
+    const rawLegNumbers = item.legNumbers
+    let legNumbers: number[] = []
+    if (rawLegNumbers !== undefined) {
+      if (!Array.isArray(rawLegNumbers)) return null
+      legNumbers = [...new Set(rawLegNumbers.filter(
+        legNumber => Number.isInteger(legNumber) && (legNumber as number) >= 1 && (legNumber as number) <= 20,
+      ) as number[])].sort((left, right) => left - right)
+      if (legNumbers.length !== rawLegNumbers.length) return null
+    }
+    sourcedClaims.push({ text, sourceUrl, legNumbers })
   }
   if (!Array.isArray(value.legs) || value.legs.length < 1 || value.legs.length > 20) return null
 
