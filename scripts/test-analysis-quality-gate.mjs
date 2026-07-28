@@ -718,6 +718,64 @@ await asyncTest('Analyst route rejects stale or ambiguous per-leg identity befor
   });
 });
 
+await asyncTest('Analyst route localizes both stale-gate errors in every selected language', async () => {
+  const expected = {
+    uk: {
+      event_identity_unverified: 'Для кожної події потрібні однозначна ідентифікація матчу, точні майбутні дата й час та коректний часовий пояс.',
+      event_not_pre_match: 'Щонайменше одна подія вже почалася, завершилася або наразі недоступна для ставки.',
+    },
+    ru: {
+      event_identity_unverified: 'Для каждого события нужны однозначная идентификация матча, точные будущие дата и время и корректный часовой пояс.',
+      event_not_pre_match: 'Как минимум одно событие уже началось, завершилось или сейчас недоступно для ставки.',
+    },
+    en: {
+      event_identity_unverified: 'Every event needs an unambiguous fixture identity, exact future date/time, and valid timezone.',
+      event_not_pre_match: 'At least one event has already started, finished, or is not currently bettable.',
+    },
+    es: {
+      event_identity_unverified: 'Cada evento necesita una identidad de partido inequívoca, una fecha y hora futuras exactas y una zona horaria válida.',
+      event_not_pre_match: 'Al menos un evento ya ha comenzado, ha finalizado o no está disponible actualmente para apostar.',
+    },
+    fr: {
+      event_identity_unverified: 'Chaque événement nécessite une identité de match sans ambiguïté, une date et une heure futures exactes et un fuseau horaire valide.',
+      event_not_pre_match: 'Au moins un événement a déjà commencé, est terminé ou n’est actuellement pas disponible pour les paris.',
+    },
+    de: {
+      event_identity_unverified: 'Für jedes Ereignis sind eine eindeutige Spielidentität, ein genaues zukünftiges Datum mit Uhrzeit und eine gültige Zeitzone erforderlich.',
+      event_not_pre_match: 'Mindestens ein Ereignis hat bereits begonnen, ist beendet oder kann derzeit nicht bewettet werden.',
+    },
+    ar: {
+      event_identity_unverified: 'يتطلب كل حدث هوية مباراة واضحة وتاريخًا ووقتًا دقيقين في المستقبل ومنطقة زمنية صالحة.',
+      event_not_pre_match: 'بدأ حدث واحد على الأقل بالفعل أو انتهى أو أنه غير متاح حاليًا للمراهنة.',
+    },
+  };
+
+  await withAnalystRouteHarness(async ({ POST, calls }) => {
+    for (const [output_language, copy] of Object.entries(expected)) {
+      const ambiguous = await POST(analystRequest({ output_language }));
+      const ambiguousBody = await ambiguous.json();
+      assert.equal(ambiguous.status, 422, output_language);
+      assert.equal(ambiguousBody.code, 'event_identity_unverified');
+      assert.equal(ambiguousBody.error, copy.event_identity_unverified);
+
+      const stale = await POST(analystRequest({
+        output_language,
+        coupon_event_time: '2020-07-31 22:10',
+        client_timezone: 'Europe/Kyiv',
+      }));
+      const staleBody = await stale.json();
+      assert.equal(stale.status, 422, output_language);
+      assert.equal(staleBody.code, 'event_not_pre_match');
+      assert.equal(staleBody.error, copy.event_not_pre_match);
+    }
+
+    assert.equal(calls.profile, 0);
+    assert.equal(calls.provider, 0);
+    assert.equal(calls.admin, 0);
+    assert.equal(calls.rpc, 0);
+  });
+});
+
 test('exact live coupon is parsed per leg and blocked as unsupported live analysis', () => {
   const qualityGate = evaluateAnalysisQuality({
     sport: exactLiveCoupon.sport,
@@ -1242,6 +1300,24 @@ test('per-leg identity gate shares time only within one fixture and fingerprints
   assert.equal(builder.code, 'ok');
   assert.equal(builder.legs[0].fixtureFingerprint, builder.legs[1].fixtureFingerprint);
   assert.equal(builder.legs[0].scheduledStartUtc, '2026-07-31T19:10:00.000Z');
+
+  const sameParticipantsDifferentCompetitions = evaluateAnalystEventIdentityGate({
+    sport: 'soccer',
+    eventName: 'Spain - Argentina',
+    couponEventTime: '31.07.2026 22:10',
+    clientTimezone: 'Europe/Kyiv',
+    currentUtcIso: now,
+    legs: [
+      { eventName: 'Spain - Argentina', competition: 'International Friendly' },
+      { eventName: 'Spain - Argentina', competition: 'World Cup' },
+    ],
+  });
+  assert.equal(sameParticipantsDifferentCompetitions.allowed, false);
+  assert.equal(sameParticipantsDifferentCompetitions.code, 'event_identity_unverified');
+  assert.deepEqual(
+    sameParticipantsDifferentCompetitions.legs.map(leg => leg.blockingReasons),
+    [['event_time_missing'], ['event_time_missing']],
+  );
 
   const ambiguousExpress = evaluateAnalystEventIdentityGate({
     sport: 'soccer',

@@ -243,9 +243,49 @@ function normalizeAnalystRaw(raw: unknown): unknown {
   return raw
 }
 
+const EVENT_IDENTITY_COPY: Record<
+  z.infer<typeof requestSchema>['output_language'],
+  { eventNotPreMatch: string; eventIdentityUnverified: string }
+> = {
+  auto: {
+    eventNotPreMatch: 'At least one event has already started, finished, or is not currently bettable.',
+    eventIdentityUnverified: 'Every event needs an unambiguous fixture identity, exact future date/time, and valid timezone.',
+  },
+  uk: {
+    eventNotPreMatch: 'Щонайменше одна подія вже почалася, завершилася або наразі недоступна для ставки.',
+    eventIdentityUnverified: 'Для кожної події потрібні однозначна ідентифікація матчу, точні майбутні дата й час та коректний часовий пояс.',
+  },
+  ru: {
+    eventNotPreMatch: 'Как минимум одно событие уже началось, завершилось или сейчас недоступно для ставки.',
+    eventIdentityUnverified: 'Для каждого события нужны однозначная идентификация матча, точные будущие дата и время и корректный часовой пояс.',
+  },
+  en: {
+    eventNotPreMatch: 'At least one event has already started, finished, or is not currently bettable.',
+    eventIdentityUnverified: 'Every event needs an unambiguous fixture identity, exact future date/time, and valid timezone.',
+  },
+  es: {
+    eventNotPreMatch: 'Al menos un evento ya ha comenzado, ha finalizado o no está disponible actualmente para apostar.',
+    eventIdentityUnverified: 'Cada evento necesita una identidad de partido inequívoca, una fecha y hora futuras exactas y una zona horaria válida.',
+  },
+  fr: {
+    eventNotPreMatch: 'Au moins un événement a déjà commencé, est terminé ou n’est actuellement pas disponible pour les paris.',
+    eventIdentityUnverified: 'Chaque événement nécessite une identité de match sans ambiguïté, une date et une heure futures exactes et un fuseau horaire valide.',
+  },
+  de: {
+    eventNotPreMatch: 'Mindestens ein Ereignis hat bereits begonnen, ist beendet oder kann derzeit nicht bewettet werden.',
+    eventIdentityUnverified: 'Für jedes Ereignis sind eine eindeutige Spielidentität, ein genaues zukünftiges Datum mit Uhrzeit und eine gültige Zeitzone erforderlich.',
+  },
+  ar: {
+    eventNotPreMatch: 'بدأ حدث واحد على الأقل بالفعل أو انتهى أو أنه غير متاح حاليًا للمراهنة.',
+    eventIdentityUnverified: 'يتطلب كل حدث هوية مباراة واضحة وتاريخًا ووقتًا دقيقين في المستقبل ومنطقة زمنية صالحة.',
+  },
+}
+
 function analystRouteCopy(locale: z.infer<typeof requestSchema>['output_language']) {
+  const eventIdentity = EVENT_IDENTITY_COPY[locale]
   if (locale === 'uk') {
     return {
+      ...eventIdentity,
       liveUnsupported: 'Live-аналіз недоступний без поточного рахунку, фази матчу, ігрового часу та актуальної live-лінії. Для цього модуля використовуйте лише pre-match купони.',
       profileUnavailable: 'Не вдалося перевірити налаштування пошуку. Аналіз не запускався — спробуйте ще раз пізніше.',
       searchConfigurationUnavailable: 'Пошук актуальних джерел недоступний через конфігурацію. Аналіз не збережено.',
@@ -256,6 +296,7 @@ function analystRouteCopy(locale: z.infer<typeof requestSchema>['output_language
   }
   if (locale === 'ru') {
     return {
+      ...eventIdentity,
       liveUnsupported: 'Live-анализ недоступен без текущего счёта, фазы матча, игрового времени и актуальной live-линии. Для этого модуля используйте только pre-match купоны.',
       profileUnavailable: 'Не удалось проверить настройки поиска. Анализ не запускался — попробуйте позже.',
       searchConfigurationUnavailable: 'Поиск актуальных источников недоступен из-за конфигурации. Анализ не сохранён.',
@@ -265,6 +306,7 @@ function analystRouteCopy(locale: z.infer<typeof requestSchema>['output_language
     }
   }
   return {
+    ...eventIdentity,
     liveUnsupported: 'Live analysis requires the current score, match phase, game clock, and current live odds. This module supports pre-match coupons only.',
     profileUnavailable: 'Research settings could not be verified. Analysis was not started; please try again later.',
     searchConfigurationUnavailable: 'Current-source search is unavailable due to configuration. The analysis was not saved.',
@@ -517,8 +559,8 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           error: eventIdentityGate.code === 'event_not_pre_match'
-            ? 'At least one event has already started, finished, or is not currently bettable.'
-            : 'Every event needs an unambiguous fixture identity, exact future date/time, and valid timezone.',
+            ? copy.eventNotPreMatch
+            : copy.eventIdentityUnverified,
           code: eventIdentityGate.code,
           event_identity_gate: eventIdentityGate,
         },

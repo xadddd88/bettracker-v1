@@ -529,8 +529,12 @@ export function evaluateAnalystEventIdentityGate(input: {
     eventTimezone: input.clientTimezone ?? null,
     sport: input.sport,
   }]
-  const eventKeys = new Set(suppliedLegs.map(leg => normalizedIdentity(leg.eventName ?? input.eventName)))
-  const canShareCouponTime = suppliedLegs.length === 1 || eventKeys.size === 1
+  const fixtureIdentityKeys = new Set(suppliedLegs.map(leg => [
+    normalizedIdentity(leg.sport ?? input.sport),
+    normalizedIdentity(leg.eventName ?? input.eventName),
+    normalizedIdentity(leg.competition ?? input.competition),
+  ].join('|')))
+  const canShareCouponTime = suppliedLegs.length === 1 || fixtureIdentityKeys.size === 1
 
   const legs = suppliedLegs.map((leg, index): AnalystEventIdentityLeg => {
     const eventName = cleanPromptValue(leg.eventName ?? input.eventName)
