@@ -1,32 +1,32 @@
-# BetTracker AI / LineHunter AI Docs
+# BetTracker Docs
 
-This folder is the product and architecture memory for BetTracker AI, future brand LineHunter AI.
+This folder is the product, architecture, trust, and decision memory for BetTracker.
 
-## Core Philosophy
+## Product Source of Truth
 
-BetTracker AI is not just a betting tracker. It is a Decision Support Platform.
+[`product.md`](product.md) is the approved R18 product source of truth under Decision #069.
 
-Future brand: LineHunter AI
-Slogan: Hunt the edge. Beat the line.
-RU: Ищи слабые линии. Принимай сильные решения.
+BetTracker is a private decision-quality and risk-control system. It does not rank bets, recommend stake size, connect bookmakers, promise profit, or position itself as LineHunter.
 
 ## Key Principles
 
-- Decision-first architecture
-- Bet is optional, Decision is primary
-- AI must support decisions, not promise outcomes
-- Bankroll safety is mandatory
-- All betting actions must be traceable
-- Analytics must be based on settled outcomes
-- Sport taxonomy must remain canonical
-- Multilingual foundation must be preserved
+- Decision before outcome
+- Decision quality is not result
+- Code calculates; AI explains
+- Evidence before confidence
+- Risk before action
+- Private by default
+- Market is independent from locale
+- English (`en`), українська (`uk`), русский (`ru`)
 
 ## Structure
 
-- `/docs/adr` — Architecture Decision Records
-- `/docs/sprints` — Sprint specs and final acceptance notes
-- `/docs/product` — Product rules, taxonomies, brand, AI behavior
-- `/docs/smoke-tests` — Manual smoke-test protocols
+- [`product.md`](product.md) — complete R18 product, design, data, state, and acceptance specification
+- [`strategy.md`](strategy.md) — level-1 strategy
+- [`decisions.md`](decisions.md) — immutable decision history
+- [`decision-ledger-numbering-governance.md`](decision-ledger-numbering-governance.md) — numbering governance
+- [`../PROJECT_STATE.md`](../PROJECT_STATE.md) — current operational state and holds
+- [`../PRODUCT_VISION_GAP.md`](../PRODUCT_VISION_GAP.md) — current implementation gap to R18
 
 ## Team
 
@@ -37,4 +37,4 @@ RU: Ищи слабые линии. Принимай сильные решени
 | Lead Engineer / Technical Reviewer | Claude Chat |
 | Implementation Agent | Claude Code |
 
-Single source of truth: `/docs`
+Operational facts in `PROJECT_STATE.md` do not override product truth in R18, and R18 does not lift runtime holds recorded in `PROJECT_STATE.md`.

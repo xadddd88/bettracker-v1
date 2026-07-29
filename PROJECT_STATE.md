@@ -1,23 +1,25 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-29 (Decision #068 source-freshness resolution scope; D056 warning split from enrichment writes and downstream use)
+> Last updated: 2026-07-29 (Decision #069 R18 product source-of-truth adoption pending merge)
 
 ## 1. Executive Status
 
 | Field | Current state |
 |---|---|
 | Engineering shell | **READY** — production is stable and guarded by CI, RLS/RPC write boundaries, FP-001 checks, and durable rate limits |
-| Product Vision Beta | **NOT READY** — core product capabilities and trusted sports-data usage remain incomplete |
+| Product Vision Beta | **NOT READY** — R18 defines the complete target; current Web/mobile implementation and trusted-data contracts remain incomplete |
 | External beta launch | **PAUSED** — product decision; do not invite external users yet |
 | Production | `https://btdk.app` |
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
 | Latest completed operational milestone | **Decision #056 production execution — GitHub Actions run `30429349031` completed successfully on `240e3e9`: exactly one approved read-only SportMonks request, `writes: none`, Supabase ledger `row_count = 1`, no artifacts** |
 | Highest-numbered closed decision | **#068 — SportMonks Source Freshness Resolution Scope (docs-scope only; implementation/provider calls/writes not started)** |
-| Active decisions | **#062 — Mobile Founder client (Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171; Event analysis remains deferred and Tracker Save remains manual after Review)** |
+| Active decisions | **#062 — Mobile Founder client; #069 — approved R18 product/documentation baseline pending merge** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
-| Next unreserved decision | **#069** |
+| Next unreserved decision | **#070** |
+
+Decision #069 adopts R18 as the complete product target: Home, Research, Journal, Insights, and Risk; global Add/Review/Tools/Assistant/Privacy/Settings; `en`, `uk`, and `ru`; and the first internal market profile `GB_EW_SC`. It supersedes the conflicting product consequences of Decisions #007–#009 without rewriting their history. It is documentation-only and lifts no production, provider, sports-data, settlement, payment, company-formation, market-launch, or external-beta hold.
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 completed one canonical-linked base-response dry-run with zero writes. Decision #055 then closed the trust/storage contract. Decision #056's Class A structural-presence implementation, OIDC hardening, ledger migration, and single production execution are complete: GitHub Actions run `30429349031` succeeded on 2026-07-29 with exactly one provider request, `writes: none`, and ledger `row_count = 1` for deployment SHA `240e3e9916299fd21a71d3c1b5b8ec562ab9316f`. The run surfaced missing/invalid fixture source `updated_at`; `collectedAt` is not source freshness, so downstream usage remains blocked. Decision #068 closes the scope for resolving this blocker: prove provider-source freshness first, then separately consider storage/write validation. Decision #057 closed the results-ingestion and settlement trust contract (docs-evidence only; no results runtime, result writes, or automated settlement is approved).
 
@@ -177,9 +179,9 @@ External beta remains paused because the product vision is not yet complete. Imp
 2. Source freshness remains unproven after Decision #056; Decision #068 now requires documented provider-source timestamp evidence before any future runtime, write, or downstream use.
 3. Odds ingestion/normalization and user-facing trust validation.
 4. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated. Decision #058 unifies the metric formulas (G4) and removes the misleading Void fallback (G12), but adds no new settlement semantics. Tracker legs in production still have no safe relationship to `canonical_fixtures` or `fixture_provider_links`. Closed docs-only Decision #063 defines the contract; Decision #064 migration 025 is applied and catalog-verified, while `create_tracked_bet_v2` remains service-role-only with no application caller or matching authority.
-5. Trusted Analyst/Scout v2 using verified provider data rather than ungrounded pricing.
-6. Full i18n UX, including Arabic RTL. Russian Web/auth coverage and deterministic Cyrillic rendering are improved, but full supported-language coverage is not complete.
-7. Mobile/tablet product polish and closed-beta onboarding.
+5. R18 Research/Assistant/Review conversion: retire generated/ranked Scout opportunities and allow AI to explain only verified or explicitly user-supplied prepared context.
+6. Complete `en` / `uk` / `ru` localization across UI, validation, errors, email, push, AI, reports, paywall, legal documents, and help; locale must remain independent from market eligibility.
+7. Complete R18 Web/iPhone/Android information architecture, MarketProfile/UserMarketEligibility states, Risk controls, Resolution lifecycle, metric service, privacy, and onboarding.
 
 ## 6. Holds
 
@@ -200,6 +202,7 @@ Decision #064 — migration 025 / create_tracked_bet_v2 — EXECUTED / VERIFIED 
 Decision #066 — migration 030 security-invoker hardening — EXECUTED / VERIFIED / CLOSED
 Decision #067 — migration 031 public API privilege hardening — EXECUTED / VERIFIED / CLOSED
 Decision #068 — SportMonks source-freshness resolution scope — EXECUTED / CLOSED docs-scope only; implementation/provider calls/writes not started
+Decision #069 — R18 target product structure and global market architecture — APPROVED / DOCS-ONLY; repository adoption pending merge; no runtime authority
 Decision #065 — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via #202 → #224; no mobile release authority
 Decision #056 — EXECUTED / VERIFIED / CLOSED via GitHub Actions run `30429349031`; exactly one approved provider request, `writes: none`, ledger consumed; no rerun authorized
 ```
@@ -208,13 +211,14 @@ Decision #056 — EXECUTED / VERIFIED / CLOSED via GitHub Actions run `304293490
 
 - Decision #050 is EXECUTED / VERIFIED / CLOSED after the founder-confirmed production invite lifecycle, negative non-allowlisted check, and Supabase template/signup-control verification recorded on 2026-07-26.
 - Decision #053 reconciled this file, README, the numbering ledger, and the migration inventory.
+- Decision #069 is Founder-approved and reserves the R18 product/documentation baseline; repository adoption is pending merge. It changes no runtime, production service, provider, database, settlement, payment, company, or market-launch authority.
 - Decision #063 was approved and merged docs-only via PR #183 as `df4723f`.
 - Decision #064 implementation merged via PR #186 as `4fce917701b95b3d3ad98ad9f157d02216323d3e`; Gate 3 merged via PR #231 as `f5f17385d711ccd1df323cd71be3448dd3e08d85`. Migration 025 was applied once as `20260727060234_tracked_leg_fixture_lineage_025`; 12/12 columns, 3/3 constraints, 2/2 indexes, 2/2 triggers, 3/3 functions, and service-role-only v2 ACL were verified. No application caller was added.
 - Decision #066 merged via PR #232 as `8ce79df4444c366b07a3585fde3de8554f431b4a`. Migration 030 was applied once as `20260727093233_odds_snapshots_public_security_invoker_030`; `security_invoker`, the exact authenticated-only policy, 9/9 safe-column access, 0/5 internal-column access, zero `anon`/DML access, and service-role continuity were verified. Both related Advisor findings were cleared and the table remained at 0 rows.
 - Decision #067 merged via PR #233 as `9211c7e5450ce1854a7621ab0a5fa3284decef82` after 10/10 CI jobs and a 12/12 PostgreSQL 17 verifier. Migration 031 was applied once as `20260727123510_public_api_privilege_hardening_031`; read-only verification confirmed 7/7 RLS tables and restrictive deny-policies, zero `anon`/`authenticated` table ACLs, preserved `service_role`, 11/11 function boundaries, 9/9 protected `search_path` values, service-only retired RPCs, client-deny future-object defaults, only nine intentional RPC Advisor warnings, and healthy public web routing. No RPC, user-data read, retry, or rollback ran.
 - Decision #056 OIDC hardening merged via PR #237 as `240e3e9916299fd21a71d3c1b5b8ec562ab9316f`; migration `20260728162034_decision_056_execution_ledger` was applied and verified. The separately approved workflow run `30429349031` completed successfully on attempt `1` with required environment approval from `dkhodakivskyi-88`: exactly one SportMonks POST, `requestCount: 1`, `writes: none`, no artifacts, and ledger `row_count = 1` for deployment SHA `240e3e9916299fd21a71d3c1b5b8ec562ab9316f`. The sanitized report warning keeps source freshness and all downstream sports-data usage blocked.
-- Decision #061 Phase A2 exact head `b14168a246cfb76f0d566cd795eed758805f4e48` passed all 10 Preview Tests jobs, including Hermetic Web acceptance at 320/375/1280 px, merged via PR #235 as `2fb83250cc648d990f844bbb8edc73ae81dc5a17`, and the automatic production deployment succeeded. The harness remained loopback-only and produced no production smoke, provider/AI/Supabase call, settlement action, or financial write. Decision #061 is CLOSED; #068 remains next unreserved.
-- Decision #065 Web rollout is closed and production-deployed via PR #202 followed by #203 → #224, ending at `eb51d91`. Mobile source remains present but authorizes only Review → manual Save through the existing tracked-bet endpoint; no auto-save, EAS/device build, beta, publication, Supabase/provider runtime, server/RPC/schema/migration, settlement, or financial-formula change is authorized. #068 is next unreserved.
+- Decision #061 Phase A2 exact head `b14168a246cfb76f0d566cd795eed758805f4e48` passed all 10 Preview Tests jobs, including Hermetic Web acceptance at 320/375/1280 px, merged via PR #235 as `2fb83250cc648d990f844bbb8edc73ae81dc5a17`, and the automatic production deployment succeeded. The harness remained loopback-only and produced no production smoke, provider/AI/Supabase call, settlement action, or financial write. Decision #061 is CLOSED.
+- Decision #065 Web rollout is closed and production-deployed via PR #202 followed by #203 → #224, ending at `eb51d91`. Mobile source remains present but authorizes only Review → manual Save through the existing tracked-bet endpoint; no auto-save, EAS/device build, beta, publication, Supabase/provider runtime, server/RPC/schema/migration, settlement, or financial-formula change is authorized.
 - Post-rollout corrective PR #228 merged as `9040673` and deployed READY after exact-head green CI, Vercel READY, and Chrome re-verification. It changes Web typography, control sizing, and browser acceptance coverage only; it does not consume Decision #066 or expand any runtime authority.
 - PR #182 merged as `d103947f` and deployed the fail-closed grading foundation without production provider calls, result writes, scheduling, or automatic settlement.
 - PR #181 applied production migration `20260721152711_cancel_pending_bet`, merged as `d5ebb87d`, and deployed READY. Its emergency kill switch is `docs/cancel-pending-bet-rollback.sql`; the executable SQL is unchanged by the governance rename.
@@ -231,7 +235,6 @@ Decision #056 — EXECUTED / VERIFIED / CLOSED via GitHub Actions run `304293490
 #054 — CSP Report Hardening & Security Headers, Phase A — EXECUTED / MERGED / DEPLOYED
 #055 — Sports Data Trust Contract & Football Enrichment Storage Boundary — EXECUTED / CLOSED
 #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run — EXECUTED / VERIFIED / CLOSED; run 30429349031 success, requestCount 1, writes none, ledger consumed; source freshness warning remains
-#068 — SportMonks Source Freshness Resolution Scope — EXECUTED / CLOSED docs-scope only; no provider call/write/runtime started
 #057 — Results Ingestion & Settlement Trust Contract — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY
 #058 — Settlement Metrics & Status Presentation Reconciliation — EXECUTED / CLOSED
 #059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY (eligibility BLOCKED)
@@ -243,7 +246,9 @@ Decision #056 — EXECUTED / VERIFIED / CLOSED via GitHub Actions run `304293490
 #065 — Broadcast Noir Cross-Platform Rollout — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via #202 → #224; mobile release remains unauthorized
 #066 — odds_snapshots_public Security-Invoker Hardening — EXECUTED / VERIFIED / CLOSED; PR #232 merged; migration 030 applied and verified
 #067 — Public API Privilege Hardening — EXECUTED / VERIFIED / CLOSED; PR #233 merged; migration 031 applied and verified
-#068 — next unreserved decision
+#068 — SportMonks Source Freshness Resolution Scope — EXECUTED / CLOSED docs-scope only; implementation not started
+#069 — R18 Target Product Structure and Global Market Architecture — APPROVED / DOCS-ONLY; repository adoption pending merge; no runtime authority
+#070 — next unreserved decision
 ```
 
 PR #90 is closed without merge; its policy is not adopted. Decision #020 is never reused.

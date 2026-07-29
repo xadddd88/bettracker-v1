@@ -2420,5 +2420,27 @@ Reference: `docs/decision-068-source-freshness-resolution-scope.md`
 
 ---
 
+## Decision #069 — Target Product Structure and Global Market Architecture
+**Date:** 2026-07-29
+**Proposed by:** CPO
+**Approved by:** Founder (conversation approval: «начинаем работать согласно нового плана», 2026-07-29)
+**Status:** APPROVED / DOCS-ONLY — repository adoption pending merge. No runtime or production authority.
+
+**Decision:** Adopt R18 (`docs/product.md`) as the product source of truth. BetTracker is a private decision-quality and risk-control system, not a prediction, signal, bookmaker, copy-bet, or “best bets” product. The complete target product is one scope with five canonical sections: Home, Research, Journal, Insights, and Risk, plus global Add, Review, Search, Privacy View, Assistant, Tools, Notifications, Settings, and Trust Center.
+
+**Market and locale:** The first internal MarketProfile is `GB_EW_SC` for England, Wales, and Scotland with `storefront_country=GB`; Northern Ireland remains unsupported pending a separate legal/market gate. Interface locales are English (`en`), українська (`uk`), and русский (`ru`). Locale never changes eligibility, legal profile, price, currency policy, or feature access.
+
+**Supersession:** This decision supersedes only the conflicting product consequences of Decision #007 (seven locales), Decision #008 (live predictive Scout), and Decision #009 (LineHunter / “Hunt the edge. Beat the line.”). Their historical records remain immutable. Decision-first architecture and all non-conflicting security, financial, provider, data-trust, idempotency, audit, and settlement gates remain in force.
+
+**Implementation rule:** “One complete product” defines one product scope, full IA, and all working/blocked/error states for Web, iPhone, and Android. Dependency-safe implementation PRs are permitted for correctness and auditability, but they are merge order rather than reduced product editions or optional phases.
+
+**Non-authorization:** application/mobile runtime change 0; migration/RPC/schema/RLS/data write 0; provider/AI/payment/email/production-smoke call 0; Vercel/env/store/deployment action 0; external beta 0; company formation/contract/monetization/market launch 0; Decision #056 rerun 0; source-freshness/enrichment/odds/result/grading/settlement execution 0.
+
+**Numbering:** Decision #069 is occupied and APPROVED / DOCS-ONLY pending merge. Decision #070 is next unreserved.
+
+Reference: `docs/decision-069-target-product-structure.md`
+
+---
+
 *Last updated: 2026-07-29*
 *Owner: All (each role contributes)*

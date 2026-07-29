@@ -1,80 +1,133 @@
 # BetTracker — Strategy
-> Level 1 Document. Changes rarely. Answers: "Why does BetTracker exist?"
 
----
+> Level 1 document. Product details and acceptance criteria live in [`product.md`](product.md).
 
 ## Vision
 
-Create the best analytical platform for bettors — one that an experienced bettor opens before every serious bet because it helps them make a better decision.
+Build the most trusted private system for improving betting decision quality and controlling risk.
 
 ## Mission
 
-Help bettors make more informed decisions through deep analytics, intelligent AI agents, and disciplined bankroll management — not by selling predictions, but by building a thinking system.
+Help a user record a decision before an event, check risk, account for the result correctly, and learn from the quality of the process.
 
-## Core Values
-
-**Analytics over predictions.** We help users think, not tell them what to bet.  
-**Clarity over complexity.** Every feature must earn its place in the UI.  
-**Discipline over excitement.** We build tools for serious bettors, not casual gamblers.  
-**Quality over speed.** A strong foundation now prevents rewrites later.  
-**Transparency.** Every recommendation is explainable.
-
-## Target Audience
-
-**Primary:** Experienced bettors (1–5+ years) who already track bets manually or with basic tools, understand concepts like ROI/Yield/EV, and want a professional system.
-
-**Secondary:** Semi-serious bettors who want to become more disciplined and data-driven.
-
-**Not our audience (yet):** Casual bettors, beginners looking for "hot tips", people expecting guaranteed wins.
+BetTracker does not tell the user what to bet, where to bet, or how much to stake.
 
 ## Positioning
 
-> "BetTracker is the analytical layer between a bettor and their decision — not a tipster, not a social network, not a prediction machine."
+> BetTracker is the private decision-quality and risk-control layer between evidence, a user's own decision, and the later review.
 
-Competitors track bets. We analyze them.  
-Competitors show history. We show patterns.  
-Competitors add AI chat. We build specialized agents for specific tasks.
+The product is not:
 
-## North Star Metric
+- a tipster;
+- a bookmaker or bookmaker connector;
+- a signal feed;
+- a social picks network;
+- a copy-bet product;
+- a profit promise.
 
-**Monthly Active Analysts** — users who run at least 3 AI analyses per month.
+## Core Product Cycle
 
-This metric confirms the core value proposition: the product is used as an analytical tool, not just a journal.
+```txt
+Research → Decision → Risk Check → Pass / Paper / Bet → Resolution → Review
+```
 
-## Success Metrics
+Decision is the primary object. Bet is a separate user-owned record of an independently taken action. Result does not retroactively redefine decision quality.
 
-| Metric | 6 months | 12 months |
-|--------|----------|-----------|
-| MAU (Monthly Active Users) | 500 | 2,000 |
-| Monthly Active Analysts | 200 | 1,000 |
-| Avg analyses per user/month | 5 | 10 |
-| Paid conversion | — | 5% |
-| D30 retention | 30% | 45% |
+## Strategic Principles
+
+1. Decision before outcome.
+2. Decision quality is not the same as result.
+3. Code calculates; AI explains.
+4. Evidence before confidence.
+5. Risk before action.
+6. No fabricated availability or false precision.
+7. Private by default.
+8. The user owns export and deletion.
+9. Market is independent from locale.
+10. No dark patterns.
+
+## Product Architecture
+
+The complete product has five canonical sections:
+
+- Home;
+- Research;
+- Journal;
+- Insights;
+- Risk.
+
+Global capabilities include Add, Review Inbox, Search, Privacy View, Assistant, Tools, Notifications, Settings, and Trust Center.
+
+The same entity, state, policy, and metric contracts apply to Web, iPhone, and Android.
+
+## Global Model
+
+The operating model is:
+
+> One codebase → one operating core → three interface locales → separately approved MarketProfiles.
+
+The first internal profile is `GB_EW_SC` for England, Wales, and Scotland. Northern Ireland is excluded until separately approved.
+
+The interface locales are `en`, `uk`, and `ru`. Locale never grants market eligibility.
+
+One OpCo is the working structural hypothesis. UK Ltd, tax residence, payments, data residency, monetization, and launch remain subject to written UK–UA and market-specific advice.
+
+## North-Star Metric
+
+**Weekly Completed Decision Users**
+
+A counted user completes:
+
+```txt
+Decision → Risk Check → Result → Review
+```
+
+Profit, turnover, bet count, win streak, AI message count, and app opens are not north-star metrics.
 
 ## Business Model
 
-**Phase 1 (MVP):** Free with shared API key  
-**Phase 2 (Beta):** Freemium — basic tracker free, AI agents behind paywall  
-**Phase 3 (v1.0):** Subscription tiers  
-- Free: tracker + basic stats  
-- Pro ($9–15/mo): all AI agents + advanced analytics  
-- Team: multi-user (future)
+Subscription may monetize advanced analysis of the user's own history, deeper reports, additional deterministic simulations, automation, and convenience.
 
-**No ads. No affiliate links. No selling picks.**
+Never paywall:
+
+- export;
+- account deletion;
+- responsible-use controls;
+- core limits;
+- access to basic personal history;
+- cancellation and billing control required by law.
+
+No ads, bookmaker affiliate links, sale of picks, or paid ranking of betting opportunities.
+
+## Competitive Advantage
+
+The differentiated intersection is:
+
+- Decision Ledger;
+- evidence-first Review;
+- Risk Controls;
+- transparent deterministic mathematics;
+- AI that explains verified user data without predicting or inventing.
+
+Competitor mechanics are adapted only when they strengthen this intersection and preserve legal, trust, privacy, and responsible-use boundaries.
+
+## Delivery Rule
+
+R18 is one complete target product. Engineering may use dependency-safe PRs for correctness, testing, rollback, and review, but those PRs do not define smaller product editions and may not erase required screens or states.
 
 ## Anti-Vision
 
-We will never:
-- Sell predictions or tips
-- Guarantee profits
-- Build a social feed or copy-trading feature
-- Add features just because competitors have them
-- Ship a feature that fails the 3-question filter:
-  1. Does it save user time?
-  2. Does it improve decision quality?
-  3. Does it reduce errors or increase profit?
+BetTracker will not:
+
+- rank “best bets”;
+- recommend stake size;
+- generate live betting opportunities or push signals;
+- use Martingale, loss recovery, or chasing mechanics;
+- gamify profit, turnover, streaks, or frequency;
+- claim guaranteed returns, bankroll growth, or “beating the line”;
+- present stale, incomplete, or unverified data as evidence.
 
 ---
 
-*Last updated: 2026-06-26*  
+*Adopted by Decision #069: 2026-07-29*
 *Owner: CPO*
