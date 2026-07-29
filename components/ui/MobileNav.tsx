@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { LucideIcon } from 'lucide-react'
 import {
+  Calculator,
   ClipboardList,
   LayoutDashboard,
   Search,
@@ -25,34 +26,48 @@ function isActive(pathname: string, item: NavItem): boolean {
   return [item.href, ...(item.aliases ?? [])].some((route) => pathname === route || pathname.startsWith(`${route}/`))
 }
 
-export default function MobileNav() {
+const TENNIS_CALC_LINK: NavItem = { href: '/tennis-calculator', Icon: Calculator, label: 'Серия 40:40' }
+
+export default function MobileNav({ tennisCalcEnabled }: { tennisCalcEnabled: boolean }) {
   const pathname = usePathname()
 
   return (
-    <nav
-      className="fixed inset-x-0 bottom-0 z-50 flex border-t border-[var(--border-strong)] bg-[var(--night)] px-1 pt-1 text-[var(--text-primary)] md:hidden"
-      aria-label="Мобильная навигация"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-    >
-      {NAV.map((item) => {
-        const { href, Icon, label } = item
-        const active = isActive(pathname, item)
-        return (
-          <Link
-            key={href}
-            href={href}
-            aria-current={active ? 'page' : undefined}
-            className={`relative mx-0.5 flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 rounded-[var(--radius-control)] border text-center transition-colors ${
-              active
-                ? 'border-[var(--signal)] bg-[var(--signal)] text-[var(--on-signal)]'
-                : 'border-transparent text-[var(--text-quiet)] hover:border-[var(--border-strong)] hover:bg-[var(--field)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            <Icon size={18} strokeWidth={1.8} aria-hidden />
-            <span className="max-w-full px-0.5 text-center font-mono text-[11px] font-black uppercase leading-tight tracking-[0.01em]">{label}</span>
-          </Link>
-        )
-      })}
-    </nav>
+    <>
+      {tennisCalcEnabled ? (
+        <Link
+          href={TENNIS_CALC_LINK.href}
+          className="fixed bottom-[calc(60px+env(safe-area-inset-bottom))] right-3 z-50 flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--signal)] bg-[var(--signal)] px-3 font-mono text-[11px] font-black uppercase tracking-[0.04em] text-[var(--on-signal)] shadow-2xl shadow-black/35 md:hidden"
+        >
+          <TENNIS_CALC_LINK.Icon size={14} strokeWidth={1.9} aria-hidden />
+          {TENNIS_CALC_LINK.label}
+        </Link>
+      ) : null}
+
+      <nav
+        className="fixed inset-x-0 bottom-0 z-50 flex border-t border-[var(--border-strong)] bg-[var(--night)] px-1 pt-1 text-[var(--text-primary)] md:hidden"
+        aria-label="Мобильная навигация"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {NAV.map((item) => {
+          const { href, Icon, label } = item
+          const active = isActive(pathname, item)
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? 'page' : undefined}
+              className={`relative mx-0.5 flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 rounded-[var(--radius-control)] border text-center transition-colors ${
+                active
+                  ? 'border-[var(--signal)] bg-[var(--signal)] text-[var(--on-signal)]'
+                  : 'border-transparent text-[var(--text-quiet)] hover:border-[var(--border-strong)] hover:bg-[var(--field)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <Icon size={18} strokeWidth={1.8} aria-hidden />
+              <span className="max-w-full px-0.5 text-center font-mono text-[11px] font-black uppercase leading-tight tracking-[0.01em]">{label}</span>
+            </Link>
+          )
+        })}
+      </nav>
+    </>
   )
 }

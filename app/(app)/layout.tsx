@@ -24,7 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </div>
 
-      <MobileNav />
+      <MobileNav tennisCalcEnabled={tennisCalcEnabled} />
       <FeedbackWidget />
     </div>
   )
