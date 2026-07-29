@@ -1,7 +1,7 @@
 # Decision Ledger / Numbering Governance
 
-Status: Decision #061 is EXECUTED / VERIFIED / CLOSED after PR #235 merged as `2fb83250`; the highest-numbered closed decision remains #067 after migration 031 verification. #068 is next unreserved.
-Last updated: 2026-07-27
+Status: Decision #056 is EXECUTED / VERIFIED / CLOSED after GitHub Actions run `30429349031`; the highest-numbered closed decision remains #067 after migration 031 verification. #068 is next unreserved.
+Last updated: 2026-07-29
 
 ## Purpose
 
@@ -14,6 +14,7 @@ Occupied: #001-#019, #021-#031, #033-#067
 Do not reuse: #020
 Retired reservation / do not reuse: #032
 Occupied / closed: #061 — Founder Daily Flow Acceptance (Phase A1 via PR #162; Phase A2 via PR #235 as `2fb83250`)
+Occupied / closed: #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run (run `30429349031`; requestCount 1; writes none; ledger consumed)
 Occupied / closed: #063 — Tracked-Leg Fixture Lineage Contract (docs-only; merged via PR #183 as `df4723f`)
 Occupied / closed: #064 — Tracked-Leg Fixture Lineage Foundation (Gate 3 merged via PR #231; migration 025 applied and verified)
 Occupied / closed: #065 — Broadcast Noir Cross-Platform Rollout (Web rollout production-deployed via #202 → #224; mobile release unauthorized)
@@ -21,8 +22,6 @@ Occupied / closed: #066 — odds_snapshots_public Security-Invoker Hardening (PR
 Occupied / closed: #067 — Public API Privilege Hardening (PR #233 merged; migration 031 applied and verified)
 Highest-numbered closed: #067 — Public API Privilege Hardening
 Active approved: #062 — Mobile Founder client (0/1B/1C merged; 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171)
-                 #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run
-                 (implementation merged/deployed; runtime provider call not approved / not run)
 Next unreserved: #068
 ```
 
@@ -42,7 +41,7 @@ Next unreserved: #068
 | #053 | Project State & Migration Reconciliation — EXECUTED / CLOSED |
 | #054 | CSP Report Hardening & Security Headers, Phase A — EXECUTED / MERGED / DEPLOYED; Phase B NOT APPROVED |
 | #055 | Sports Data Trust Contract & Football Enrichment Storage Boundary — EXECUTED / CLOSED; provider calls/writes not approved |
-| #056 | Canonical-Linked SportMonks Class A Structural Presence Dry-Run — IMPLEMENTATION MERGED / DEPLOYED / READY; runtime call NOT APPROVED / NOT RUN |
+| #056 | Canonical-Linked SportMonks Class A Structural Presence Dry-Run — EXECUTED / VERIFIED / CLOSED; run `30429349031`, requestCount 1, writes none, ledger consumed; source freshness warning remains |
 | #057 | Results Ingestion & Settlement Trust Contract — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY; no runtime, writes, or automated settlement |
 | #058 | Settlement Metrics & Status Presentation Reconciliation (G4+G12) — EXECUTED / CLOSED by merge |
 | #059 | Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY; eligibility BLOCKED |
@@ -76,7 +75,7 @@ Next unreserved: #068
 
 Decision numbering does not grant runtime authority.
 
-- Decision #056's implementation is merged and deployed, but its production provider call, writes, migrations, environment changes, persistence, odds ingestion, and downstream use remain unapproved and the call has not been run.
+- Decision #056 is EXECUTED / VERIFIED / CLOSED. Its single approved production provider call ran once via GitHub Actions run `30429349031`, returned `success: true`, `responseStatus: ok`, `requestCount: 1`, and `writes: none`; the execution ledger has one row for deployment SHA `240e3e9916299fd21a71d3c1b5b8ec562ab9316f`. No retry, rerun, second dispatch, ledger reset, structural persistence, odds ingestion, or downstream use is authorized. Source freshness remains unproven because fixture source `updated_at` was missing or invalid.
 - Decision #057 is executed as docs-evidence only: results ingestion, result writes, automated settlement, and bankroll mutations remain unapproved.
 - Decision #058 reconciled reporting metrics and status presentation only — it changed no payout/settlement calculation, settlement outcome, write path, or provider work.
 - Decision #059 recorded a BLOCKED eligibility verdict and a future dry-run contract only — the result-presence dry-run has no implementation and no runtime authorization.

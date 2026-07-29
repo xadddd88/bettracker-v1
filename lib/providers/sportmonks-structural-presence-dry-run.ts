@@ -87,6 +87,14 @@ const BLOCKED_DOWNSTREAM_USAGE = [
 
 export type StructuralPresenceDryRunStatus = 'ok' | 'blocked' | 'failed'
 export type StructuralRelationshipShape = 'absent' | 'array' | 'object' | 'invalid'
+export type FixtureSourceFreshnessStatus = 'present' | 'missing_or_invalid'
+
+export interface FixtureSourceFreshnessObservation {
+  field: 'updated_at'
+  status: FixtureSourceFreshnessStatus
+  sourceUpdatedAt: string | null
+  collectedAtIsSourceFreshness: false
+}
 
 export interface StructuralRelationshipObservation {
   present: boolean
@@ -110,6 +118,9 @@ export interface StructuralPresenceDryRunReport {
   responseStatus: StructuralPresenceDryRunStatus
   fixtureIdentityMatch: boolean | null
   providerStartingAt: string | null
+  fixtureSourceFreshness: FixtureSourceFreshnessObservation
+  // Backward-compatible summary boolean. Consumers must use
+  // fixtureSourceFreshness.sourceUpdatedAt for the actual provider timestamp.
   fixtureSourceFreshnessPresent: boolean
   structuralRelationships: Record<StructuralRelationshipKey, StructuralRelationshipObservation>
   unexpectedNonStructuralRelationshipsPresent: boolean
@@ -203,6 +214,12 @@ function baseReport(): StructuralPresenceDryRunReport {
     responseStatus: 'blocked',
     fixtureIdentityMatch: null,
     providerStartingAt: null,
+    fixtureSourceFreshness: {
+      field: 'updated_at',
+      status: 'missing_or_invalid',
+      sourceUpdatedAt: null,
+      collectedAtIsSourceFreshness: false,
+    },
     fixtureSourceFreshnessPresent: false,
     structuralRelationships: emptyStructuralRelationships(),
     unexpectedNonStructuralRelationshipsPresent: false,
@@ -458,7 +475,14 @@ export async function runSportMonksStructuralPresenceDryRun(): Promise<Structura
   }
 
   report.providerStartingAt = toIsoTimestamp(data.starting_at)
-  report.fixtureSourceFreshnessPresent = toIsoTimestamp(data.updated_at) !== null
+  const sourceUpdatedAt = toIsoTimestamp(data.updated_at)
+  report.fixtureSourceFreshness = {
+    field: 'updated_at',
+    status: sourceUpdatedAt === null ? 'missing_or_invalid' : 'present',
+    sourceUpdatedAt,
+    collectedAtIsSourceFreshness: false,
+  }
+  report.fixtureSourceFreshnessPresent = report.fixtureSourceFreshness.status === 'present'
   if (!report.fixtureSourceFreshnessPresent) {
     report.warnings.push(
       'fixture source updated_at not present or invalid — collectedAt is not source freshness'

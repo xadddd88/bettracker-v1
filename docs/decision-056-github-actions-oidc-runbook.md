@@ -4,6 +4,9 @@
 
 This runbook covers only the authorization path for the already implemented Decision #056 structural-presence dry-run.
 
+Decision #056 has now been executed once and closed. This file remains as the audit
+record for the OIDC authorization path; it is not a rerun procedure.
+
 The OIDC pull request:
 
 - adds one reviewed migration for an append-only Supabase execution ledger;
@@ -13,7 +16,7 @@ The OIDC pull request:
 - removes the static operator-token fallback only from the Decision #056 route;
 - leaves every other admin route and the existing `SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN` environment value unchanged.
 
-The workflow is manual-only. It has no `push`, `pull_request`, `schedule`, or reusable-workflow trigger.
+The workflow is manual-only. It has no `push`, `pull_request`, `schedule`, or reusable-workflow trigger. The single approved dispatch was GitHub Actions run `30429349031`.
 
 ## Trust Boundary
 
@@ -86,7 +89,7 @@ An automatic preview check created by repository integrations is not authority t
 
 The workflow must not be dispatched merely because the PR was merged or deployed.
 
-For a future separately authorized run:
+For the separately authorized run that was executed on 2026-07-29:
 
 1. Confirm `btdk.app` is deployed from the exact current `main` SHA.
 2. Enter that exact 40-character SHA as `approved_production_sha`.
@@ -97,6 +100,10 @@ For a future separately authorized run:
 The workflow obtains one GitHub OIDC token and sends one POST. It has no retry path. Any HTTP response, timeout, authentication failure, or provider failure consumes the one-call authorization.
 
 The workflow succeeds only when the endpoint returns HTTP `200`, `success: true`, `report.responseStatus: "ok"`, `report.requestCount: 1`, `report.maxProviderRequests: 1`, the pinned provider, and `writes: "none"`. A blocked or structurally malformed JSON response fails the job.
+
+The executed run met those success conditions on attempt `1` for SHA
+`240e3e9916299fd21a71d3c1b5b8ec562ab9316f`; the ledger has one row for that SHA.
+No rerun, second dispatch, or ledger reset is authorized.
 
 ## Verification
 

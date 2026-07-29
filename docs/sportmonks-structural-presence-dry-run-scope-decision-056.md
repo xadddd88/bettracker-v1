@@ -2,13 +2,15 @@
 
 ## Status
 
-**IMPLEMENTED / DEPLOYED. ONE RUNTIME POST APPROVED 2026-07-28 BUT NOT RUN; AUTHORIZATION REMAINS UNCONSUMED.**
+**EXECUTED / VERIFIED / CLOSED — 2026-07-29.**
 
 Founder approval: `APPROVE #056`.
 
-The original decision permitted a reviewed implementation PR for a new read-only admin dry-run. On 2026-07-28, Founder separately approved exactly one production POST, but the call could not be authenticated through the existing Vercel Sensitive operator token and was not sent. The authorization remains unconsumed.
+The original decision permitted a reviewed implementation PR for a new read-only admin dry-run. On 2026-07-28, Founder separately approved exactly one production POST, but the call could not be authenticated through the existing Vercel Sensitive operator token and was not sent. PR #237 replaced that path with GitHub Actions OIDC, a protected GitHub Environment, and a durable Supabase execution ledger.
 
-The GitHub Actions OIDC hardening PR includes a reviewed durable execution-ledger migration, but does not authorize merge, deployment, migration application, workflow dispatch, production execution, provider quota use, environment changes, or downstream consumption.
+After separate merge, production deployment, migration, workflow dispatch, and environment approvals, GitHub Actions run `30429349031` executed the single authorized production POST on 2026-07-29. The authorization is now consumed and no retry, rerun, second dispatch, rollback deletion, or ledger reset is authorized.
+
+Execution record: `docs/decision-056-production-execution-record.md`.
 
 ## Objective
 
@@ -145,7 +147,8 @@ The report additionally contains:
 
 - fixture identity status;
 - normalized fixture kickoff;
-- fixture source-freshness presence boolean;
+- explicit fixture source-freshness object for provider `updated_at`;
+- backward-compatible fixture source-freshness presence boolean;
 - one boolean indicating whether a non-approved Class B/C relationship appeared;
 - `collectedAt`, explicitly not source freshness;
 - fixed warnings;
@@ -207,16 +210,16 @@ All existing FP-001, financial, domain-boundary, agent-boundary, auth, quarantin
 
 ## Runtime Boundary
 
-The 2026-07-28 approval permits exactly one future production POST and remains unconsumed because no POST was sent and the ledger migration has not been applied. This OIDC PR does not authorize merge, migration application, deployment, workflow dispatch, or execution. Those steps remain separately gated. Once a valid production OIDC token claims the ledger key, every eventual outcome — invalid body, success, blocked, failed, timeout, `401`, `429`, or `5xx` — consumes the authorization and forbids a retry without a new approval.
+The 2026-07-28 approval permitted exactly one production POST. It was consumed by GitHub Actions run `30429349031` on 2026-07-29 after the production ledger migration and required environment approval. Once a valid production OIDC token claimed the ledger key, the authorization became consumed regardless of the eventual result. The result was successful, but this does not authorize another run.
 
 ## Non-Use
 
 ```text
 provider call during implementation/testing: 0
-production Supabase writes: 0
-execution-ledger production writes: 0
+production Supabase writes outside the execution ledger: 0
+execution-ledger production writes: 1
 migrations authored: 1
-migrations applied to production: 0
+migrations applied to production: 1
 environment changes: 0
 structural persistence: 0
 football_enrichment writes: 0
@@ -226,7 +229,7 @@ Scout / Analyst / UI: HOLD
 probability / implied probability / edge / EV / recommendation / Place Bet: HOLD
 betting signals: HOLD
 CSP Phase B: untouched
-Decision #050 SMTP round-trip: remains PENDING
+additional Decision #056 runtime: NOT AUTHORIZED
 ```
 
 ## FP-001
