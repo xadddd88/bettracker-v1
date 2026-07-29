@@ -6,9 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
-import { bucketOdds, bucketStake } from '@/lib/analytics/buckets'
 import RiskEvaluator from '@/components/risk/RiskEvaluator'
-import { Camera, Eye, X, CheckCircle, Search } from 'lucide-react'
+import { Camera, Eye, X, Search } from 'lucide-react'
 import SectionGuide from '@/components/ui/SectionGuide'
 import {
   buildAnalystTrustView,
@@ -262,7 +261,7 @@ const AI_PAGE_COPY = {
     downloadPdf: 'Download PDF',
     copied: 'Copied!',
     copyToShare: 'Copy to share',
-    placeBet: 'Place Bet',
+    placeBet: 'Check Risk',
     watch: 'Watch',
     skip: 'Skip',
     closeStakeInput: 'Close stake input',
@@ -370,7 +369,7 @@ const AI_PAGE_COPY = {
     downloadPdf: 'Завантажити PDF',
     copied: 'Скопійовано!',
     copyToShare: 'Копіювати для відправки',
-    placeBet: 'Зробити ставку',
+    placeBet: 'Перевірити ризик',
     watch: 'Спостерігати',
     skip: 'Пропустити',
     closeStakeInput: 'Закрити введення ставки',
@@ -478,7 +477,7 @@ const AI_PAGE_COPY = {
     downloadPdf: 'Скачать PDF',
     copied: 'Скопировано!',
     copyToShare: 'Копировать для отправки',
-    placeBet: 'Сделать ставку',
+    placeBet: 'Проверить риск',
     watch: 'Наблюдать',
     skip: 'Пропустить',
     closeStakeInput: 'Закрыть ввод ставки',
@@ -789,68 +788,12 @@ export default function AIAnalystPage() {
 
   // ── Act on already-persisted decision ─────────────────────
   // Decision is created immediately by /api/ai/analyst.
-  // handleAction only calls the 2nd RPC (place or mark).
-  const handleAction = useCallback(async (action: 'placed' | 'skipped' | 'watchlisted') => {
+  // R18 keeps Research/Decision flows informational: no direct Bet creation.
+  const handleAction = useCallback(async (action: 'skipped' | 'watchlisted') => {
     if (!analysis) return
     if (!analysis.decision_id) {
       const copy = AI_PAGE_COPY[normalizeAiPageLocale(analysis.trust_view?.locale ?? analysis.output_language)]
       setRootErr(copy.analysisFailed)
-      return
-    }
-
-    if (action === 'placed') {
-      const copy = AI_PAGE_COPY[normalizeAiPageLocale(analysis.trust_view?.locale ?? analysis.output_language)]
-      const stake = parseFloat(stakeStr)
-      if (!stakeStr || isNaN(stake) || stake <= 0) {
-        setRootErr(copy.invalidStake)
-        return
-      }
-      setSaving(true)
-      setRootErr('')
-      trackClientEvent(EVENTS.BET_PLACE_CLICKED, {
-        decision_id:  analysis.decision_id,
-        from_page:    'ai_page',
-        stake_bucket: bucketStake(stake),
-        odds_bucket:  bucketOdds(analysis.offered_odds),
-        is_ai_linked: true,
-      })
-      try {
-        const { data: betData, error: betErr } = await supabase.rpc('place_bet_from_decision', {
-          p_decision_id: analysis.decision_id,
-          p_stake:       stake,
-          p_bookmaker:   analysis.bookmaker,
-        })
-        if (betErr) {
-          const isDuplicate = betErr.code === '23505' || betErr.message?.includes('duplicate') || betErr.message?.includes('already placed')
-          if (isDuplicate) {
-            trackClientEvent(EVENTS.BET_DUPLICATE_REJECTED, { decision_id: analysis.decision_id, from_page: 'ai_page' })
-          } else {
-            trackClientEvent(EVENTS.BET_PLACE_FAILED, { decision_id: analysis.decision_id, from_page: 'ai_page' })
-          }
-          throw new Error(betErr.message || betErr.details || JSON.stringify(betErr))
-        }
-        const betPayload = betData as { bet_id?: string } | null
-        trackClientEvent(EVENTS.BET_PLACE_SUCCEEDED, {
-          bet_id:      betPayload?.bet_id,
-          decision_id: analysis.decision_id,
-          sport:       analysis.sport,
-          bet_type:    'single',
-          source:      'ai_page',
-          stake_bucket: bucketStake(stake),
-          odds_bucket:  bucketOdds(analysis.offered_odds),
-          is_ai_linked: true,
-          is_parlay:    false,
-          legs_count:   1,
-        })
-        trackClientEvent(EVENTS.DECISION_ACTION_PLACED, { decision_id: analysis.decision_id, from_page: 'ai_page' })
-        router.push(`/decisions/${analysis.decision_id}`)
-      } catch (err: unknown) {
-        trackClientEvent(EVENTS.DECISION_ACTION_FAILED, { decision_id: analysis.decision_id, action: 'placed', from_page: 'ai_page' })
-        setRootErr(err instanceof Error ? err.message : String(err))
-        setShowRisk(false)
-      } finally {
-        setSaving(false)
-      }
       return
     }
 
@@ -875,7 +818,7 @@ export default function AIAnalystPage() {
     } finally {
       setSaving(false)
     }
-  }, [analysis, stakeStr, supabase, router])
+  }, [analysis, supabase, router])
 
   // ── PDF download ───────────────────────────────────────────
   const downloadPDF = useCallback(() => {
@@ -1658,12 +1601,11 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               stake={parseFloat(stakeStr)}
               decisionId={analysis.decision_id}
               fromPage="ai_page"
-              onConfirm={() => handleAction('placed')}
               onAdjustStake={() => { setShowRisk(false); setRootErr('') }}
             />
           )}
 
-          {/* Stake input — shown when Place Bet is clicked */}
+          {/* Intended exposure input — shown before risk review */}
           {showStake && !showRisk && (
             <div className="grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
               <div>
@@ -1707,20 +1649,13 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
               <button
                 className="bn-button bn-button-primary"
                 onClick={() => {
-                  if (analysis?.decision_id) {
-                    trackClientEvent(EVENTS.DECISION_ACTION_PLACE_CLICKED, {
-                      decision_id: analysis.decision_id,
-                      odds_bucket: bucketOdds(analysis.offered_odds),
-                      from_page: 'ai_page',
-                    })
-                  }
                   setShowStake(true)
                   setShowRisk(false)
                   setRootErr('')
                 }}
                 disabled={saving}
               >
-                <CheckCircle size={14} strokeWidth={2} /> {trustView?.placeBetLabel ?? copy.placeBet}
+                <Search size={14} strokeWidth={2} /> {trustView?.placeBetLabel ?? copy.placeBet}
               </button>
             )}
             {trustView?.showWatch !== false && (

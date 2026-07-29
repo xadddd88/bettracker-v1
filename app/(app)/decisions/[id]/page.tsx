@@ -568,10 +568,10 @@ export default async function DecisionDetailPage({
         <DecisionActions
           decisionId={d.id}
           offeredOdds={d.offered_odds}
-          canPlaceBet={showPricing && (trustView?.showPlaceBet ?? true)}
+          canCheckRisk={showPricing && (trustView?.showPlaceBet ?? true)}
           canWatch={trustView?.showWatch !== false}
           labels={trustView ? {
-            placeBet:     trustView.placeBetLabel,
+            riskCheck:    trustView.placeBetLabel,
             watch:        trustView.watchLabel,
             skip:         trustView.skipLabel,
             checkRisk:    copy.checkRisk,

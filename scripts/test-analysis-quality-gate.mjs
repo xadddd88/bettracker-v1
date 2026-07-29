@@ -1220,7 +1220,7 @@ test('Ukrainian trust view localizes exact mixed-sport coupon and structurally h
   assert.equal(view.copyToShareLabel, 'Скопіювати для поширення');
   assert.equal(view.watchLabel, 'Спостерігати');
   assert.equal(view.skipLabel, 'Пропустити');
-  assert.equal(view.placeBetLabel, 'Зробити ставку');
+  assert.equal(view.placeBetLabel, 'Перевірити ризик');
   assertNoForbiddenPricingText(text);
 });
 
