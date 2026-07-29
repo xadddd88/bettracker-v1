@@ -76,6 +76,8 @@ jobs:
         run: npm ci
       - name: Provider safety suite
         run: npm run test:provider-safety
+      - name: "Decision #056 GitHub OIDC authorization"
+        run: npm run test:decision-056-oidc
       - name: Analysis quality gate (FP-001) suite
         run: npm run test:analysis-quality-gate
       - name: "Financial safety suite (Decision #047)"
@@ -154,6 +156,33 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Run migration 025 lineage verifier
         run: bash scripts/verify-migration-025.sh postgresql://postgres:postgres@localhost:5432/postgres
+
+  # Durable one-time authorization gate for Decision #056. This uses only a
+  # disposable localhost PostgreSQL service and never receives Supabase or
+  # provider credentials.
+  decision-056-ledger-postgres:
+    name: Decision 056 ledger PostgreSQL 17
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Run Decision #056 ledger verifier
+        run: bash scripts/verify-decision-056-ledger.sh postgresql://postgres:postgres@localhost:5432/postgres
 
   # ── Job: Decision #066 odds view security on PostgreSQL 17 ────────────────
   odds-view-security:

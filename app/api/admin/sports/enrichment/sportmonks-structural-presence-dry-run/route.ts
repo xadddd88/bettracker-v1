@@ -1,4 +1,3 @@
-import { timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import {
@@ -11,6 +10,7 @@ import {
   SPORTMONKS_ENRICHMENT_APPROVED_CANONICAL_FIXTURE_ID,
   SPORTMONKS_ENRICHMENT_APPROVED_PROVIDER_FIXTURE_ID,
 } from '@/lib/providers/sportmonks-enrichment-dry-run'
+import { authorizeDecision056GitHubOidcRequest } from '@/lib/security/github-actions-oidc'
 
 export const runtime = 'nodejs'
 
@@ -36,38 +36,15 @@ const structuralPresenceDryRunBodySchema = z
   })
   .strict()
 
-function getBearerToken(req: NextRequest): string | null {
-  const authorization = req.headers.get('authorization')
-  if (authorization?.startsWith('Bearer ')) return authorization.slice('Bearer '.length).trim()
-  return req.headers.get('x-bettracker-sync-token')?.trim() ?? null
-}
-
-function safeEqual(left: string, right: string): boolean {
-  const leftBuffer = Buffer.from(left)
-  const rightBuffer = Buffer.from(right)
-  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer)
-}
-
-function authorize(req: NextRequest): NextResponse | null {
-  const expected = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN
-  if (!expected) {
-    return NextResponse.json(
-      { success: false, error: 'Structural presence dry-run operator token is not configured' },
-      { status: 503 }
-    )
-  }
-
-  const provided = getBearerToken(req)
-  if (!provided || !safeEqual(provided, expected)) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-  }
-
-  return null
-}
-
 export async function POST(req: NextRequest) {
-  const unauthorized = authorize(req)
-  if (unauthorized) return unauthorized
+  const authorization = await authorizeDecision056GitHubOidcRequest(req.headers)
+  if (!authorization.ok) {
+    const error =
+      authorization.status === 503
+        ? 'Decision #056 OIDC authorization is not configured'
+        : 'Unauthorized'
+    return NextResponse.json({ success: false, error }, { status: authorization.status })
+  }
 
   try {
     const rawBody = await req.json().catch(() => ({}))

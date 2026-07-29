@@ -4015,6 +4015,7 @@ const STRUCTURAL_PRESENCE_INCLUDE_SET = [
 function clearCompiledStructuralPresenceDryRunModules() {
   for (const relPath of [
     'app/api/admin/sports/enrichment/sportmonks-structural-presence-dry-run/route.js',
+    'lib/security/github-actions-oidc.js',
     'lib/providers/sportmonks-structural-presence-dry-run.js',
     'lib/providers/sportmonks-enrichment-dry-run.js',
     'lib/providers/sportmonks-mapping-discovery.js',
@@ -4027,6 +4028,25 @@ function clearCompiledStructuralPresenceDryRunModules() {
       // Module may not have been loaded yet.
     }
   }
+}
+
+function stubDecision056OidcModule() {
+  const modulePath = path.join(buildDir, 'lib/security/github-actions-oidc.js');
+  require.cache[require.resolve(modulePath)] = {
+    id: modulePath,
+    filename: modulePath,
+    loaded: true,
+    exports: {
+      async authorizeDecision056GitHubOidcRequest(headers) {
+        const authorization = headers.get('authorization');
+        if (authorization === 'Bearer valid-oidc-token') return { ok: true };
+        if (authorization === 'Bearer oidc-not-configured') {
+          return { ok: false, status: 503 };
+        }
+        return { ok: false, status: 401 };
+      },
+    },
+  };
 }
 
 function structuralProviderData(overrides = {}) {
@@ -4080,7 +4100,7 @@ function approvedStructuralPresenceBody(overrides = {}) {
   };
 }
 
-function structuralPresenceRequest(body, token = 'operator-token') {
+function structuralPresenceRequest(body, token = 'valid-oidc-token') {
   const headers = { 'content-type': 'application/json' };
   if (token) headers.authorization = `Bearer ${token}`;
   return new Request(
@@ -4096,6 +4116,7 @@ function structuralPresenceRequest(body, token = 'operator-token') {
 async function withStructuralPresenceDryRunRoute(dbRows, fn) {
   return withCompiledAlias(async () => {
     clearCompiledStructuralPresenceDryRunModules();
+    stubDecision056OidcModule();
     stubEnrichmentAdminModule(dbRows);
     const route = require(
       path.join(
@@ -4111,9 +4132,8 @@ async function withStructuralPresenceDryRunRoute(dbRows, fn) {
   });
 }
 
-await testAsync('structural presence dry-run: operator gate rejects missing/wrong token with zero fetches', async () => {
+await testAsync('structural presence dry-run: OIDC gate rejects unavailable/missing/wrong auth with zero fetches', async () => {
   const originalFetch = globalThis.fetch;
-  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
   let fetchCalls = 0;
 
   globalThis.fetch = async () => {
@@ -4122,13 +4142,13 @@ await testAsync('structural presence dry-run: operator gate rejects missing/wron
   };
 
   try {
-    delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
     await withStructuralPresenceDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
-      const response = await POST(structuralPresenceRequest(approvedStructuralPresenceBody()));
+      const response = await POST(
+        structuralPresenceRequest(approvedStructuralPresenceBody(), 'oidc-not-configured')
+      );
       assert.equal(response.status, 503);
     });
 
-    process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
     await withStructuralPresenceDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
       const response = await POST(
         structuralPresenceRequest(approvedStructuralPresenceBody(), 'wrong-token')
@@ -4136,11 +4156,14 @@ await testAsync('structural presence dry-run: operator gate rejects missing/wron
       assert.equal(response.status, 401);
     });
 
+    await withStructuralPresenceDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(structuralPresenceRequest(approvedStructuralPresenceBody(), null));
+      assert.equal(response.status, 401);
+    });
+
     assert.equal(fetchCalls, 0);
   } finally {
     globalThis.fetch = originalFetch;
-    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
-    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
   }
 });
 
