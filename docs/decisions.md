@@ -2247,7 +2247,7 @@ unnumbered operational correction: it does not consume or reassign Decision
 governance rename.
 
 **Numbering:** Decision #063, #064, #065, and #066 are occupied and CLOSED.
-Decision #067 is occupied and CLOSED; Decision #068 is next unreserved.
+Decision #067 is occupied and CLOSED; Decision #068 is occupied and CLOSED; Decision #069 is next unreserved.
 
 Reference: `docs/tracked-leg-fixture-lineage-contract-decision-063.md`
 
@@ -2291,7 +2291,7 @@ holds remain active.
 
 **Execution checkpoint:** PR #186 was squash-merged and its automatic Vercel deployment reached READY without applying migration 025. Gate 3 then merged via PR #231, and migration 025 was applied once as `20260727060234_tracked_leg_fixture_lineage_025`. Read-only catalog verification confirmed 12/12 columns, 3/3 constraints, 2/2 indexes, 2/2 triggers, 3/3 functions, and service-role-only v2 ACL. No bet was created and no application caller, provider/result/settlement action, env change, or additional deployment was authorized by the apply gate.
 
-**Numbering:** Decision #064 is occupied and CLOSED. Decision #065 is occupied and CLOSED for the Web rollout. Decision #066 is occupied and CLOSED after migration 030 verification. Decision #067 is occupied and CLOSED for public API privilege hardening; Decision #068 is next unreserved.
+**Numbering:** Decision #064 is occupied and CLOSED. Decision #065 is occupied and CLOSED for the Web rollout. Decision #066 is occupied and CLOSED after migration 030 verification. Decision #067 is occupied and CLOSED for public API privilege hardening; Decision #068 is occupied and CLOSED; Decision #069 is next unreserved.
 
 Reference: `docs/tracked-leg-fixture-lineage-foundation-decision-064.md`
 
@@ -2365,7 +2365,7 @@ Reference: `docs/broadcast-noir-cross-platform-rollout-decision-065.md`
 
 **Execution checkpoint:** All nine repository CI jobs passed, including the PostgreSQL 17 verifier. Migration 030 applied successfully on the first attempt. Read-only verification confirmed `security_invoker=true`, one exact authenticated-only RLS policy, 9/9 safe columns accessible, 0/5 internal columns accessible, zero `anon` and DML access, unchanged `service_role` access, zero odds rows, and removal of both related Security Advisor findings. No retry or rollback ran.
 
-**Numbering:** Decision #066 is occupied and CLOSED. Decision #067 is occupied and CLOSED for public API privilege hardening; Decision #068 is next unreserved.
+**Numbering:** Decision #066 is occupied and CLOSED. Decision #067 is occupied and CLOSED for public API privilege hardening; Decision #068 is occupied and CLOSED; Decision #069 is next unreserved.
 
 Reference: `docs/odds-snapshots-security-invoker-decision-066.md`
 
@@ -2387,11 +2387,38 @@ Reference: `docs/odds-snapshots-security-invoker-decision-066.md`
 
 **Initial Draft boundary:** migration apply, production DB writes, function-body or financial-logic changes, runtime caller changes, env changes, Vercel actions, merge, and production deployment were outside the implementation Draft approval and required separate founder gates. The completed apply changed none of `main`, env, Vercel configuration, function bodies, financial logic, or runtime callers.
 
-**Numbering:** Decision #067 is occupied and CLOSED. Decision #068 is next unreserved.
+**Numbering:** Decision #067 is occupied and CLOSED. Decision #068 is occupied and CLOSED; Decision #069 is next unreserved.
 
 Reference: `docs/public-api-privilege-hardening-decision-067.md`
 
 ---
 
-*Last updated: 2026-07-27*
+## Decision #068 — SportMonks Source Freshness Resolution Scope
+**Date:** 2026-07-29
+**Proposed by:** CPO
+**Approved by:** Founder (conversation approval, 2026-07-29)
+**Status:** EXECUTED / CLOSED — docs-scope only. Implementation, provider calls, writes, env changes, migrations, deployment gates, and downstream product usage are not started.
+
+**Decision:** Split source freshness resolution from football enrichment storage and downstream product use. After Decision #056, BetTracker may only plan a separate source-freshness gate that proves whether a documented provider-source timestamp exists, can be parsed, and can be reported distinctly from `collectedAt`.
+
+**Why:**
+- Decision #056 proved one sanitized read-only structural-presence request with `writes: none`, but the provider fixture source `updated_at` was missing or invalid.
+- `collectedAt` is BetTracker collection time, not provider source freshness.
+- Writing enrichment or unlocking Analyst/Scout/UI from stale or unproven source freshness would reopen the false-precision class blocked by Decision #055 and FP-001.
+
+**Required next evidence:** A future implementation PR must document the exact provider endpoint/include set, exact source freshness field(s), field semantics, account-plan availability, valid/absent/present-invalid timestamp behavior, and sanitized report shape before any new runtime is approved.
+
+**Runtime boundary for a future PR:** Any future provider call must be separately approved, read-only, exact-fixture only, maximum one request, no retry/pagination/fallback/crawl, no raw payload/log leakage, no writes, and must distinguish `providerSourceFreshness`, `collectedAt`, and `freshnessUsableForDownstream`. The Decision #056 ledger authorization is consumed and cannot be reused.
+
+**Write boundary:** No football enrichment write may begin until a later decision separately approves source freshness proof, schema review, row cap, idempotency, rollback/cleanup stance, post-write verification, and continued non-use by Analyst, Scout, UI, probability, edge, EV, recommendations, Place Bet, and settlement until trust validation.
+
+**Non-authorization:** provider call 0; workflow dispatch 0; Supabase migration/write 0; Vercel env/config change 0; production deployment gate 0; Decision #056 rerun 0; football enrichment write 0; odds/result/settlement work 0; Analyst/Scout/UI usage 0; betting signals 0.
+
+**Numbering:** Decision #068 is occupied and CLOSED. Decision #069 is next unreserved.
+
+Reference: `docs/decision-068-source-freshness-resolution-scope.md`
+
+---
+
+*Last updated: 2026-07-29*
 *Owner: All (each role contributes)*
