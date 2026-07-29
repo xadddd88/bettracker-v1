@@ -1,6 +1,6 @@
 # BetTracker AI
 
-Decision-first betting analytics and bankroll tracking platform. The current working brand is **BetTracker AI**; **LineHunter AI** remains the preferred future brand direction.
+Private decision-quality and risk-control platform for betting records. BetTracker helps a user record a decision before an event, check risk, account for the result correctly, and review the quality of the process.
 
 ## Current Status
 
@@ -9,15 +9,18 @@ Decision-first betting analytics and bankroll tracking platform. The current wor
 - Product Vision Beta: **NOT READY**
 - External beta: **PAUSED**
 - Current source of truth: [`PROJECT_STATE.md`](PROJECT_STATE.md)
+- Product source of truth: [`docs/product.md`](docs/product.md) — approved R18 / Decision #069
+- Target locales: English (`en`), українська (`uk`), русский (`ru`)
+- First internal market profile: `GB_EW_SC` — England, Wales and Scotland; Northern Ireland excluded
 
-The product is intentionally trust-gated: incomplete fixture, odds, enrichment, or AI context must not become model probability, edge, EV, recommendation, Place Bet, or another betting signal.
+The product is intentionally trust-gated: incomplete fixture, odds, enrichment, or AI context must not become model probability, edge, EV, recommendation, a ranked opportunity, or another betting signal.
 
 ## Stack
 
 - Next.js 15 / React 19 / TypeScript
 - Tailwind CSS
 - Supabase Auth + PostgreSQL + RLS/RPC domain boundaries
-- Anthropic API for Scanner, Analyst, Scout, and Coach
+- Anthropic API for bounded capture, explanation, and review workflows
 - PostHog and Sentry
 - Vercel
 
@@ -127,19 +130,23 @@ types/                  shared TypeScript types
 
 There is no required `legacy/` directory in the current repository.
 
-## Core Product Model
+## Target Product Model
 
 ```txt
-Fixture → Odds/Enrichment → Trust Gate → Decision → Bet → Result → Analytics → Learning
+Research → Decision → Risk Check → Pass / Paper / Bet → Resolution → Review
 ```
 
-`Decision` is the first-class object. A user may analyze and skip/watch without placing a bet. Financial execution is recorded separately through `Bet`, `BetLeg`, and append-only bankroll transactions.
+`Decision` is the first-class object. A user may choose Pass or Paper without recording a Bet. A Bet is a separate user-owned record of an independently taken action. Financial execution is accounted for through reviewed ledger and Resolution contracts.
+
+The target information architecture is Home, Research, Journal, Insights, and Risk, with global Add, Review, Search, Privacy View, Assistant, Tools, Notifications, Settings, and Trust Center. Web, iPhone, and Android share the same product contracts.
 
 ## Documentation
 
 - [`PROJECT_STATE.md`](PROJECT_STATE.md) — current operational source of truth
-- [`PRODUCT_VISION_GAP.md`](PRODUCT_VISION_GAP.md) — gap to the intended product
-- [`docs/product.md`](docs/product.md) — product bible
+- [`docs/product.md`](docs/product.md) — approved R18 product source of truth
+- [`PRODUCT_VISION_GAP.md`](PRODUCT_VISION_GAP.md) — current implementation gap to R18
+- [`docs/decision-069-target-product-structure.md`](docs/decision-069-target-product-structure.md) — product and market architecture decision
+- [`docs/strategy.md`](docs/strategy.md) — level-1 strategy
 - [`docs/decisions.md`](docs/decisions.md) — decision log
 - [`docs/decision-ledger-numbering-governance.md`](docs/decision-ledger-numbering-governance.md) — numbering governance
 - [`docs/migration-state-reconciliation-053.md`](docs/migration-state-reconciliation-053.md) — tracked vs production migration inventory
