@@ -8,10 +8,12 @@ import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
 
 interface RiskResult {
   risk_level:                'low' | 'medium' | 'high' | 'very_high'
+  bankroll_balance:          number
+  intended_exposure_amount:  number
   stake_percent_of_bankroll: number
+  pending_exposure_amount:   number
   pending_exposure_percent:  number
   total_exposure_after_bet:  number
-  recommended_max_stake:     number
   warnings:                  string[]
   disclaimer:                string
 }
@@ -20,7 +22,6 @@ interface Props {
   stake:         number
   decisionId?:   string
   fromPage:      string
-  onConfirm:     () => Promise<void> | void
   onAdjustStake: () => void
 }
 
@@ -31,26 +32,10 @@ const RISK_CONFIG: Record<RiskResult['risk_level'], { label: string; status: Bro
   very_high: { label: 'Very High', status: 'negative' },
 }
 
-export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, onAdjustStake }: Props) {
+export default function RiskEvaluator({ stake, decisionId, fromPage, onAdjustStake }: Props) {
   const [result,     setResult]     = useState<RiskResult | null>(null)
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState('')
-  const [confirming, setConfirming] = useState(false)
-
-  async function handleConfirm(riskLevel?: string) {
-    if (confirming) return
-    setConfirming(true)
-    trackClientEvent(EVENTS.RISK_PLACE_ANYWAY_CLICKED, {
-      risk_level:   riskLevel ?? 'unavailable',
-      from_page:    fromPage,
-      has_warnings: result ? result.warnings.length > 0 : false,
-    })
-    try {
-      await onConfirm()
-    } finally {
-      setConfirming(false)
-    }
-  }
 
   useEffect(() => {
     let cancelled = false
@@ -95,7 +80,6 @@ export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, 
     )
   }
 
-  // On fetch error: still let the user place
   if (error || !result) {
     return (
       <BroadcastPanel className="flex flex-col gap-3 p-4">
@@ -104,10 +88,7 @@ export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, 
           <BroadcastButton className="flex-1" tone="secondary"
             onClick={onAdjustStake}
           >
-            Adjust Stake
-          </BroadcastButton>
-          <BroadcastButton className="flex-1" onClick={() => handleConfirm()} disabled={confirming}>
-            {confirming ? '…' : 'Place Bet'}
+            Adjust Exposure
           </BroadcastButton>
         </div>
       </BroadcastPanel>
@@ -128,7 +109,7 @@ export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, 
       {/* Metrics */}
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-bn-muted">Stake</span>
+          <span className="text-xs text-bn-muted">Intended</span>
           <BroadcastDataValue className="text-sm font-semibold">
             {result.stake_percent_of_bankroll.toFixed(1)}%
           </BroadcastDataValue>
@@ -142,11 +123,11 @@ export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, 
           <span className="text-xs text-bn-quiet">exposure</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-bn-muted">Suggested max</span>
+          <span className="text-xs text-bn-muted">Projected</span>
           <BroadcastDataValue className="text-sm font-semibold">
-            {result.recommended_max_stake}
+            {result.total_exposure_after_bet.toFixed(1)}%
           </BroadcastDataValue>
-          <span className="text-xs text-bn-quiet">2% guideline</span>
+          <span className="text-xs text-bn-quiet">after action</span>
         </div>
       </div>
 
@@ -161,7 +142,7 @@ export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, 
 
       {/* Total exposure line */}
       <p className="text-xs text-bn-muted">
-        Total exposure after bet:{' '}
+        Total exposure after external action:{' '}
         <BroadcastDataValue className="font-medium">{result.total_exposure_after_bet.toFixed(1)}%</BroadcastDataValue> of bankroll
       </p>
 
@@ -176,15 +157,9 @@ export default function RiskEvaluator({ stake, decisionId, fromPage, onConfirm, 
             onAdjustStake()
           }}
         >
-          Adjust Stake
+          Adjust Exposure
         </BroadcastButton>
-        <BroadcastButton
-          className="flex-1"
-          disabled={confirming}
-          onClick={() => handleConfirm(result.risk_level)}
-        >
-          {confirming ? '…' : 'Place anyway'}
-        </BroadcastButton>
+        <BroadcastButton className="flex-1" onClick={onAdjustStake}>Back</BroadcastButton>
       </div>
 
       {/* Disclaimer */}

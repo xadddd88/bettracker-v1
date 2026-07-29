@@ -10,9 +10,6 @@ const requestSchema = z.object({
   decision_id: z.string().uuid().optional(),
 })
 
-// Default recommended max stake: 2% of bankroll
-const RECOMMENDED_MAX_PCT = 0.02
-
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
@@ -80,12 +77,6 @@ export async function POST(req: NextRequest) {
     else if (stakePercent <= 5) riskLevel = 'high'
     else                        riskLevel = 'very_high'
 
-    // Start from 2% baseline; reduce if decision context signals elevated risk
-    let recommendedMaxStake = balance * RECOMMENDED_MAX_PCT
-    if (decision?.risk_level === 'high')                                                 recommendedMaxStake *= 0.5
-    if (decision?.confidence_score != null && decision.confidence_score < 50)           recommendedMaxStake *= 0.75
-    recommendedMaxStake = Math.round(recommendedMaxStake * 100) / 100
-
     const warnings: string[] = []
     if      (riskLevel === 'very_high') warnings.push('This stake is over 5% of your bankroll — well above disciplined sizing limits.')
     else if (riskLevel === 'high')      warnings.push('This stake is over 3% of your bankroll. Consider reducing it.')
@@ -107,12 +98,14 @@ export async function POST(req: NextRequest) {
       success: true,
       data: {
         risk_level:                riskLevel,
+        bankroll_balance:          parseFloat(balance.toFixed(2)),
+        intended_exposure_amount:  parseFloat(stake.toFixed(2)),
         stake_percent_of_bankroll: parseFloat(stakePercent.toFixed(2)),
+        pending_exposure_amount:   parseFloat(pendingExposure.toFixed(2)),
         pending_exposure_percent:  parseFloat(pendingPercent.toFixed(2)),
         total_exposure_after_bet:  parseFloat(totalExposure.toFixed(2)),
-        recommended_max_stake:     recommendedMaxStake,
         warnings,
-        disclaimer:                'Risk evaluation is informational only. Always bet within your means.',
+        disclaimer:                'Risk evaluation is informational only. BetTracker does not recommend stake size or place bets.',
       },
     })
 
