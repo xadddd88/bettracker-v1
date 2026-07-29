@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-29 (Decision #056 production execution checkpoint `240e3e9`; one approved SportMonks structural-presence request, `writes: none`, ledger consumed)
+> Last updated: 2026-07-29 (Decision #068 source-freshness resolution scope; D056 warning split from enrichment writes and downstream use)
 
 ## 1. Executive Status
 
@@ -14,12 +14,12 @@
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
 | Latest completed operational milestone | **Decision #056 production execution — GitHub Actions run `30429349031` completed successfully on `240e3e9`: exactly one approved read-only SportMonks request, `writes: none`, Supabase ledger `row_count = 1`, no artifacts** |
-| Highest-numbered closed decision | **#067 — Public API Privilege Hardening (migration 031 applied and verified)** |
+| Highest-numbered closed decision | **#068 — SportMonks Source Freshness Resolution Scope (docs-scope only; implementation/provider calls/writes not started)** |
 | Active decisions | **#062 — Mobile Founder client (Phases 0/1B/1C merged; Phase 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171; Event analysis remains deferred and Tracker Save remains manual after Review)** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
-| Next unreserved decision | **#068** |
+| Next unreserved decision | **#069** |
 
-The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 completed one canonical-linked base-response dry-run with zero writes. Decision #055 then closed the trust/storage contract. Decision #056's Class A structural-presence implementation, OIDC hardening, ledger migration, and single production execution are complete: GitHub Actions run `30429349031` succeeded on 2026-07-29 with exactly one provider request, `writes: none`, and ledger `row_count = 1` for deployment SHA `240e3e9916299fd21a71d3c1b5b8ec562ab9316f`. The run surfaced missing/invalid fixture source `updated_at`; `collectedAt` is not source freshness, so downstream usage remains blocked. Decision #057 closed the results-ingestion and settlement trust contract (docs-evidence only; no results runtime, result writes, or automated settlement is approved).
+The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 completed one canonical-linked base-response dry-run with zero writes. Decision #055 then closed the trust/storage contract. Decision #056's Class A structural-presence implementation, OIDC hardening, ledger migration, and single production execution are complete: GitHub Actions run `30429349031` succeeded on 2026-07-29 with exactly one provider request, `writes: none`, and ledger `row_count = 1` for deployment SHA `240e3e9916299fd21a71d3c1b5b8ec562ab9316f`. The run surfaced missing/invalid fixture source `updated_at`; `collectedAt` is not source freshness, so downstream usage remains blocked. Decision #068 closes the scope for resolving this blocker: prove provider-source freshness first, then separately consider storage/write validation. Decision #057 closed the results-ingestion and settlement trust contract (docs-evidence only; no results runtime, result writes, or automated settlement is approved).
 
 Decision #060 migration 024 was applied to production on 2026-07-16 as `20260716142736_create_tracked_bet_024`, and the exact catalog contract was verified read-only. The authenticated smoke used a dedicated non-login synthetic account with a seed deposit of 100. It called `create_tracked_bet` twice: the initial write returned `replayed=false` and balance 90; the exact semantic replay returned `replayed=true`, the same `bet_id`, and balance 90 with zero additional writes.
 
@@ -75,6 +75,7 @@ provider identity link exists
 Decision #034 base-response identity check passed
 Decision #055 trust/storage boundary is closed
 Decision #056 runtime executed once; authorization consumed
+Decision #068 source-freshness resolution scope closed; implementation not started
 fixture source freshness remains unproven because provider updated_at was missing/invalid
 football_enrichment rows remain 0 and are not approved for use
 no provider data may unlock Analyst/Scout/UI pricing or betting signals
@@ -173,7 +174,7 @@ Current safeguards:
 External beta remains paused because the product vision is not yet complete. Important open areas:
 
 1. Decision #054 Report-Only observation period; enforced CSP and nonce/hash Phase B remain unapproved.
-2. Source freshness remains unproven after Decision #056: the fixture source `updated_at` was not present or invalid, and `collectedAt` cannot be used as provider source freshness.
+2. Source freshness remains unproven after Decision #056; Decision #068 now requires documented provider-source timestamp evidence before any future runtime, write, or downstream use.
 3. Odds ingestion/normalization and user-facing trust validation.
 4. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated. Decision #058 unifies the metric formulas (G4) and removes the misleading Void fallback (G12), but adds no new settlement semantics. Tracker legs in production still have no safe relationship to `canonical_fixtures` or `fixture_provider_links`. Closed docs-only Decision #063 defines the contract; Decision #064 migration 025 is applied and catalog-verified, while `create_tracked_bet_v2` remains service-role-only with no application caller or matching authority.
 5. Trusted Analyst/Scout v2 using verified provider data rather than ungrounded pricing.
@@ -198,6 +199,7 @@ Decision #061 — Playwright / Supabase-stub E2E harness — EXECUTED / VERIFIED
 Decision #064 — migration 025 / create_tracked_bet_v2 — EXECUTED / VERIFIED / CLOSED; RPC service-role-only; no application caller
 Decision #066 — migration 030 security-invoker hardening — EXECUTED / VERIFIED / CLOSED
 Decision #067 — migration 031 public API privilege hardening — EXECUTED / VERIFIED / CLOSED
+Decision #068 — SportMonks source-freshness resolution scope — EXECUTED / CLOSED docs-scope only; implementation/provider calls/writes not started
 Decision #065 — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via #202 → #224; no mobile release authority
 Decision #056 — EXECUTED / VERIFIED / CLOSED via GitHub Actions run `30429349031`; exactly one approved provider request, `writes: none`, ledger consumed; no rerun authorized
 ```
@@ -229,6 +231,7 @@ Decision #056 — EXECUTED / VERIFIED / CLOSED via GitHub Actions run `304293490
 #054 — CSP Report Hardening & Security Headers, Phase A — EXECUTED / MERGED / DEPLOYED
 #055 — Sports Data Trust Contract & Football Enrichment Storage Boundary — EXECUTED / CLOSED
 #056 — Canonical-Linked SportMonks Class A Structural Presence Dry-Run — EXECUTED / VERIFIED / CLOSED; run 30429349031 success, requestCount 1, writes none, ledger consumed; source freshness warning remains
+#068 — SportMonks Source Freshness Resolution Scope — EXECUTED / CLOSED docs-scope only; no provider call/write/runtime started
 #057 — Results Ingestion & Settlement Trust Contract — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY
 #058 — Settlement Metrics & Status Presentation Reconciliation — EXECUTED / CLOSED
 #059 — Finished Fixture Eligibility & Result-Presence Dry-Run Scope — EXECUTED / CLOSED, DOCS-EVIDENCE ONLY (eligibility BLOCKED)
