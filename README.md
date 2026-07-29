@@ -145,6 +145,7 @@ The target information architecture is Home, Research, Journal, Insights, and Ri
 - [`PROJECT_STATE.md`](PROJECT_STATE.md) — current operational source of truth
 - [`docs/product.md`](docs/product.md) — approved R18 product source of truth
 - [`PRODUCT_VISION_GAP.md`](PRODUCT_VISION_GAP.md) — current implementation gap to R18
+- [`docs/r18-implementation-map.md`](docs/r18-implementation-map.md) — R18 engineering PR map, dependencies, tests, flags, and gates
 - [`docs/decision-069-target-product-structure.md`](docs/decision-069-target-product-structure.md) — product and market architecture decision
 - [`docs/strategy.md`](docs/strategy.md) — level-1 strategy
 - [`docs/decisions.md`](docs/decisions.md) — decision log

@@ -2,7 +2,8 @@
 
 > Decision #069 control document.
 > Product source of truth: [`docs/product.md`](docs/product.md).
-> Baseline implementation: `main@d96f1d2d142bfdd8f729cefa8e483c0fb9b49e0e`.
+> Implementation map: [`docs/r18-implementation-map.md`](docs/r18-implementation-map.md).
+> Baseline implementation for R18 adoption: `main@d00d4520b88724e8e4a76d38ec161f3590c5abe1`.
 
 ## Status
 
@@ -84,4 +85,4 @@ Decision #069 changes product truth only. It does not lift:
 
 Claude Design should use section 21 of [`docs/product.md`](docs/product.md) to produce the complete cross-platform design system, screen inventory, flows, and all working/blocked/error states.
 
-Engineering should use this file only as the implementation control map. If it conflicts with R18, R18 wins.
+Engineering should use [`docs/r18-implementation-map.md`](docs/r18-implementation-map.md) for PR package sequencing, dependencies, migrations, tests, feature flags, and production gates. If this file or the implementation map conflicts with R18, R18 wins.

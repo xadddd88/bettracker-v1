@@ -2424,7 +2424,7 @@ Reference: `docs/decision-068-source-freshness-resolution-scope.md`
 **Date:** 2026-07-29
 **Proposed by:** CPO
 **Approved by:** Founder (conversation approval: «начинаем работать согласно нового плана», 2026-07-29)
-**Status:** APPROVED / DOCS-ONLY — repository adoption pending merge. No runtime or production authority.
+**Status:** EXECUTED / CLOSED, DOCS-ONLY — repository adoption complete via PR #242. No runtime or production authority.
 
 **Decision:** Adopt R18 (`docs/product.md`) as the product source of truth. BetTracker is a private decision-quality and risk-control system, not a prediction, signal, bookmaker, copy-bet, or “best bets” product. The complete target product is one scope with five canonical sections: Home, Research, Journal, Insights, and Risk, plus global Add, Review, Search, Privacy View, Assistant, Tools, Notifications, Settings, and Trust Center.
 
@@ -2436,7 +2436,7 @@ Reference: `docs/decision-068-source-freshness-resolution-scope.md`
 
 **Non-authorization:** application/mobile runtime change 0; migration/RPC/schema/RLS/data write 0; provider/AI/payment/email/production-smoke call 0; Vercel/env/store/deployment action 0; external beta 0; company formation/contract/monetization/market launch 0; Decision #056 rerun 0; source-freshness/enrichment/odds/result/grading/settlement execution 0.
 
-**Numbering:** Decision #069 is occupied and APPROVED / DOCS-ONLY pending merge. Decision #070 is next unreserved.
+**Numbering:** Decision #069 is occupied and CLOSED. Decision #070 is next unreserved.
 
 Reference: `docs/decision-069-target-product-structure.md`
 
