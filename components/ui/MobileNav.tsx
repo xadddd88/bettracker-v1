@@ -49,7 +49,7 @@ export default function MobileNav() {
             }`}
           >
             <Icon size={18} strokeWidth={1.8} aria-hidden />
-            <span className="max-w-full px-0.5 text-center font-mono text-[9px] font-black uppercase leading-tight tracking-[0.01em]">{label}</span>
+            <span className="max-w-full px-0.5 text-center font-mono text-[11px] font-black uppercase leading-tight tracking-[0.01em]">{label}</span>
           </Link>
         )
       })}
