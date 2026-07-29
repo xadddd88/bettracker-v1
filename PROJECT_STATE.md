@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-29 (Decision #069 R18 product source-of-truth adoption pending merge)
+> Last updated: 2026-07-29 (Decision #069 R18 product source-of-truth adoption merged via PR #242)
 
 ## 1. Executive Status
 
@@ -14,8 +14,8 @@
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
 | Latest completed operational milestone | **Decision #056 production execution — GitHub Actions run `30429349031` completed successfully on `240e3e9`: exactly one approved read-only SportMonks request, `writes: none`, Supabase ledger `row_count = 1`, no artifacts** |
-| Highest-numbered closed decision | **#068 — SportMonks Source Freshness Resolution Scope (docs-scope only; implementation/provider calls/writes not started)** |
-| Active decisions | **#062 — Mobile Founder client; #069 — approved R18 product/documentation baseline pending merge** |
+| Highest-numbered closed decision | **#069 — R18 Target Product Structure and Global Market Architecture (docs-only; repository adoption complete; no runtime authority)** |
+| Active decisions | **#062 — Mobile Founder client** |
 | Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
 | Next unreserved decision | **#070** |
 
@@ -202,7 +202,7 @@ Decision #064 — migration 025 / create_tracked_bet_v2 — EXECUTED / VERIFIED 
 Decision #066 — migration 030 security-invoker hardening — EXECUTED / VERIFIED / CLOSED
 Decision #067 — migration 031 public API privilege hardening — EXECUTED / VERIFIED / CLOSED
 Decision #068 — SportMonks source-freshness resolution scope — EXECUTED / CLOSED docs-scope only; implementation/provider calls/writes not started
-Decision #069 — R18 target product structure and global market architecture — APPROVED / DOCS-ONLY; repository adoption pending merge; no runtime authority
+Decision #069 — R18 target product structure and global market architecture — EXECUTED / CLOSED, DOCS-ONLY; repository adoption complete via PR #242; no runtime authority
 Decision #065 — WEB ROLLOUT CLOSED / PRODUCTION DEPLOYED via #202 → #224; no mobile release authority
 Decision #056 — EXECUTED / VERIFIED / CLOSED via GitHub Actions run `30429349031`; exactly one approved provider request, `writes: none`, ledger consumed; no rerun authorized
 ```
@@ -211,7 +211,7 @@ Decision #056 — EXECUTED / VERIFIED / CLOSED via GitHub Actions run `304293490
 
 - Decision #050 is EXECUTED / VERIFIED / CLOSED after the founder-confirmed production invite lifecycle, negative non-allowlisted check, and Supabase template/signup-control verification recorded on 2026-07-26.
 - Decision #053 reconciled this file, README, the numbering ledger, and the migration inventory.
-- Decision #069 is Founder-approved and reserves the R18 product/documentation baseline; repository adoption is pending merge. It changes no runtime, production service, provider, database, settlement, payment, company, or market-launch authority.
+- Decision #069 is Founder-approved and merged via PR #242 as the R18 product/documentation baseline. It changes no runtime code, production service behavior, provider, database, settlement, payment, company, or market-launch authority.
 - Decision #063 was approved and merged docs-only via PR #183 as `df4723f`.
 - Decision #064 implementation merged via PR #186 as `4fce917701b95b3d3ad98ad9f157d02216323d3e`; Gate 3 merged via PR #231 as `f5f17385d711ccd1df323cd71be3448dd3e08d85`. Migration 025 was applied once as `20260727060234_tracked_leg_fixture_lineage_025`; 12/12 columns, 3/3 constraints, 2/2 indexes, 2/2 triggers, 3/3 functions, and service-role-only v2 ACL were verified. No application caller was added.
 - Decision #066 merged via PR #232 as `8ce79df4444c366b07a3585fde3de8554f431b4a`. Migration 030 was applied once as `20260727093233_odds_snapshots_public_security_invoker_030`; `security_invoker`, the exact authenticated-only policy, 9/9 safe-column access, 0/5 internal-column access, zero `anon`/DML access, and service-role continuity were verified. Both related Advisor findings were cleared and the table remained at 0 rows.
@@ -247,7 +247,7 @@ Decision #056 — EXECUTED / VERIFIED / CLOSED via GitHub Actions run `304293490
 #066 — odds_snapshots_public Security-Invoker Hardening — EXECUTED / VERIFIED / CLOSED; PR #232 merged; migration 030 applied and verified
 #067 — Public API Privilege Hardening — EXECUTED / VERIFIED / CLOSED; PR #233 merged; migration 031 applied and verified
 #068 — SportMonks Source Freshness Resolution Scope — EXECUTED / CLOSED docs-scope only; implementation not started
-#069 — R18 Target Product Structure and Global Market Architecture — APPROVED / DOCS-ONLY; repository adoption pending merge; no runtime authority
+#069 — R18 Target Product Structure and Global Market Architecture — EXECUTED / CLOSED, DOCS-ONLY; repository adoption complete via PR #242; no runtime authority
 #070 — next unreserved decision
 ```
 

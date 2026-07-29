@@ -1,6 +1,6 @@
 # Decision Ledger / Numbering Governance
 
-Status: Decision #068 is the highest-numbered closed decision. Decision #069 is occupied and Founder-approved as a docs-only R18 product baseline pending merge. #070 is next unreserved.
+Status: Decision #069 is the highest-numbered closed decision. It is occupied and closed as the docs-only R18 product baseline merged via PR #242. #070 is next unreserved.
 Last updated: 2026-07-29
 
 ## Purpose
@@ -21,8 +21,8 @@ Occupied / closed: #065 — Broadcast Noir Cross-Platform Rollout (Web rollout p
 Occupied / closed: #066 — odds_snapshots_public Security-Invoker Hardening (PR #232 merged; migration 030 applied and verified)
 Occupied / closed: #067 — Public API Privilege Hardening (PR #233 merged; migration 031 applied and verified)
 Occupied / closed: #068 — SportMonks Source Freshness Resolution Scope (docs-scope only; implementation/runtime not started)
-Occupied / approved: #069 — R18 Target Product Structure and Global Market Architecture (docs-only; repository adoption pending merge)
-Highest-numbered closed: #068 — SportMonks Source Freshness Resolution Scope
+Occupied / closed: #069 — R18 Target Product Structure and Global Market Architecture (docs-only; repository adoption complete via PR #242)
+Highest-numbered closed: #069 — R18 Target Product Structure and Global Market Architecture
 Active approved: #062 — Mobile Founder client (0/1B/1C merged; 1A Bearer bridge merged via PR #170; authenticated Coupon Scanner merged via PR #171)
 Next unreserved: #070
 ```
@@ -56,7 +56,7 @@ Next unreserved: #070
 | #066 | `odds_snapshots_public` Security-Invoker Hardening — EXECUTED / VERIFIED / CLOSED; PR #232 merged as `8ce79df4`; migration 030 applied as `20260727093233_odds_snapshots_public_security_invoker_030` |
 | #067 | Public API Privilege Hardening — EXECUTED / VERIFIED / CLOSED; PR #233 merged as `9211c7e5`; migration 031 applied as `20260727123510_public_api_privilege_hardening_031` |
 | #068 | SportMonks Source Freshness Resolution Scope — EXECUTED / CLOSED, DOCS-SCOPE ONLY; implementation/provider calls/writes not started |
-| #069 | R18 Target Product Structure and Global Market Architecture — APPROVED / DOCS-ONLY; repository adoption pending merge; no runtime authority |
+| #069 | R18 Target Product Structure and Global Market Architecture — EXECUTED / CLOSED, DOCS-ONLY; repository adoption complete via PR #242; no runtime authority |
 
 ## Retired / Superseded Tracks
 
@@ -90,7 +90,7 @@ Decision numbering does not grant runtime authority.
 - Decision #066 is EXECUTED / VERIFIED / CLOSED: PR #232 merged as `8ce79df4`; migration 030 was applied once and its view, RLS, ACL, internal-field denial, Advisor, and web-health contracts were verified read-only.
 - Decision #067 is EXECUTED / VERIFIED / CLOSED. PR #233 merged as `9211c7e5`; migration 031 applied once as `20260727123510_public_api_privilege_hardening_031` and its table-policy, ACL, function, default-privilege, Advisor, and web-health contracts were verified read-only. No further privilege, RPC, runtime, env, or deployment action is authorized by closure.
 - Decision #061 is EXECUTED / VERIFIED / CLOSED. Phase A1 merged via PR #162 as `a6d4ebb` and deployed READY. Phase A2 exact head `b14168a2` passed all 10 CI jobs, including Hermetic Web acceptance at 320/375/1280 px, and merged via PR #235 as `2fb83250`; the automatic production deployment succeeded. The browser proof remained loopback-only; no production smoke or real scanner/tracked-bet/Supabase/provider/AI call, settlement action, or financial write ran. Runtime scope was limited to the semantic `<dt>/<dd>` correction for the populated `/bets` date. Closure grants no new runtime authority.
-- Decision #069 is APPROVED / DOCS-ONLY pending merge. It defines product truth and reserves #069 but authorizes no application/mobile runtime, migration/RPC/schema/data write, provider/AI/payment call, deployment, external beta, company formation, monetization, or market launch.
+- Decision #069 is EXECUTED / CLOSED, DOCS-ONLY after repository adoption via PR #242. It defines product truth but authorizes no application/mobile runtime, migration/RPC/schema/data write, provider/AI/payment call, external beta, company formation, monetization, or market launch.
 - FP-001 remains active. Decision #054 Phase B is not approved. Decision #050 is EXECUTED / VERIFIED / CLOSED; custom SMTP scale/readiness is a separate follow-up.
 
 ## Reconciliation Receipt — 2026-07-22

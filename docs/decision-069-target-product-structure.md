@@ -3,7 +3,7 @@
 Date: 2026-07-29
 Proposed by: CPO
 Approved by: Founder (conversation approval: «начинаем работать согласно нового плана», 2026-07-29)
-Status: APPROVED / DOCS-ONLY — repository adoption pending merge. Runtime implementation, provider calls, migrations, production writes, deployments, company formation, monetization, and market launch are not authorized by this decision.
+Status: EXECUTED / CLOSED, DOCS-ONLY — repository adoption complete via PR #242. Runtime implementation, provider calls, migrations, production writes, company formation, monetization, and market launch are not authorized by this decision.
 
 ## Context
 
