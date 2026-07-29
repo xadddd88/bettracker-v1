@@ -2038,7 +2038,7 @@ Reference: `docs/sports-data-trust-contract-scope-decision-055.md`
 **Date:** 2026-07-14
 **Proposed by:** CPO
 **Approved by:** Founder (`APPROVE #056`)
-**Status:** IMPLEMENTATION MERGED / DEPLOYED / READY (PR #146, merged as `bc7bcfa`). Runtime provider call NOT APPROVED / NOT RUN. Merging the implementation does not authorize execution.
+**Status:** EXECUTED / VERIFIED / CLOSED 2026-07-29. Implementation merged via PR #146 as `bc7bcfa`; OIDC/ledger hardening merged via PR #237 as `240e3e9916299fd21a71d3c1b5b8ec562ab9316f`; production migration `20260728162034_decision_056_execution_ledger` applied and verified; GitHub Actions run `30429349031` completed successfully on attempt `1` after required environment approval from `dkhodakivskyi-88`. The run made exactly one approved read-only SportMonks request, returned `success: true`, `responseStatus: ok`, `requestCount: 1`, and `writes: none`; Supabase ledger `row_count = 1` on deployment SHA `240e3e9916299fd21a71d3c1b5b8ec562ab9316f`. The one-runtime authorization is consumed; retry/rerun/second dispatch/ledger reset is not authorized.
 
 **Decision:** Implement a separate read-only admin dry-run for the already linked canonical fixture and exactly six Decision #055 Class A relationships: `participants;league;season;round;venue;state`.
 
@@ -2057,13 +2057,13 @@ Reference: `docs/sports-data-trust-contract-scope-decision-055.md`
 
 **Implementation boundary:** A new module and route are used; the completed Decision #034 empty-include route is not widened. Mocked tests may exercise provider-shaped payloads, but no real provider call is permitted during implementation or CI.
 
-**Runtime boundary:** After implementation merge/deployment, one production execution still requires a separate CPO runtime authorization. Any first outcome consumes that authorization; retry requires another approval.
+**Runtime result:** The single authorized production execution succeeded. The sanitized report exposed one freshness warning: fixture source `updated_at` was not present or invalid, and `collectedAt` is not source freshness. This preserves the downstream block on source freshness, structural persistence, `football_enrichment`, `fixture_results`, `odds_snapshots`, Scout, Analyst, UI, probability, edge, EV, recommendation, Place Bet, and betting signals.
 
-**Non-use:** Provider calls 0 during implementation; Supabase writes/migrations/env changes 0. Structural persistence, `football_enrichment`, `fixture_results`, `odds_snapshots`, Scout, Analyst, UI, probability, edge, EV, recommendation, Place Bet, and betting signals remain blocked. FP-001 active. CSP Phase B untouched. Decision #050 remains pending.
+**Non-use:** Provider calls during implementation/CI 0; production provider calls after execution 0; production Supabase writes outside the append-only execution ledger 0; structural persistence 0; `football_enrichment`, `fixture_results`, and `odds_snapshots` writes 0; Scout, Analyst, UI, probability, edge, EV, recommendation, Place Bet, and betting signals remain blocked. FP-001 active. CSP Phase B untouched.
 
 **Numbering:** Decision #056 occupied; next unreserved decision #057.
 
-Reference: `docs/sportmonks-structural-presence-dry-run-scope-decision-056.md`
+References: `docs/sportmonks-structural-presence-dry-run-scope-decision-056.md`, `docs/decision-056-production-execution-record.md`
 
 ---
 

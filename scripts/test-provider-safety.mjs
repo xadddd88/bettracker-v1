@@ -4308,6 +4308,12 @@ await testAsync('structural presence dry-run: approved run makes one exact inclu
       assert.equal(report.fixtureIdentityMatch, true);
       assert.deepEqual(report.requestedIncludeSet, STRUCTURAL_PRESENCE_INCLUDE_SET);
       assert.equal(report.providerStartingAt, '2026-08-21T19:00:00.000Z');
+      assert.deepEqual(report.fixtureSourceFreshness, {
+        field: 'updated_at',
+        status: 'present',
+        sourceUpdatedAt: '2026-07-14T15:40:00.000Z',
+        collectedAtIsSourceFreshness: false,
+      });
       assert.equal(report.fixtureSourceFreshnessPresent, true);
       assert.equal(report.unexpectedNonStructuralRelationshipsPresent, false);
       assert.equal(report.structuralRelationships.participants.shape, 'array');
@@ -4331,6 +4337,49 @@ await testAsync('structural presence dry-run: approved run makes one exact inclu
       assert.equal(report.structuralRelationships.season.sourceFreshnessMissingOrInvalidCount, 1);
       assert.equal(report.writes, 'none');
       assert.ok(report.blockedDownstreamUsage.length >= 4);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+    else process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = originalToken;
+  }
+});
+
+await testAsync('structural presence dry-run: missing fixture source freshness is explicit', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN;
+
+  process.env.SPORTS_FIXTURE_SYNC_OPERATOR_TOKEN = 'operator-token';
+  globalThis.fetch = async () =>
+    jsonResponse({
+      data: structuralProviderData({
+        updated_at: 'invalid provider freshness',
+      }),
+    });
+
+  try {
+    await withStructuralPresenceDryRunRoute(enrichmentDbRows(), async ({ POST }) => {
+      const response = await POST(structuralPresenceRequest(approvedStructuralPresenceBody()));
+      const result = await readJsonResponse(response);
+      const report = result.body.report;
+
+      assert.equal(result.body.success, true);
+      assert.equal(report.responseStatus, 'ok');
+      assert.equal(report.fixtureSourceFreshnessPresent, false);
+      assert.deepEqual(report.fixtureSourceFreshness, {
+        field: 'updated_at',
+        status: 'missing_or_invalid',
+        sourceUpdatedAt: null,
+        collectedAtIsSourceFreshness: false,
+      });
+      assert.ok(
+        report.warnings.includes(
+          'fixture source updated_at not present or invalid — collectedAt is not source freshness'
+        )
+      );
+      const serialized = JSON.stringify(result.body);
+      assert.ok(!serialized.includes('invalid provider freshness'));
+      assert.ok(!serialized.includes('Arsenal'));
     });
   } finally {
     globalThis.fetch = originalFetch;
