@@ -1,10 +1,13 @@
 import { SymbolView } from 'expo-symbols';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/auth/auth-context';
+import { fetchBankroll, type BankrollDto } from '@/bets/data';
+import { readErrorMessage } from '@/bets/errors';
+import { formatMoney } from '@/bets/models';
 import { ActionCard, ScreenHeader, SectionTitle } from '@/ui/product-shell';
 import { BroadcastPanel, BroadcastStatus } from '@/ui/broadcast-noir-primitives';
 import { semanticColors } from '@/ui/theme';
@@ -12,16 +15,35 @@ import { semanticColors } from '@/ui/theme';
 export default function MoreScreen() {
   const router = useRouter();
   const { session, signOut } = useAuth();
+  const userId = session?.user.id;
   const email = session?.user.email ?? 'Founder account';
   const [notice, setNotice] = useState<string | null>(null);
+  const [bankroll, setBankroll] = useState<BankrollDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!userId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setBankroll(await fetchBankroll(userId));
+    } catch (nextError) {
+      setError(readErrorMessage(nextError));
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenHeader
-          eyebrow="BETTRACKER"
-          subtitle="Profile, preferences and secure access."
-          title="Account"
+          eyebrow="RISK"
+          subtitle="Default bankroll and secure control surface."
+          title="Risk"
         />
 
         <BroadcastPanel style={styles.profileCard}>
@@ -40,12 +62,39 @@ export default function MoreScreen() {
           <BroadcastStatus label="Active session" status="success" />
         </BroadcastPanel>
 
-        <SectionTitle title="Performance" />
+        <SectionTitle title="Bankroll" />
+        <BroadcastPanel style={styles.riskCard}>
+          {loading ? (
+            <>
+              <ActivityIndicator color={semanticColors.signal} size="small" />
+              <BroadcastStatus label="Loading bankroll" status="neutral" />
+            </>
+          ) : error ? (
+            <>
+              <BroadcastStatus label="Could not load bankroll" status="negative" />
+              <Text accessibilityLiveRegion="polite" role="alert" style={styles.error}>{error}</Text>
+            </>
+          ) : (
+            <>
+              <View style={styles.riskMetric}>
+                <Text style={styles.riskLabel}>Default balance</Text>
+                <Text style={styles.riskValue}>
+                  {bankroll?.balance === null || bankroll?.balance === undefined
+                    ? '—'
+                    : formatMoney(bankroll.balance, bankroll.currency)}
+                </Text>
+              </View>
+              <BroadcastStatus label="Risk checks use user-entered exposure only" status="review" />
+            </>
+          )}
+        </BroadcastPanel>
+
+        <SectionTitle title="Insights" />
         <View style={styles.actions}>
           <ActionCard
-            description="Open exact metrics calculated from saved Tracker records."
+            description="Open exact metrics calculated from saved Journal records."
             icon={{ android: 'bar_chart', ios: 'chart.bar.fill', web: 'bar_chart' }}
-            label="Stats"
+            label="Insights"
             onPress={() => router.push('/(app)/stats')}
           />
         </View>
@@ -54,7 +103,7 @@ export default function MoreScreen() {
         <View style={styles.rows}>
           <SettingRow label="Currency" value="From bankroll" />
           <SettingRow label="Theme" value="Dark" />
-          <SettingRow label="Notifications" value="Coming later" />
+          <SettingRow label="Notifications" value="Off" />
         </View>
 
         <SectionTitle title="Account" />
@@ -63,7 +112,7 @@ export default function MoreScreen() {
             description="Open the existing secure web account settings."
             icon={{ android: 'settings', ios: 'gearshape.fill', web: 'settings' }}
             label="Account settings"
-            onPress={() => setNotice('Mobile account settings are being prepared. Use the web app for now.')}
+            onPress={() => setNotice('Use the web app for detailed account settings.')}
           />
           <ActionCard
             description="Remove the mobile session from this device."
@@ -115,6 +164,11 @@ const styles = StyleSheet.create({
   profileTitle: { color: semanticColors.textPrimary, fontSize: 16, fontWeight: '800' },
   profileEmail: { color: semanticColors.textMuted, fontSize: 12 },
   rows: { backgroundColor: semanticColors.field, borderColor: semanticColors.borderStrong, borderWidth: 1 },
+  riskCard: { gap: 12, padding: 14 },
+  riskMetric: { gap: 4 },
+  riskLabel: { color: semanticColors.textMuted, fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
+  riskValue: { color: semanticColors.textPrimary, fontSize: 26, fontWeight: '900' },
+  error: { color: semanticColors.negative, fontSize: 12, lineHeight: 18 },
   settingRow: {
     alignItems: 'center',
     borderBottomColor: semanticColors.borderSubtle,

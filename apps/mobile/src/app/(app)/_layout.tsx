@@ -42,10 +42,10 @@ export default function AppLayout() {
       }}
     >
       <Tabs.Screen name="home" options={screen('HOME')} />
-      <Tabs.Screen name="ai" options={screen('SCAN')} />
-      <Tabs.Screen name="bets" options={screen('TRACKER')} />
-      <Tabs.Screen name="stats" options={{ href: null }} />
-      <Tabs.Screen name="more" options={{ href: null }} />
+      <Tabs.Screen name="ai" options={screen('RESEARCH')} />
+      <Tabs.Screen name="bets" options={screen('JOURNAL')} />
+      <Tabs.Screen name="stats" options={screen('INSIGHTS')} />
+      <Tabs.Screen name="more" options={screen('RISK')} />
       <Tabs.Screen name="index" options={{ href: null }} />
     </Tabs>
   );

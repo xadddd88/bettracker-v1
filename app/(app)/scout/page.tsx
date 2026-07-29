@@ -27,14 +27,14 @@ export default async function ScoutPage() {
     <main className="bn-page mx-auto flex w-full max-w-3xl flex-col gap-4 pb-8">
       <PageView event={EVENTS.SCOUT_PAGE_VIEWED} />
       <BroadcastPanel className="p-5 sm:p-7">
-        <p className="editorial-kicker">Исследование · поиск кандидатов</p>
-        <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Скаут</h1>
+        <p className="editorial-kicker">Исследование · лаборатория рынка</p>
+        <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Исследование</h1>
         <p className="mt-4 text-sm leading-6 text-bn-muted">
-          Поиск потенциально интересных рынков: сначала кандидат, затем отдельная проверка в AI Analyst.
+          Рабочее пространство для изучения события: сначала кандидат и факты, затем отдельная проверка в AI Analyst.
         </p>
       </BroadcastPanel>
       <SectionGuide
-        title="Как пользоваться Скаутом"
+        title="Как пользоваться исследованием"
         items={[
           {
             title: 'Опишите область поиска',
@@ -42,7 +42,7 @@ export default async function ScoutPage() {
           },
           {
             title: 'Получите кандидатов',
-            body: 'Скаут возвращает рынки для дальнейшего изучения. Score показывает релевантность исследования, а не вероятность прохода.',
+            body: 'Лаборатория рынка возвращает рынки для дальнейшего изучения. Score показывает релевантность исследования, а не вероятность прохода.',
           },
           {
             title: 'Передайте в Analyst',
@@ -51,7 +51,7 @@ export default async function ScoutPage() {
         ]}
         note={{
           title: 'Граница доверия',
-          body: 'Скаут не показывает ценовой edge и не является готовой ставкой. Текущие коэффициенты, новости и составы нужно подтверждать отдельно.',
+          body: 'Исследование не показывает ценовой edge и не является готовой ставкой. Текущие коэффициенты, новости и составы нужно подтверждать отдельно.',
         }}
       />
       <ScoutForm initialOpportunities={opportunities} pulsePresets={pulsePresets} />

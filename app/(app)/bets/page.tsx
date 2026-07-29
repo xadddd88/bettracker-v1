@@ -47,9 +47,9 @@ export default async function BetsPage() {
 
       <BroadcastPanel className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div>
-          <p className="editorial-kicker">Ставки · сохранённые записи</p>
+          <p className="editorial-kicker">Журнал · сохранённые ставки</p>
           <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">
-            Ставки
+            Журнал ставок
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-bn-muted">
             Записей: {bets.length} · открыто: {metrics.pendingCount} · рассчитано: {metrics.settledCount}

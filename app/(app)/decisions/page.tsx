@@ -95,8 +95,8 @@ export default async function DecisionsPage({ searchParams }: { searchParams: Pr
 
       <BroadcastPanel className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div>
-          <p className="editorial-kicker">Архив решений · сохранённые анализы</p>
-          <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Решения</h1>
+          <p className="editorial-kicker">Журнал · сохранённые решения</p>
+          <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Журнал решений</h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-bn-muted">Записей в текущем виде: {decisions.length}</p>
         </div>
         <Link className="bn-button bn-button-primary" href="/ai">Проанализировать</Link>
