@@ -27,15 +27,15 @@ assert.match(appLayout, /max-w-\[1600px\]/)
 
 assert.deepEqual(hrefsIn(appHeader, 'const PRIMARY_NAV', 'const SECONDARY_NAV'), [
   '/dashboard',
-  '/ai',
-  '/bets',
+  '/scout',
+  '/decisions',
   '/analytics',
+  '/bankroll',
 ])
 assert.deepEqual(hrefsIn(appHeader, 'const SECONDARY_NAV', 'export default'), [
-  '/decisions',
-  '/scout',
+  '/ai',
+  '/bets',
   '/coach',
-  '/bankroll',
   '/settings',
 ])
 assert.match(appHeader, /aria-label="(?:Primary navigation|Основная навигация)"/)
@@ -43,18 +43,12 @@ assert.match(appHeader, /aria-current=\{active \? 'page'/)
 assert.match(appHeader, /BetTracker/)
 assert.match(appHeader, /var\(--signal\)/)
 
-assert.deepEqual(hrefsIn(mobileNav, 'const NAV', 'const MORE_LINKS'), [
+assert.deepEqual(hrefsIn(mobileNav, 'const NAV', 'function isActive'), [
   '/dashboard',
-  '/ai',
-  '/bets',
-  '/analytics',
-])
-assert.deepEqual(hrefsIn(mobileNav, 'const MORE_LINKS', 'const MORE_ROUTES'), [
-  '/decisions',
   '/scout',
-  '/coach',
+  '/decisions',
+  '/analytics',
   '/bankroll',
-  '/settings',
 ])
 assert.match(mobileNav, /paddingBottom:\s*'env\(safe-area-inset-bottom\)'/)
 assert.match(mobileNav, /bg-\[var\(--signal\)\] text-\[var\(--on-signal\)\]/)
@@ -66,11 +60,14 @@ assert.match(loginPage, /max-w-full break-words/)
 const mobileTabs = read('apps/mobile/src/app/(app)/_layout.tsx')
 const tabNames = [...mobileTabs.matchAll(/<Tabs\.Screen name="([^"]+)"/g)].map(match => match[1])
 assert.deepEqual(tabNames, ['home', 'ai', 'bets', 'stats', 'more', 'index'])
+for (const title of ['HOME', 'RESEARCH', 'JOURNAL', 'INSIGHTS', 'RISK']) {
+  assert.match(mobileTabs, new RegExp(`screen\\('${title}'\\)`))
+}
 assert.match(mobileTabs, /tabBarActiveBackgroundColor:\s*semanticColors\.signal/)
 assert.match(mobileTabs, /tabBarActiveTintColor:\s*semanticColors\.onSignal/)
 assert.match(mobileTabs, /Platform\.OS === 'android' \? 48 : 44/)
 assert.doesNotMatch(mobileTabs, /useSafeAreaInsets/)
-for (const hiddenRoute of ['stats', 'more', 'index']) {
+for (const hiddenRoute of ['index']) {
   assert.match(mobileTabs, new RegExp(`name=["']${hiddenRoute}["'][\\s\\S]*?href:\\s*null`))
 }
 

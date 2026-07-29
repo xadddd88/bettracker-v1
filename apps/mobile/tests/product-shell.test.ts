@@ -9,28 +9,27 @@ function source(path: string): string {
   return readFileSync(join(root, path), 'utf8');
 }
 
-test('product shell exposes three focused sections with Tracker as a nested Stack', () => {
+test('product shell exposes the R18 primary tabs with Journal as a nested Stack', () => {
   const tabs = source('src/app/(app)/_layout.tsx');
-  const tracker = source('src/app/(app)/bets/_layout.tsx');
+  const journal = source('src/app/(app)/bets/_layout.tsx');
 
   assert.match(tabs, /import \{ Tabs \} from 'expo-router'/);
-  for (const route of ['home', 'ai', 'bets']) {
+  for (const route of ['home', 'ai', 'bets', 'stats', 'more']) {
     assert.match(tabs, new RegExp(`name=["']${route}["']`));
   }
-  for (const label of ['HOME', 'SCAN', 'TRACKER']) {
+  for (const label of ['HOME', 'RESEARCH', 'JOURNAL', 'INSIGHTS', 'RISK']) {
     assert.match(tabs, new RegExp(`screen\\(['"]${label}['"]\\)`));
   }
-  for (const route of ['stats', 'more']) {
-    assert.match(tabs, new RegExp(`name=["']${route}["'][\\s\\S]*?href:\\s*null`));
-  }
+  assert.doesNotMatch(tabs, /screen\(['"](?:SCAN|TRACKER)['"]\)/);
+  assert.match(tabs, /name=["']index["'][\s\S]*?href:\s*null/);
   assert.match(tabs, /tabBarHideOnKeyboard:\s*true/);
   assert.match(tabs, /tabBarActiveBackgroundColor:\s*semanticColors\.signal/);
   assert.match(tabs, /tabBarActiveTintColor:\s*semanticColors\.onSignal/);
   assert.match(tabs, /Platform\.OS === 'android' \? 48 : 44/);
   assert.doesNotMatch(tabs, /useSafeAreaInsets/);
-  assert.match(tracker, /import \{ Stack \} from 'expo-router'/);
-  assert.match(tracker, /name="\[id\]"/);
-  assert.match(tracker, /name="new"/);
+  assert.match(journal, /import \{ Stack \} from 'expo-router'/);
+  assert.match(journal, /name="\[id\]"/);
+  assert.match(journal, /name="new"/);
 });
 
 test('Broadcast Noir native shell keeps stable identity and opts into predictive Back', () => {
@@ -88,7 +87,7 @@ test('mobile tracker editor saves only through the audited authenticated endpoin
   assert.match(intent, /conflict_unchanged/);
 });
 
-test('support routes remain available outside the focused tab bar', () => {
+test('Risk tab keeps support routes and loads the default bankroll read model', () => {
   for (const path of [
     'src/app/(app)/home.tsx',
     'src/app/(app)/stats.tsx',
@@ -100,7 +99,9 @@ test('support routes remain available outside the focused tab bar', () => {
   }
 
   const more = source('src/app/(app)/more.tsx');
-  assert.match(more, /label=["']Stats["']/);
+  assert.match(more, /title="Risk"/);
+  assert.match(more, /fetchBankroll\(userId\)/);
+  assert.match(more, /label=["']Insights["']/);
   assert.match(more, /router\.push\('\/\(app\)\/stats'\)/);
 });
 

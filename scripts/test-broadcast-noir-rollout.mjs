@@ -75,12 +75,33 @@ const globals = source('app/globals.css')
 const theme = source('apps/mobile/src/ui/theme.ts')
 const webPrimitives = source('components/ui/BroadcastNoir.tsx')
 const mobilePrimitives = source('apps/mobile/src/ui/broadcast-noir-primitives.tsx')
+const appHeader = source('components/ui/AppHeader.tsx')
+const webMobileNav = source('components/ui/MobileNav.tsx')
+const nativeTabs = source('apps/mobile/src/app/(app)/_layout.tsx')
+const nativeRisk = source('apps/mobile/src/app/(app)/more.tsx')
 
 assert.doesNotMatch(globals, /\.web-editorial\s+\.(?:text|bg|border)-/, 'Legacy Web utility adapter survived')
 assert.doesNotMatch(globals, /gradient\s*\(/i)
 assert.doesNotMatch(theme, /export const colors\s*=/, 'Second native theme alias survived')
 assert.match(webPrimitives, /aria-label=\{ariaLabel \?\? \(typeof children === 'string' \? `\$\{status\}: \$\{children\}` : status\)\}/)
 assert.match(mobilePrimitives, /accessibilityLabel=\{`\$\{status\}: \$\{label\}`\}/)
+
+for (const sourceText of [appHeader, webMobileNav]) {
+  for (const label of ['Главная', 'Исследование', 'Журнал', 'Аналитика', 'Риск']) {
+    assert.match(sourceText, new RegExp(label), `R18 primary nav is missing ${label}`)
+  }
+  assert.doesNotMatch(sourceText, /label:\s*['"](?:Скан|Ставки|Статистика|Скаут|Коуч|Банкролл)['"]/, 'Legacy section label survived in primary navigation')
+}
+
+assert.match(appHeader, /aliases:\s*\['\/ai'\]/)
+assert.match(appHeader, /aliases:\s*\['\/bets'\]/)
+assert.match(appHeader, /aliases:\s*\['\/coach'\]/)
+for (const label of ['HOME', 'RESEARCH', 'JOURNAL', 'INSIGHTS', 'RISK']) {
+  assert.match(nativeTabs, new RegExp(`screen\\('${label}'\\)`), `native tabs must expose ${label}`)
+}
+assert.doesNotMatch(nativeTabs, /screen\('(?:SCAN|TRACKER)'\)/, 'native tabs still expose legacy product labels')
+assert.match(nativeRisk, /title="Risk"/)
+assert.match(nativeRisk, /fetchBankroll\(userId\)/)
 
 for (const removed of [
   'apps/mobile/src/ui/time-warp.tsx',

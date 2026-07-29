@@ -40,12 +40,12 @@ export default async function BankrollPage() {
     <main className="bn-page mx-auto flex w-full max-w-5xl flex-col gap-4 pb-8">
       <PageView event={EVENTS.BANKROLL_PAGE_VIEWED} />
       <BroadcastPanel className="p-5 sm:p-7">
-        <p className="editorial-kicker">Банкролл · записанные операции</p>
-        <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Банкролл</h1>
-        <p className="mt-4 max-w-2xl text-sm leading-6 text-bn-muted">Отдельный фонд для ставок: пополнения, выводы, использование ставки и результат закрытых исходов.</p>
+        <p className="editorial-kicker">Риск · контроль банкролла</p>
+        <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Риск</h1>
+        <p className="mt-4 max-w-2xl text-sm leading-6 text-bn-muted">Контроль фонда, операций и текущего риска: пополнения, выводы, использование ставки и результат закрытых исходов.</p>
       </BroadcastPanel>
       <SectionGuide
-        title="Как вести банкролл"
+        title="Как вести риск"
         items={[
           {
             title: 'Запишите стартовый баланс',

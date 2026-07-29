@@ -14,6 +14,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   LogOut,
+  PlusCircle,
   Search,
   Settings,
   Target,
@@ -21,20 +22,26 @@ import {
   Wallet,
 } from 'lucide-react'
 
-const PRIMARY_NAV: { href: string; Icon: LucideIcon; label: string }[] = [
+type NavItem = { href: string; Icon: LucideIcon; label: string; aliases?: string[] }
+
+const PRIMARY_NAV: NavItem[] = [
   { href: '/dashboard', Icon: LayoutDashboard, label: 'Главная' },
-  { href: '/ai', Icon: Bot, label: 'Скан' },
-  { href: '/bets', Icon: Target, label: 'Ставки' },
-  { href: '/analytics', Icon: TrendingUp, label: 'Статистика' },
+  { href: '/scout', Icon: Search, label: 'Исследование', aliases: ['/ai'] },
+  { href: '/decisions', Icon: ClipboardList, label: 'Журнал', aliases: ['/bets'] },
+  { href: '/analytics', Icon: TrendingUp, label: 'Аналитика', aliases: ['/coach'] },
+  { href: '/bankroll', Icon: Wallet, label: 'Риск' },
 ]
 
-const SECONDARY_NAV: { href: string; Icon: LucideIcon; label: string }[] = [
-  { href: '/decisions', Icon: ClipboardList, label: 'Решения' },
-  { href: '/scout', Icon: Search, label: 'Скаут' },
-  { href: '/coach', Icon: Brain, label: 'Коуч' },
-  { href: '/bankroll', Icon: Wallet, label: 'Банкролл' },
+const SECONDARY_NAV: NavItem[] = [
+  { href: '/ai', Icon: Bot, label: 'Добавить / скан' },
+  { href: '/bets', Icon: Target, label: 'Журнал: ставки' },
+  { href: '/coach', Icon: Brain, label: 'Разбор' },
   { href: '/settings', Icon: Settings, label: 'Настройки' },
 ]
+
+function isActive(pathname: string, item: NavItem): boolean {
+  return [item.href, ...(item.aliases ?? [])].some((route) => pathname === route || pathname.startsWith(`${route}/`))
+}
 
 export default function AppHeader({
   user,
@@ -80,8 +87,9 @@ export default function AppHeader({
         </Link>
 
         <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1 md:flex" aria-label="Основная навигация">
-          {PRIMARY_NAV.map(({ href, Icon, label }) => {
-            const active = pathname === href || pathname.startsWith(`${href}/`)
+          {PRIMARY_NAV.map((item) => {
+            const { href, Icon, label } = item
+            const active = isActive(pathname, item)
             return (
               <Link
                 key={href}
@@ -100,6 +108,14 @@ export default function AppHeader({
           })}
         </nav>
 
+        <Link
+          href="/ai"
+          className="hidden min-h-11 shrink-0 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--signal)] bg-[var(--signal)] px-3 text-xs font-extrabold uppercase tracking-[0.06em] text-[var(--on-signal)] transition-colors hover:brightness-95 sm:flex"
+        >
+          <PlusCircle size={15} strokeWidth={1.9} aria-hidden />
+          Добавить
+        </Link>
+
         <details ref={accountMenuRef} className="group relative ml-auto">
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-strong)] bg-[var(--field)] px-2.5 text-[var(--text-muted)] marker:content-none hover:border-[var(--signal)] hover:text-[var(--text-primary)]">
             <span className="grid h-7 w-7 place-items-center rounded-control border border-[var(--border-strong)] font-mono text-[11px] font-black text-[var(--text-primary)]">
@@ -116,8 +132,9 @@ export default function AppHeader({
             </div>
 
             <nav className="p-2" aria-label="Навигация инструментов">
-              {secondaryNav.map(({ href, Icon, label }) => {
-                const active = pathname === href || pathname.startsWith(`${href}/`)
+              {secondaryNav.map((item) => {
+                const { href, Icon, label } = item
+                const active = isActive(pathname, item)
                 return (
                   <Link
                     key={href}

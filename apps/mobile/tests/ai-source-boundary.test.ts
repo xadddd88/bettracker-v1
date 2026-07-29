@@ -509,23 +509,21 @@ test('generated JPEG cache cleanup is wired to replacement, removal, success and
   assert.doesNotMatch(cache, /console\.|deleteAsync|documentDirectory/);
 });
 
-test('authenticated layout exposes three focused tabs and keeps Tracker detail in a Stack', () => {
+test('authenticated layout exposes the R18 primary tabs and keeps Journal detail in a Stack', () => {
   const layoutPath = join(root, 'src/app/(app)/_layout.tsx');
   const trackerLayoutPath = join(root, 'src/app/(app)/bets/_layout.tsx');
   const layout = readFileSync(layoutPath, 'utf8');
   const trackerLayout = readFileSync(trackerLayoutPath, 'utf8');
 
   assert.match(layout, /<Tabs/);
-  for (const route of ['home', 'ai', 'bets']) {
+  for (const route of ['home', 'ai', 'bets', 'stats', 'more']) {
     assert.match(layout, new RegExp(`name=["']${route}["']`));
   }
   assert.match(layout, /tabBarAccessibilityLabel:\s*title/);
-  for (const label of ['HOME', 'SCAN', 'TRACKER']) {
+  for (const label of ['HOME', 'RESEARCH', 'JOURNAL', 'INSIGHTS', 'RISK']) {
     assert.match(layout, new RegExp(`screen\\(['"]${label}['"]\\)`));
   }
-  for (const route of ['stats', 'more']) {
-    assert.match(layout, new RegExp(`name=["']${route}["'][\\s\\S]*?href:\\s*null`));
-  }
+  assert.doesNotMatch(layout, /screen\(['"](?:SCAN|TRACKER)['"]\)/);
   assert.match(layout, /minHeight:\s*Platform\.OS === 'android' \? 48 : 44/);
   assert.match(layout, /backBehavior="history"/);
   assert.match(layout, /name="index" options=\{\{ href: null \}\}/);
