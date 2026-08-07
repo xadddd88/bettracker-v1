@@ -1,0 +1,199 @@
+{
+  "schemaVersion": 1,
+  "baselineId": "bettracker-supabase-advisor-security-s1",
+  "status": "accepted-intentional-findings",
+  "repository": {
+    "baseCommit": "24c80c384df7a5a48f9e91d88db0a2810b67a65b"
+  },
+  "snapshot": {
+    "capturedAt": "2026-08-07",
+    "projectRef": "ybbdkwjtytokrpbvgbmq",
+    "postgresVersion": "17.6.1.127",
+    "securityFindingCounts": {
+      "0029_authenticated_security_definer_function_executable": 8,
+      "0008_rls_enabled_no_policy": 1
+    }
+  },
+  "acceptedFindings": [
+    {
+      "lintId": "0029_authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "cacheKey": "authenticated_security_definer_function_executable_public_adjust_bankroll_p_type text, p_amount numeric, p_note text, p_idempotency_key text",
+      "object": {
+        "kind": "function",
+        "signature": "public.adjust_bankroll(text,numeric,text,text)",
+        "identityArguments": "p_type text, p_amount numeric, p_note text, p_idempotency_key text",
+        "owner": "postgres",
+        "securityDefiner": true,
+        "searchPath": "public, pg_temp",
+        "explicitExecuteGrantees": ["postgres", "authenticated", "service_role"],
+        "deniedExecuteRoles": ["PUBLIC", "anon"]
+      },
+      "sourceEvidence": [
+        "supabase/migrations/016_atomic_financial_writes.sql",
+        "supabase/migrations/031_public_api_privilege_hardening.sql"
+      ]
+    },
+    {
+      "lintId": "0029_authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "cacheKey": "authenticated_security_definer_function_executable_public_cancel_pending_bet_p_bet_id uuid, p_idempotency_key text",
+      "object": {
+        "kind": "function",
+        "signature": "public.cancel_pending_bet(uuid,text)",
+        "identityArguments": "p_bet_id uuid, p_idempotency_key text",
+        "owner": "postgres",
+        "securityDefiner": true,
+        "searchPath": "",
+        "explicitExecuteGrantees": ["postgres", "authenticated", "service_role"],
+        "deniedExecuteRoles": ["PUBLIC", "anon"]
+      },
+      "sourceEvidence": [
+        "supabase/migrations/20260721152711_cancel_pending_bet.sql"
+      ]
+    },
+    {
+      "lintId": "0029_authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "cacheKey": "authenticated_security_definer_function_executable_public_complete_onboarding_",
+      "object": {
+        "kind": "function",
+        "signature": "public.complete_onboarding()",
+        "identityArguments": "",
+        "owner": "postgres",
+        "securityDefiner": true,
+        "searchPath": "public, pg_temp",
+        "explicitExecuteGrantees": ["postgres", "authenticated", "service_role"],
+        "deniedExecuteRoles": ["PUBLIC", "anon"]
+      },
+      "sourceEvidence": [
+        "supabase/migrations/017_prepare_domain_write_boundaries.sql",
+        "supabase/migrations/031_public_api_privilege_hardening.sql"
+      ]
+    },
+    {
+      "lintId": "0029_authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "cacheKey": "authenticated_security_definer_function_executable_public_create_tracked_bet_p_legs jsonb, p_total_odds numeric, p_stake numeric, p_bookmaker text, p_notes text, p_source text, p_idempotency_key text",
+      "object": {
+        "kind": "function",
+        "signature": "public.create_tracked_bet(jsonb,numeric,numeric,text,text,text,text)",
+        "identityArguments": "p_legs jsonb, p_total_odds numeric, p_stake numeric, p_bookmaker text, p_notes text, p_source text, p_idempotency_key text",
+        "owner": "postgres",
+        "securityDefiner": true,
+        "searchPath": "",
+        "explicitExecuteGrantees": ["postgres", "authenticated", "service_role"],
+        "deniedExecuteRoles": ["PUBLIC", "anon"]
+      },
+      "sourceEvidence": [
+        "supabase/migrations/024_create_tracked_bet.sql"
+      ]
+    },
+    {
+      "lintId": "0029_authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "cacheKey": "authenticated_security_definer_function_executable_public_save_user_settings_p_display_name text, p_currency text, p_default_stake numeric, p_kelly_fraction numeric, p_web_search_enabled boolean, p_timezone text",
+      "object": {
+        "kind": "function",
+        "signature": "public.save_user_settings(text,text,numeric,numeric,boolean,text)",
+        "identityArguments": "p_display_name text, p_currency text, p_default_stake numeric, p_kelly_fraction numeric, p_web_search_enabled boolean, p_timezone text",
+        "owner": "postgres",
+        "securityDefiner": true,
+        "searchPath": "public, pg_temp",
+        "explicitExecuteGrantees": ["postgres", "authenticated", "service_role"],
+        "deniedExecuteRoles": ["PUBLIC", "anon"]
+      },
+      "sourceEvidence": [
+        "supabase/migrations/017_prepare_domain_write_boundaries.sql",
+        "supabase/migrations/031_public_api_privilege_hardening.sql"
+      ]
+    },
+    {
+      "lintId": "0029_authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "cacheKey": "authenticated_security_definer_function_executable_public_settle_bet_p_bet_id uuid, p_outcome text",
+      "object": {
+        "kind": "function",
+        "signature": "public.settle_bet(uuid,text)",
+        "identityArguments": "p_bet_id uuid, p_outcome text",
+        "owner": "postgres",
+        "securityDefiner": true,
+        "searchPath": "public, pg_temp",
+        "explicitExecuteGrantees": ["postgres", "authenticated", "service_role"],
+        "deniedExecuteRoles": ["PUBLIC", "anon"]
+      },
+      "sourceEvidence": [
+        "supabase/migrations/012_settle_bet_fixes.sql",
+        "supabase/migrations/031_public_api_privilege_hardening.sql"
+      ]
+    },
+    {
+      "lintId": "0029_authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "cacheKey": "authenticated_security_definer_function_executable_public_update_decision_action_p_decision_id uuid, p_final_action text",
+      "object": {
+        "kind": "function",
+        "signature": "public.update_decision_action(uuid,text)",
+        "identityArguments": "p_decision_id uuid, p_final_action text",
+        "owner": "postgres",
+        "securityDefiner": true,
+        "searchPath": "public, pg_temp",
+        "explicitExecuteGrantees": ["postgres", "authenticated", "service_role"],
+        "deniedExecuteRoles": ["PUBLIC", "anon"]
+      },
+      "sourceEvidence": [
+        "supabase/migrations/017_prepare_domain_write_boundaries.sql",
+        "supabase/migrations/031_public_api_privilege_hardening.sql"
+      ]
+    },
+    {
+      "lintId": "0029_authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "cacheKey": "authenticated_security_definer_function_executable_public_update_opportunity_status_p_opportunity_id uuid, p_status text, p_linked_decision_id uuid",
+      "object": {
+        "kind": "function",
+        "signature": "public.update_opportunity_status(uuid,text,uuid)",
+        "identityArguments": "p_opportunity_id uuid, p_status text, p_linked_decision_id uuid",
+        "owner": "postgres",
+        "securityDefiner": true,
+        "searchPath": "public, pg_temp",
+        "explicitExecuteGrantees": ["postgres", "authenticated", "service_role"],
+        "deniedExecuteRoles": ["PUBLIC", "anon"]
+      },
+      "sourceEvidence": [
+        "supabase/migrations/019_prepare_agent_write_boundaries.sql",
+        "supabase/migrations/031_public_api_privilege_hardening.sql"
+      ]
+    },
+    {
+      "lintId": "0008_rls_enabled_no_policy",
+      "level": "INFO",
+      "cacheKey": "rls_enabled_no_policy_public_decision_056_execution_ledger",
+      "object": {
+        "kind": "table",
+        "name": "public.decision_056_execution_ledger",
+        "owner": "postgres",
+        "rlsEnabled": true,
+        "policyCount": 0,
+        "clientTablePrivileges": [],
+        "serviceRoleTablePrivileges": ["INSERT"]
+      },
+      "sourceEvidence": [
+        "supabase/migrations/20260728162034_decision_056_execution_ledger.sql"
+      ]
+    }
+  ],
+  "requiredServiceOnlyRpc": {
+    "signature": "public.place_bet_from_decision(uuid,uuid,numeric,text,text)",
+    "identityArguments": "p_decision_id uuid, p_bankroll_id uuid, p_stake numeric, p_bookmaker text, p_notes text",
+    "owner": "postgres",
+    "securityDefiner": true,
+    "searchPath": "public, pg_temp",
+    "explicitExecuteGrantees": ["postgres", "service_role"],
+    "deniedExecuteRoles": ["PUBLIC", "anon", "authenticated"],
+    "sourceEvidence": [
+      "supabase/migrations/031_public_api_privilege_hardening.sql",
+      "supabase/migrations/20260806154618_quarantine_place_bet_from_decision.sql"
+    ]
+  }
+}

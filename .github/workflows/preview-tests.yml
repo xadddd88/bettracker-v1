@@ -90,6 +90,8 @@ jobs:
         run: npm run test:auth-invite
       - name: "FP-001 legacy quarantine suite (Decision #051)"
         run: npm run test:fp001-quarantine
+      - name: "Supabase Advisor exception baseline (Slice S1)"
+        run: npm run test:supabase-advisor-baseline
       - name: "Global rate-limit suite (Decision #052)"
         run: npm run test:rate-limit
       - name: "CSP security suite (Decision #054)"
@@ -233,6 +235,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Run migration 031 public API privilege verifier
         run: bash scripts/verify-migration-031.sh postgresql://postgres:postgres@localhost:5432/postgres
+      - name: Run Supabase Advisor Slice S1 baseline verifier
+        run: bash scripts/verify-supabase-advisor-baseline.sh postgresql://postgres:postgres@localhost:5432/postgres
 
   # ── Job: Cross-platform design-system compile gate ─────────────────────────
   design-system:
