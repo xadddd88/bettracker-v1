@@ -8,6 +8,7 @@
  */
 
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -138,6 +139,8 @@ await testAsync('capped body reader rejects a body over 32 KB', async () => {
 const route = readFileSync(path.join(repoRoot, 'app/api/csp-report/route.ts'), 'utf8')
 const config = readFileSync(path.join(repoRoot, 'next.config.ts'), 'utf8')
 const rateLimit = readFileSync(path.join(repoRoot, 'lib/rate-limit.ts'), 'utf8')
+const posthogProvider = readFileSync(path.join(repoRoot, 'components/PostHogProvider.tsx'), 'utf8')
+const analyticsClient = readFileSync(path.join(repoRoot, 'lib/analytics/client.ts'), 'utf8')
 
 test('route allows only reviewed CSP report media types', () => {
   for (const type of ['application/csp-report', 'application/reports+json', 'application/json']) {
@@ -188,6 +191,96 @@ test('baseline headers exist while CSP remains Report-Only with unsafe-inline', 
   }
   assert.doesNotMatch(config, /key:\s*['"]Content-Security-Policy['"]/)
   assert.ok(config.includes("'unsafe-inline'"))
+  assert.doesNotMatch(config, /\*\.posthog\.com/)
+  assert.doesNotMatch(config, /['"]strict-dynamic['"]/)
+})
+
+test('PostHog browser initialization disables unused remote capabilities', () => {
+  assert.equal((posthogProvider.match(/posthog\.init\(/g) ?? []).length, 1)
+  for (const option of [
+    'advanced_disable_flags',
+    'disable_external_dependency_loading',
+    'disable_surveys',
+    'disable_product_tours',
+    'disable_conversations',
+  ]) {
+    assert.match(posthogProvider, new RegExp(`${option}:\\s*true`), `${option} must be true`)
+  }
+})
+
+test('locked PostHog SDK blocks external scripts and remote config under S2A controls', () => {
+  const posthogRoot = path.dirname(require.resolve('posthog-js/package.json'))
+  const probe = `
+    global.window = {}
+    let createdScripts = 0
+    global.document = {
+      body: { appendChild() { throw new Error('external script append reached') } },
+      head: { appendChild() { throw new Error('external script append reached') } },
+      querySelectorAll() { return [] },
+      createElement() { createdScripts++; return {} },
+      addEventListener() {},
+    }
+
+    require(${JSON.stringify(path.join(posthogRoot, 'lib/src/entrypoints/external-scripts-loader.js'))})
+    const { PostHog } = require(${JSON.stringify(path.join(posthogRoot, 'lib/src/posthog-core.js'))})
+    const { RemoteConfigLoader } = require(${JSON.stringify(path.join(posthogRoot, 'lib/src/remote-config.js'))})
+
+    const scriptErrors = []
+    const scriptInstance = {
+      config: {
+        disable_external_dependency_loading: true,
+        strict_script_versioning: false,
+        token: 'public-test-token',
+      },
+      requestRouter: { endpointFor(_kind, suffix) { return 'https://posthog.invalid' + suffix } },
+      version: 'locked-test-version',
+    }
+    window.__PosthogExtensions__.loadExternalDependency(scriptInstance, 'remote-config', error => scriptErrors.push(error))
+    window.__PosthogExtensions__.loadExternalDependency(scriptInstance, 'surveys', error => scriptErrors.push(error))
+    window.__PosthogExtensions__.loadSiteApp(scriptInstance, '/site-app.js', error => scriptErrors.push(error))
+
+    const core = new PostHog()
+    core._originalUserConfig = { advanced_disable_flags: true }
+    core.config.advanced_disable_flags = true
+    let remoteRequests = 0
+    let remoteApplications = 0
+    const remoteInstance = {
+      config: core.config,
+      _shouldDisableFlags: core._shouldDisableFlags.bind(core),
+      _send_request() { remoteRequests++ },
+      _onRemoteConfig() { remoteApplications++ },
+      requestRouter: { endpointFor(_kind, suffix) { return 'https://posthog.invalid' + suffix } },
+    }
+    new RemoteConfigLoader(remoteInstance).load()
+
+    console.log(JSON.stringify({
+      createdScripts,
+      manualMethods: [typeof core.capture, typeof core.identify],
+      remoteApplications,
+      remoteRequests,
+      scriptErrors,
+    }))
+  `
+  const result = spawnSync(process.execPath, ['-e', probe], { encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr)
+  const output = JSON.parse(result.stdout.trim().split(/\r?\n/).at(-1))
+  assert.deepEqual(output, {
+    createdScripts: 0,
+    manualMethods: ['function', 'function'],
+    remoteApplications: 0,
+    remoteRequests: 0,
+    scriptErrors: Array(3).fill('Loading of external scripts is disabled'),
+  })
+})
+
+test('manual PostHog capture, identify, pageview, and pageleave remain enabled', () => {
+  assert.match(posthogProvider, /capture_pageview:\s*false/)
+  assert.match(posthogProvider, /capture_pageleave:\s*true/)
+  assert.match(posthogProvider, /autocapture:\s*false/)
+  assert.match(posthogProvider, /disable_session_recording:\s*true/)
+  assert.match(posthogProvider, /ph\.capture\(['"]\$pageview['"],\s*\{\s*path:\s*pathname\s*\}\)/)
+  assert.match(analyticsClient, /posthog\.capture\(event,\s*sanitize\(props\)\)/)
+  assert.match(analyticsClient, /posthog\.identify\(userId,\s*sanitize\(traits\)\)/)
 })
 
 test('RATE_LIMITS exposes CSP report windows 60/min + 500/hour', () => {
