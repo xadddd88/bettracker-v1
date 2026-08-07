@@ -30,6 +30,14 @@ if (
     capture_pageleave: true,
     autocapture: false,
     disable_session_recording: true,
+    // Slice S2A: BetTracker uses PostHog only for explicit capture, identify,
+    // pageview, and pageleave events. Do not load remote product capabilities
+    // or executable dependencies into the application origin.
+    advanced_disable_flags: true,
+    disable_external_dependency_loading: true,
+    disable_surveys: true,
+    disable_product_tours: true,
+    disable_conversations: true,
   })
 }
 
