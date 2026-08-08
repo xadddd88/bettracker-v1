@@ -1,0 +1,132 @@
+{
+  "schema_version": "csp-phase-b-readiness-s2b.v1",
+  "slice": "S2B",
+  "status": "readiness-only",
+  "baseline": {
+    "ref": "main@e76901d913034f8bfeb2370e2ce318c41b30f13e",
+    "sha": "e76901d913034f8bfeb2370e2ce318c41b30f13e"
+  },
+  "scope": {
+    "runtime_source_changed": false,
+    "runtime_diff": "clean",
+    "allowed_changed_files": [
+      "docs/csp-posthog-capability-reduction-s2a.md",
+      "docs/csp-phase-b-compatibility-inventory-s2b.md",
+      "docs/security/csp-phase-b-readiness-s2b.v1.json",
+      "scripts/test-csp-phase-b-readiness.mjs",
+      "package.json"
+    ]
+  },
+  "constraints": {
+    "active_header": "Content-Security-Policy-Report-Only",
+    "unsafe_inline_retained": true,
+    "phase_b": "not-approved",
+    "forbidden_in_s2b": [
+      "Content-Security-Policy enforcement",
+      "nonce",
+      "strict-dynamic",
+      "wildcard CSP source"
+    ]
+  },
+  "middleware": {
+    "file": "middleware.ts",
+    "next_response_next_sites": 2,
+    "redirects": [
+      {
+        "when": "unauthenticated protected request",
+        "destination": "/login"
+      },
+      {
+        "when": "authenticated login request",
+        "destination": "/dashboard"
+      }
+    ],
+    "request_cookie_write_sites": 1,
+    "response_cookie_write_sites": 1,
+    "supabase_get_user_sites": 1
+  },
+  "app_router": {
+    "entrypoints": [
+      "app/(app)/ai/page.tsx",
+      "app/(app)/analytics/page.tsx",
+      "app/(app)/bankroll/page.tsx",
+      "app/(app)/bets/[id]/page.tsx",
+      "app/(app)/bets/new/page.tsx",
+      "app/(app)/bets/page.tsx",
+      "app/(app)/coach/page.tsx",
+      "app/(app)/dashboard/page.tsx",
+      "app/(app)/decisions/[id]/page.tsx",
+      "app/(app)/decisions/page.tsx",
+      "app/(app)/layout.tsx",
+      "app/(app)/scout/page.tsx",
+      "app/(app)/settings/page.tsx",
+      "app/(app)/tennis-calculator/page.tsx",
+      "app/(auth)/login/page.tsx",
+      "app/auth/set-password/page.tsx",
+      "app/layout.tsx",
+      "app/page.tsx"
+    ],
+    "direct_supabase_server_consumers": [
+      "app/(app)/analytics/page.tsx",
+      "app/(app)/bankroll/page.tsx",
+      "app/(app)/bets/[id]/page.tsx",
+      "app/(app)/bets/page.tsx",
+      "app/(app)/coach/page.tsx",
+      "app/(app)/dashboard/page.tsx",
+      "app/(app)/decisions/[id]/page.tsx",
+      "app/(app)/decisions/page.tsx",
+      "app/(app)/layout.tsx",
+      "app/(app)/scout/page.tsx",
+      "app/(app)/settings/page.tsx",
+      "app/(app)/tennis-calculator/page.tsx"
+    ],
+    "inherited_request_bound_pages": [
+      "app/(app)/ai/page.tsx",
+      "app/(app)/bets/new/page.tsx"
+    ],
+    "static_candidates": [
+      {
+        "route": "/",
+        "file": "app/page.tsx"
+      },
+      {
+        "route": "/login",
+        "file": "app/(auth)/login/page.tsx"
+      },
+      {
+        "route": "/auth/set-password",
+        "file": "app/auth/set-password/page.tsx"
+      }
+    ]
+  },
+  "inline_style_inventory": {
+    "total": 5,
+    "files": [
+      {
+        "path": "app/(app)/ai/page.tsx",
+        "count": 2
+      },
+      {
+        "path": "app/(app)/decisions/[id]/page.tsx",
+        "count": 2
+      },
+      {
+        "path": "components/ui/MobileNav.tsx",
+        "count": 1
+      }
+    ],
+    "dangerously_set_inner_html": 0,
+    "next_script_or_script_component": 0
+  },
+  "s2a_execution_evidence": {
+    "pull_request": 248,
+    "reviewed_head": "0b254d6e6a8522d1c2400fe9fa7adc7980009501",
+    "preview_tests_run": "31163938940",
+    "ci_result": "11/11 jobs success",
+    "hermetic_web_acceptance": "success",
+    "merge_commit": "e76901d913034f8bfeb2370e2ce318c41b30f13e",
+    "production_deployment": "dpl_As3vXgypNHdFNuL7yEFa5DtyReC2",
+    "deployment_state": "READY",
+    "production_alias": "https://btdk.app"
+  }
+}
