@@ -18,6 +18,10 @@ const baselinePath = path.join(
 const docPath = path.join(repoRoot, 'docs/supabase-advisor-security-baseline-s1.md');
 const verifierPath = path.join(repoRoot, 'scripts/verify-supabase-advisor-baseline.sh');
 const migrationsDir = path.join(repoRoot, 'supabase/migrations');
+const membershipMigrationPath = path.join(
+  migrationsDir,
+  '20260809083122_active_membership_foundation.sql',
+);
 
 const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
 const migrationFiles = readdirSync(migrationsDir)
@@ -123,12 +127,19 @@ function migrationEvents() {
     let match;
     while ((match = eventPattern.exec(sql)) !== null) {
       const target = match[2].trim();
-      const nameMatch = target.match(/^(?:public\.)?([a-z_][a-z0-9_]*)\s*(?:\(|$)/i);
+      const nameMatch = target.match(
+        /^(?:([a-z_][a-z0-9_]*)\.)?([a-z_][a-z0-9_]*)\s*(?:\(|$)/i,
+      );
       assert.ok(nameMatch, `cannot parse function target in ${migration.name}: ${target}`);
+      const schema = (nameMatch[1] ?? 'public').toLowerCase();
+      const name = nameMatch[2].toLowerCase();
       events.push({
         migration: migration.name,
         action: match[1].toUpperCase(),
-        name: nameMatch[1],
+        schema,
+        name,
+        qualifiedName: `${schema}.${name}`,
+        functionTarget: target.replace(/\s+/g, ' ').toLowerCase(),
         roles: match[4]
           .split(',')
           .map((role) => role.trim().toLowerCase()),
@@ -237,14 +248,17 @@ test('each accepted RPC has definition, grant and search_path migration evidence
   }
 });
 
-test('unknown authenticated function grants are rejected and accepted RPCs remain open', () => {
-  const accepted = new Set(expectedRpcs.map((rpc) => rpcName(rpc.signature)));
+test('unknown public grants are rejected and only the exact private helper is added', () => {
+  const accepted = new Set(
+    expectedRpcs.map((rpc) => `public.${rpcName(rpc.signature)}`),
+  );
   const retired = new Set([
-    'create_decision_with_analysis',
-    'create_quick_bet',
-    'place_bet_from_decision',
-    'set_user_currency',
+    'public.create_decision_with_analysis',
+    'public.create_quick_bet',
+    'public.place_bet_from_decision',
+    'public.set_user_currency',
   ]);
+  const privateHelper = 'private.is_active_member';
   const state = new Map();
 
   const allSql = normalizedSql(migrations.map(({ sql }) => sql).join('\n'));
@@ -255,14 +269,22 @@ test('unknown authenticated function grants are rejected and accepted RPCs remai
 
   for (const event of migrationEvents()) {
     if (!event.roles.includes('authenticated')) continue;
+    const isExactPrivateHelper = event.qualifiedName === privateHelper
+      && event.functionTarget === 'private.is_active_member()';
     if (event.action === 'GRANT') {
       assert.ok(
-        accepted.has(event.name) || retired.has(event.name),
-        `unknown authenticated RPC grant in ${event.migration}: ${event.name}`,
+        accepted.has(event.qualifiedName)
+          || retired.has(event.qualifiedName)
+          || isExactPrivateHelper,
+        `unknown authenticated function grant in ${event.migration}: ${event.qualifiedName}`,
       );
     }
-    if (accepted.has(event.name) || retired.has(event.name)) {
-      state.set(event.name, event.action === 'GRANT');
+    if (
+      accepted.has(event.qualifiedName)
+      || retired.has(event.qualifiedName)
+      || isExactPrivateHelper
+    ) {
+      state.set(event.qualifiedName, event.action === 'GRANT');
     }
   }
 
@@ -272,6 +294,34 @@ test('unknown authenticated function grants are rejected and accepted RPCs remai
   for (const name of retired) {
     assert.equal(state.get(name), false, `${name} must remain closed to authenticated`);
   }
+  assert.equal(
+    state.get(privateHelper),
+    true,
+    'private.is_active_member must be the only new authenticated helper',
+  );
+});
+
+test('S2.1 helper stays private and the service RPC stays out of the accepted baseline', () => {
+  const sql = normalizedSql(readFileSync(membershipMigrationPath, 'utf8'));
+  assert.match(
+    sql,
+    /CREATE FUNCTION private\.is_active_member\(\)[\s\S]*?SECURITY DEFINER[\s\S]*?SET search_path = ''/i,
+  );
+  assert.doesNotMatch(sql, /CREATE FUNCTION public\.is_active_member\(/i);
+  assert.match(
+    sql,
+    /REVOKE EXECUTE ON FUNCTION public\.consume_beta_access_invite\(uuid, text\) FROM PUBLIC, anon, authenticated, service_role;/i,
+  );
+  assert.match(
+    sql,
+    /GRANT EXECUTE ON FUNCTION public\.consume_beta_access_invite\(uuid, text\) TO service_role;/i,
+  );
+  assert.ok(
+    !baseline.acceptedFindings.some((finding) =>
+      finding.object?.signature?.includes('is_active_member')
+      || finding.object?.signature?.includes('consume_beta_access_invite')),
+    'S2.1 functions must not be allowlisted as accepted public findings',
+  );
 });
 
 test('place_bet_from_decision remains a service-only negative control', () => {
