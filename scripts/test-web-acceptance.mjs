@@ -162,7 +162,7 @@ function safeChildEnvironment(supabaseOrigin) {
     SENTRY_PROJECT: '',
     ANTHROPIC_API_KEY: '',
     THE_ODDS_API_KEY: '',
-    SUPABASE_SERVICE_ROLE_KEY: '',
+    SUPABASE_SERVICE_ROLE_KEY: 'acceptance-service-role-key',
   }
 }
 
@@ -750,6 +750,12 @@ const supabaseStub = createServer((request, response) => {
     jsonResponse(response, 200, TEST_USER)
     return
   }
+  if (url.pathname === '/rest/v1/beta_access') {
+    assert.equal(request.headers.apikey, 'acceptance-service-role-key', 'membership lookup must use only the synthetic service client')
+    assert.equal(url.searchParams.get('used_by_user_id'), `eq.${TEST_USER_ID}`, 'membership lookup must bind to the verified user id')
+    jsonResponse(response, 200, [{ status: 'used', used_by_user_id: TEST_USER_ID }], { 'content-range': '0-0/1' })
+    return
+  }
   if (url.pathname === '/rest/v1/bets') {
     if (url.searchParams.get('id') === `eq.${TEST_BET_ID}`) {
       jsonResponse(response, 200, SETTLED_TEST_BET, { 'content-range': '0-0/1' })
@@ -1001,6 +1007,7 @@ try {
   assert.deepEqual(browserErrors, [], 'Authenticated acceptance pages must have no uncaught browser errors')
   assert.deepEqual(browserConsoleErrors, [], 'Authenticated acceptance pages must have no application console errors')
   assert.ok(stubRequests.some(request => request === 'GET /auth/v1/user'), 'Acceptance must exercise the real auth contract through the local stub')
+  assert.ok(stubRequests.some(request => request === 'GET /rest/v1/beta_access'), 'Acceptance must exercise the live membership predicate through the local stub')
   assert.ok(stubRequests.some(request => request === 'GET /rest/v1/bets'), 'Dashboard acceptance must exercise local data reads')
   assert.ok(stubRequests.some(request => request === 'GET /rest/v1/coaching_sessions'), 'Coach acceptance must exercise local session reads')
   assert.ok(stubRequests.some(request => request === 'GET /rest/v1/bankroll_transactions'), 'Bankroll acceptance must exercise local transaction reads')

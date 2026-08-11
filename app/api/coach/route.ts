@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import {
+  activeMemberAuthErrorResponse,
+  authenticateActiveMemberRequest,
+} from '@/lib/supabase/request-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
@@ -376,11 +379,9 @@ ${smallSampleWarning}`
 export async function POST(req: NextRequest) {
   try {
     // 1. Auth
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    }
+    const auth = await authenticateActiveMemberRequest(req)
+    if (!auth.authorized) return activeMemberAuthErrorResponse(auth)
+    const { supabase, user } = auth
 
     // 2. Rate limit (durable, cross-instance — Decision #052)
     const rl = await enforceRateLimit(`coach:${user.id}`, RATE_LIMITS.coach())

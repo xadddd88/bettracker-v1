@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import {
+  activeMemberAuthErrorResponse,
+  authenticateActiveMemberRequest,
+} from '@/lib/supabase/request-auth'
 
 // Decision #049: only genuine user actions are accepted here. System
 // transitions ('discovered', 'research_needed', 'expired') are not
@@ -15,17 +18,14 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const auth = await authenticateActiveMemberRequest(req)
+    if (!auth.authorized) return activeMemberAuthErrorResponse(auth)
+    const { supabase } = auth
+
     const { id } = await params
     if (!z.string().uuid().safeParse(id).success) {
       return NextResponse.json({ success: false, error: 'Invalid id' }, { status: 400 })
     }
-
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    }
-
     const body = await req.json()
     const parsed = patchSchema.safeParse(body)
     if (!parsed.success) {

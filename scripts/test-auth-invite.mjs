@@ -57,17 +57,22 @@ function test(name, fn) {
 
 let adminStub = null;   // for createAdminClient
 let serverStub = null;  // for createClient (server)
+let analyticsEvents = [];
 
 function betaTable(cfg) {
-  const calls = { updates: [] };
+  const calls = { updates: [], rpcs: [] };
   return {
     calls,
     // The register route rate-limits via enforceRateLimit → admin.rpc
     // ('rate_limit_check'); allow it through so these tests exercise the
     // invite logic (rate limiting has its own suite).
-    rpc: async (name) => {
+    rpc: async (name, args) => {
+      calls.rpcs.push({ name, args });
       if (name === 'rate_limit_check') return { data: { allowed: true, retry_after: 0 }, error: null };
-      return { data: null, error: null };
+      if (name === 'consume_beta_access_invite') {
+        return { data: cfg.consumeOutcome ?? null, error: cfg.consumeError ?? null };
+      }
+      throw new Error(`unexpected RPC ${name}`);
     },
     from(table) {
       assert.equal(table, 'beta_access', `unexpected table ${table}`);
@@ -119,7 +124,7 @@ function installStubs() {
   const analyticsPath = path.join(buildDir, 'lib/analytics/server.js');
   require.cache[require.resolve(analyticsPath)] = {
     id: analyticsPath, filename: analyticsPath, loaded: true,
-    exports: { trackServerEvent: async () => {} },
+    exports: { trackServerEvent: async (...args) => { analyticsEvents.push(args); } },
   };
 }
 
@@ -138,7 +143,7 @@ async function withRoutes(fn) {
   } finally {
     clearCompiled();
     Module._resolveFilename = orig;
-    adminStub = null; serverStub = null;
+    adminStub = null; serverStub = null; analyticsEvents = [];
   }
 }
 
@@ -241,56 +246,67 @@ await testAsync('register: invalid email → 400', async () => {
 
 // ── complete-invite ──────────────────────────────────────────────────
 
-function completeStubs({ user, row, updateError }) {
+function completeStubs({ user, outcome = 'consumed', consumeError = null }) {
   serverStub = { auth: { getUser: async () => ({ data: { user } }) } };
-  adminStub = betaTable({ row, updateError });
+  adminStub = betaTable({ consumeOutcome: outcome, consumeError });
   return adminStub;
 }
 
 await testAsync('complete-invite: unauthenticated → 401', async () => {
-  completeStubs({ user: null, row: null });
+  completeStubs({ user: null });
   await withRoutes(async ({ complete }) => {
     const res = await complete.POST();
     assert.equal(res.status, 401);
   });
 });
 
-await testAsync('complete-invite: invited row → marked used', async () => {
-  const t = completeStubs({ user: { id: 'u1', email: 'Invitee@Example.com' }, row: { id: 'b1', status: 'invited', used_by_user_id: null } });
+await testAsync('complete-invite: consumed → 200, exact atomic RPC, one analytics event', async () => {
+  const t = completeStubs({ user: { id: 'u1', email: 'Invitee@Example.com' }, outcome: 'consumed' });
   await withRoutes(async ({ complete }) => {
     const res = await complete.POST();
     assert.equal(res.status, 200);
-    assert.equal(t.calls.updates[0].status, 'used', 'invite must be consumed');
-    assert.equal(t.calls.updates[0].used_by_user_id, 'u1', 'used_by_user_id must be the caller');
+    assert.deepEqual(t.calls.rpcs, [{
+      name: 'consume_beta_access_invite',
+      args: { p_user_id: 'u1', p_email: 'Invitee@Example.com' },
+    }]);
+    assert.equal(t.calls.updates.length, 0, 'complete-invite must never write beta_access directly');
+    assert.equal(analyticsEvents.length, 1, 'consumed must emit one completion event');
   });
 });
 
-await testAsync('complete-invite: revoked / missing → 403, not consumed', async () => {
-  for (const row of [null, { id: 'b1', status: 'revoked' }]) {
-    const t = completeStubs({ user: { id: 'u1', email: 'x@example.com' }, row });
-    await withRoutes(async ({ complete }) => {
-      const res = await complete.POST();
-      assert.equal(res.status, 403);
-      assert.equal(t.calls.updates.length, 0, 'must not update');
-    });
-  }
+await testAsync('complete-invite: already_used → idempotent 200 without duplicate analytics', async () => {
+  completeStubs({ user: { id: 'u1', email: 'x@example.com' }, outcome: 'already_used' });
+  await withRoutes(async ({ complete }) => {
+    const res = await complete.POST();
+    assert.equal(res.status, 200);
+    assert.equal(analyticsEvents.length, 0);
+  });
 });
 
-await testAsync('complete-invite: already used by another user → 403', async () => {
-  const t = completeStubs({ user: { id: 'u1', email: 'x@example.com' }, row: { id: 'b1', status: 'used', used_by_user_id: 'someone-else' } });
+await testAsync('complete-invite: not_eligible → 403 without analytics', async () => {
+  completeStubs({ user: { id: 'u1', email: 'x@example.com' }, outcome: 'not_eligible' });
   await withRoutes(async ({ complete }) => {
     const res = await complete.POST();
     assert.equal(res.status, 403);
-    assert.equal(t.calls.updates.length, 0);
+    assert.equal(analyticsEvents.length, 0);
   });
 });
 
-await testAsync('complete-invite: already used by same user → idempotent 200', async () => {
-  const t = completeStubs({ user: { id: 'u1', email: 'x@example.com' }, row: { id: 'b1', status: 'used', used_by_user_id: 'u1' } });
+await testAsync('complete-invite: RPC error → fail-closed 503', async () => {
+  completeStubs({ user: { id: 'u1', email: 'x@example.com' }, consumeError: { message: 'unavailable' } });
   await withRoutes(async ({ complete }) => {
     const res = await complete.POST();
-    assert.equal(res.status, 200);
-    assert.equal(t.calls.updates.length, 0, 'no re-write on idempotent replay');
+    assert.equal(res.status, 503);
+    assert.equal(analyticsEvents.length, 0);
+  });
+});
+
+await testAsync('complete-invite: unknown RPC outcome → fail-closed 503', async () => {
+  completeStubs({ user: { id: 'u1', email: 'x@example.com' }, outcome: 'unexpected' });
+  await withRoutes(async ({ complete }) => {
+    const res = await complete.POST();
+    assert.equal(res.status, 503);
+    assert.equal(analyticsEvents.length, 0);
   });
 });
 

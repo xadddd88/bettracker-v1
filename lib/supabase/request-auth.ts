@@ -1,4 +1,6 @@
 import { createClient as createSupabaseClient, type SupabaseClient, type User } from '@supabase/supabase-js'
+import { NextResponse } from 'next/server'
+import { checkActiveMembership } from '@/lib/supabase/active-membership'
 import { createClient as createCookieClient } from '@/lib/supabase/server'
 
 export type RequestAuthResult =
@@ -6,6 +8,14 @@ export type RequestAuthResult =
   | { authorized: false }
 
 const UNAUTHORIZED: RequestAuthResult = { authorized: false }
+
+export type ActiveMemberRequestAuthResult =
+  | { authorized: true; supabase: SupabaseClient; user: User }
+  | {
+      authorized: false
+      status: 401 | 403 | 503
+      reason: 'unauthorized' | 'inactive_membership' | 'membership_unavailable'
+    }
 
 function jwtRole(token: string): string | null {
   const parts = token.split('.')
@@ -74,4 +84,40 @@ export async function authenticateRequest(req: Request): Promise<RequestAuthResu
   } catch {
     return UNAUTHORIZED
   }
+}
+
+/**
+ * Add live, fail-closed product membership to the existing cookie/Bearer Auth
+ * contract. The verified Auth user id is the only identity accepted by the
+ * membership primitive.
+ */
+export async function authenticateActiveMemberRequest(
+  req: Request,
+): Promise<ActiveMemberRequestAuthResult> {
+  const auth = await authenticateRequest(req)
+  if (!auth.authorized) {
+    return { authorized: false, status: 401, reason: 'unauthorized' }
+  }
+
+  const membership = await checkActiveMembership(auth.user.id)
+  if (membership.status === 'inactive') {
+    return { authorized: false, status: 403, reason: 'inactive_membership' }
+  }
+  if (membership.status === 'unavailable') {
+    return { authorized: false, status: 503, reason: 'membership_unavailable' }
+  }
+
+  return auth
+}
+
+export function activeMemberAuthErrorResponse(
+  auth: Extract<ActiveMemberRequestAuthResult, { authorized: false }>,
+): NextResponse {
+  const error = auth.status === 401
+    ? 'Unauthorized'
+    : auth.status === 403
+      ? 'Forbidden'
+      : 'Service unavailable'
+
+  return NextResponse.json({ error }, { status: auth.status })
 }

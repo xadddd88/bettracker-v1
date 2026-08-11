@@ -1,5 +1,14 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { checkActiveMembership } from '@/lib/supabase/active-membership'
+
+function isPublicWebPath(pathname: string): boolean {
+  return pathname === '/login'
+    || pathname === '/access-denied'
+    || pathname === '/service-unavailable'
+    || pathname === '/auth'
+    || pathname.startsWith('/auth/')
+}
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -24,19 +33,34 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
 
+  function redirectPreservingSupabaseCookies(destination: string) {
+    const response = NextResponse.redirect(new URL(destination, request.url))
+    for (const cookie of supabaseResponse.cookies.getAll()) {
+      response.cookies.set(cookie)
+    }
+    return response
+  }
+
+  const protectedWebPath = !pathname.startsWith('/api/') && !isPublicWebPath(pathname)
+
   // Redirect unauthenticated users to login
-  if (
-    !user &&
-    !pathname.startsWith('/login') &&
-    !pathname.startsWith('/auth') &&
-    !pathname.startsWith('/api/')
-  ) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  if (!user && protectedWebPath) {
+    return redirectPreservingSupabaseCookies('/login')
+  }
+
+  if (user && protectedWebPath) {
+    const membership = await checkActiveMembership(user.id)
+    if (membership.status === 'inactive') {
+      return redirectPreservingSupabaseCookies('/access-denied')
+    }
+    if (membership.status === 'unavailable') {
+      return redirectPreservingSupabaseCookies('/service-unavailable')
+    }
   }
 
   // Redirect authenticated users away from login
   if (user && pathname === '/login') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return redirectPreservingSupabaseCookies('/dashboard')
   }
 
   return supabaseResponse

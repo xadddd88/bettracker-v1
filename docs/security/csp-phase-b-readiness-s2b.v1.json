@@ -31,6 +31,7 @@
   "middleware": {
     "file": "middleware.ts",
     "next_response_next_sites": 2,
+    "redirect_response_factory_sites": 1,
     "redirects": [
       {
         "when": "unauthenticated protected request",
@@ -39,10 +40,19 @@
       {
         "when": "authenticated login request",
         "destination": "/dashboard"
+      },
+      {
+        "when": "authenticated inactive-member protected request",
+        "destination": "/access-denied"
+      },
+      {
+        "when": "membership dependency unavailable on protected request",
+        "destination": "/service-unavailable"
       }
     ],
     "request_cookie_write_sites": 1,
     "response_cookie_write_sites": 1,
+    "redirect_cookie_copy_sites": 1,
     "supabase_get_user_sites": 1
   },
   "app_router": {
@@ -62,9 +72,11 @@
       "app/(app)/settings/page.tsx",
       "app/(app)/tennis-calculator/page.tsx",
       "app/(auth)/login/page.tsx",
+      "app/access-denied/page.tsx",
       "app/auth/set-password/page.tsx",
       "app/layout.tsx",
-      "app/page.tsx"
+      "app/page.tsx",
+      "app/service-unavailable/page.tsx"
     ],
     "direct_supabase_server_consumers": [
       "app/(app)/analytics/page.tsx",
@@ -96,6 +108,14 @@
       {
         "route": "/auth/set-password",
         "file": "app/auth/set-password/page.tsx"
+      },
+      {
+        "route": "/access-denied",
+        "file": "app/access-denied/page.tsx"
+      },
+      {
+        "route": "/service-unavailable",
+        "file": "app/service-unavailable/page.tsx"
       }
     ]
   },

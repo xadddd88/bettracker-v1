@@ -652,12 +652,30 @@ function installHarness() {
     return originalLoad.call(this, request, parent, isMain);
   };
 
-  installCacheStub(paths.requestAuth, {
-    authenticateRequest: async () => ({
+  const activeAuth = async () => {
+    const context = asyncContext.getStore();
+    assert.ok(context, 'request-auth stub escaped async context');
+    const supabase = {
+      auth: {
+        getUser: async () => ({
+          data: { user: { id: 'synthetic-baseline-user' } },
+        }),
+      },
+      from: table => queryBuilder(table, context),
+    };
+    return {
       authorized: true,
       user: { id: 'synthetic-baseline-user' },
-      supabase: {},
-    }),
+      supabase,
+    };
+  };
+  installCacheStub(paths.requestAuth, {
+    authenticateRequest: activeAuth,
+    authenticateActiveMemberRequest: activeAuth,
+    activeMemberAuthErrorResponse: auth => Response.json(
+      { error: auth.status === 403 ? 'Forbidden' : auth.status === 503 ? 'Service unavailable' : 'Unauthorized' },
+      { status: auth.status ?? 401 },
+    ),
   });
   installCacheStub(paths.supabaseServer, {
     createClient: async () => {

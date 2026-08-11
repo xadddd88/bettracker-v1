@@ -101,6 +101,7 @@ function assertMissing(result, needle) {
 async function withAnalystRouteHarness(run) {
   const routePath = path.join(buildDir, 'app/api/ai/analyst/route.js');
   const serverPath = path.join(buildDir, 'lib/supabase/server.js');
+  const requestAuthPath = path.join(buildDir, 'lib/supabase/request-auth.js');
   const adminPath = path.join(buildDir, 'lib/supabase/admin.js');
   const analyticsPath = path.join(buildDir, 'lib/analytics/server.js');
   const rateLimitPath = path.join(buildDir, 'lib/rate-limit.js');
@@ -125,7 +126,7 @@ async function withAnalystRouteHarness(run) {
   }
 
   const clear = () => {
-    for (const compiledPath of [routePath, serverPath, adminPath, analyticsPath, rateLimitPath]) {
+    for (const compiledPath of [routePath, serverPath, requestAuthPath, adminPath, analyticsPath, rateLimitPath]) {
       try { delete require.cache[require.resolve(compiledPath)]; } catch { /* not loaded */ }
     }
   };
@@ -142,23 +143,40 @@ async function withAnalystRouteHarness(run) {
   };
 
   clear();
+  const userClient = {
+    auth: { getUser: async () => ({ data: { user: { id: 'user-live-test' } } }) },
+    from() {
+      calls.profile += 1;
+      const builder = {
+        select() { return builder; },
+        eq() { return builder; },
+        async single() { return { data: { web_search_enabled: false }, error: null }; },
+      };
+      return builder;
+    },
+  };
   require.cache[serverPath] = {
     id: serverPath,
     filename: serverPath,
     loaded: true,
     exports: {
-      createClient: async () => ({
-        auth: { getUser: async () => ({ data: { user: { id: 'user-live-test' } } }) },
-        from() {
-          calls.profile += 1;
-          const builder = {
-            select() { return builder; },
-            eq() { return builder; },
-            async single() { return { data: { web_search_enabled: false }, error: null }; },
-          };
-          return builder;
-        },
+      createClient: async () => userClient,
+    },
+  };
+  require.cache[requestAuthPath] = {
+    id: requestAuthPath,
+    filename: requestAuthPath,
+    loaded: true,
+    exports: {
+      authenticateActiveMemberRequest: async () => ({
+        authorized: true,
+        supabase: userClient,
+        user: { id: 'user-live-test' },
       }),
+      activeMemberAuthErrorResponse: auth => Response.json(
+        { error: auth.status === 403 ? 'Forbidden' : auth.status === 503 ? 'Service unavailable' : 'Unauthorized' },
+        { status: auth.status ?? 401 },
+      ),
     },
   };
   require.cache[adminPath] = {

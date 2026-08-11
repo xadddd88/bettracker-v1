@@ -5,7 +5,10 @@ import { trackServerEvent } from '@/lib/analytics/server'
 import { checkTennisCalcAccess } from '@/lib/flags/tennis-calc'
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { authenticateRequest } from '@/lib/supabase/request-auth'
+import {
+  activeMemberAuthErrorResponse,
+  authenticateActiveMemberRequest,
+} from '@/lib/supabase/request-auth'
 import {
   MAX_MONEY_MINOR,
   formatMoneyMinor,
@@ -232,8 +235,8 @@ export async function runTennisWrite(req: Request, command: TennisCommand): Prom
     return deniedResponse(preflight.reason)
   }
 
-  const auth = await authenticateRequest(req)
-  if (!auth.authorized) return deniedResponse('unauthenticated')
+  const auth = await authenticateActiveMemberRequest(req)
+  if (!auth.authorized) return activeMemberAuthErrorResponse(auth)
 
   const access = checkTennisCalcAccess(auth.user.id)
   if (!access.allowed) return deniedResponse(access.reason)

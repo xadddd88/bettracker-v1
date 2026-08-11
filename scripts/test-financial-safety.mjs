@@ -65,6 +65,7 @@ async function readJsonResponse(response) {
 
 function withCompiledAlias(fn) {
   const originalResolveFilename = Module._resolveFilename;
+  const originalLoad = Module._load;
 
   Module._resolveFilename = function resolveAlias(request, parent, isMain, options) {
     if (request.startsWith('@/')) {
@@ -72,9 +73,14 @@ function withCompiledAlias(fn) {
     }
     return originalResolveFilename.call(this, request, parent, isMain, options);
   };
+  Module._load = function loadServerOnly(request, parent, isMain) {
+    if (request === 'server-only') return {};
+    return originalLoad.call(this, request, parent, isMain);
+  };
 
   const restore = () => {
     Module._resolveFilename = originalResolveFilename;
+    Module._load = originalLoad;
   };
 
   return Promise.resolve()
@@ -135,6 +141,8 @@ function clearCompiledFinancialModules() {
     'app/api/settings/route.js',
     'app/api/bets/[id]/cancel/route.js',
     'lib/supabase/server.js',
+    'lib/supabase/request-auth.js',
+    'lib/supabase/active-membership.js',
     'lib/analytics/server.js',
     'lib/money.js',
   ]) {
@@ -162,6 +170,31 @@ function stubServerModules() {
     filename: analyticsPath,
     loaded: true,
     exports: { trackServerEvent: async () => {} },
+  };
+
+  const requestAuthPath = path.join(buildDir, 'lib/supabase/request-auth.js');
+  require.cache[require.resolve(requestAuthPath)] = {
+    id: requestAuthPath,
+    filename: requestAuthPath,
+    loaded: true,
+    exports: activeRequestAuthStubExports(),
+  };
+}
+
+function activeRequestAuthStubExports() {
+  const authenticate = async () => {
+    const { data: { user } } = await currentStub.auth.getUser();
+    return user
+      ? { authorized: true, supabase: currentStub, user }
+      : { authorized: false, status: 401, reason: 'unauthorized' };
+  };
+  return {
+    authenticateRequest: authenticate,
+    authenticateActiveMemberRequest: authenticate,
+    activeMemberAuthErrorResponse: (auth) => Response.json(
+      { error: auth.status === 403 ? 'Forbidden' : auth.status === 503 ? 'Service unavailable' : 'Unauthorized' },
+      { status: auth.status ?? 401 },
+    ),
   };
 }
 
@@ -1158,7 +1191,7 @@ function makeAuthOnlyClient({ user = { id: 'verified-user' }, error = null } = {
 }
 
 function clearRequestAuthModules() {
-  for (const rel of [REQUEST_AUTH_MODULE, 'lib/supabase/server.js']) {
+  for (const rel of [REQUEST_AUTH_MODULE, 'lib/supabase/server.js', 'lib/supabase/active-membership.js', 'lib/supabase/admin.js']) {
     try { delete require.cache[require.resolve(path.join(buildDir, rel))]; } catch { /* not loaded */ }
   }
 }
@@ -1334,14 +1367,22 @@ function stubRequestAuthModule() {
   require.cache[require.resolve(p)] = {
     id: p, filename: p, loaded: true,
     exports: {
-      authenticateRequest: async (req) => {
+      authenticateActiveMemberRequest: async (req) => {
         routeAuthState.calls.push(req.headers.get('authorization'));
-        if (routeAuthState.override) return routeAuthState.override;
+        if (routeAuthState.override) {
+          return routeAuthState.override.authorized === false && routeAuthState.override.status == null
+            ? { ...routeAuthState.override, status: 401, reason: 'unauthorized' }
+            : routeAuthState.override;
+        }
         const { data: { user } } = await currentStub.auth.getUser();
         return user
           ? { authorized: true, supabase: currentStub, user }
-          : { authorized: false };
+          : { authorized: false, status: 401, reason: 'unauthorized' };
       },
+      activeMemberAuthErrorResponse: (auth) => Response.json(
+        { error: auth.status === 403 ? 'Forbidden' : auth.status === 503 ? 'Service unavailable' : 'Unauthorized' },
+        { status: auth.status ?? 401 },
+      ),
     },
   };
 }
