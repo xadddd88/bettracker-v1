@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateRequest } from '@/lib/supabase/request-auth'
+import {
+  activeMemberAuthErrorResponse,
+  authenticateActiveMemberRequest,
+} from '@/lib/supabase/request-auth'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 import {
@@ -263,10 +266,8 @@ const scanOutputSchema = z.object({
 // ─── Handler ─────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   // Auth check
-  const auth = await authenticateRequest(req)
-  if (!auth.authorized) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await authenticateActiveMemberRequest(req)
+  if (!auth.authorized) return activeMemberAuthErrorResponse(auth)
   const { user } = auth
 
   const rateCheck = await enforceRateLimit(`scanner:${user.id}`, RATE_LIMITS.scanner())

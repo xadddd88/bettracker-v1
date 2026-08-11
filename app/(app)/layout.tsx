@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { checkActiveMembership } from '@/lib/supabase/active-membership'
 import { redirect } from 'next/navigation'
 import AppHeader from '@/components/ui/AppHeader'
 import MobileNav from '@/components/ui/MobileNav'
@@ -10,6 +11,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+  const membership = await checkActiveMembership(user.id)
+  if (membership.status === 'inactive') redirect('/access-denied')
+  if (membership.status === 'unavailable') redirect('/service-unavailable')
   const tennisCalcEnabled = checkTennisCalcAccess(user.id).allowed
 
   return (

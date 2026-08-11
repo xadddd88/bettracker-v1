@@ -224,11 +224,11 @@ await test('route repeats owner auth, durable rate limit and never exposes the p
   )
 
   assert.ok(route.includes('checkTennisCalcAccess(null)'))
-  assert.ok(route.includes('authenticateRequest(req)'))
+  assert.ok(route.includes('authenticateActiveMemberRequest(req)'))
   assert.ok(route.includes('checkTennisCalcAccess(auth.user.id)'))
   assert.ok(route.includes('RATE_LIMITS.tennisFortyFortyAnalysis()'))
   assert.ok(route.includes("'Cache-Control': 'private, no-store, max-age=0'"))
-  assert.ok(route.indexOf('authenticateRequest(req)') < route.indexOf('fetchLast24HoursFortyForty()'))
+  assert.ok(route.indexOf('authenticateActiveMemberRequest(req)') < route.indexOf('fetchLast24HoursFortyForty()'))
   assert.ok(client.includes('Анализ за последние 24 часа'))
   assert.ok(client.includes('ATP/WTA, Challenger и ITF, только основная сетка'))
   assert.ok(client.includes('Всего срабатываний 40:40'))

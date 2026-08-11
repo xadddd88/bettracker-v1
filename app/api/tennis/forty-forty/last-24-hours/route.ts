@@ -3,7 +3,10 @@ import { NextResponse } from 'next/server'
 import { checkTennisCalcAccess } from '@/lib/flags/tennis-calc'
 import { ProviderError } from '@/lib/providers/errors'
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
-import { authenticateRequest } from '@/lib/supabase/request-auth'
+import {
+  activeMemberAuthErrorResponse,
+  authenticateActiveMemberRequest,
+} from '@/lib/supabase/request-auth'
 import { fetchLast24HoursFortyForty } from '@/lib/tennis/forty-forty-analysis'
 
 export const runtime = 'nodejs'
@@ -35,8 +38,8 @@ export async function GET(req: Request) {
     return deniedResponse(preflight.reason)
   }
 
-  const auth = await authenticateRequest(req)
-  if (!auth.authorized) return deniedResponse('unauthenticated')
+  const auth = await authenticateActiveMemberRequest(req)
+  if (!auth.authorized) return activeMemberAuthErrorResponse(auth)
 
   const access = checkTennisCalcAccess(auth.user.id)
   if (!access.allowed) return deniedResponse(access.reason)

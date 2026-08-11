@@ -267,6 +267,8 @@ function clearCompiledModules() {
     'app/api/settings/route.js',
     'app/api/onboarding/complete/route.js',
     'lib/supabase/server.js',
+    'lib/supabase/request-auth.js',
+    'lib/supabase/active-membership.js',
     'lib/analytics/server.js',
   ]) {
     const compiledPath = path.join(buildDir, relPath);
@@ -288,6 +290,22 @@ function stubServerModules() {
   require.cache[require.resolve(analyticsPath)] = {
     id: analyticsPath, filename: analyticsPath, loaded: true,
     exports: { trackServerEvent: async () => {} },
+  };
+  const requestAuthPath = path.join(buildDir, 'lib/supabase/request-auth.js');
+  require.cache[require.resolve(requestAuthPath)] = {
+    id: requestAuthPath, filename: requestAuthPath, loaded: true,
+    exports: {
+      authenticateActiveMemberRequest: async () => {
+        const { data: { user } } = await currentStub.auth.getUser();
+        return user
+          ? { authorized: true, supabase: currentStub, user }
+          : { authorized: false, status: 401, reason: 'unauthorized' };
+      },
+      activeMemberAuthErrorResponse: (auth) => Response.json(
+        { error: auth.status === 403 ? 'Forbidden' : auth.status === 503 ? 'Service unavailable' : 'Unauthorized' },
+        { status: auth.status ?? 401 },
+      ),
+    },
   };
 }
 

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import {
+  activeMemberAuthErrorResponse,
+  authenticateActiveMemberRequest,
+} from '@/lib/supabase/request-auth'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 
@@ -21,9 +24,9 @@ const settingsSchema = z.object({
 // after migration 018). The RPC returns the updated profile row, so no
 // separate read-back is needed.
 export async function PATCH(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await authenticateActiveMemberRequest(req)
+  if (!auth.authorized) return activeMemberAuthErrorResponse(auth)
+  const { supabase, user } = auth
 
   let body: unknown
   try { body = await req.json() } catch {

@@ -151,6 +151,15 @@ S2.2 alone is insufficient because direct Supabase calls remain possible.
 S2.3 must preserve existing tenant ownership predicates and service-only
 boundaries rather than replacing them with membership-only checks.
 
+### S2.2 application boundary
+
+The S2.2 implementation contract is recorded in
+`docs/active-membership-enforcement-s2-2.md`. It adds fail-closed Web and user
+API enforcement, preserves refreshed Auth cookies on redirects, and replaces
+the invite route's two-call flow with the existing atomic service-only RPC.
+It does not change this S2.1 database contract and cannot close the direct Data
+API/RPC boundary assigned to S2.3.
+
 ## Rollback
 
 Before any S2.2/S2.3 caller depends on these primitives, an authorized rollback

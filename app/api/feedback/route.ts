@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import {
+  activeMemberAuthErrorResponse,
+  authenticateActiveMemberRequest,
+} from '@/lib/supabase/request-auth'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 
@@ -12,9 +15,9 @@ const feedbackSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const auth = await authenticateActiveMemberRequest(req)
+    if (!auth.authorized) return activeMemberAuthErrorResponse(auth)
+    const { supabase, user } = auth
 
     const body = await req.json()
     const parsed = feedbackSchema.safeParse(body)

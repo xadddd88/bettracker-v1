@@ -84,9 +84,10 @@ test('S2A execution evidence is recorded without claiming Phase B approval', () 
 test('middleware inventory covers next responses, redirects, cookies, and getUser', () => {
   const source = text(inventory.middleware.file)
   assert.equal(occurrences(source, /NextResponse\.next\(/g), inventory.middleware.next_response_next_sites)
-  assert.equal(occurrences(source, /NextResponse\.redirect\(/g), inventory.middleware.redirects.length)
+  assert.equal(occurrences(source, /NextResponse\.redirect\(/g), inventory.middleware.redirect_response_factory_sites)
   assert.equal(occurrences(source, /request\.cookies\.set\(/g), inventory.middleware.request_cookie_write_sites)
   assert.equal(occurrences(source, /supabaseResponse\.cookies\.set\(/g), inventory.middleware.response_cookie_write_sites)
+  assert.equal(occurrences(source, /response\.cookies\.set\(cookie\)/g), inventory.middleware.redirect_cookie_copy_sites)
   assert.equal(occurrences(source, /supabase\.auth\.getUser\(\)/g), inventory.middleware.supabase_get_user_sites)
   for (const redirect of inventory.middleware.redirects) {
     assert.ok(source.includes(`'${redirect.destination}'`), `${redirect.destination} redirect missing`)

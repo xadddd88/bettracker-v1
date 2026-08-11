@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import {
+  activeMemberAuthErrorResponse,
+  authenticateActiveMemberRequest,
+} from '@/lib/supabase/request-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
@@ -262,11 +265,9 @@ export async function POST(req: NextRequest) {
       console.error('[scout] ANTHROPIC_API_KEY is not set — scout requests will fail')
     }
 
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    }
+    const auth = await authenticateActiveMemberRequest(req)
+    if (!auth.authorized) return activeMemberAuthErrorResponse(auth)
+    const { supabase, user } = auth
 
     // 2. Parse + validate input (before rate-limit so sport is available for analytics)
     const body = await req.json()

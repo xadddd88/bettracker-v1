@@ -23,19 +23,22 @@ observed sites:
 | Concern | Count | Evidence |
 | --- | ---: | --- |
 | `NextResponse.next({ request })` | 2 | initial response and replacement after cookie writes |
-| Redirect responses | 2 | unauthenticated redirect to `/login`; authenticated redirect to `/dashboard` |
+| Redirect response factory | 1 | one helper creates every redirect response |
+| Logical redirect outcomes | 4 | `/login`, `/dashboard`, `/access-denied`, `/service-unavailable` |
 | Request-cookie write | 1 | `request.cookies.set(...)` in Supabase `setAll` |
 | Response-cookie write | 1 | `supabaseResponse.cookies.set(...)` in Supabase `setAll` |
+| Redirect-cookie copy | 1 | the helper copies refreshed Supabase cookies to every redirect |
 | `supabase.auth.getUser()` | 1 | auth decision before redirects |
 
 Any future nonce design must preserve the request/response relation through
-both `NextResponse.next(...)` sites and both redirect branches. It must not
-lose Supabase cookie refreshes or introduce a different header policy for a
-redirect response.
+both `NextResponse.next(...)` sites and all four logical redirect outcomes. It
+must not lose the explicit refreshed-cookie copy or introduce a different
+header policy for a redirect response.
 
 ## App Router rendering inventory
 
-There are 18 `page.tsx` or `layout.tsx` entrypoints.
+There are 20 `page.tsx` or `layout.tsx` entrypoints after S2.2 adds the two
+non-protected fail-closed destination pages.
 
 - 12 directly import `@/lib/supabase/server`:
   `analytics`, `bankroll`, `bets/[id]`, `bets`, `coach`, `dashboard`, both
@@ -43,9 +46,10 @@ There are 18 `page.tsx` or `layout.tsx` entrypoints.
   `tennis-calculator`.
 - `/ai` and `/bets/new` do not directly import the server helper, but inherit
   a request-bound dependency through the `(app)` layout.
-- `/`, `/login`, and `/auth/set-password` are current static candidates. This
-  is source-level evidence only; a future implementation must revalidate the
-  actual build/rendering result.
+- `/`, `/login`, `/auth/set-password`, `/access-denied`, and
+  `/service-unavailable` are current static candidates. This is source-level
+  evidence only; a future implementation must revalidate the actual
+  build/rendering result.
 
 The direct helper calls use `next/headers` cookies. A Phase B design must treat
 the authenticated application shell as dynamic unless a new, tested rendering

@@ -192,7 +192,7 @@ const helper = readFileSync(helperPath, 'utf8')
 test('one server helper owns auth, owner gate, rate limit and admin RPC', () => {
   for (const expected of [
     'checkTennisCalcAccess',
-    'authenticateRequest',
+    'authenticateActiveMemberRequest',
     'enforceRateLimit',
     'RATE_LIMITS.tennisSeries()',
     'createAdminClient',
@@ -274,10 +274,16 @@ function stubCompiledModules() {
     filename: authPath,
     loaded: true,
     exports: {
-      authenticateRequest: async () => {
+      authenticateActiveMemberRequest: async () => {
         current.calls.auth++
-        return current.auth
+        return current.auth.authorized === false && current.auth.status == null
+          ? { ...current.auth, status: 401, reason: 'unauthorized' }
+          : current.auth
       },
+      activeMemberAuthErrorResponse: auth => Response.json(
+        { error: auth.status === 403 ? 'Forbidden' : auth.status === 503 ? 'Service unavailable' : 'Unauthorized' },
+        { status: auth.status ?? 401 },
+      ),
     },
   }
 

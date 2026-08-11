@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/supabase/request-auth'
+import {
+  activeMemberAuthErrorResponse,
+  authenticateActiveMemberRequest,
+} from '@/lib/supabase/request-auth'
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { trackedBetRequestSchema } from '@/lib/bets/tracked-bet'
 
@@ -18,8 +21,8 @@ const RPC_VALIDATION_PATTERN =
   /legs must|leg \d+ |total_odds|stake must|stake exceeds|bookmaker too long|notes too long|unsupported source|invalid idempotency key/i
 
 export async function POST(req: NextRequest) {
-  const auth = await authenticateRequest(req)
-  if (!auth.authorized) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await authenticateActiveMemberRequest(req)
+  if (!auth.authorized) return activeMemberAuthErrorResponse(auth)
   const { supabase, user } = auth
 
   const rateCheck = await enforceRateLimit(`tracked-bet:${user.id}`, RATE_LIMITS.trackedBet())

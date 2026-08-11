@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import {
+  activeMemberAuthErrorResponse,
+  authenticateActiveMemberRequest,
+} from '@/lib/supabase/request-auth'
 
 // Decision #048: profiles is SELECT-only for authenticated after
 // migration 018 — the onboarding flag is set via the
 // complete_onboarding() RPC instead of a direct UPDATE.
-export async function PATCH() {
+export async function PATCH(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    const auth = await authenticateActiveMemberRequest(req)
+    if (!auth.authorized) return activeMemberAuthErrorResponse(auth)
+    const { supabase } = auth
 
     const { error } = await supabase.rpc('complete_onboarding')
 
