@@ -98,6 +98,8 @@ jobs:
         run: npm run test:active-membership-foundation
       - name: "Active Membership Enforcement (Security S2.2)"
         run: npm run test:active-membership-enforcement
+      - name: "Direct Data API & RPC Membership Enforcement (Security S2.3)"
+        run: npm run test:active-membership-enforcement-s2-3
       - name: "Global rate-limit suite (Decision #052)"
         run: npm run test:rate-limit
       - name: "CSP security suite (Decision #054)"
@@ -274,6 +276,40 @@ jobs:
         run: bash scripts/verify-supabase-advisor-baseline.sh postgresql://postgres:postgres@localhost:5432/postgres
       - name: Run Security S2.1 foundation verifier
         run: bash scripts/verify-active-membership-foundation.sh postgresql://postgres:postgres@localhost:5432/postgres
+
+  # ── Job: Security S2.3 direct Data API and RPC enforcement ───────────────
+  # Builds the exact S2.1/S2.2-era database boundary in disposable PostgreSQL
+  # 17, rejects catalog drift, applies the review-only migration, proves
+  # fail-closed revocation and exercises the service-only emergency stop.
+  active-membership-database-enforcement:
+    name: Active Membership Database Enforcement PostgreSQL 17
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bettracker_s23_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d bettracker_s23_disposable"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Run Security S2.3 database-boundary verifier
+        run: >-
+          bash scripts/verify-active-membership-enforcement-s2-3.sh
+          --confirm-disposable
+          postgresql://postgres:postgres@localhost:5432/bettracker_s23_disposable
 
   # ── Job: Cross-platform design-system compile gate ─────────────────────────
   design-system:

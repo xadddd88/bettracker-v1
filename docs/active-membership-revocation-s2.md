@@ -160,6 +160,19 @@ the invite route's two-call flow with the existing atomic service-only RPC.
 It does not change this S2.1 database contract and cannot close the direct Data
 API/RPC boundary assigned to S2.3.
 
+### S2.3 database boundary
+
+The repository-only S2.3 implementation contract is recorded in
+`docs/active-membership-enforcement-s2-3.md`. It composes the private helper
+with all 16 client-readable base tables through restrictive RLS and adds one
+fail-closed assertion to each of the eight authenticated definer RPCs. It does
+not replace ownership predicates or reopen any service-only function.
+
+The migration remains review-only. Until current membership reconciliation,
+separate production approval, controlled apply, and direct Data API/RPC
+postflight are complete, this document must continue to describe the full S2
+finding as open.
+
 ## Rollback
 
 Before any S2.2/S2.3 caller depends on these primitives, an authorized rollback
