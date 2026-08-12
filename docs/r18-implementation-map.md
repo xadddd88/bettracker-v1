@@ -137,7 +137,7 @@ Production gate:
 
 ### PR 3A - Repository-Only Locale Contract
 
-Status: implemented locally as an independently reviewable precursor to PR 3; not merged or deployed.
+Status: COMPLETE — merged in PR #253 and deployed from `main@486266a6a066f891060166d2cb55678d22f915b3` on 2026-08-12.
 
 Scope:
 - Define one shared UI/output-language contract for `en`, `uk`, and `ru`.
@@ -156,9 +156,14 @@ Tests:
 - TypeScript, lint, and existing provider/rate-limit/design regression suites.
 
 Production gate:
-- Repository and CI changes only.
-- No Supabase migration, market eligibility, consent enablement, env change, provider call, deployment, or production write.
+- Automatic Git/Vercel deployment only; no manual deployment or non-repository production mutation.
+- No Supabase migration, market eligibility, consent enablement, env change, provider call, or data write.
 - PR 3 remains subject to its own explicit approvals and legal/market gates.
+
+Execution record:
+- PR #253 merged with the repository's standard merge-commit strategy after 15/15 required checks passed.
+- Vercel production deployment `dpl_jrDXN1UzdaJnDU5WuHaZiNHoZkqa` reached `READY` and served `btdk.app` without alias errors.
+- No database migration, historical-row rewrite, market enablement, environment change, or provider execution occurred.
 
 ### PR 3 - MarketProfile, Eligibility, And Locale Foundation
 
