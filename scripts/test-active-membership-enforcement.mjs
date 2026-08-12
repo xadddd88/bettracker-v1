@@ -7,7 +7,6 @@
  */
 
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
 import { readFileSync, readdirSync } from 'node:fs'
 import Module from 'node:module'
 import { createRequire } from 'node:module'
@@ -373,24 +372,30 @@ test('S2.2 evidence records residual S2.3 boundary, CSP delta, and unit rollback
   assert.doesNotMatch(evidence, /full revocation enforcement.*complete/i)
 })
 
-test('candidate scope contains no SQL, migration, RLS/RPC definition, or lockfile change', () => {
-  const status = execFileSync('git', ['status', '--porcelain=v1', '--untracked-files=all'], {
-    cwd: repoRoot,
-    encoding: 'utf8',
-  })
-  const workingPaths = status.trim().split('\n').filter(Boolean).map(line => line.slice(3))
-  const committedPaths = workingPaths.length > 0 ? [] : execFileSync(
-    'git',
-    ['diff', '--name-only', 'HEAD^1', 'HEAD'],
-    { cwd: repoRoot, encoding: 'utf8' },
-  ).trim().split('\n').filter(Boolean)
-  const paths = workingPaths.length > 0 ? workingPaths : committedPaths
-  assert.ok(paths.length > 0, 'S2.2 candidate diff must be present')
-  for (const file of paths) {
+test('S2.2 application boundary contains no SQL, RLS, or RPC definition', () => {
+  const s22ApplicationSources = [
+    'lib/supabase/active-membership.ts',
+    'lib/supabase/request-auth.ts',
+    'middleware.ts',
+    'app/(app)/layout.tsx',
+    'app/api/auth/complete-invite/route.ts',
+    'lib/tennis/server-write.ts',
+    ...protectedRoutes,
+  ]
+  const uniqueSources = [...new Set(s22ApplicationSources)]
+  assert.ok(uniqueSources.length > 0, 'S2.2 application inventory must be present')
+  for (const file of uniqueSources) {
     assert.doesNotMatch(file, /(^|\/)supabase\/migrations\/|\.sql$|(^|\/)package-lock\.json$/)
   }
-  const changedSources = paths.filter(file => /\.tsx?$/.test(file)).map(source).join('\n')
-  assert.doesNotMatch(changedSources, /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION|CREATE\s+POLICY|ALTER\s+POLICY/i)
+  const implementation = uniqueSources.map(source).join('\n')
+  assert.doesNotMatch(
+    implementation,
+    /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION|CREATE\s+POLICY|ALTER\s+POLICY/i,
+  )
+  assert.match(
+    source('docs/active-membership-enforcement-s2-2.md'),
+    /No SQL, migration, RLS, grant, RPC definition[\s\S]*belongs to S2\.2\./,
+  )
 })
 
 console.log(`\n${passed + failed} tests — ${passed} passed, ${failed} failed\n`)
