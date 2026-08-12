@@ -1,9 +1,18 @@
 # R18 PR3A Locale Contract
 
-Status: local implementation candidate; not merged or deployed.
+Status: COMPLETE — merged in PR #253 and deployed from `main@486266a6a066f891060166d2cb55678d22f915b3`.
 Date: 2026-08-12
 
 PR3A is a repository-only precursor to the broader R18 MarketProfile and eligibility work. It narrows the active UI and API output-language contract without changing production data or enabling any market.
+
+## Execution Record
+
+- GitHub PR: `#253` (`agent/r18-pr3a-locale-contract` -> `main`).
+- Merge commit: `486266a6a066f891060166d2cb55678d22f915b3`.
+- Required checks: 15/15 passed, including Hermetic Web acceptance, Typecheck & lint, safety suites, PostgreSQL 17 gates, and Vercel Preview.
+- Production deployment: `dpl_jrDXN1UzdaJnDU5WuHaZiNHoZkqa`, state `READY`, aliases include `btdk.app`.
+- Post-deploy smoke: public `GET /login` returned `200` from that deployment; the immediate deployment-scoped error/fatal log scan returned no entries.
+- Data-plane changes: none. No migration, stored-row rewrite, market enablement, environment change, or provider execution occurred.
 
 ## Contract
 
