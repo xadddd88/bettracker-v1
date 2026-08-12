@@ -30,6 +30,12 @@ import {
 } from '@/lib/ai/analyst-research'
 import { BroadcastStatus } from '@/components/ui/BroadcastNoir'
 import { broadcastNoirColors, type BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
+import {
+  isUiLocale,
+  resolveStoredUiLocale,
+  UI_LOCALE_OPTIONS,
+  type UiLocale,
+} from '@/lib/i18n/ui-locale'
 
 // ─── Image helper ─────────────────────────────────────────────
 function fileToBase64(file: File): Promise<{ data: string; media_type: string }> {
@@ -48,11 +54,9 @@ function fileToBase64(file: File): Promise<{ data: string; media_type: string }>
 
 // ─── Types ────────────────────────────────────────────────────
 type Sport = 'tennis' | 'soccer' | 'cs2' | 'basketball' | 'ice_hockey' | 'mma' | 'other'
-type Locale = 'auto' | 'uk' | 'ru' | 'en' | 'es' | 'fr' | 'de' | 'ar'
 type CaptureMode = 'coupon' | 'event'
 type Recommendation = 'bet' | 'skip' | 'watch' | 'no_value'
 type RiskLevel = 'low' | 'medium' | 'high'
-type UiLocale = 'en' | 'uk' | 'ru'
 
 interface Factor { name: string; score: number; detail: string }
 interface Analysis {
@@ -85,7 +89,7 @@ interface Analysis {
   offered_odds:    number
   bookmaker:       string | null
   coupon_event_time?: string | null
-  output_language: string
+  output_language: UiLocale
 }
 
 type ScannedLiveEnvelope = {
@@ -170,17 +174,6 @@ const SPORTS: { value: Sport; label: string }[] = [
   { value: 'other',      label: 'Other'      },
 ]
 
-const LOCALES: { value: Locale; label: string }[] = [
-  { value: 'auto', label: 'Авто' },
-  { value: 'en',   label: 'English' },
-  { value: 'uk',   label: '\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430' },
-  { value: 'ru',   label: '\u0420\u0443\u0441\u0441\u043A\u0438\u0439' },
-  { value: 'es',   label: 'Espa\u00F1ol' },
-  { value: 'fr',   label: 'Fran\u00E7ais' },
-  { value: 'de',   label: 'Deutsch' },
-  { value: 'ar',   label: '\u0627\u0644\u0639\u0631\u0628\u064A\u0629' },
-]
-
 const REC_CONFIG: Record<Recommendation, { label: string; status: BroadcastNoirStatus }> = {
   bet:      { label: 'BET', status: 'neutral' },
   watch:    { label: 'WATCH', status: 'review' },
@@ -192,12 +185,6 @@ const RISK_CONFIG: Record<RiskLevel, { label: string; status: BroadcastNoirStatu
   low:    { label: 'Low Risk', status: 'neutral' },
   medium: { label: 'Medium Risk', status: 'review' },
   high:   { label: 'High Risk', status: 'negative' },
-}
-
-function normalizeAiPageLocale(locale: string | null | undefined): UiLocale {
-  if (locale === 'uk') return 'uk'
-  if (locale === 'ru') return 'ru'
-  return 'en'
 }
 
 const AI_PAGE_COPY = {
@@ -588,7 +575,7 @@ export default function AIAnalystPage() {
 
   const [scoutId,    setScoutId]    = useState<string | null>(null)
   const [sport,      setSport]      = useState<Sport>('soccer')
-  const [locale,     setLocale]     = useState<Locale>('ru')
+  const [locale,     setLocale]     = useState<UiLocale>('ru')
   const [form,       setForm]       = useState({ event_name: '', market_type: '', selection: '', line: '', odds: '', bookmaker: '', event_time: '', notes: '' })
   const [errors,     setErrors]     = useState<Record<string, string>>({})
   const [analysis,   setAnalysis]   = useState<Analysis | null>(null)
@@ -626,7 +613,7 @@ export default function AIAnalystPage() {
   // ── Scanner ────────────────────────────────────────────────
   const runScanner = useCallback(async (file: File) => {
     const scanGeneration = scanGenerationGateRef.current.begin()
-    const copy = AI_PAGE_COPY[normalizeAiPageLocale(locale)]
+    const copy = AI_PAGE_COPY[resolveStoredUiLocale(locale)]
     setScanning(true)
     setScanMsg(copy.scanningCoupon)
     try {
@@ -677,7 +664,7 @@ export default function AIAnalystPage() {
     setAnalysis(null)
     setRootErr('')
     if (captureMode === 'event') {
-      setScanMsg(AI_PAGE_COPY[normalizeAiPageLocale(locale)].eventCapturePending)
+      setScanMsg(AI_PAGE_COPY[resolveStoredUiLocale(locale)].eventCapturePending)
       return
     }
     void runScanner(file)
@@ -698,7 +685,7 @@ export default function AIAnalystPage() {
     setCaptureMode(mode)
     setAnalysis(null)
     if (mode === 'event') {
-      setScanMsg(selectedFileRef.current ? AI_PAGE_COPY[normalizeAiPageLocale(locale)].eventCapturePending : '')
+      setScanMsg(selectedFileRef.current ? AI_PAGE_COPY[resolveStoredUiLocale(locale)].eventCapturePending : '')
       return
     }
     if (selectedFileRef.current) void runScanner(selectedFileRef.current)
@@ -719,7 +706,7 @@ export default function AIAnalystPage() {
     setErrors({})
     setRootErr('')
     setAnalysis(null)
-    const copy = AI_PAGE_COPY[normalizeAiPageLocale(locale)]
+    const copy = AI_PAGE_COPY[resolveStoredUiLocale(locale)]
 
     if (scanGenerationGateRef.current.isActive()) {
       setRootErr(copy.waitForScan)
@@ -792,7 +779,7 @@ export default function AIAnalystPage() {
   const handleAction = useCallback(async (action: 'skipped' | 'watchlisted') => {
     if (!analysis) return
     if (!analysis.decision_id) {
-      const copy = AI_PAGE_COPY[normalizeAiPageLocale(analysis.trust_view?.locale ?? analysis.output_language)]
+      const copy = AI_PAGE_COPY[resolveStoredUiLocale(analysis.trust_view?.locale ?? analysis.output_language)]
       setRootErr(copy.analysisFailed)
       return
     }
@@ -825,7 +812,7 @@ export default function AIAnalystPage() {
     if (!analysis) return
     const a = analysis
     const trustView = getAnalysisTrustView(a)
-    const pdfCopy = AI_PAGE_COPY[normalizeAiPageLocale(trustView?.locale ?? a.output_language)]
+    const pdfCopy = AI_PAGE_COPY[resolveStoredUiLocale(trustView?.locale ?? a.output_language)]
     const recLabels = pdfCopy.recommendationLabels
     const showPricing = shouldShowPricingStats({
       qualityGate:        a.quality_gate,
@@ -1010,7 +997,7 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
   const a = analysis
   const trustView = a ? getAnalysisTrustView(a) : null
-  const uiLocale = normalizeAiPageLocale(trustView?.locale ?? locale)
+  const uiLocale = resolveStoredUiLocale(trustView?.locale ?? locale)
   const copy = AI_PAGE_COPY[uiLocale]
   const pricingVisible = a ? shouldShowPricingStats({
     qualityGate:        a.quality_gate,
@@ -1211,8 +1198,17 @@ ${disclaimerText?`<div class="disclaimer">${escapeHtml(disclaimerText)}</div>`:'
 
           <div>
             <label className="label" htmlFor="ai-output-language">{copy.outputLanguage}</label>
-            <select id="ai-output-language" className="input" value={locale} onChange={e => setLocale(e.target.value as Locale)}>
-              {LOCALES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+            <select
+              id="ai-output-language"
+              className="input"
+              value={locale}
+              onChange={event => {
+                if (isUiLocale(event.target.value)) setLocale(event.target.value)
+              }}
+            >
+              {UI_LOCALE_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </div>
 

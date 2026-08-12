@@ -436,7 +436,7 @@ async function assertFeedbackFocus(page, feedbackStubs) {
 async function assertSourceOnlyControls() {
   const ai = await readFile(new URL('../app/(app)/ai/page.tsx', import.meta.url), 'utf8')
   const decisions = await readFile(new URL('../app/(app)/decisions/[id]/DecisionActions.tsx', import.meta.url), 'utf8')
-  assert.match(ai, /useState<Locale>\('ru'\)/, 'Analyst page must default to the current beta language')
+  assert.match(ai, /useState<UiLocale>\('ru'\)/, 'Analyst page must default to the current supported beta language')
   assert.match(ai, /<label className="label" htmlFor="ai-stake">[\s\S]*?<\/label>[\s\S]*?<input[\s\S]*?id="ai-stake"/, 'Conditional Analyst stake must have a bound label')
   assert.match(decisions, /<label[^>]+htmlFor="decision-stake"[\s\S]*?<input[\s\S]*?id="decision-stake"/, 'Decision stake must have a bound label')
 }

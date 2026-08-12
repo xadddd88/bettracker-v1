@@ -10,9 +10,13 @@ import { Search, Eye, X, AlertTriangle } from 'lucide-react'
 import BetaNote from '@/components/ui/BetaNote'
 import { BroadcastButton, BroadcastDataValue, BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
 import type { BroadcastNoirStatus } from '@/lib/ui/broadcast-noir'
+import {
+  isUiLocale,
+  UI_LOCALE_OPTIONS,
+  type UiLocale,
+} from '@/lib/i18n/ui-locale'
 
 type Sport     = 'soccer' | 'tennis' | 'cs2' | 'basketball' | 'ice_hockey' | 'mma' | 'other'
-type Locale    = 'auto' | 'uk' | 'ru' | 'en' | 'es' | 'fr' | 'de' | 'ar'
 type Timeframe = 'today' | 'tomorrow' | 'this_week'
 
 const SPORTS: { value: Sport; label: string }[] = [
@@ -34,17 +38,6 @@ const SPORT_ABBR: Record<Sport, string> = {
   mma:        'MMA',
   other:      'OTH',
 }
-
-const LOCALES: { value: Locale; label: string }[] = [
-  { value: 'auto', label: 'Авто' },
-  { value: 'en',   label: 'English' },
-  { value: 'uk',   label: 'Українська' },
-  { value: 'ru',   label: 'Русский' },
-  { value: 'es',   label: 'Español' },
-  { value: 'fr',   label: 'Français' },
-  { value: 'de',   label: 'Deutsch' },
-  { value: 'ar',   label: 'العربية' },
-]
 
 const TIMEFRAMES: { value: Timeframe; label: string }[] = [
   { value: 'today',     label: 'Сегодня' },
@@ -226,7 +219,7 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
   const [sport,     setSport]     = useState<Sport>('soccer')
   const [context,   setContext]   = useState('')
   const [timeframe, setTimeframe] = useState<Timeframe>('this_week')
-  const [locale,    setLocale]    = useState<Locale>('auto')
+  const [locale,    setLocale]    = useState<UiLocale>('ru')
 
   // Scout run state
   const [loading,     setLoading]     = useState(false)
@@ -411,8 +404,16 @@ export default function ScoutForm({ initialOpportunities, pulsePresets }: ScoutF
         {/* Language */}
         <div>
           <label className="label">Язык результата</label>
-          <select className="input mt-1" value={locale} onChange={e => setLocale(e.target.value as Locale)}>
-            {LOCALES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+          <select
+            className="input mt-1"
+            value={locale}
+            onChange={event => {
+              if (isUiLocale(event.target.value)) setLocale(event.target.value)
+            }}
+          >
+            {UI_LOCALE_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
           </select>
         </div>
 

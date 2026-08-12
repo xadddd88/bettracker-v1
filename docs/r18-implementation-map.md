@@ -60,7 +60,7 @@ These conflicts are higher priority than visual IA polish because they can misre
 | Place Bet copy and CTA | `analysis-quality-gate` labels and Web decision actions expose "Place Bet". | Rename and re-scope CTAs so the product records user-owned external facts only. No bookmaker or placement implication. |
 | Legacy Scout opportunity generation | `/scout` and `/api/scout` still generate and persist candidate opportunities. | Convert to Research / Market Lab with prepared evidence, watchlist, and user-controlled notes. No ranked opportunities, no best-bet framing, no LLM-created numbers. |
 | Coach action recommendations | `CoachRecommendation` and Coach UI render recommendations with priority. | Convert to Review observations and questions grounded in deterministic metrics, period, N, and confidence. |
-| Locale list still includes seven values in runtime forms | `Locale = 'auto' | 'uk' | 'ru' | 'en' | 'es' | 'fr' | 'de' | 'ar'` appears in AI/Scout routes. | Restrict user-facing locale contract to `en`, `uk`, `ru`, with legacy values quarantined or rejected at boundaries. |
+| Legacy locale values at active write boundaries | The PR3A local candidate replaces the former eight-value AI/Scout unions with one shared `en`/`uk`/`ru` contract. Historical rows and pinned baseline fixtures can still contain legacy strings. | Keep legacy values read-only with an English presentation fallback, reject them on new writes, and leave broader translation completeness to PR 3. |
 
 ## 3. Dependency-Safe PR Packages
 
@@ -134,6 +134,31 @@ Tests:
 Production gate:
 - Green preview and visual acceptance only.
 - No data writes or provider calls.
+
+### PR 3A - Repository-Only Locale Contract
+
+Status: implemented locally as an independently reviewable precursor to PR 3; not merged or deployed.
+
+Scope:
+- Define one shared UI/output-language contract for `en`, `uk`, and `ru`.
+- Use that contract in the Web Analyst and Scout selectors and their Route Handler schemas.
+- Reject legacy write values (`auto`, `es`, `fr`, `de`, `ar`) before profile reads, provider construction, or persistence.
+- Preserve historical reads without rewriting stored data: unsupported or legacy stored language values render through the English trust-copy fallback.
+- Keep the historical AI baseline fixture unchanged as evidence for its pinned pre-R18 runtime; the active runtime contract is guarded separately.
+
+Migrations: none.
+
+Feature flags: none; this is a fail-closed contract narrowing.
+
+Tests:
+- `test:locale-contract` asserts the exact locale set, selector/route adoption, read fallback, and zero-side-effect rejection of legacy writes.
+- `test:analysis-quality-gate` covers localized trust-copy behavior and legacy Analyst rejection.
+- TypeScript, lint, and existing provider/rate-limit/design regression suites.
+
+Production gate:
+- Repository and CI changes only.
+- No Supabase migration, market eligibility, consent enablement, env change, provider call, deployment, or production write.
+- PR 3 remains subject to its own explicit approvals and legal/market gates.
 
 ### PR 3 - MarketProfile, Eligibility, And Locale Foundation
 

@@ -1,3 +1,5 @@
+import { resolveStoredUiLocale, type UiLocale } from '../i18n/ui-locale'
+
 export type PricingField = 'model_probability' | 'implied_probability' | 'edge_percent'
 export type AnalysisQualityStatus = 'priced' | 'insufficient_data' | 'unsupported'
 export type AnalysisType = 'risk_warning' | 'priced_betting_analysis'
@@ -15,7 +17,7 @@ export type FixtureStatus =
   | 'not_bettable'
 export type AnalysisActionability = 'actionable' | 'status_unverified' | 'not_actionable' | 'live_not_supported'
 export type LegSupportLevel = 'full' | 'approximate' | 'unsupported'
-export type AnalystTrustLocale = 'en' | 'uk' | 'ru'
+export type AnalystTrustLocale = UiLocale
 export type CouponStatusSource = 'coupon' | 'provider' | 'unknown'
 
 export interface AnalysisDataCoverage {
@@ -1019,8 +1021,7 @@ const TRUST_LABELS = {
 } as const
 
 function normalizeTrustLocale(locale: string | null | undefined): AnalystTrustLocale {
-  if (locale === 'ru') return 'ru'
-  return locale === 'uk' ? 'uk' : 'en'
+  return resolveStoredUiLocale(locale)
 }
 
 export function localizeAnalystTrustSport(sport: string | null | undefined, locale: AnalystTrustLocale): string {
