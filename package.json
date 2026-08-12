@@ -13,6 +13,7 @@
     "test:provider-safety": "npm run build:provider-scripts && node scripts/test-provider-safety.mjs",
     "test:decision-056-oidc": "npm run build:provider-scripts && node scripts/test-decision-056-oidc.mjs",
     "test:analysis-quality-gate": "npm run build:provider-scripts && node scripts/test-analysis-quality-gate.mjs",
+    "test:locale-contract": "npm run build:provider-scripts && node scripts/test-locale-contract.mjs",
     "test:ai-baseline": "npm run build:provider-scripts && node scripts/ai-baseline-harness.mjs",
     "test:tennis": "npm run build:provider-scripts && node scripts/test-tennis-series.mjs",
     "test:tennis-access-gate": "npm run build:provider-scripts && node scripts/test-tennis-access-gate.mjs",

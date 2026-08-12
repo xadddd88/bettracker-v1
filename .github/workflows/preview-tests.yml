@@ -82,6 +82,8 @@ jobs:
         run: npm run test:decision-056-oidc
       - name: Analysis quality gate (FP-001) suite
         run: npm run test:analysis-quality-gate
+      - name: "R18 locale contract (PR3A)"
+        run: npm run test:locale-contract
       - name: "Financial safety suite (Decision #047)"
         run: npm run test:financial-safety
       - name: "Domain write boundaries suite (Decision #048)"

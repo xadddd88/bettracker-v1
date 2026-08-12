@@ -799,7 +799,7 @@ await asyncTest('Analyst route shares coupon time only for a confirmed one-fixtu
   });
 });
 
-await asyncTest('Analyst route localizes both stale-gate errors in every selected language', async () => {
+await asyncTest('Analyst route localizes both stale-gate errors in every supported R18 language', async () => {
   const expected = {
     uk: {
       event_identity_unverified: 'Для кожної події потрібні однозначна ідентифікація матчу, точні майбутні дата й час та коректний часовий пояс.',
@@ -812,22 +812,6 @@ await asyncTest('Analyst route localizes both stale-gate errors in every selecte
     en: {
       event_identity_unverified: 'Every event needs an unambiguous fixture identity, exact future date/time, and valid timezone.',
       event_not_pre_match: 'At least one event has already started, finished, or is not currently bettable.',
-    },
-    es: {
-      event_identity_unverified: 'Cada evento necesita una identidad de partido inequívoca, una fecha y hora futuras exactas y una zona horaria válida.',
-      event_not_pre_match: 'Al menos un evento ya ha comenzado, ha finalizado o no está disponible actualmente para apostar.',
-    },
-    fr: {
-      event_identity_unverified: 'Chaque événement nécessite une identité de match sans ambiguïté, une date et une heure futures exactes et un fuseau horaire valide.',
-      event_not_pre_match: 'Au moins un événement a déjà commencé, est terminé ou n’est actuellement pas disponible pour les paris.',
-    },
-    de: {
-      event_identity_unverified: 'Für jedes Ereignis sind eine eindeutige Spielidentität, ein genaues zukünftiges Datum mit Uhrzeit und eine gültige Zeitzone erforderlich.',
-      event_not_pre_match: 'Mindestens ein Ereignis hat bereits begonnen, ist beendet oder kann derzeit nicht bewettet werden.',
-    },
-    ar: {
-      event_identity_unverified: 'يتطلب كل حدث هوية مباراة واضحة وتاريخًا ووقتًا دقيقين في المستقبل ومنطقة زمنية صالحة.',
-      event_not_pre_match: 'بدأ حدث واحد على الأقل بالفعل أو انتهى أو أنه غير متاح حاليًا للمراهنة.',
     },
   };
 
@@ -854,6 +838,25 @@ await asyncTest('Analyst route localizes both stale-gate errors in every selecte
     assert.equal(calls.provider, 0);
     assert.equal(calls.admin, 0);
     assert.equal(calls.rpc, 0);
+  });
+});
+
+await asyncTest('Analyst route rejects every legacy locale before profile, provider, or persistence work', async () => {
+  await withAnalystRouteHarness(async ({ POST, calls }) => {
+    for (const output_language of ['auto', 'es', 'fr', 'de', 'ar']) {
+      const response = await POST(analystRequest({ output_language }));
+      const body = await response.json();
+
+      assert.equal(response.status, 400, output_language);
+      assert.equal(body.error, 'Invalid input', output_language);
+      assert.ok(body.details?.fieldErrors?.output_language?.length > 0, output_language);
+    }
+
+    assert.equal(calls.profile, 0);
+    assert.equal(calls.provider, 0);
+    assert.equal(calls.admin, 0);
+    assert.equal(calls.rpc, 0);
+    assert.equal(calls.analytics, 0);
   });
 });
 

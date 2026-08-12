@@ -30,12 +30,17 @@ import {
   resolveAnalystWebSearchTelemetry,
   type AnalystResearchBrief,
 } from '@/lib/ai/analyst-research'
+import {
+  DEFAULT_UI_LOCALE,
+  SUPPORTED_UI_LOCALES,
+  UI_LOCALE_PROMPT_NAMES,
+  type UiLocale,
+} from '@/lib/i18n/ui-locale'
 
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 // ─── Zod schemas ─────────────────────────────────────────────
 const SPORTS = ['tennis', 'soccer', 'cs2', 'basketball', 'ice_hockey', 'mma', 'other'] as const
-const LOCALES = ['auto', 'uk', 'ru', 'en', 'es', 'fr', 'de', 'ar'] as const
 
 const requestSchema = z.object({
   sport:           z.enum(SPORTS),
@@ -51,7 +56,7 @@ const requestSchema = z.object({
   coupon_is_live:  z.boolean().optional(),
   coupon_status_text: z.string().max(120).nullable().optional(),
   client_timezone: z.string().max(80).optional(),
-  output_language: z.enum(LOCALES).default('auto'),
+  output_language: z.enum(SUPPORTED_UI_LOCALES).default(DEFAULT_UI_LOCALE),
   legs: z.array(z.object({
     rawText:          z.string().max(500).nullable().optional(),
     eventName:        z.string().max(500).nullable().optional(),
@@ -247,13 +252,9 @@ function normalizeAnalystRaw(raw: unknown): unknown {
 }
 
 const EVENT_IDENTITY_COPY: Record<
-  z.infer<typeof requestSchema>['output_language'],
+  UiLocale,
   { eventNotPreMatch: string; eventIdentityUnverified: string }
 > = {
-  auto: {
-    eventNotPreMatch: 'At least one event has already started, finished, or is not currently bettable.',
-    eventIdentityUnverified: 'Every event needs an unambiguous fixture identity, exact future date/time, and valid timezone.',
-  },
   uk: {
     eventNotPreMatch: 'Щонайменше одна подія вже почалася, завершилася або наразі недоступна для ставки.',
     eventIdentityUnverified: 'Для кожної події потрібні однозначна ідентифікація матчу, точні майбутні дата й час та коректний часовий пояс.',
@@ -266,25 +267,9 @@ const EVENT_IDENTITY_COPY: Record<
     eventNotPreMatch: 'At least one event has already started, finished, or is not currently bettable.',
     eventIdentityUnverified: 'Every event needs an unambiguous fixture identity, exact future date/time, and valid timezone.',
   },
-  es: {
-    eventNotPreMatch: 'Al menos un evento ya ha comenzado, ha finalizado o no está disponible actualmente para apostar.',
-    eventIdentityUnverified: 'Cada evento necesita una identidad de partido inequívoca, una fecha y hora futuras exactas y una zona horaria válida.',
-  },
-  fr: {
-    eventNotPreMatch: 'Au moins un événement a déjà commencé, est terminé ou n’est actuellement pas disponible pour les paris.',
-    eventIdentityUnverified: 'Chaque événement nécessite une identité de match sans ambiguïté, une date et une heure futures exactes et un fuseau horaire valide.',
-  },
-  de: {
-    eventNotPreMatch: 'Mindestens ein Ereignis hat bereits begonnen, ist beendet oder kann derzeit nicht bewettet werden.',
-    eventIdentityUnverified: 'Für jedes Ereignis sind eine eindeutige Spielidentität, ein genaues zukünftiges Datum mit Uhrzeit und eine gültige Zeitzone erforderlich.',
-  },
-  ar: {
-    eventNotPreMatch: 'بدأ حدث واحد على الأقل بالفعل أو انتهى أو أنه غير متاح حاليًا للمراهنة.',
-    eventIdentityUnverified: 'يتطلب كل حدث هوية مباراة واضحة وتاريخًا ووقتًا دقيقين في المستقبل ومنطقة زمنية صالحة.',
-  },
 }
 
-function analystRouteCopy(locale: z.infer<typeof requestSchema>['output_language']) {
+function analystRouteCopy(locale: UiLocale) {
   const eventIdentity = EVENT_IDENTITY_COPY[locale]
   if (locale === 'uk') {
     return {
@@ -386,11 +371,10 @@ function getAnalystSportSupport(sport: string): SportModuleSupport {
 }
 
 // ─── System prompt ────────────────────────────────────────────
-function buildSystemPrompt(sport: string, outputLanguage: string, webSearchEnabled: boolean): string {
+function buildSystemPrompt(sport: string, outputLanguage: UiLocale, webSearchEnabled: boolean): string {
   const sportModule = getSportModule(sport)
-  const langInstruction = outputLanguage === 'auto'
-    ? 'Respond in the same language the user writes in. If unclear, use English.'
-    : `Respond in this language for all user-facing text: ${outputLanguage}. Reasoning and factors must be in ${outputLanguage}.`
+  const promptLanguage = UI_LOCALE_PROMPT_NAMES[outputLanguage]
+  const langInstruction = `Respond in ${promptLanguage} for all user-facing text. Reasoning and factors must be in ${promptLanguage}.`
 
   const disclaimer = webSearchEnabled
     ? `
@@ -935,7 +919,7 @@ export async function POST(req: NextRequest) {
       p_line:                input.line ?? null,
       p_offered_odds:        input.offered_odds,
       p_bookmaker:           input.bookmaker ?? null,
-      p_output_language:     input.output_language === 'auto' ? null : input.output_language,
+      p_output_language:     input.output_language,
       p_model_probability:   gatedPricing.model_probability,
       p_implied_probability: gatedPricing.implied_probability,
       p_edge_percent:        gatedPricing.edge_percent,

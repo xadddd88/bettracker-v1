@@ -1,3 +1,5 @@
+import type { UiLocale } from '@/lib/i18n/ui-locale'
+
 // ─── ENUMS ──────────────────────────────────────────────────
 // Canonical sport codes — never localized labels in the data layer
 export type SportCode = 'soccer' | 'tennis' | 'cs2' | 'basketball' | 'ice_hockey' | 'mma' | 'other'
@@ -84,7 +86,7 @@ export interface AnalystRequest {
   offered_odds: number
   bookmaker?: string
   notes?: string
-  output_language?: string
+  output_language?: UiLocale
 }
 
 export interface AnalystResponse {

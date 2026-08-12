@@ -10,6 +10,12 @@ import { trackServerEvent } from '@/lib/analytics/server'
 import { EVENTS } from '@/lib/analytics/events'
 import { bucketScoutScore } from '@/lib/analytics/buckets'
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import {
+  DEFAULT_UI_LOCALE,
+  SUPPORTED_UI_LOCALES,
+  UI_LOCALE_PROMPT_NAMES,
+  type UiLocale,
+} from '@/lib/i18n/ui-locale'
 
 const TIMEOUT_WITH_WEB_SEARCH_MS    = 55_000
 const TIMEOUT_WITHOUT_WEB_SEARCH_MS = 55_000
@@ -118,14 +124,13 @@ async function callClaudeWithTimeout(
 
 // ─── Zod schemas ─────────────────────────────────────────────
 const SPORTS     = ['tennis', 'soccer', 'cs2', 'basketball', 'ice_hockey', 'mma', 'other'] as const
-const LOCALES    = ['auto', 'uk', 'ru', 'en', 'es', 'fr', 'de', 'ar'] as const
 const TIMEFRAMES = ['today', 'tomorrow', 'this_week', 'custom'] as const
 
 const requestSchema = z.object({
   sport:           z.enum(SPORTS),
   context:         z.string().min(1).max(1000),
   timeframe:       z.enum(TIMEFRAMES),
-  output_language: z.enum(LOCALES).default('auto'),
+  output_language: z.enum(SUPPORTED_UI_LOCALES).default(DEFAULT_UI_LOCALE),
 })
 
 const candidateSchema = z.object({
@@ -185,10 +190,9 @@ function getScoutSportModule(sport: string): string {
 }
 
 // ─── System prompt ─────────────────────────────────────────────
-function buildScoutSystemPrompt(sport: string, outputLanguage: string, webSearchEnabled: boolean): string {
-  const langInstruction = outputLanguage === 'auto'
-    ? 'Respond in the same language the user writes in. If unclear, use English.'
-    : `All user-facing text (reasoning, required_checks, disclaimer) must be in: ${outputLanguage}. JSON field names and enum values (opportunity_type, risk_level, and all other keys) must remain in English exactly as specified — do not translate them.`
+function buildScoutSystemPrompt(sport: string, outputLanguage: UiLocale, webSearchEnabled: boolean): string {
+  const promptLanguage = UI_LOCALE_PROMPT_NAMES[outputLanguage]
+  const langInstruction = `All user-facing text (reasoning, required_checks, disclaimer) must be in ${promptLanguage}. JSON field names and enum values (opportunity_type, risk_level, and all other keys) must remain in English exactly as specified — do not translate them.`
 
   const dataDisclaimer = webSearchEnabled
     ? ''
