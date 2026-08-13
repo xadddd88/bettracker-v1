@@ -69,8 +69,9 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
       <BroadcastPanel className="flex flex-col gap-4 p-4 sm:p-5">
         <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">Профиль</h2>
         <div>
-          <label className="label">Имя в приложении</label>
+          <label className="label" htmlFor="settings-display-name">Имя в приложении</label>
           <input
+            id="settings-display-name"
             className="input mt-1"
             type="text"
             maxLength={50}
@@ -102,10 +103,11 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
           <div className="mt-2"><BroadcastStatus status="review">Смена валюты не конвертирует баланс.</BroadcastStatus></div>
         </div>
         <div>
-          <label className="label">Базовая ставка</label>
+          <label className="label" htmlFor="settings-default-stake">Базовая ставка</label>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-sm text-bn-muted">{currencySymbol(currency)}</span>
             <input
+              id="settings-default-stake"
               className="input flex-1"
               type="number"
               min={0.01}
@@ -122,10 +124,11 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
       <BroadcastPanel className="flex flex-col gap-4 p-4 sm:p-5">
         <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">AI и анализ</h2>
         <div>
-          <label className="label">
+          <label className="label" htmlFor="settings-kelly-fraction">
             Доля Kelly — <BroadcastDataValue>{kellyFraction.toFixed(2)}×</BroadcastDataValue>
           </label>
           <input
+            id="settings-kelly-fraction"
             className="mt-2 w-full [accent-color:var(--signal)]"
             type="range"
             min={0.1}
@@ -167,8 +170,9 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
       <BroadcastPanel className="flex flex-col gap-4 p-4 sm:p-5">
         <h2 className="font-mono text-[11px] font-black uppercase tracking-[0.08em] text-bn-text">Аккаунт</h2>
         <div>
-          <label className="label">Email</label>
+          <label className="label" htmlFor="settings-email">Email</label>
           <input
+            id="settings-email"
             className="input mt-1 opacity-50 cursor-not-allowed"
             type="email"
             value={email}
@@ -177,8 +181,9 @@ export default function SettingsForm({ profile, email }: SettingsFormProps) {
           />
         </div>
         <div>
-          <label className="label">Часовой пояс</label>
+          <label className="label" htmlFor="settings-timezone">Часовой пояс</label>
           <input
+            id="settings-timezone"
             className="input mt-1"
             type="text"
             placeholder="UTC"
