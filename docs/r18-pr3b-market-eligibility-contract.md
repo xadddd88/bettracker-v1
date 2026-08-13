@@ -1,6 +1,6 @@
 # R18 PR3B Market Eligibility Contract
 
-Status: REPOSITORY CONTRACT — runtime activation disabled.
+Status: EXECUTED / VERIFIED / CLOSED — runtime activation disabled.
 Date: 2026-08-13
 Product source: [`docs/product.md`](product.md), sections 4, 14, 15, and acceptance criteria 43/46/50/59.
 
@@ -65,3 +65,11 @@ Those remain separate PR3 gates. A later migration requires an exact fresh read-
 - conflict, travel, legal, verification, blocked, and unknown-market outcomes;
 - routine elevation rejection, server-policy elevation, and routine downgrade;
 - absence of Supabase dependencies and runtime imports from `app/` or `components/`.
+
+## Execution record
+
+- PR #255 head `949f93ce82099ccaff5cc4a457fea1aaee69151e` passed 15/15 checks and merged through the normal merge-commit path as `8e627b320b0ec33ca690db2fe04e94836f05a8c0` on 2026-08-13.
+- The required CI included TypeScript/lint, `test:market-eligibility-contract`, all existing safety/PostgreSQL gates, preview smoke, and Hermetic Web acceptance with GitHub-hosted Chromium.
+- Automatic production deployment `dpl_FqCxfkbxbrSV5bHLHKRJmNxEZEhh` reached `READY` with `aliasError=null`; `btdk.app/login` and the immutable deployment URL returned HTTP 200 and referenced that deployment's assets.
+- Deployment-scoped runtime logs contained no `error` or `fatal` entries after the smoke request.
+- The explicit exclusions above remained intact. In particular, no migration, production data write, environment change, runtime policy import, or market activation was performed.

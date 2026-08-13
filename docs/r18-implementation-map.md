@@ -167,7 +167,7 @@ Execution record:
 
 ### PR 3B - Repository-Only Market Eligibility Contract
 
-Status: CONTRACT DEFINED — runtime activation disabled.
+Status: COMPLETE — merged and verified; runtime activation disabled.
 
 Scope:
 - Define the immutable `GB_EW_SC_PROFILE_V1` profile for England, Wales, and Scotland with `storefront_country=GB` and minimum age 18.
@@ -191,6 +191,12 @@ Production gate:
 - Automatic repository deployment is inert because no runtime code imports the policy.
 - No Supabase migration, schema/RLS/RPC change, production data write, environment change, market enablement, legal approval, consent persistence, provider call, or external service execution.
 - Persistence, UI integration, and activation remain separate PR 3 gates.
+
+Execution record:
+- PR #255 merged with the repository's standard merge-commit strategy as `8e627b320b0ec33ca690db2fe04e94836f05a8c0` after 15/15 checks passed, including the new policy gate and Hermetic Web acceptance.
+- Vercel production deployment `dpl_FqCxfkbxbrSV5bHLHKRJmNxEZEhh` reached `READY`, mapped `btdk.app`, and served `/login` with HTTP 200 from the exact deployment.
+- Deployment-scoped error/fatal log inspection returned no entries after the smoke request.
+- No database migration, schema/RLS/RPC change, production data write, environment change, market enablement, legal approval, consent persistence, or provider execution occurred.
 
 Detailed contract: [`r18-pr3b-market-eligibility-contract.md`](r18-pr3b-market-eligibility-contract.md).
 
