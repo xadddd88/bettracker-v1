@@ -283,6 +283,43 @@ async function assertBaseAcceptance(page, route, viewport) {
   await assertAxe(page, `${route} at ${viewport.width}px`)
 }
 
+async function assertMarketAccessAcceptance(page, route) {
+  const surface = route === '/settings' ? 'settings' : 'home'
+  const card = page.locator(`[data-market-access-surface="${surface}"]`)
+
+  assert.equal(await card.count(), 1, `${route} must expose one market-access summary`)
+  assert.equal(await card.getAttribute('data-market-access-status'), 'blocked', `${route} market access must fail closed`)
+  assert.equal(await card.getAttribute('data-market-access-reason'), 'market_not_enabled', `${route} must expose the disabled profile reason`)
+  assert.equal(
+    await card.getByText('Этот рынок пока недоступен', { exact: true }).count(),
+    1,
+    `${route} must render the server-resolved disabled copy`,
+  )
+  assert.match(
+    await card.innerText(),
+    /Язык, валюта и часовой пояс.*не открывают доступ/s,
+    `${route} must state that display preferences are not eligibility evidence`,
+  )
+
+  if (route === '/settings') {
+    assert.equal(await card.getAttribute('id'), 'market-access', 'Settings must own the canonical market-access anchor')
+    assert.equal(
+      await card.locator('input, select, textarea, button').count(),
+      0,
+      'Package C Settings status must not collect evidence or expose a fake action',
+    )
+    assert.match(
+      await card.innerText(),
+      /Сейчас этот экран ничего не собирает и не меняет/,
+      'Settings must disclose the current non-collecting boundary',
+    )
+  } else {
+    const settingsLink = card.getByRole('link', { name: 'Посмотреть текущий статус' })
+    assert.equal(await settingsLink.count(), 1, 'Home must deeplink to the canonical Settings owner')
+    assert.equal(await settingsLink.getAttribute('href'), '/settings#market-access')
+  }
+}
+
 async function assertLoginAcceptance(page, viewport) {
   const label = `/login at ${viewport.width}px`
   assert.equal(new URL(page.url()).pathname, '/login', '/login must remain publicly reachable')
@@ -917,6 +954,7 @@ try {
         continue
       }
       await assertBaseAcceptance(page, route, viewport)
+      if (route === '/settings' || route === '/dashboard') await assertMarketAccessAcceptance(page, route)
       if (route === '/ai') await assertAiLabels(page)
       if (route === '/bets/new') await assertTrackerLabels(page, viewport.width === 375)
       if (route === `/bets/${TEST_BET_ID}`) await assertBetDetailHydration(page)

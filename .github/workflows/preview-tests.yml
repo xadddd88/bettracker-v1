@@ -90,6 +90,8 @@ jobs:
         run: npm run test:r18-pr3c-handoff
       - name: "R18 PR3C Package A copy and presentation contract"
         run: npm run test:r18-pr3c-package-a
+      - name: "R18 PR3C Package C fail-closed Web integration"
+        run: npm run test:r18-pr3c-package-c-safe
       - name: "Financial safety suite (Decision #047)"
         run: npm run test:financial-safety
       - name: "Domain write boundaries suite (Decision #048)"

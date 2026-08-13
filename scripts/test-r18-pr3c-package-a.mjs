@@ -165,14 +165,15 @@ function sourceFilesUnder(relativeDir) {
   return files
 }
 
-for (const file of [...sourceFilesUnder('app'), ...sourceFilesUnder('components')]) {
-  const contents = readFileSync(file, 'utf8')
-  assert.doesNotMatch(
-    contents,
-    /lib\/market\/presentation|@\/lib\/market\/presentation/,
-    `${path.relative(repoRoot, file)} must not integrate Package A before Package C`,
-  )
-}
+const presentationConsumers = [...sourceFilesUnder('app'), ...sourceFilesUnder('components')]
+  .filter(file => /lib\/market\/presentation|@\/lib\/market\/presentation/.test(readFileSync(file, 'utf8')))
+  .map(file => path.relative(repoRoot, file).split(path.sep).join('/'))
+  .sort()
+assert.deepEqual(
+  presentationConsumers,
+  ['components/market/MarketAccessCard.tsx'],
+  'Package A presentation must remain limited to the reviewed Package C adapter',
+)
 
 const onboarding = source('components/onboarding/OnboardingCard.tsx')
 assert.doesNotMatch(onboarding, /сохраняй ставку из AI-рекомендации/)

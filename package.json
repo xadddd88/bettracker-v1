@@ -17,6 +17,7 @@
     "test:market-eligibility-contract": "npm run build:provider-scripts && node scripts/test-market-eligibility-contract.mjs",
     "test:r18-pr3c-handoff": "node scripts/test-r18-pr3c-handoff.mjs",
     "test:r18-pr3c-package-a": "npm run build:provider-scripts && node scripts/test-r18-pr3c-package-a.mjs",
+    "test:r18-pr3c-package-c-safe": "node scripts/test-r18-pr3c-package-c-safe.mjs",
     "test:ai-baseline": "npm run build:provider-scripts && node scripts/ai-baseline-harness.mjs",
     "test:tennis": "npm run build:provider-scripts && node scripts/test-tennis-series.mjs",
     "test:tennis-access-gate": "npm run build:provider-scripts && node scripts/test-tennis-access-gate.mjs",

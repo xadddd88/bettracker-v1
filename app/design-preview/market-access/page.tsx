@@ -1,6 +1,8 @@
 import SettingsForm from '@/app/(app)/settings/SettingsForm'
+import MarketAccessCard from '@/components/market/MarketAccessCard'
 import SectionGuide from '@/components/ui/SectionGuide'
 import { BroadcastPanel } from '@/components/ui/BroadcastNoir'
+import { resolveCurrentMarketAccessPresentation } from '@/lib/market/runtime-presentation'
 import { notFound } from 'next/navigation'
 import type { Profile } from '@/types'
 
@@ -17,8 +19,15 @@ const PREVIEW_PROFILE: Profile = {
   updated_at: '2026-08-13T00:00:00.000Z',
 }
 
-export default function MarketAccessDesignPreview() {
+interface MarketAccessDesignPreviewProps {
+  searchParams: Promise<{ variant?: string }>
+}
+
+export default async function MarketAccessDesignPreview({ searchParams }: MarketAccessDesignPreviewProps) {
   if (process.env.VERCEL_ENV === 'production') notFound()
+  const { variant } = await searchParams
+  const showImplementation = variant === 'implementation'
+  const marketAccess = resolveCurrentMarketAccessPresentation('ru')
 
   return (
     <div className="web-editorial min-h-dvh bg-[var(--night)] p-4 text-[var(--text-primary)] md:p-8">
@@ -29,9 +38,12 @@ export default function MarketAccessDesignPreview() {
             Настройки
           </h1>
           <p className="mt-4 text-sm leading-6 text-bn-muted">
-            Профиль, валюта, банкролл и параметры анализа.
+            {showImplementation
+              ? 'Профиль, доступ к рынку, банкролл и параметры анализа.'
+              : 'Профиль, валюта, банкролл и параметры анализа.'}
           </p>
         </BroadcastPanel>
+        {showImplementation ? <MarketAccessCard model={marketAccess} surface="settings" /> : null}
         <SectionGuide
           title="Что управляется в настройках"
           items={[
@@ -44,8 +56,10 @@ export default function MarketAccessDesignPreview() {
               body: 'Базовая ставка помогает быстрее заполнять записи, а доля Kelly задаёт осторожность расчётов риска.',
             },
             {
-              title: 'Язык источников и часовой пояс',
-              body: 'Веб-поиск и часовой пояс влияют на проверку актуальности, времени матчей и качество анализа.',
+              title: showImplementation ? 'Доступ и часовой пояс' : 'Язык источников и часовой пояс',
+              body: showImplementation
+                ? 'Статус рынка приходит с сервера. Веб-поиск и часовой пояс влияют только на актуальность времени и качество анализа.'
+                : 'Веб-поиск и часовой пояс влияют на проверку актуальности, времени матчей и качество анализа.',
             },
           ]}
           note={{
