@@ -1,14 +1,26 @@
 # R18 Implementation Map
 
-Status: ACTIVE ENGINEERING MAP - created after Decision #069 repository adoption.
-Date: 2026-07-29
+Status: ACTIVE ENGINEERING MAP — reconciled through R18 PR3B; runtime activation disabled.
+Date: 2026-08-13
 Product source of truth: [`docs/product.md`](product.md)
 Decision: [`Decision #069`](decision-069-target-product-structure.md)
-Code baseline: `main@d00d4520b88724e8e4a76d38ec161f3590c5abe1`
+Code baseline: `main@0e96784ea5aa65dd2fbc741d29abfe653ec78423`
 
 This document maps the current repository to the approved R18 target product. It is an engineering control map, not a new product scope, legal decision, migration approval, provider approval, production-write approval, or market-launch approval.
 
 R18 remains one complete product. The PR packages below are dependency-safe delivery slices for review, testing, rollback, and audit. They are not reduced editions of the product and do not make any R18 section optional.
+
+### Delivery checkpoint
+
+| Slice | Current state |
+|---|---|
+| PR0 | COMPLETE — PR #243 merged as `40b091c086d924fef47cbc6f394e66c1ba6ed3f5`. |
+| PR1 | COMPLETE — PR #244 merged as `b9ea1c654b7988e47fcb8aec404ddf7aa84d8b88`; active automatic-stake and Decision-to-Bet surfaces are removed. |
+| PR2 | COMPLETE — PR #245 merged as `931f2896db293a3c25d2fc17f860d4b68cf9fd57`; canonical navigation and compatibility aliases are active. |
+| Security #246-#252 | MERGED — direct-bet quarantine, Advisor baseline, PostHog hardening, CSP readiness, and active-membership S2.1-S2.3. Approved database migrations are present in production history; CSP enforcement remains unapproved. |
+| PR3A | COMPLETE — PR #253 plus audit PR #254; exact active locale set is `en`, `uk`, `ru`. |
+| PR3B | COMPLETE — PR #255 plus audit PR #256; `GB_EW_SC_PROFILE_V1` is configured, has no runtime caller, and remains disabled. |
+| Remaining PR3 | NOT COMPLETE — persistence, age/territory evidence, legal-terms acknowledgement, consent separation, blocked-state UI, and every activation gate remain ahead. |
 
 ## 1. Current Runtime Inventory
 
@@ -17,10 +29,10 @@ R18 remains one complete product. The PR packages below are dependency-safe deli
 | Current surface | Current owner in code | R18 owner | Current issue |
 |---|---|---|---|
 | `/dashboard` | `app/(app)/dashboard` | Home | Useful account state exists, but Home lacks full R18 attention queue, Review queue, market state, limit state, and full blocked/stale/insufficient states. |
-| `/ai` | `app/(app)/ai` | Global Add / Research / Assistant | Scanner and Analyst are coupled. Analyst can still lead into stake entry and `place_bet_from_decision`; R18 requires Research to never create Bet or prefill action. |
+| `/ai` | `app/(app)/ai` | Global Add / Research / Assistant | PR1 removed the active Decision-to-Bet caller, but Scanner and Analyst remain coupled and the prepared-context-only Research/Assistant boundary is incomplete. |
 | `/scout` | `app/(app)/scout`, `app/api/scout` | Research / Market Lab | Legacy Scout still asks an LLM to generate opportunities and stores `market_opportunities`; even with FP-001 nulling pricing fields, the surface conflicts with R18 Market Lab boundaries. |
 | `/bets` | `app/(app)/bets` | Journal / Bets | Tracker is useful, but Bet is still the primary journal object; R18 makes Decision Ledger primary and separates Decision, Pass, Paper, external action, Execution, Resolution, and Review. |
-| `/decisions` | `app/(app)/decisions` | Journal / Decision Ledger | Decision records exist, but they still include legacy recommendation/probability fields and direct Place Bet actions. No immutable pre-event lock contract is complete. |
+| `/decisions` | `app/(app)/decisions` | Journal / Decision Ledger | PR1 removed direct Place Bet actions. Decision records still include legacy recommendation/probability fields, and no immutable pre-event lock contract is complete. |
 | `/analytics` | `app/(app)/analytics` | Insights | Uses deterministic settlement helpers, but does not yet expose R18 metric provenance: period, N, denominator, coverage, freshness, confidence, formula version, and uncertainty. |
 | `/coach` | `app/(app)/coach`, `app/api/coach` | Insights / Review | Retrospective history analysis exists, but Coach still produces recommendations as action cards. R18 requires evidence-first Review with observations, questions, N, period, and confidence. |
 | `/bankroll` | `app/(app)/bankroll` | Risk | Bankroll and transactions exist, but R18 RiskPolicy, intended vs actual exposure, projected exposure, limits, cooldown, stop mode, breach reason, and simulations are not implemented. |
@@ -42,29 +54,31 @@ R18 remains one complete product. The PR packages below are dependency-safe deli
 |---|---|---|
 | Tracked Bet write | `POST /api/bets/tracked` -> `create_tracked_bet` | Good foundation for user-owned factual Bet records, but not yet linked to R18 Decision/Execution/Resolution lifecycle. |
 | Analyst Decision write | `POST /api/ai/analyst` -> `persist_analysis_decision` | Still stores legacy recommendation/probability fields. Needs prepared-context-only Research/Assistant boundary and Decision draft semantics. |
-| Direct Decision to Bet | `place_bet_from_decision` RPC and UI callers | Conflicts with R18. Research/Decision may record intended external action after risk check, but must not create Bet directly. |
-| Risk check | `POST /api/risk/evaluate` | Returns `recommended_max_stake`; R18 forbids automatic stake recommendation. Needs RiskScenario with user-entered Intended Exposure and no suggested stake. |
+| Direct Decision to Bet | `place_bet_from_decision` historical RPC | Active UI callers were removed in PR1; PR #246 revoked `PUBLIC`, `anon`, and `authenticated` execution and retained `service_role` only. The historical function must remain quarantined. |
+| Risk check | `POST /api/risk/evaluate` | PR1 removed `recommended_max_stake`; the route now returns non-prescriptive intended-exposure facts and warnings. Full versioned R18 RiskPolicy remains PR6 work. |
 | Settlement | `settle_bet`, `cancel_pending_bet`, `calcSettlementMetrics` | Current support excludes push/cashout/partial from financial metrics. R18 needs unified Resolution contract with `resolved_at` and reproducible P/L across every terminal outcome. |
 | Metrics | `lib/bets/settlement-metrics.ts`, `lib/analytics/performance.ts` | Good deterministic base, but not versioned as a shared metric service for Web/mobile/export/AI with N, period, coverage, confidence, and uncertainty. |
-| Market / locale | profile currency/timezone/settings | No complete `MarketProfile`, `UserMarketEligibility`, consent versioning, or locale completeness gate for `en`, `uk`, `ru`. |
+| Market / locale | `lib/i18n/locale-contract.ts`, `lib/market/contract.ts`, `lib/market/server-policy.ts` | PR3A and PR3B provide pure locale and fail-closed market-policy contracts. Persistence, consent/legal acknowledgement, UI integration, and activation remain absent. |
 | Privacy | settings and auth basics | No Privacy View, export/delete workflow, AI history controls, processor transparency, or travel/unsupported account states. |
 
 ## 2. P0 R18 Conflicts To Remove First
 
 These conflicts are higher priority than visual IA polish because they can misrepresent the product boundary.
 
-| Conflict | Evidence | Required correction |
-|---|---|---|
-| Automatic stake recommendation | `app/api/risk/evaluate/route.ts` returns `recommended_max_stake`; `components/risk/RiskEvaluator.tsx` renders "Suggested max". | Replace with non-prescriptive RiskScenario facts: current bankroll, user-entered Intended Exposure, open exposure, projected exposure, threshold result, and warnings. No suggested stake or allocation. |
-| Research/Decision can create Bet | `app/(app)/ai/page.tsx` and `app/(app)/decisions/[id]/DecisionActions.tsx` call `place_bet_from_decision`. | Remove direct Bet creation from Research/Decision surfaces. Replace with R18-safe `Pass`, `Paper`, and `Track external action` Decision flow. |
-| Place Bet copy and CTA | `analysis-quality-gate` labels and Web decision actions expose "Place Bet". | Rename and re-scope CTAs so the product records user-owned external facts only. No bookmaker or placement implication. |
-| Legacy Scout opportunity generation | `/scout` and `/api/scout` still generate and persist candidate opportunities. | Convert to Research / Market Lab with prepared evidence, watchlist, and user-controlled notes. No ranked opportunities, no best-bet framing, no LLM-created numbers. |
-| Coach action recommendations | `CoachRecommendation` and Coach UI render recommendations with priority. | Convert to Review observations and questions grounded in deterministic metrics, period, N, and confidence. |
-| Legacy locale values at active write boundaries | The PR3A local candidate replaces the former eight-value AI/Scout unions with one shared `en`/`uk`/`ru` contract. Historical rows and pinned baseline fixtures can still contain legacy strings. | Keep legacy values read-only with an English presentation fallback, reject them on new writes, and leave broader translation completeness to PR 3. |
+| Conflict | Current evidence | Status | Remaining correction |
+|---|---|---|---|
+| Automatic stake recommendation | Active Risk API/UI no longer expose `recommended_max_stake`, "Suggested max", or a confirm-to-bet action. | RESOLVED IN PR1 #244 | Preserve static regression coverage; full versioned RiskPolicy remains PR6. |
+| Research/Decision can create Bet | Active AI/Decision surfaces have no `place_bet_from_decision` caller; the historical RPC is service-only after #246. | RESOLVED IN PR1 #244 / SECURITY #246 | Never restore authenticated execution or a Research-to-Bet caller. |
+| Place Bet copy and CTA | Active Decision actions use user-owned intended-exposure language. A separate onboarding sentence still describes saving from an AI recommendation. | ACTIVE FLOW RESOLVED; COPY FOLLOW-UP OPEN | Replace the onboarding sentence in its own runtime-copy slice; do not mix it into this docs reconciliation. |
+| Legacy Scout opportunity generation | `/scout` and `/api/scout` still generate and persist candidate opportunities. | OPEN | Convert to Research / Market Lab with prepared evidence, watchlist, and user-controlled notes. No ranked opportunities, best-bet framing, or LLM-created numbers. |
+| Coach action recommendations | `CoachRecommendation` and Coach UI render recommendations with priority. | OPEN | Convert to Review observations and questions grounded in deterministic metrics, period, N, and confidence. |
+| Legacy locale values at active write boundaries | PR3A uses one `en` / `uk` / `ru` contract and rejects legacy values on new Analyst/Scout writes; historical fixtures remain read-only. | ACTIVE WRITE BOUNDARY RESOLVED IN PR3A #253 | Complete remaining product-copy and surface coverage without coupling locale to market eligibility. |
 
 ## 3. Dependency-Safe PR Packages
 
 ### PR 0 - Post-Merge Cleanup And Map
+
+Status: COMPLETE — merged in PR #243 as `40b091c086d924fef47cbc6f394e66c1ba6ed3f5`.
 
 Scope:
 - Update live Decision #069 status after PR #242 merge.
@@ -77,6 +91,8 @@ Tests: `git diff --check`, docs consistency grep for obsolete live repository-ad
 Production gate: no production action.
 
 ### PR 1 - R18 Policy Blockers
+
+Status: COMPLETE — merged in PR #244 as `b9ea1c654b7988e47fcb8aec404ddf7aa84d8b88`.
 
 Scope:
 - Remove `recommended_max_stake` from the risk API response and UI.
@@ -92,9 +108,7 @@ Migrations:
 - None if implemented as a UI/API contract narrowing.
 - A later migration may be needed for proper Intended Exposure persistence.
 
-Feature flags:
-- `R18_DISABLE_DECISION_TO_BET=true` for fail-closed route/UI behavior.
-- `R18_RISK_SCENARIO_V1=true` for the non-prescriptive risk response shape.
+Feature flags: none added. The narrowed non-prescriptive contract and removal of active Decision-to-Bet callers are the baseline behavior.
 
 Tests:
 - Unit/static test that `/api/risk/evaluate` no longer returns `recommended_max_stake`.
@@ -105,7 +119,13 @@ Production gate:
 - Deployable after green CI.
 - No Supabase migration, provider call, settlement run, env change, or production smoke.
 
+Execution record:
+- PR #244 removed active Decision-to-Bet UI calls and automatic stake recommendation after required CI passed.
+- PR #246 later quarantined the retained historical `place_bet_from_decision` RPC to `service_role`; its production migration is applied.
+
 ### PR 2 - R18 App Shell And Route Compatibility
+
+Status: COMPLETE — merged in PR #245 as `931f2896db293a3c25d2fc17f860d4b68cf9fd57`.
 
 Scope:
 - Introduce canonical Web navigation: Home, Research, Journal, Insights, Risk.
@@ -122,8 +142,7 @@ Dependencies:
 - `AppHeader`, `MobileNav`, `app/(app)/layout.tsx`, route files.
 
 Migrations: none.
-Feature flags:
-- `R18_NAV_ENABLED` for the new shell and alias mapping.
+Feature flags: none added. The canonical navigation and compatibility aliases are the baseline shell.
 
 Tests:
 - Design shell/navigation tests.
@@ -134,6 +153,9 @@ Tests:
 Production gate:
 - Green preview and visual acceptance only.
 - No data writes or provider calls.
+
+Execution record:
+- PR #245 established the canonical Home, Research, Journal, Insights, and Risk navigation while retaining the documented legacy route aliases.
 
 ### PR 3A - Repository-Only Locale Contract
 
@@ -202,6 +224,8 @@ Detailed contract: [`r18-pr3b-market-eligibility-contract.md`](r18-pr3b-market-e
 
 ### PR 3 - MarketProfile, Eligibility, And Locale Foundation
 
+Status: IN PROGRESS — PR3A and PR3B are complete. The next dependency-safe slice is PR3C design/handoff; no schema, migration, runtime integration, or activation is authorized by this status.
+
 Scope:
 - Add server-owned `MarketProfile` and `UserMarketEligibility` contracts for `GB_EW_SC`.
 - Keep locale independent from market access, currency, timezone, odds format, and eligibility.
@@ -218,7 +242,7 @@ Migrations:
 
 Feature flags:
 - `MARKET_PROFILE_GB_EW_SC_ENABLED=false` until separate legal/market gate.
-- `R18_LOCALE_CONTRACT_V1`.
+- The PR3A locale contract is active without an environment flag.
 
 Tests:
 - Policy tests for locale not changing eligibility.
@@ -474,15 +498,17 @@ Every R18 product surface must cover:
 - privacy view;
 - error and recovery.
 
-## 6. Current Best First Runtime PR
+## 6. Current Best Next Slice
 
-After this docs-only map, the first runtime PR should be **PR 1 - R18 Policy Blockers**.
+The next dependency-safe activity is **PR3C design/handoff for eligibility persistence and blocked-state UX**.
 
-Reason:
+It should:
 
-- it removes the clearest conflicts with the approved product/legal boundary;
-- it requires no migration if scoped carefully;
-- it makes the existing product safer before large IA or data-model work;
-- it creates tests that prevent regression back to recommended stake or Research-to-Bet conversion.
+- combine the completed PR3A locale and PR3B server-policy contracts without changing either invariant;
+- separate legal-terms acknowledgement from optional analytics/marketing consent and from the documented lawful basis for required processing;
+- define minimal, non-document evidence states for age, residence, current territory, verification, and policy versioning;
+- define onboarding and Settings states for unsupported, verification required/pending, signal conflict, travel limited, legal update required, policy unavailable, market disabled, and inactive membership;
+- preserve `LEGAL INPUT REQUIRED` for the strength of age and territory verification;
+- keep `MARKET_PROFILE_GB_EW_SC_ENABLED` disabled.
 
-Do not start PR 1 until Dmitriy explicitly approves runtime changes under this map.
+PR3C design/handoff authorizes no migration, schema/RLS/RPC change, production write, environment change, provider or bookmaker integration, affiliate work, market activation, or external beta. A later repository implementation must have its own reviewed scope; any production migration must have a fresh read-only preflight and separate approval.

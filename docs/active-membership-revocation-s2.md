@@ -1,5 +1,11 @@
 # Security S2 — Active Membership & Revocation Enforcement
 
+Current status (2026-08-13): S2.1 foundation applied; S2.2 Web/user-API
+enforcement merged and deployed; S2.3 Data API/RPC enforcement merged and
+applied. Production migration history and the accepted Security Advisor baseline
+reconcile. This status grants no authority to alter memberships, sessions, Auth
+records, or rollback controls.
+
 ## S2.1 status and repository scope
 
 Security S2.1 is a repository-only foundation prepared on
@@ -41,8 +47,10 @@ The approved invariant is:
   cannot be overwritten;
 - authorization reads live membership instead of stale JWT metadata.
 
-S2.1 encodes the invariant but does not yet enforce it at runtime entry points.
-The full finding therefore remains open until S2.2 and S2.3 are complete.
+At the S2.1 checkpoint, the invariant was encoded but not yet enforced at
+runtime entry points, so the full finding remained open pending S2.2 and S2.3.
+Those later boundaries are now deployed/applied as recorded below; this
+historical S2.1 scope remains unchanged.
 
 ## Database contract
 
@@ -147,9 +155,18 @@ Every state-changing gate requires separate approval:
    authenticated `SECURITY DEFINER` RPCs;
 8. verify direct Data API/RPC denial before declaring revocation enforced.
 
-S2.2 alone is insufficient because direct Supabase calls remain possible.
-S2.3 must preserve existing tenant ownership predicates and service-only
-boundaries rather than replacing them with membership-only checks.
+Current execution checkpoint: repository gates 1-7 are complete. S2.1 is present
+in production history as `20260809134845_active_membership_foundation`; S2.2 is
+deployed from merged PR #251; and S2.3 is present as
+`20260812172400_active_membership_data_api_rpc_enforcement`. The 2026-08-13
+read-only reconciliation confirmed the accepted Security Advisor baseline. It
+did not repeat user-data reads or authenticated direct-role probes and therefore
+does not replace the saved rollout evidence required by gate 8.
+
+At the S2.2-only checkpoint, direct Supabase calls remained possible, so S2.2
+alone was insufficient. The later S2.3 boundary preserves existing tenant
+ownership predicates and service-only functions rather than replacing them with
+membership-only checks.
 
 ### S2.2 application boundary
 
@@ -168,10 +185,13 @@ with all 16 client-readable base tables through restrictive RLS and adds one
 fail-closed assertion to each of the eight authenticated definer RPCs. It does
 not replace ownership predicates or reopen any service-only function.
 
-The migration remains review-only. Until current membership reconciliation,
-separate production approval, controlled apply, and direct Data API/RPC
-postflight are complete, this document must continue to describe the full S2
-finding as open.
+The migration was subsequently merged in PR #252 and applied once under separate
+production authorization. Its exact repository SHA-256 is
+`c544e30454188fe6ae709c8b953d91e88793c10befe0f2514de9bd28fdf7c04c`; the
+production history version is
+`20260812172400_active_membership_data_api_rpc_enforcement`. The emergency stop
+was not invoked. Any future change or rollback still requires its own guarded
+approval and compatibility plan.
 
 ## Rollback
 
@@ -196,8 +216,11 @@ separate compatibility plan and must not simply remove the enforcement layer.
 
 ## Remaining risk
 
-Until S2.2/S2.3 are implemented and production reconciliation is approved,
-revoked, orphan, or externally created Auth users with valid sessions can still
-reach current authenticated paths. Session deletion alone is not the security
-boundary because an already issued JWT can remain valid until expiry. Live
-membership checks at both server and database boundaries are mandatory.
+The original valid-session bypass now has live membership checks at both the
+server and database boundaries. Remaining risk is narrower: authorization is
+evaluated at each database statement/transaction snapshot; a transaction
+authorized before a concurrent revoke may finish, mobile still lacks a dedicated
+membership-denial experience, and any partial rollback of S2.2/S2.3 could reopen
+the bypass. Session deletion alone is still not the security boundary. Preserve
+the live membership checks, ownership predicates, service-only functions, and
+fail-closed emergency-stop contract together.

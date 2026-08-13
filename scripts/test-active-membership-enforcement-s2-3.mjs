@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -209,6 +210,13 @@ if (process.argv.includes('--emit-predecessor-fingerprints')) {
 
 const migration = fs.readFileSync(migrationPath, 'utf8')
 const verifier = fs.readFileSync(verifierPath, 'utf8')
+const expectedMigrationSha256 = 'c544e30454188fe6ae709c8b953d91e88793c10befe0f2514de9bd28fdf7c04c'
+
+assert.equal(
+  createHash('sha256').update(migration).digest('hex'),
+  expectedMigrationSha256,
+  'S2.3 migration payload SHA-256 drifted from the production-applied artifact',
+)
 
 assert.match(migration, /^BEGIN;/m)
 assert.match(migration, /^COMMIT;/m)
@@ -397,7 +405,10 @@ for (const required of [
   'inactive_membership',
   '42501',
   'odds_snapshots_public',
-  'No production migration has been applied',
+  'PRODUCTION MIGRATION APPLIED',
+  '20260812172400_active_membership_data_api_rpc_enforcement',
+  expectedMigrationSha256,
+  'The fail-closed emergency stop was not invoked',
 ]) {
   assert(evidence.includes(required), `S2.3 evidence missing: ${required}`)
 }
