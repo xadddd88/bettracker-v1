@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import MarketAccessCard from '@/components/market/MarketAccessCard'
 import OnboardingCard from '@/components/onboarding/OnboardingCard'
 import NextBestAction, { type NextAction } from '@/components/dashboard/NextBestAction'
 import { BroadcastDataValue, BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
@@ -9,6 +10,7 @@ import { PageView } from '@/lib/analytics/PageView'
 import { calcSettlementMetrics, isSupportedSettlementStatus } from '@/lib/bets/settlement-metrics'
 import { resolveBetStatus } from '@/lib/bets/bet-status'
 import { formatMoney } from '@/lib/money'
+import { resolveCurrentMarketAccessPresentation } from '@/lib/market/runtime-presentation'
 import { createClient } from '@/lib/supabase/server'
 import type { Bet } from '@/types'
 
@@ -46,6 +48,7 @@ export default async function DashboardPage() {
   const pendingOpenLabel = pluralRu(pendingBets.length, 'открытая ставка', 'открытые ставки', 'открытых ставок')
   const recentRecordsLabel = pluralRu(recent.length, 'запись', 'записи', 'записей')
   const legsLabel = (count: number) => pluralRu(count, 'исход', 'исхода', 'исходов')
+  const marketAccess = resolveCurrentMarketAccessPresentation('ru')
 
   // Adaptive Action is derived only from trusted persisted state. There is no
   // durable Web draft contract yet, so Home must not claim that one exists.
@@ -84,6 +87,8 @@ export default async function DashboardPage() {
 
         <NextBestAction action={nextAction} />
       </section>
+
+      <MarketAccessCard model={marketAccess} surface="home" />
 
       <SectionGuide
         title="Как читать главную"

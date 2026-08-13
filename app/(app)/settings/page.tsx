@@ -4,8 +4,10 @@ import SettingsForm from './SettingsForm'
 import { PageView } from '@/lib/analytics/PageView'
 import { EVENTS } from '@/lib/analytics/events'
 import type { Profile } from '@/types'
+import MarketAccessCard from '@/components/market/MarketAccessCard'
 import { BroadcastPanel, BroadcastStatus } from '@/components/ui/BroadcastNoir'
 import SectionGuide from '@/components/ui/SectionGuide'
+import { resolveCurrentMarketAccessPresentation } from '@/lib/market/runtime-presentation'
 
 export default async function SettingsPage() {
   const supabase = await createClient()
@@ -17,6 +19,7 @@ export default async function SettingsPage() {
     .select('*')
     .eq('id', user.id)
     .single()
+  const marketAccess = resolveCurrentMarketAccessPresentation('ru')
 
   return (
     <main className="bn-page mx-auto flex w-full max-w-3xl flex-col gap-4 pb-8">
@@ -24,8 +27,9 @@ export default async function SettingsPage() {
       <BroadcastPanel className="p-5 sm:p-7">
         <p className="editorial-kicker">Аккаунт · настройки</p>
         <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,6rem)] font-black leading-none tracking-[-0.06em] text-bn-text">Настройки</h1>
-        <p className="mt-4 text-sm leading-6 text-bn-muted">Профиль, валюта, банкролл и параметры анализа.</p>
+        <p className="mt-4 text-sm leading-6 text-bn-muted">Профиль, доступ к рынку, банкролл и параметры анализа.</p>
       </BroadcastPanel>
+      <MarketAccessCard model={marketAccess} surface="settings" />
       <SectionGuide
         title="Что управляется в настройках"
         items={[
@@ -38,8 +42,8 @@ export default async function SettingsPage() {
             body: 'Базовая ставка помогает быстрее заполнять записи, а доля Kelly задаёт осторожность расчётов риска.',
           },
           {
-            title: 'Язык источников и часовой пояс',
-            body: 'Веб-поиск и часовой пояс влияют на проверку актуальности, времени матчей и качество анализа.',
+            title: 'Доступ и часовой пояс',
+            body: 'Статус рынка приходит с сервера. Веб-поиск и часовой пояс влияют только на актуальность времени и качество анализа.',
           },
         ]}
         note={{

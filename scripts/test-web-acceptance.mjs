@@ -47,7 +47,7 @@ const FOUNDER_FLOW_VIEWPORTS = [
   { width: 375, height: 812 },
   { width: 1280, height: 900 },
 ]
-const ROUTES = ['/dashboard', '/ai', '/bets/new', `/bets/${TEST_BET_ID}`, '/bankroll', '/coach']
+const ROUTES = ['/settings', '/dashboard', '/ai', '/bets/new', `/bets/${TEST_BET_ID}`, '/bankroll', '/coach']
 const SETTLED_TEST_BET = {
   id: TEST_BET_ID,
   user_id: TEST_USER_ID,
@@ -281,6 +281,43 @@ async function assertBaseAcceptance(page, route, viewport) {
   await assertNoHorizontalOverflow(page, `${route} at ${viewport.width}px`)
   await assertNoDuplicateIds(page, `${route} at ${viewport.width}px`)
   await assertAxe(page, `${route} at ${viewport.width}px`)
+}
+
+async function assertMarketAccessAcceptance(page, route) {
+  const surface = route === '/settings' ? 'settings' : 'home'
+  const card = page.locator(`[data-market-access-surface="${surface}"]`)
+
+  assert.equal(await card.count(), 1, `${route} must expose one market-access summary`)
+  assert.equal(await card.getAttribute('data-market-access-status'), 'blocked', `${route} market access must fail closed`)
+  assert.equal(await card.getAttribute('data-market-access-reason'), 'market_not_enabled', `${route} must expose the disabled profile reason`)
+  assert.equal(
+    await card.getByText('Этот рынок пока недоступен', { exact: true }).count(),
+    1,
+    `${route} must render the server-resolved disabled copy`,
+  )
+  assert.match(
+    await card.innerText(),
+    /Язык, валюта и часовой пояс.*не открывают доступ/s,
+    `${route} must state that display preferences are not eligibility evidence`,
+  )
+
+  if (route === '/settings') {
+    assert.equal(await card.getAttribute('id'), 'market-access', 'Settings must own the canonical market-access anchor')
+    assert.equal(
+      await card.locator('input, select, textarea, button').count(),
+      0,
+      'Package C Settings status must not collect evidence or expose a fake action',
+    )
+    assert.match(
+      await card.innerText(),
+      /Сейчас этот экран ничего не собирает и не меняет/,
+      'Settings must disclose the current non-collecting boundary',
+    )
+  } else {
+    const settingsLink = card.getByRole('link', { name: 'Посмотреть текущий статус' })
+    assert.equal(await settingsLink.count(), 1, 'Home must deeplink to the canonical Settings owner')
+    assert.equal(await settingsLink.getAttribute('href'), '/settings#market-access')
+  }
 }
 
 async function assertLoginAcceptance(page, viewport) {
@@ -801,7 +838,16 @@ const supabaseStub = createServer((request, response) => {
     return
   }
   if (url.pathname === '/rest/v1/profiles') {
-    jsonResponse(response, 200, { onboarding_completed: true }, { 'content-range': '0-0/1' })
+    jsonResponse(response, 200, {
+      id: TEST_USER_ID,
+      display_name: 'Acceptance User',
+      currency: 'GBP',
+      default_stake: 10,
+      kelly_fraction: 0.5,
+      web_search_enabled: false,
+      timezone: 'Europe/Kyiv',
+      onboarding_completed: true,
+    }, { 'content-range': '0-0/1' })
     return
   }
 
@@ -878,6 +924,7 @@ try {
     }
 
     for (const route of ROUTES) {
+      if (process.env.MARKET_ACCESS_VISUAL_CAPTURE_DIR && route !== '/settings') continue
       const page = await context.newPage()
       await page.addInitScript({ content: axe.source })
       page.on('pageerror', error => browserErrors.push(`${route} at ${viewport.width}px: ${error.message}`))
@@ -892,7 +939,22 @@ try {
       })
       const response = await page.goto(`${nextOrigin}${route}`, { waitUntil: 'networkidle', timeout: 120_000 })
       assert.equal(response?.status(), 200, `${route} must return 200 from the local app`)
+      if (
+        route === '/settings'
+        && process.env.MARKET_ACCESS_VISUAL_CAPTURE_DIR
+        && [375, 1440].includes(viewport.width)
+      ) {
+        await page.screenshot({
+          path: `${process.env.MARKET_ACCESS_VISUAL_CAPTURE_DIR}/settings-${viewport.width}.png`,
+          fullPage: true,
+        })
+      }
+      if (route === '/settings' && process.env.MARKET_ACCESS_VISUAL_CAPTURE_DIR) {
+        await page.close()
+        continue
+      }
       await assertBaseAcceptance(page, route, viewport)
+      if (route === '/settings' || route === '/dashboard') await assertMarketAccessAcceptance(page, route)
       if (route === '/ai') await assertAiLabels(page)
       if (route === '/bets/new') await assertTrackerLabels(page, viewport.width === 375)
       if (route === `/bets/${TEST_BET_ID}`) await assertBetDetailHydration(page)
@@ -903,7 +965,7 @@ try {
     await context.close()
   }
 
-  for (const viewport of FOUNDER_FLOW_VIEWPORTS) {
+  for (const viewport of process.env.MARKET_ACCESS_VISUAL_CAPTURE_DIR ? [] : FOUNDER_FLOW_VIEWPORTS) {
     founderFlowBet = null
     const scannerGate = deferred()
     const trackedGate = deferred()
