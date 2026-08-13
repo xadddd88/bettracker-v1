@@ -42,6 +42,7 @@
     "lib/bets/**/*.ts",
     "lib/tennis/**/*.ts",
     "lib/flags/**/*.ts",
+    "lib/market/**/*.ts",
     "lib/analytics/performance.ts",
     "lib/security/**/*.ts",
     "lib/ai/**/*.ts",
