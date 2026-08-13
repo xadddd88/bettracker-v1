@@ -98,7 +98,7 @@ assert.match(handoff, /Storefront.*locale.*currency.*timezone.*not proof/is)
 assert.match(handoff, /user_metadata.*authorization evidence/i)
 assert.match(handoff, /Until such frames exist.*not visual\s+design acceptance/is)
 
-assert.match(onboarding, /сохраняй ставку из AI-рекомендации/)
+assert.doesNotMatch(onboarding, /сохраняй ставку из AI-рекомендации/)
 assert.match(handoff, /сохраняй ставку из AI-рекомендации/)
 assert.match(handoff, /documented by this handoff but not\s+changed here/i)
 

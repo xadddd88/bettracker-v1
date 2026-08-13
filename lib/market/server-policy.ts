@@ -10,6 +10,7 @@ import {
   GB_EW_SC_MARKET_PROFILE,
   isGbEwScEligibleTerritory,
   marketEligibilityGrantsAccess,
+  type MarketEligibilityReason,
   type MarketEligibilityStatus,
 } from './contract'
 
@@ -19,24 +20,6 @@ export const GB_EW_SC_POLICY_VERSION = 'GB_EW_SC_POLICY_V1'
 export type VerificationState = 'required' | 'pending' | 'verified'
 export type MarketSignalAssessment = 'consistent' | 'conflict' | 'unresolved'
 export type LegalTermsState = 'current' | 'update_required' | 'unknown'
-
-export type MarketEligibilityReason =
-  | 'eligible'
-  | 'unknown_market_profile'
-  | 'market_not_enabled'
-  | 'policy_blocked'
-  | 'policy_state_unavailable'
-  | 'residence_verification_required'
-  | 'northern_ireland_not_in_profile'
-  | 'unsupported_residence'
-  | 'market_signal_conflict'
-  | 'market_signals_unresolved'
-  | 'current_location_required'
-  | 'travel_outside_profile'
-  | 'legal_terms_update_required'
-  | 'legal_terms_status_required'
-  | 'verification_pending'
-  | 'verification_required'
 
 /**
  * Inputs are already-collected server evidence classes, not client assertions.
