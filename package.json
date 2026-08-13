@@ -18,6 +18,7 @@
     "test:r18-pr3c-handoff": "node scripts/test-r18-pr3c-handoff.mjs",
     "test:r18-pr3c-package-a": "npm run build:provider-scripts && node scripts/test-r18-pr3c-package-a.mjs",
     "test:r18-pr3c-package-b-preflight": "node scripts/test-r18-pr3c-package-b-preflight.mjs",
+    "test:r18-pr3c-owner-legal-decision-packet": "node scripts/test-r18-pr3c-owner-legal-decision-packet.mjs",
     "test:r18-pr3c-package-c-safe": "node scripts/test-r18-pr3c-package-c-safe.mjs",
     "test:ai-baseline": "npm run build:provider-scripts && node scripts/ai-baseline-harness.mjs",
     "test:tennis": "npm run build:provider-scripts && node scripts/test-tennis-series.mjs",

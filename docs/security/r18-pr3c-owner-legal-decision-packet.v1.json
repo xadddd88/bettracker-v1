@@ -1,0 +1,349 @@
+{
+  "schemaVersion": 1,
+  "packetId": "bettracker-r18-pr3c-owner-legal-decision-packet",
+  "status": "prepared-pending-owner-and-uk-counsel-signoff",
+  "asOfDate": "2026-08-13",
+  "repository": {
+    "baseCommit": "44aa35edfd7b1c0a0f57c1cba48e3dd923e3d27f",
+    "packageBPreflightCommit": "92fd7a3e3398d6218d3d8be922bdd0842a12c4ef"
+  },
+  "sourceInputs": [
+    {
+      "inputClass": "external-research",
+      "submittedFilename": "Вставлено файл розмітки (2).md",
+      "sha256": "d9eb12167b6a6fd7016b4fe703ef62d8df8b85e0153bbd4712b5e60471b90394"
+    },
+    {
+      "inputClass": "external-research-duplicate",
+      "submittedFilename": "Вставлено файл розмітки (3).md",
+      "sha256": "d9eb12167b6a6fd7016b4fe703ef62d8df8b85e0153bbd4712b5e60471b90394",
+      "byteIdenticalToSourceInput": 0
+    }
+  ],
+  "proposedProductBoundary": {
+    "approvalState": "recommendation-only",
+    "marketProfile": "GB_EW_SC",
+    "supportedTerritories": [
+      "England",
+      "Wales",
+      "Scotland"
+    ],
+    "unsupportedTerritories": [
+      "Northern Ireland"
+    ],
+    "minimumAge": 18,
+    "accessModel": "private-invite-only",
+    "purpose": "private-decision-quality-and-risk-control-journal",
+    "prohibitedCapabilities": [
+      "accept-or-execute-a-bet",
+      "transmit-or-prefill-a-bet",
+      "bookmaker-link-or-deep-link",
+      "affiliate-or-bookmaker-promotion",
+      "recommended-or-prefilled-stake",
+      "ranked-picks-or-copy-betting",
+      "profit-or-winning-promise"
+    ],
+    "separatelyGatedCapabilities": [
+      "odds-or-provider-feed",
+      "bookmaker-name-or-logo",
+      "commercial-promotion",
+      "any-gambling-transaction-integration"
+    ]
+  },
+  "existingAnalyticsRepositoryObservation": {
+    "observationClass": "static-repository-review-only",
+    "productionEnvironmentInspected": false,
+    "clientProvider": "PostHog",
+    "initializationCondition": "NEXT_PUBLIC_POSTHOG_KEY-and-NEXT_PUBLIC_POSTHOG_HOST",
+    "codeLevelConsentGateObserved": false,
+    "configuredEvents": [
+      "explicit-pageview",
+      "automatic-pageleave",
+      "other-explicit-capture-and-identify-calls"
+    ],
+    "protectiveSettingsObserved": [
+      "autocapture-disabled",
+      "session-recording-disabled",
+      "remote-capabilities-and-external-dependencies-disabled"
+    ],
+    "requiredAction": "separate-current-telemetry-privacy-and-pecr-review",
+    "authorityToChangeRuntime": false
+  },
+  "legalGates": [
+    {
+      "id": "LEGAL-01",
+      "topic": "children-access-classification",
+      "status": "pending-owner-and-uk-counsel-signoff",
+      "approvedDecision": null,
+      "recommendation": {
+        "intendedAudience": "adults-only-18-plus",
+        "serviceTargeting": "not-directed-at-children",
+        "interimApplicability": "unknown-until-documented-likely-accessed-screening",
+        "interimControl": "high-privacy-defaults-and-no-package-b-evidence-collection"
+      },
+      "requiredSignoffs": [
+        "owner",
+        "uk_counsel"
+      ],
+      "implementationInputs": [
+        "likely-accessed-verdict",
+        "children-code-duties",
+        "assessment-owner",
+        "assessment-evidence-reference",
+        "review-date",
+        "dpia-requirement"
+      ],
+      "failClosed": "No evidence collection, migration, or market activation."
+    },
+    {
+      "id": "LEGAL-02",
+      "topic": "age-assurance-method-and-strength",
+      "status": "pending-owner-and-uk-counsel-signoff",
+      "approvedDecision": null,
+      "recommendation": {
+        "minimumAge": 18,
+        "selfDeclarationAloneCanProduceVerified": false,
+        "persistDerivedResultOnly": true,
+        "prohibitedPersistentFields": [
+          "full-date-of-birth",
+          "identity-document-image",
+          "biometric-template",
+          "raw-provider-payload"
+        ]
+      },
+      "requiredSignoffs": [
+        "owner",
+        "uk_counsel"
+      ],
+      "implementationInputs": [
+        "allowed-method-codes",
+        "minimum-assurance-level",
+        "accepted-result-classes",
+        "verification-expiry-or-recheck-rule",
+        "vendor-or-no-vendor-decision",
+        "approved-derived-fields",
+        "prohibited-raw-fields"
+      ],
+      "failClosed": "No age result may be persisted as verified."
+    },
+    {
+      "id": "LEGAL-03",
+      "topic": "residence-and-current-territory-methods",
+      "status": "pending-owner-and-uk-counsel-signoff",
+      "approvedDecision": null,
+      "recommendation": {
+        "residenceAndCurrentTerritoryAreIndependent": true,
+        "coarseTerritoryOnly": true,
+        "rawIpOrGpsPersistence": false,
+        "localeCurrencyTimezoneOrStorefrontCanElevate": false,
+        "signalConflictResult": "verification-required"
+      },
+      "requiredSignoffs": [
+        "owner",
+        "uk_counsel"
+      ],
+      "implementationInputs": [
+        "allowed-territory-classes",
+        "approved-method-codes-by-purpose",
+        "signal-precedence",
+        "conflict-rule",
+        "travel-rule",
+        "freshness-and-ttl",
+        "manual-review-boundary"
+      ],
+      "failClosed": "No coarse or inferred signal may grant or elevate access."
+    },
+    {
+      "id": "LEGAL-04",
+      "topic": "lawful-basis-by-processing-purpose",
+      "status": "pending-owner-and-uk-counsel-signoff",
+      "approvedDecision": null,
+      "recommendation": {
+        "oneSizeFitsAllBasis": false,
+        "candidateBasisByPurpose": {
+          "core-account-and-requested-service": "contract",
+          "eligibility-decision-and-derived-evidence": "legitimate-interests-subject-to-lia",
+          "security-and-abuse-prevention": "legitimate-interests-subject-to-lia",
+          "required-terms-acknowledgement": "contract-and-accountability-record",
+          "privacy-notice-presentation": "transparency-record-not-consent",
+          "support": "contract-or-legitimate-interests-by-case",
+          "optional-product-analytics": "consent-subject-to-pecr-analysis",
+          "optional-ai-history": "consent",
+          "optional-ai-memory": "separate-consent",
+          "electronic-marketing": "out-of-scope-and-disabled"
+        },
+        "legalObligationRequiresNamedLaw": true
+      },
+      "requiredSignoffs": [
+        "owner",
+        "uk_counsel"
+      ],
+      "implementationInputs": [
+        "purpose-id",
+        "purpose-statement",
+        "lawful-basis",
+        "necessity-analysis",
+        "lia-or-statutory-source",
+        "data-classes",
+        "notice-reference",
+        "rights-and-withdrawal-effect"
+      ],
+      "failClosed": "A field with no approved purpose and basis is omitted."
+    },
+    {
+      "id": "LEGAL-05",
+      "topic": "retention-deletion-and-user-erasure",
+      "status": "pending-owner-and-uk-counsel-signoff",
+      "approvedDecision": null,
+      "recommendation": {
+        "inventedDurationsAllowed": false,
+        "rawAgeOrTerritoryEvidencePersistence": false,
+        "indefiniteJustInCaseRetentionAllowed": false,
+        "destructiveRollbackBeforeScheduleApproval": false
+      },
+      "requiredSignoffs": [
+        "owner",
+        "uk_counsel"
+      ],
+      "implementationInputs": [
+        "record-class",
+        "retention-trigger",
+        "duration",
+        "delete-or-anonymise-action",
+        "account-erasure-action",
+        "legal-hold-ground-and-release",
+        "backup-treatment",
+        "schedule-owner",
+        "review-date"
+      ],
+      "failClosed": "No affected record class is created and no destructive rollback is authorized."
+    },
+    {
+      "id": "LEGAL-06",
+      "topic": "legal-document-master-translation-and-version-lifecycle",
+      "status": "pending-owner-and-uk-counsel-signoff",
+      "approvedDecision": null,
+      "recommendation": {
+        "masterLocale": "en",
+        "supportedLocales": [
+          "en",
+          "uk",
+          "ru"
+        ],
+        "sharedDocumentIdAndVersion": true,
+        "bundledPrivacyConsentAllowed": false,
+        "staleOrUnapprovedTranslationCanGrantAccess": false,
+        "dataRightsRemainAvailableWhenReacknowledgementBlocked": true
+      },
+      "requiredSignoffs": [
+        "owner",
+        "uk_counsel"
+      ],
+      "implementationInputs": [
+        "document-id",
+        "document-kind",
+        "exact-version",
+        "effective-date",
+        "master-content-hash",
+        "translation-approval-by-locale",
+        "acknowledgement-or-presentation-event",
+        "stale-version-behavior"
+      ],
+      "failClosed": "No unversioned or bundled acceptance and no silent translation fallback."
+    },
+    {
+      "id": "LEGAL-07",
+      "topic": "optional-analytics-ai-history-and-ai-memory-basis",
+      "status": "pending-owner-and-uk-counsel-signoff",
+      "approvedDecision": null,
+      "recommendation": {
+        "purposes": {
+          "optional-product-analytics": {
+            "default": "off",
+            "independentChoice": true,
+            "candidateBasis": "consent-subject-to-pecr-analysis"
+          },
+          "optional-ai-history": {
+            "default": "off",
+            "independentChoice": true,
+            "candidateBasis": "consent"
+          },
+          "optional-ai-memory": {
+            "default": "off",
+            "independentChoice": true,
+            "candidateBasis": "separate-consent"
+          }
+        },
+        "refusalBlocksCoreJournal": false,
+        "withdrawalStopsFutureOptionalProcessing": true
+      },
+      "requiredSignoffs": [
+        "owner",
+        "uk_counsel"
+      ],
+      "implementationInputs": [
+        "purpose-id-and-version",
+        "lawful-basis-and-pecr-gateway",
+        "default",
+        "capture-method",
+        "withdrawal-effect",
+        "retention",
+        "feature-degradation",
+        "processor-and-transfer-disclosure"
+      ],
+      "failClosed": "All three optional purposes remain off and cannot gate the core journal."
+    },
+    {
+      "id": "LEGAL-08",
+      "topic": "product-classification-and-permitted-copy",
+      "status": "pending-owner-and-uk-counsel-signoff",
+      "approvedDecision": null,
+      "recommendation": {
+        "workingDescription": "private-decision-quality-and-risk-control-journal",
+        "gamblingRegulatoryConclusion": "not-asserted-pending-uk-counsel",
+        "bookmakerAffiliateOrExecutionSurface": "prohibited",
+        "providerOrOddsSurface": "separately-gated",
+        "permittedCopyThemes": [
+          "decision-quality",
+          "risk-control",
+          "private-journal",
+          "user-entered-external-facts",
+          "responsible-use"
+        ]
+      },
+      "requiredSignoffs": [
+        "owner",
+        "uk_counsel"
+      ],
+      "implementationInputs": [
+        "approved-classification",
+        "permitted-and-prohibited-copy",
+        "provider-bookmaker-affiliate-boundaries",
+        "approved-jurisdictions",
+        "classification-owner",
+        "review-date",
+        "material-change-triggers"
+      ],
+      "failClosed": "The profile remains configured and disabled with no commercial or provider surface."
+    }
+  ],
+  "activationGate": {
+    "marketProfileEnabled": false,
+    "allLegalGatesApproved": false,
+    "schemaReady": false,
+    "migrationAuthorized": false,
+    "productionWriteAuthorized": false,
+    "nextArtifact": "immutable-owner-and-uk-counsel-signed-decision-version"
+  },
+  "authority": {
+    "repositoryDocumentation": true,
+    "repositoryTests": true,
+    "legalApproval": false,
+    "migrationFile": false,
+    "databaseDdl": false,
+    "databaseDml": false,
+    "environmentChange": false,
+    "marketActivation": false,
+    "providerOrExternalCall": false
+  }
+}

@@ -240,6 +240,43 @@ Production gate:
 Detailed preflight:
 [`r18-pr3c-package-b-persistence-preflight.md`](r18-pr3c-package-b-persistence-preflight.md).
 
+### PR 3C Package B - Owner And UK Counsel Decision Packet
+
+Status: PREPARED — eight gates remain pending both sign-offs; no legal,
+migration, production-write, or activation authority.
+
+Scope:
+- Convert `LEGAL-01` through `LEGAL-08` into one review-ready Owner/UK-counsel
+  packet with conservative recommendations, exact implementation inputs, and a
+  fail-closed state for every unresolved value.
+- Record the factual R18 product boundary separately from the legal
+  classification counsel must supply.
+- Record that the two submitted external research files are byte-identical and
+  therefore provide one research input, not two independent reviews.
+- Keep every machine-readable `approvedDecision` null and every activation gate
+  false until an immutable signed successor artifact exists.
+
+Migrations: none. No SQL, user evidence, production read/write, environment
+change, provider call, legal content, or market activation is included.
+
+Tests:
+- `test:r18-pr3c-owner-legal-decision-packet` validates the eight pending gates,
+  dual-sign-off requirement, source hashes, product prohibitions, primary-source
+  references, null approvals, fail-closed activation state, and absence of a
+  Package B migration.
+- The existing Package B preflight, PR3B/PR3C, Advisor, TypeScript, lint, and
+  repository safety suites remain required.
+
+Production gate:
+- Valid Owner and UK-counsel sign-off closes only the legal-input dependency.
+- A separate schema/migration slice, PostgreSQL 17 verifier, fresh exact
+  read-only production preflight, migration SHA-256, and one-time apply approval
+  remain mandatory.
+- `MARKET_PROFILE_GB_EW_SC_ENABLED` remains disabled.
+
+Detailed packet:
+[`r18-pr3c-owner-legal-decision-packet.md`](r18-pr3c-owner-legal-decision-packet.md).
+
 ### PR 3 - MarketProfile, Eligibility, And Locale Foundation
 
 Scope:
