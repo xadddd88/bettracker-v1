@@ -165,6 +165,35 @@ Execution record:
 - Vercel production deployment `dpl_jrDXN1UzdaJnDU5WuHaZiNHoZkqa` reached `READY` and served `btdk.app` without alias errors.
 - No database migration, historical-row rewrite, market enablement, environment change, or provider execution occurred.
 
+### PR 3B - Repository-Only Market Eligibility Contract
+
+Status: CONTRACT DEFINED — runtime activation disabled.
+
+Scope:
+- Define the immutable `GB_EW_SC_PROFILE_V1` profile for England, Wales, and Scotland with `storefront_country=GB` and minimum age 18.
+- Define every R18 eligibility state and a deterministic server-only policy with exact reason codes.
+- Keep the profile `configured`, not `enabled`, and make the server flag fail closed unless its value is exactly `true`.
+- Prove that storefront, locale-like fields, malformed evidence, and routine rechecks cannot increase access.
+- Require explicit `server_policy` authority for a denied → eligible recheck while allowing routine downgrades.
+
+Migrations: none.
+
+Feature flags:
+- Contract only for `MARKET_PROFILE_GB_EW_SC_ENABLED`; no environment value is added or changed.
+- No runtime caller consumes the flag or evaluator in this slice.
+
+Tests:
+- `test:market-eligibility-contract` covers exact profile values, all territory/status boundaries, locale independence, storefront insufficiency, fail-closed evidence, and monotonic rechecks.
+- Static guards keep the policy out of `app/` and `components/` and forbid Supabase dependencies.
+- TypeScript, lint, and the existing regression suites remain required.
+
+Production gate:
+- Automatic repository deployment is inert because no runtime code imports the policy.
+- No Supabase migration, schema/RLS/RPC change, production data write, environment change, market enablement, legal approval, consent persistence, provider call, or external service execution.
+- Persistence, UI integration, and activation remain separate PR 3 gates.
+
+Detailed contract: [`r18-pr3b-market-eligibility-contract.md`](r18-pr3b-market-eligibility-contract.md).
+
 ### PR 3 - MarketProfile, Eligibility, And Locale Foundation
 
 Scope:
