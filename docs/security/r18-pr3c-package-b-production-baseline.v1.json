@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "baselineId": "bettracker-r18-pr3c-package-b-readiness",
+  "status": "read-only-reconnaissance-legal-blocked",
+  "observedAt": "2026-08-13T15:26:39Z",
+  "repository": {
+    "baseCommit": "bdc1546083fc6096f527cf81085d505a457db8ff",
+    "branchPurpose": "package-b-readiness-preflight-only"
+  },
+  "production": {
+    "projectRef": "ybbdkwjtytokrpbvgbmq",
+    "databaseName": "postgres",
+    "postgresVersion": "17.6",
+    "latestMigration": {
+      "version": "20260812172400",
+      "name": "active_membership_data_api_rpc_enforcement"
+    },
+    "schemas": {
+      "privateExists": true,
+      "publicExists": true
+    },
+    "roles": {
+      "anon": {
+        "bypassRls": false,
+        "canLogin": false
+      },
+      "authenticated": {
+        "bypassRls": false,
+        "canLogin": false
+      },
+      "service_role": {
+        "bypassRls": true,
+        "canLogin": false
+      }
+    },
+    "candidateRelationCollisions": [],
+    "advisor": {
+      "securityFindingCounts": {
+        "0029_authenticated_security_definer_function_executable": 8,
+        "0008_rls_enabled_no_policy": 1
+      },
+      "newPackageBFindingsAccepted": 0
+    }
+  },
+  "legalInputs": [
+    {
+      "id": "LEGAL-01",
+      "topic": "children-access-classification",
+      "status": "unresolved",
+      "approvedValue": null
+    },
+    {
+      "id": "LEGAL-02",
+      "topic": "age-assurance-method-and-strength",
+      "status": "unresolved",
+      "approvedValue": null
+    },
+    {
+      "id": "LEGAL-03",
+      "topic": "residence-and-current-territory-methods",
+      "status": "unresolved",
+      "approvedValue": null
+    },
+    {
+      "id": "LEGAL-04",
+      "topic": "lawful-basis-by-processing-purpose",
+      "status": "unresolved",
+      "approvedValue": null
+    },
+    {
+      "id": "LEGAL-05",
+      "topic": "retention-deletion-and-user-erasure",
+      "status": "unresolved",
+      "approvedValue": null
+    },
+    {
+      "id": "LEGAL-06",
+      "topic": "legal-document-master-translation-and-version-lifecycle",
+      "status": "unresolved",
+      "approvedValue": null
+    },
+    {
+      "id": "LEGAL-07",
+      "topic": "optional-analytics-ai-history-and-ai-memory-basis",
+      "status": "unresolved",
+      "approvedValue": null
+    },
+    {
+      "id": "LEGAL-08",
+      "topic": "product-classification-and-permitted-copy",
+      "status": "unresolved",
+      "approvedValue": null
+    }
+  ],
+  "authority": {
+    "repositoryDocumentation": true,
+    "repositoryTests": true,
+    "migrationFile": false,
+    "databaseDdl": false,
+    "databaseDml": false,
+    "environmentChange": false,
+    "marketActivation": false,
+    "providerOrExternalCall": false
+  },
+  "limitations": [
+    "The snapshot contains catalog and Advisor metadata only; no user rows were queried.",
+    "This reconnaissance snapshot is not the fresh exact preflight required immediately before a future migration.",
+    "Candidate object names are collision checks only and do not authorize object creation."
+  ]
+}
