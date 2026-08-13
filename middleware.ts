@@ -8,6 +8,7 @@ function isPublicWebPath(pathname: string): boolean {
     || pathname === '/service-unavailable'
     || pathname === '/auth'
     || pathname.startsWith('/auth/')
+    || (process.env.VERCEL_ENV !== 'production' && pathname === '/__design-preview/market-access')
 }
 
 export async function middleware(request: NextRequest) {

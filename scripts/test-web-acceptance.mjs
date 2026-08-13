@@ -47,7 +47,7 @@ const FOUNDER_FLOW_VIEWPORTS = [
   { width: 375, height: 812 },
   { width: 1280, height: 900 },
 ]
-const ROUTES = ['/dashboard', '/ai', '/bets/new', `/bets/${TEST_BET_ID}`, '/bankroll', '/coach']
+const ROUTES = ['/settings', '/dashboard', '/ai', '/bets/new', `/bets/${TEST_BET_ID}`, '/bankroll', '/coach']
 const SETTLED_TEST_BET = {
   id: TEST_BET_ID,
   user_id: TEST_USER_ID,
@@ -801,7 +801,16 @@ const supabaseStub = createServer((request, response) => {
     return
   }
   if (url.pathname === '/rest/v1/profiles') {
-    jsonResponse(response, 200, { onboarding_completed: true }, { 'content-range': '0-0/1' })
+    jsonResponse(response, 200, {
+      id: TEST_USER_ID,
+      display_name: 'Acceptance User',
+      currency: 'GBP',
+      default_stake: 10,
+      kelly_fraction: 0.5,
+      web_search_enabled: false,
+      timezone: 'Europe/Kyiv',
+      onboarding_completed: true,
+    }, { 'content-range': '0-0/1' })
     return
   }
 
@@ -878,6 +887,7 @@ try {
     }
 
     for (const route of ROUTES) {
+      if (process.env.MARKET_ACCESS_VISUAL_CAPTURE_DIR && route !== '/settings') continue
       const page = await context.newPage()
       await page.addInitScript({ content: axe.source })
       page.on('pageerror', error => browserErrors.push(`${route} at ${viewport.width}px: ${error.message}`))
@@ -892,6 +902,20 @@ try {
       })
       const response = await page.goto(`${nextOrigin}${route}`, { waitUntil: 'networkidle', timeout: 120_000 })
       assert.equal(response?.status(), 200, `${route} must return 200 from the local app`)
+      if (
+        route === '/settings'
+        && process.env.MARKET_ACCESS_VISUAL_CAPTURE_DIR
+        && [375, 1440].includes(viewport.width)
+      ) {
+        await page.screenshot({
+          path: `${process.env.MARKET_ACCESS_VISUAL_CAPTURE_DIR}/settings-${viewport.width}.png`,
+          fullPage: true,
+        })
+      }
+      if (route === '/settings' && process.env.MARKET_ACCESS_VISUAL_CAPTURE_DIR) {
+        await page.close()
+        continue
+      }
       await assertBaseAcceptance(page, route, viewport)
       if (route === '/ai') await assertAiLabels(page)
       if (route === '/bets/new') await assertTrackerLabels(page, viewport.width === 375)
@@ -903,7 +927,7 @@ try {
     await context.close()
   }
 
-  for (const viewport of FOUNDER_FLOW_VIEWPORTS) {
+  for (const viewport of process.env.MARKET_ACCESS_VISUAL_CAPTURE_DIR ? [] : FOUNDER_FLOW_VIEWPORTS) {
     founderFlowBet = null
     const scannerGate = deferred()
     const trackedGate = deferred()
