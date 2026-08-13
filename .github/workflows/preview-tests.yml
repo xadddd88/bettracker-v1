@@ -88,6 +88,8 @@ jobs:
         run: npm run test:market-eligibility-contract
       - name: "R18 PR3C design and engineering handoff"
         run: npm run test:r18-pr3c-handoff
+      - name: "R18 PR3C Package A copy and presentation contract"
+        run: npm run test:r18-pr3c-package-a
       - name: "Financial safety suite (Decision #047)"
         run: npm run test:financial-safety
       - name: "Domain write boundaries suite (Decision #048)"
