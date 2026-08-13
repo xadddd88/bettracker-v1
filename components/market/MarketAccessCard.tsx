@@ -52,7 +52,7 @@ export default function MarketAccessCard({ model, surface }: MarketAccessCardPro
             </dl>
           ) : (
             <Link className="bn-button bn-button-secondary w-full justify-center sm:w-auto" href="/settings#market-access">
-              {model.primaryAction.label}
+              Посмотреть текущий статус
             </Link>
           )}
         </div>

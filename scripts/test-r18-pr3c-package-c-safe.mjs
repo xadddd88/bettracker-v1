@@ -54,6 +54,8 @@ test('Home and Settings consume one server-produced presentation boundary', () =
 test('Settings owns the status and Home exposes only a safe deeplink', () => {
   assert.match(component, /id=\{isSettings \? 'market-access' : undefined\}/)
   assert.match(component, /href="\/settings#market-access"/)
+  assert.match(component, />\s*Посмотреть текущий статус\s*</)
+  assert.doesNotMatch(component, /model\.primaryAction/)
   assert.match(component, /Сейчас этот экран ничего не собирает и не меняет/)
   assert.match(component, /Язык, валюта и часовой пояс[\s\S]*не открывают доступ/)
   assert.doesNotMatch(component, /^['"]use client['"]/)
