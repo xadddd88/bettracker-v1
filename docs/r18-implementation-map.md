@@ -200,6 +200,46 @@ Execution record:
 
 Detailed contract: [`r18-pr3b-market-eligibility-contract.md`](r18-pr3b-market-eligibility-contract.md).
 
+### PR 3C Package B - Persistence Readiness Preflight
+
+Status: PREFLIGHT COMPLETE — migration remains blocked by eight unresolved
+Owner/Legal inputs and has no apply authority.
+
+Scope:
+- Record a read-only production catalog and Advisor baseline without reading
+  user rows or changing Supabase.
+- Define the minimal logical persistence, presentation projection, explicit
+  grants, RLS, server-only decision transaction, audit, rollback, and emergency
+  boundaries for later implementation.
+- Convert every `LEGAL INPUT REQUIRED` dependency into one exact, versionable
+  decision request.
+- Add a CI guard that keeps this repository slice free of Package B migrations,
+  executable SQL, invented legal values, market activation, and new
+  authenticated `SECURITY DEFINER` authority.
+
+Migrations: none. Candidate object names are collision checks only.
+
+Feature flags:
+- `MARKET_PROFILE_GB_EW_SC_ENABLED` remains disabled.
+- No environment value is added or changed.
+
+Tests:
+- `test:r18-pr3c-package-b-preflight` validates the production metadata anchor,
+  eight unresolved legal gates, official Supabase constraints, ACL/RLS design,
+  recovery contract, and absence of migration authority.
+- PR3B/PR3C, Advisor, TypeScript, lint, and existing safety suites remain
+  required.
+
+Production gate:
+- No schema, RLS, RPC, grant, data, Auth, environment, provider, deployment, or
+  market change is authorized by the preflight.
+- After the legal inputs resolve, a separate exact migration, PostgreSQL 17
+  verifier, fresh read-only production preflight, SHA-256, and one-time explicit
+  apply approval remain mandatory.
+
+Detailed preflight:
+[`r18-pr3c-package-b-persistence-preflight.md`](r18-pr3c-package-b-persistence-preflight.md).
+
 ### PR 3 - MarketProfile, Eligibility, And Locale Foundation
 
 Scope:
