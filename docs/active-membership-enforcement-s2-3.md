@@ -1,13 +1,19 @@
 # Security S2.3 — Direct Data API and RPC Membership Enforcement
 
-Date: 2026-08-11
+Date: 2026-08-11; production reconciliation updated 2026-08-13
 Baseline: `main@47da4e8d9442f75b2987885cb3ab1a04dc9a6d7b`
-Mode: repository-only implementation; review, CI, and controlled rollout remain
-separate gates
+Status: MERGED / PRODUCTION MIGRATION APPLIED / READ-ONLY RECONCILED
+Original mode: repository-only implementation; review, CI, and controlled rollout
+were separate gates
 
-No production migration has been applied. No Auth record, membership row,
-session, user data, secret, or external configuration was changed while this
-slice was prepared.
+The repository slice itself changed no Auth record, membership row, session,
+user data, secret, or external configuration. Its reviewed migration was later
+applied once under separate production authorization. Production migration
+history records it as
+`20260812172400_active_membership_data_api_rpc_enforcement`; the exact repository
+payload SHA-256 is
+`c544e30454188fe6ae709c8b953d91e88793c10befe0f2514de9bd28fdf7c04c`.
+The fail-closed emergency stop was not invoked.
 
 ## Closed security boundary
 
@@ -227,8 +233,8 @@ remain required regressions.
 
 ## Controlled rollout gates
 
-Repository merge does not authorize production apply. A production rollout
-requires a separate current-state approval and must run in this order:
+Repository merge did not authorize production apply. The separately approved
+production rollout used this required order:
 
 1. confirm S2.1 is applied and S2.2 remains deployed;
 2. reconcile every Auth user to the intended live membership state by explicit
@@ -240,6 +246,22 @@ requires a separate current-state approval and must run in this order:
    RPC probes without exposing user data;
 6. observe authorization errors and core product health before declaring the
    full S2 finding closed.
+
+### Production execution record
+
+- PR #252 merged the exact repository migration through the normal PR path as
+  `1d10463` after the required PostgreSQL 17 and repository checks passed.
+- A fresh read-only production preflight preceded one apply of the exact payload
+  above; no automatic retry or emergency stop ran.
+- Production migration history contains
+  `20260812172400_active_membership_data_api_rpc_enforcement` after the apply.
+- The 2026-08-13 read-only reconciliation found the Supabase project
+  `ACTIVE_HEALTHY` on PostgreSQL 17.6 and the Security Advisor at the accepted
+  baseline: eight intentional authenticated definer-RPC WARN findings plus one
+  RLS-without-policy INFO finding for the closed Decision #056 execution ledger.
+- This documentation reconciliation does not repeat authenticated role probes,
+  inspect user data, or grant any new runtime, provider, market, or beta
+  authority.
 
 Authorization is evaluated at the assertion's database snapshot. A revocation
 committed before the check is denied. A transaction already authorized before a
