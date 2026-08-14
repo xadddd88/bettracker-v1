@@ -25,6 +25,7 @@ BetTracker is a private decision-quality and risk-control system. It does not ra
 - [`r18-implementation-map.md`](r18-implementation-map.md) — current engineering map from existing code to R18 PR packages
 - [`r18-pr3c-package-b-persistence-preflight.md`](r18-pr3c-package-b-persistence-preflight.md) — read-only Package B schema/RLS/legal readiness gate; no migration authority
 - [`r18-pr3c-owner-legal-decision-packet.md`](r18-pr3c-owner-legal-decision-packet.md) — recommended Owner/UK-counsel answers for `LEGAL-01…08`; approvals remain pending and no migration is authorized
+- [`r18-pr3c-owner-uk-counsel-signoff-template.md`](r18-pr3c-owner-uk-counsel-signoff-template.md) — fail-closed response format for Owner and qualified UK counsel; all approvals and implementation values remain blank
 - [`strategy.md`](strategy.md) — level-1 strategy
 - [`decisions.md`](decisions.md) — immutable decision history
 - [`decision-ledger-numbering-governance.md`](decision-ledger-numbering-governance.md) — numbering governance

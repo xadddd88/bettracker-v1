@@ -345,6 +345,41 @@ Execution record:
 - Deployment-scoped inspection found no error/fatal runtime logs; all eight
   legal approvals remain null.
 
+### PR 3C Package B - Dual-Signoff Response Template
+
+Status: TEMPLATE PREPARED — Owner confirmation and qualified UK-counsel advice remain external inputs; no legal, migration, production-write, or activation authority.
+
+Scope:
+- Add one exact machine-readable response format for `LEGAL-01…08` that mirrors
+  every implementation key in the source decision packet.
+- Keep all Owner decisions, counsel decisions, signatories, implementation
+  values, and approvals null until real responses are supplied.
+- Require a new immutable signed-decision version instead of editing the source
+  packet or template in place.
+- Keep confidential memo text, signature images, personal contact details, and
+  privileged material outside the public repository; allow only approved
+  implementation values and publication-approved audit references/hashes.
+
+Migrations: none. No SQL, runtime code, user evidence, production read/write,
+environment change, provider call, legal conclusion, or market activation is
+included.
+
+Tests:
+- `test:r18-pr3c-owner-uk-counsel-signoff-template` pins the reviewed source
+  packet SHA-256, exact eight-gate input key sets, blank signatories and
+  decisions, fail-closed authority, public-repository privacy boundary, CI
+  wiring, and absence of a Package B migration.
+
+Next external input:
+- The Owner must explicitly complete the Owner decisions and attestation.
+- Independently qualified UK counsel must complete the legal decisions, every
+  implementation value, assumptions, conditions, sources, review limits, and
+  verifiable professional scope.
+- A partial, conditional, generic, or LLM-generated answer remains blocked.
+
+Detailed template:
+[`r18-pr3c-owner-uk-counsel-signoff-template.md`](r18-pr3c-owner-uk-counsel-signoff-template.md).
+
 ### PR 3 - MarketProfile, Eligibility, And Locale Foundation
 
 Status: IN PROGRESS — PR3A, PR3B, the PR3C handoff, Package A, Package C, Package B preflight, and the Owner/UK-counsel packet are complete. Package B persistence is blocked on an immutable dual-sign-off artifact; no schema, migration, evidence collection, or activation is authorized by this status.
