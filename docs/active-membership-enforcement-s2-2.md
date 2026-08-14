@@ -1,8 +1,10 @@
 # Security S2.2 — Active Membership Enforcement
 
-Date: 2026-08-11
+Date: 2026-08-11; rollout reconciliation updated 2026-08-13
 Baseline: `main@63b1c8668eafbea610a6bfedca3f4126ce11d514`
-Mode: repository-only detached working tree; no branch, commit, PR, deployment, or live write
+Status: MERGED / DEPLOYED — Web and user-API membership boundary active
+Original mode: repository-only detached working tree; no live write belonged to
+the implementation slice
 
 ## Security invariant
 
@@ -62,11 +64,16 @@ wildcard source.
 
 ## Residual S2.3 boundary
 
-S2.2 is Web/server enforcement only. Direct Data API access and the eight
-authenticated `SECURITY DEFINER` RPCs still rely on their current RLS and
-ownership contracts. S2.3 must add restrictive membership policies and an
-active-membership assertion to all eight RPCs without replacing any ownership
-predicate. S2.2 alone must not be described as complete revocation enforcement.
+At the S2.2 merge checkpoint, this was Web/server enforcement only. Direct Data API
+access and the eight authenticated `SECURITY DEFINER` RPCs still relied on
+their existing RLS and ownership contracts, so S2.2 alone could not be described
+as complete revocation enforcement.
+
+That residual database boundary was subsequently implemented in S2.3, merged in
+PR #252, and applied to production as
+`20260812172400_active_membership_data_api_rpc_enforcement`. S2.3 composes live
+membership with the existing ownership predicates; it does not make S2.2's
+middleware, layout, or user-API checks redundant.
 
 ## Verification record
 

@@ -1,7 +1,7 @@
 # BetTracker AI — Project State
 
 > **Source of truth for current engineering and beta status.**
-> Last updated: 2026-07-29 (Decision #069 R18 product source-of-truth adoption merged via PR #242)
+> Last updated: 2026-08-14 (R18 PR3C control-plane and Security S2.3 production reconciliation)
 
 ## 1. Executive Status
 
@@ -13,13 +13,18 @@
 | Production | `https://btdk.app` |
 | Repository | `xadddd88/bettracker-v1` |
 | Branch model | Feature branch → PR → CPO review/accept → founder merge |
-| Latest completed operational milestone | **Decision #056 production execution — GitHub Actions run `30429349031` completed successfully on `240e3e9`: exactly one approved read-only SportMonks request, `writes: none`, Supabase ledger `row_count = 1`, no artifacts** |
+| Latest completed operational milestone | **R18 PR3C Owner/UK-counsel decision packet — PR #262 merged as `9799289`; production deployment `dpl_5kNqCLDKMMuJDrtFSrw3Lac5RxDb` reached `READY`; all eight legal decisions remain null and runtime market activation remains disabled** |
 | Highest-numbered closed decision | **#069 — R18 Target Product Structure and Global Market Architecture (docs-only; repository adoption complete; no runtime authority)** |
 | Active decisions | **#062 — Mobile Founder client** |
-| Current security state | **Decision #054 Report-Only observation period — Phase B NOT APPROVED** |
+| Current R18 delivery state | **PR0, PR1, PR2, PR3A, PR3B, and the PR3C handoff/presentation/fail-closed UI/preflight packet are complete; Package B persistence remains blocked on immutable Owner plus qualified UK-counsel sign-off, and every activation gate remains closed** |
+| Current security state | **Active-membership enforcement is deployed through S2.3; production migration history and the accepted Advisor baseline reconcile. CSP remains Report-Only; enforcement Phase B is NOT APPROVED** |
 | Next unreserved decision | **#070** |
 
 Decision #069 adopts R18 as the complete product target: Home, Research, Journal, Insights, and Risk; global Add/Review/Tools/Assistant/Privacy/Settings; `en`, `uk`, and `ru`; and the first internal market profile `GB_EW_SC`. It supersedes the conflicting product consequences of Decisions #007–#009 without rewriting their history. It is documentation-only and lifts no production, provider, sports-data, settlement, payment, company-formation, market-launch, or external-beta hold.
+
+R18 delivery checkpoint on 2026-08-14: PR0 #243, PR1 #244, and PR2 #245 are merged. The direct Decision-to-Bet UI path and automatic stake recommendation were removed from active surfaces; PR #246 additionally quarantined `place_bet_from_decision` to `service_role`, and its production migration is applied. PR3A #253 plus audit #254 closed the shared `en` / `uk` / `ru` locale contract. PR3B #255 plus audit #256 closed the repository-only `GB_EW_SC_PROFILE_V1` eligibility contract. PR3C then completed the design handoff (#258), pure presentation contract (#259), fail-closed disabled-state Home/Settings integration (#260), read-only persistence preflight (#261), and pending Owner/UK-counsel decision packet (#262), establishing `main@97992894020d2502869fce1922f2410e6466e81f`. The market profile remains configured, not enabled; no Package B persistence, consent activation, legal approval, provider call, or market launch follows from these merges.
+
+Security checkpoint on 2026-08-13: S1 #247, S2A #248, S2B readiness #249, S2.1 #250, S2.2 #251, and S2.3 #252 are merged. Production migration history includes `20260807041033_quarantine_place_bet_from_decision`, `20260809134845_active_membership_foundation`, and `20260812172400_active_membership_data_api_rpc_enforcement`. The project reports PostgreSQL 17.6 and `ACTIVE_HEALTHY`; the Security Advisor matches the accepted eight-WARN plus one-INFO baseline. CSP enforcement, unrelated least-privilege cleanup, and any new production operation remain separate gates.
 
 The previous blocker "production has 0 SportMonks links" is obsolete. Identity mapping is complete for the controlled EPL fixture. Decision #034 completed one canonical-linked base-response dry-run with zero writes. Decision #055 then closed the trust/storage contract. Decision #056's Class A structural-presence implementation, OIDC hardening, ledger migration, and single production execution are complete: GitHub Actions run `30429349031` succeeded on 2026-07-29 with exactly one provider request, `writes: none`, and ledger `row_count = 1` for deployment SHA `240e3e9916299fd21a71d3c1b5b8ec562ab9316f`. The run surfaced missing/invalid fixture source `updated_at`; `collectedAt` is not source freshness, so downstream usage remains blocked. Decision #068 closes the scope for resolving this blocker: prove provider-source freshness first, then separately consider storage/write validation. Decision #057 closed the results-ingestion and settlement trust contract (docs-evidence only; no results runtime, result writes, or automated settlement is approved).
 
@@ -169,6 +174,9 @@ Current safeguards:
 - limiter failures are fail-closed (`503`) before Anthropic or invite work;
 - rate-limit keys are hashed before storage;
 - production domain writes are mediated through reviewed RPC/server operations;
+- protected Web navigation and all user API routes enforce live active membership fail closed through S2.2;
+- S2.3 adds the live-membership predicate to all 16 client-readable base tables through restrictive RLS and to all eight authenticated definer RPCs; its production migration is present in history;
+- the Supabase Security Advisor reconciles to the accepted eight authenticated-RPC WARN findings plus one closed-ledger INFO finding, with `place_bet_from_decision` retained as a service-only negative control;
 - Decision #054 Phase A hardens CSP report ingestion and adds baseline headers; CSP intentionally remains Report-Only pending evidence and nonce/hash design.
 
 ## 5. Active Product Blockers
@@ -180,8 +188,9 @@ External beta remains paused because the product vision is not yet complete. Imp
 3. Odds ingestion/normalization and user-facing trust validation.
 4. Results ingestion and complete settlement semantics (leg-level/parlay/push/cash-out/partial) — trust contract defined by Decision #057; every runtime/write/settlement step remains separately gated. Decision #058 unifies the metric formulas (G4) and removes the misleading Void fallback (G12), but adds no new settlement semantics. Tracker legs in production still have no safe relationship to `canonical_fixtures` or `fixture_provider_links`. Closed docs-only Decision #063 defines the contract; Decision #064 migration 025 is applied and catalog-verified, while `create_tracked_bet_v2` remains service-role-only with no application caller or matching authority.
 5. R18 Research/Assistant/Review conversion: retire generated/ranked Scout opportunities and allow AI to explain only verified or explicitly user-supplied prepared context.
-6. Complete `en` / `uk` / `ru` localization across UI, validation, errors, email, push, AI, reports, paywall, legal documents, and help; locale must remain independent from market eligibility.
-7. Complete R18 Web/iPhone/Android information architecture, MarketProfile/UserMarketEligibility states, Risk controls, Resolution lifecycle, metric service, privacy, and onboarding.
+6. Extend the completed PR3A `en` / `uk` / `ru` contract across remaining UI, validation, errors, email, push, AI, reports, paywall, legal documents, and help; locale must remain independent from market eligibility.
+7. Persist and present the completed PR3B `GB_EW_SC` policy safely: age evidence, residence/current-territory evidence, legal-terms acknowledgement, consent separation, Settings/onboarding blocked states, RLS/service-only write boundaries, and a still-disabled activation flag.
+8. Complete the remaining R18 Web/iPhone/Android information architecture, Risk controls, Resolution lifecycle, metric service, privacy, and onboarding.
 
 ## 6. Holds
 
@@ -196,6 +205,8 @@ results ingestion / result writes / automated settlement — HOLD (Decision #057
 probability / implied probability / edge / EV / recommendation signals — FP-001 gated
 external beta invitations — PAUSED
 CSP enforcement / nonce / strict-dynamic — NOT APPROVED in Phase A
+GB_EW_SC runtime market activation — DISABLED; separate legal/market gate required
+bookmaker links, affiliate promotion, bet transmission, and provider-data integration — HOLD
 Decision #060 — EXECUTED / VERIFIED / CLOSED; no further synthetic runtime smoke authorized
 Decision #061 — Playwright / Supabase-stub E2E harness — EXECUTED / VERIFIED / CLOSED via PR #235 as `2fb83250`; exact head passed 10/10 CI; loopback-only, with no production smoke or real service write
 Decision #064 — migration 025 / create_tracked_bet_v2 — EXECUTED / VERIFIED / CLOSED; RPC service-role-only; no application caller
@@ -212,6 +223,11 @@ Decision #056 — EXECUTED / VERIFIED / CLOSED via GitHub Actions run `304293490
 - Decision #050 is EXECUTED / VERIFIED / CLOSED after the founder-confirmed production invite lifecycle, negative non-allowlisted check, and Supabase template/signup-control verification recorded on 2026-07-26.
 - Decision #053 reconciled this file, README, the numbering ledger, and the migration inventory.
 - Decision #069 is Founder-approved and merged via PR #242 as the R18 product/documentation baseline. It changes no runtime code, production service behavior, provider, database, settlement, payment, company, or market-launch authority.
+- R18 PR0 #243, PR1 #244, and PR2 #245 are complete. PR1 removed automatic stake recommendation and active Decision-to-Bet callers; PR #246 separately restricted the retained historical RPC to `service_role`. PR2 established the canonical Home / Research / Journal / Insights / Risk shell with compatibility aliases.
+- R18 PR3A #253 plus audit #254 are complete. The active locale contract is exactly `en`, `uk`, and `ru`; historical values remain read-only and cannot authorize a new write.
+- R18 PR3B #255 plus audit #256 are complete at final `main@0e96784ea5aa65dd2fbc741d29abfe653ec78423`. `GB_EW_SC_PROFILE_V1` is configured but has no runtime caller, persisted eligibility, legal approval, or enabled environment value.
+- R18 PR3C #258-#262 is complete through the decision-packet gate at `main@97992894020d2502869fce1922f2410e6466e81f`: design handoff, presentation copy, fail-closed disabled-state UI, read-only persistence preflight, and a versioned Owner/UK-counsel review packet are present. All `LEGAL-01…08` approvals remain null; no Package B migration, environment change, or activation is authorized.
+- Security S1 #247, S2A #248, S2B readiness #249, S2.1 #250, S2.2 #251, and S2.3 #252 are merged. S2B did not enable CSP enforcement. S2.3 production apply used the exact repository payload SHA-256 `c544e30454188fe6ae709c8b953d91e88793c10befe0f2514de9bd28fdf7c04c`; no emergency stop was invoked.
 - Decision #063 was approved and merged docs-only via PR #183 as `df4723f`.
 - Decision #064 implementation merged via PR #186 as `4fce917701b95b3d3ad98ad9f157d02216323d3e`; Gate 3 merged via PR #231 as `f5f17385d711ccd1df323cd71be3448dd3e08d85`. Migration 025 was applied once as `20260727060234_tracked_leg_fixture_lineage_025`; 12/12 columns, 3/3 constraints, 2/2 indexes, 2/2 triggers, 3/3 functions, and service-role-only v2 ACL were verified. No application caller was added.
 - Decision #066 merged via PR #232 as `8ce79df4444c366b07a3585fde3de8554f431b4a`. Migration 030 was applied once as `20260727093233_odds_snapshots_public_security_invoker_030`; `security_invoker`, the exact authenticated-only policy, 9/9 safe-column access, 0/5 internal-column access, zero `anon`/DML access, and service-role continuity were verified. Both related Advisor findings were cleared and the table remained at 0 rows.
@@ -222,7 +238,7 @@ Decision #056 — EXECUTED / VERIFIED / CLOSED via GitHub Actions run `304293490
 - Post-rollout corrective PR #228 merged as `9040673` and deployed READY after exact-head green CI, Vercel READY, and Chrome re-verification. It changes Web typography, control sizing, and browser acceptance coverage only; it does not consume Decision #066 or expand any runtime authority.
 - PR #182 merged as `d103947f` and deployed the fail-closed grading foundation without production provider calls, result writes, scheduling, or automatic settlement.
 - PR #181 applied production migration `20260721152711_cancel_pending_bet`, merged as `d5ebb87d`, and deployed READY. Its emergency kill switch is `docs/cancel-pending-bet-rollback.sql`; the executable SQL is unchanged by the governance rename.
-- `supabase/migrations` contains numbered files through 031, with no 008 file. Migration 025 is applied as `20260727060234_tracked_leg_fixture_lineage_025`. Migration 030 is applied as `20260727093233_odds_snapshots_public_security_invoker_030`. Migration 031 is applied as `20260727123510_public_api_privilege_hardening_031`. Decision #060 is **EXECUTED / VERIFIED / CLOSED**. Migration 024 production version: `20260716142736_create_tracked_bet_024`; Phase B added no migrations.
+- `supabase/migrations` contains the legacy numbered series through 031, with no 008 file, plus the later security migrations. Migration 025 is applied as `20260727060234_tracked_leg_fixture_lineage_025`; migration 030 as `20260727093233_odds_snapshots_public_security_invoker_030`; migration 031 as `20260727123510_public_api_privilege_hardening_031`; the direct-bet quarantine as `20260807041033_quarantine_place_bet_from_decision`; S2.1 as `20260809134845_active_membership_foundation`; and S2.3 as `20260812172400_active_membership_data_api_rpc_enforcement`. Decision #060 is **EXECUTED / VERIFIED / CLOSED**. Migration 024 production version is `20260716142736_create_tracked_bet_024`; its Phase B added no migrations.
 - Production's timestamped migration ledger does not represent all earlier manually applied history.
 - A fresh-database bootstrap is **not yet certified**; see `docs/migration-state-reconciliation-053.md`.
 - Never run `001_initial_schema.sql` against production as a general setup command.
@@ -250,5 +266,7 @@ Decision #056 — EXECUTED / VERIFIED / CLOSED via GitHub Actions run `304293490
 #069 — R18 Target Product Structure and Global Market Architecture — EXECUTED / CLOSED, DOCS-ONLY; repository adoption complete via PR #242; no runtime authority
 #070 — next unreserved decision
 ```
+
+Unnumbered R18 delivery after Decision #069: PR0 #243, PR1 #244, PR2 #245, PR3A #253/#254, PR3B #255/#256, and the PR3C handoff/presentation/fail-closed UI/preflight/decision-packet sequence #258-#262 are complete. Security hardening #246-#252 is merged and the approved database migrations listed above are present in production history. The next PR3 gate is an immutable Owner plus qualified UK-counsel signed decision version for `LEGAL-01…08`; only after that may a separate Package B migration/verifier slice be proposed. Neither step grants runtime activation authority.
 
 PR #90 is closed without merge; its policy is not adopted. Decision #020 is never reused.
