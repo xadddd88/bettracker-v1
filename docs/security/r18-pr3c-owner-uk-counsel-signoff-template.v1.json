@@ -1,0 +1,278 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "bettracker-r18-pr3c-owner-uk-counsel-signoff",
+  "artifactType": "dual-signoff-response-template",
+  "status": "template-pending-owner-and-qualified-uk-counsel-completion",
+  "preparedAt": "2026-08-14",
+  "sourcePacket": {
+    "packetId": "bettracker-r18-pr3c-owner-legal-decision-packet",
+    "path": "docs/security/r18-pr3c-owner-legal-decision-packet.v1.json",
+    "mergedCommit": "97992894020d2502869fce1922f2410e6466e81f",
+    "sha256": "96e945181cd639057ff8806e61b64930a261abad6ad57ab64b7988fc07fc2a66"
+  },
+  "templateRepositoryBase": "a199008f0a32a6c6fb5c6dd7b038211a83245029",
+  "templateRules": {
+    "sourcePacketMustNotBeEditedInPlace": true,
+    "templateMustNotBeEditedInPlaceToClaimApproval": true,
+    "completedArtifactPathPattern": "docs/security/r18-pr3c-owner-uk-counsel-signed-decision.v{n}.json",
+    "confidentialMemoCommittedToPublicRepository": false,
+    "signatureImageCommittedToPublicRepository": false,
+    "personalContactDetailsCommittedToPublicRepository": false,
+    "publicArtifactMayContain": [
+      "approved-implementation-values",
+      "professional-role-and-organisation-if-publication-approved",
+      "regulator-and-registration-reference-if-publication-approved",
+      "signed-at-date",
+      "private-memo-stable-reference",
+      "private-memo-sha256"
+    ]
+  },
+  "signatories": {
+    "owner": {
+      "status": "pending-explicit-owner-confirmation",
+      "name": null,
+      "role": "owner",
+      "organisation": null,
+      "signedAt": null,
+      "attestation": null,
+      "signatureReference": null
+    },
+    "ukCounsel": {
+      "status": "pending-qualified-uk-counsel-response",
+      "name": null,
+      "role": null,
+      "organisation": null,
+      "professionalRegulator": null,
+      "registrationReference": null,
+      "qualificationAndJurisdiction": null,
+      "scope": null,
+      "signedAt": null,
+      "attestation": null,
+      "signatureReference": null
+    }
+  },
+  "privateMemoEvidence": {
+    "stableReference": null,
+    "sha256": null,
+    "memoDate": null,
+    "confidentialStorageOwner": null,
+    "publicationApprovedByCounsel": false
+  },
+  "decisions": [
+    {
+      "id": "LEGAL-01",
+      "topic": "children-access-classification",
+      "status": "pending-complete-dual-signoff",
+      "sourceRecommendationReference": "sourcePacket.legalGates[LEGAL-01].recommendation",
+      "ownerDecision": null,
+      "ukCounselDecision": null,
+      "implementationInputs": {
+        "likely-accessed-verdict": null,
+        "children-code-duties": null,
+        "assessment-owner": null,
+        "assessment-evidence-reference": null,
+        "review-date": null,
+        "dpia-requirement": null
+      },
+      "sourceOrMemoReferences": [],
+      "assumptions": [],
+      "conditions": [],
+      "expiryOrReviewDate": null,
+      "materialChangeTriggers": [],
+      "approvedDecision": null
+    },
+    {
+      "id": "LEGAL-02",
+      "topic": "age-assurance-method-and-strength",
+      "status": "pending-complete-dual-signoff",
+      "sourceRecommendationReference": "sourcePacket.legalGates[LEGAL-02].recommendation",
+      "ownerDecision": null,
+      "ukCounselDecision": null,
+      "implementationInputs": {
+        "allowed-method-codes": null,
+        "minimum-assurance-level": null,
+        "accepted-result-classes": null,
+        "verification-expiry-or-recheck-rule": null,
+        "vendor-or-no-vendor-decision": null,
+        "approved-derived-fields": null,
+        "prohibited-raw-fields": null
+      },
+      "sourceOrMemoReferences": [],
+      "assumptions": [],
+      "conditions": [],
+      "expiryOrReviewDate": null,
+      "materialChangeTriggers": [],
+      "approvedDecision": null
+    },
+    {
+      "id": "LEGAL-03",
+      "topic": "residence-and-current-territory-methods",
+      "status": "pending-complete-dual-signoff",
+      "sourceRecommendationReference": "sourcePacket.legalGates[LEGAL-03].recommendation",
+      "ownerDecision": null,
+      "ukCounselDecision": null,
+      "implementationInputs": {
+        "allowed-territory-classes": null,
+        "approved-method-codes-by-purpose": null,
+        "signal-precedence": null,
+        "conflict-rule": null,
+        "travel-rule": null,
+        "freshness-and-ttl": null,
+        "manual-review-boundary": null
+      },
+      "sourceOrMemoReferences": [],
+      "assumptions": [],
+      "conditions": [],
+      "expiryOrReviewDate": null,
+      "materialChangeTriggers": [],
+      "approvedDecision": null
+    },
+    {
+      "id": "LEGAL-04",
+      "topic": "lawful-basis-by-processing-purpose",
+      "status": "pending-complete-dual-signoff",
+      "sourceRecommendationReference": "sourcePacket.legalGates[LEGAL-04].recommendation",
+      "ownerDecision": null,
+      "ukCounselDecision": null,
+      "implementationInputs": {
+        "purpose-id": null,
+        "purpose-statement": null,
+        "lawful-basis": null,
+        "necessity-analysis": null,
+        "lia-or-statutory-source": null,
+        "data-classes": null,
+        "notice-reference": null,
+        "rights-and-withdrawal-effect": null
+      },
+      "sourceOrMemoReferences": [],
+      "assumptions": [],
+      "conditions": [],
+      "expiryOrReviewDate": null,
+      "materialChangeTriggers": [],
+      "approvedDecision": null
+    },
+    {
+      "id": "LEGAL-05",
+      "topic": "retention-deletion-and-user-erasure",
+      "status": "pending-complete-dual-signoff",
+      "sourceRecommendationReference": "sourcePacket.legalGates[LEGAL-05].recommendation",
+      "ownerDecision": null,
+      "ukCounselDecision": null,
+      "implementationInputs": {
+        "record-class": null,
+        "retention-trigger": null,
+        "duration": null,
+        "delete-or-anonymise-action": null,
+        "account-erasure-action": null,
+        "legal-hold-ground-and-release": null,
+        "backup-treatment": null,
+        "schedule-owner": null,
+        "review-date": null
+      },
+      "sourceOrMemoReferences": [],
+      "assumptions": [],
+      "conditions": [],
+      "expiryOrReviewDate": null,
+      "materialChangeTriggers": [],
+      "approvedDecision": null
+    },
+    {
+      "id": "LEGAL-06",
+      "topic": "legal-document-master-translation-and-version-lifecycle",
+      "status": "pending-complete-dual-signoff",
+      "sourceRecommendationReference": "sourcePacket.legalGates[LEGAL-06].recommendation",
+      "ownerDecision": null,
+      "ukCounselDecision": null,
+      "implementationInputs": {
+        "document-id": null,
+        "document-kind": null,
+        "exact-version": null,
+        "effective-date": null,
+        "master-content-hash": null,
+        "translation-approval-by-locale": null,
+        "acknowledgement-or-presentation-event": null,
+        "stale-version-behavior": null
+      },
+      "sourceOrMemoReferences": [],
+      "assumptions": [],
+      "conditions": [],
+      "expiryOrReviewDate": null,
+      "materialChangeTriggers": [],
+      "approvedDecision": null
+    },
+    {
+      "id": "LEGAL-07",
+      "topic": "optional-analytics-ai-history-and-ai-memory-basis",
+      "status": "pending-complete-dual-signoff",
+      "sourceRecommendationReference": "sourcePacket.legalGates[LEGAL-07].recommendation",
+      "ownerDecision": null,
+      "ukCounselDecision": null,
+      "implementationInputs": {
+        "purpose-id-and-version": null,
+        "lawful-basis-and-pecr-gateway": null,
+        "default": null,
+        "capture-method": null,
+        "withdrawal-effect": null,
+        "retention": null,
+        "feature-degradation": null,
+        "processor-and-transfer-disclosure": null
+      },
+      "sourceOrMemoReferences": [],
+      "assumptions": [],
+      "conditions": [],
+      "expiryOrReviewDate": null,
+      "materialChangeTriggers": [],
+      "approvedDecision": null
+    },
+    {
+      "id": "LEGAL-08",
+      "topic": "product-classification-and-permitted-copy",
+      "status": "pending-complete-dual-signoff",
+      "sourceRecommendationReference": "sourcePacket.legalGates[LEGAL-08].recommendation",
+      "ownerDecision": null,
+      "ukCounselDecision": null,
+      "implementationInputs": {
+        "approved-classification": null,
+        "permitted-and-prohibited-copy": null,
+        "provider-bookmaker-affiliate-boundaries": null,
+        "approved-jurisdictions": null,
+        "classification-owner": null,
+        "review-date": null,
+        "material-change-triggers": null
+      },
+      "sourceOrMemoReferences": [],
+      "assumptions": [],
+      "conditions": [],
+      "expiryOrReviewDate": null,
+      "materialChangeTriggers": [],
+      "approvedDecision": null
+    }
+  ],
+  "completionGate": {
+    "ownerSigned": false,
+    "qualifiedUkCounselSigned": false,
+    "professionalQualificationVerified": false,
+    "allImplementationInputsComplete": false,
+    "privateMemoHashVerified": false,
+    "allLegalGatesApproved": false,
+    "unresolvedOrConditionalValuesRemainBlockers": true
+  },
+  "activationGate": {
+    "marketProfileEnabled": false,
+    "schemaReady": false,
+    "migrationAuthorized": false,
+    "productionWriteAuthorized": false
+  },
+  "authority": {
+    "repositoryDocumentation": true,
+    "repositoryTests": true,
+    "ownerApproval": false,
+    "ukLegalApproval": false,
+    "migrationFile": false,
+    "databaseDdl": false,
+    "databaseDml": false,
+    "environmentChange": false,
+    "marketActivation": false,
+    "providerOrExternalCall": false
+  }
+}

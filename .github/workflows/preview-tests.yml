@@ -94,6 +94,8 @@ jobs:
         run: npm run test:r18-pr3c-package-b-preflight
       - name: "R18 PR3C Owner and UK counsel decision packet"
         run: npm run test:r18-pr3c-owner-legal-decision-packet
+      - name: "R18 PR3C Owner and qualified UK counsel sign-off template"
+        run: npm run test:r18-pr3c-owner-uk-counsel-signoff-template
       - name: "R18 PR3C Package C fail-closed Web integration"
         run: npm run test:r18-pr3c-package-c-safe
       - name: "Financial safety suite (Decision #047)"
