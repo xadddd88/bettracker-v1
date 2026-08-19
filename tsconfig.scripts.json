@@ -24,6 +24,7 @@
     "app/api/bankroll/deposit/route.ts",
     "app/api/bets/tracked/route.ts",
     "app/api/bets/[id]/cancel/route.ts",
+    "app/api/bets/[id]/settle/route.ts",
     "app/api/tennis/series/create/route.ts",
     "app/api/tennis/series/confirm/route.ts",
     "app/api/tennis/series/settle/route.ts",

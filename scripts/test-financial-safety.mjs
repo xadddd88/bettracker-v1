@@ -103,7 +103,9 @@ function makeStubClient(cfg = {}) {
     rpc: async (name, args) => {
       calls.rpc.push({ name, args });
       const result = (cfg.rpcResults ?? {})[name];
-      return result ?? { data: null, error: null };
+      return typeof result === 'function'
+        ? await result(args)
+        : result ?? { data: null, error: null };
     },
     from(table) {
       const entry = { table, ops: [] };
@@ -113,10 +115,12 @@ function makeStubClient(cfg = {}) {
         insert(values) { entry.ops.push({ op: 'insert', values }); return builder; },
         select(sel) { entry.ops.push({ op: 'select', sel }); return builder; },
         eq(col, val) { entry.ops.push({ op: 'eq', col, val }); return builder; },
+        is(col, val) { entry.ops.push({ op: 'is', col, val }); return builder; },
         async single() {
           entry.ops.push({ op: 'single' });
-          return cfg.profileRow !== undefined
-            ? { data: cfg.profileRow, error: null }
+          const row = cfg.singleRow !== undefined ? cfg.singleRow : cfg.profileRow;
+          return row !== undefined
+            ? { data: row, error: null }
             : { data: null, error: { message: 'row not found' } };
         },
         async maybeSingle() {
@@ -140,6 +144,7 @@ function clearCompiledFinancialModules() {
     'app/api/bankroll/deposit/route.js',
     'app/api/settings/route.js',
     'app/api/bets/[id]/cancel/route.js',
+    'app/api/bets/[id]/settle/route.js',
     'lib/supabase/server.js',
     'lib/supabase/request-auth.js',
     'lib/supabase/active-membership.js',
@@ -1997,6 +2002,70 @@ test('#061 A1: write path untouched — route, RPC, migration 024 and the intent
   }
 });
 
+// ── Tracker settlement route — supported outcomes only ────────────
+
+const SETTLE_ROUTE = 'app/api/bets/[id]/settle/route.js';
+const SETTLE_BET_ID = 'eeeeeeee-3333-4333-8333-ffffffffffff';
+
+function settleRequest(outcome) {
+  return jsonRequest(`https://example.test/api/bets/${SETTLE_BET_ID}/settle`, { outcome });
+}
+
+function settleContext(id = SETTLE_BET_ID) {
+  return { params: Promise.resolve({ id }) };
+}
+
+await testAsync('settle route: won, lost and void each delegate to one authenticated RPC', async () => {
+  for (const outcome of ['won', 'lost', 'void']) {
+    const stub = makeStubClient({
+      singleRow: { id: SETTLE_BET_ID, status: 'pending' },
+      rpcResults: {
+        settle_bet: { data: { bet_id: SETTLE_BET_ID, status: outcome }, error: null },
+      },
+    });
+    await withFinancialRoute(SETTLE_ROUTE, stub, async ({ POST }) => {
+      const response = await POST(settleRequest(outcome), settleContext());
+      const result = await readJsonResponse(response);
+      assert.equal(result.status, 200);
+      assert.equal(result.body.success, true);
+      assert.deepEqual(stub.calls.rpc, [{
+        name: 'settle_bet',
+        args: { p_bet_id: SETTLE_BET_ID, p_outcome: outcome },
+      }]);
+      const ownership = stub.calls.from.find((entry) => entry.table === 'bets');
+      assert.ok(ownership?.ops.some((op) => op.op === 'eq' && op.col === 'user_id' && op.val === 'user-1'));
+      assert.ok(ownership?.ops.some((op) => op.op === 'is' && op.col === 'archived_at' && op.val === null));
+    });
+  }
+});
+
+await testAsync('settle route: invalid outcome, foreign bet and repeated settlement fail closed', async () => {
+  const invalid = makeStubClient({ singleRow: { id: SETTLE_BET_ID, status: 'pending' } });
+  await withFinancialRoute(SETTLE_ROUTE, invalid, async ({ POST }) => {
+    const response = await POST(settleRequest('half_won'), settleContext());
+    assert.equal(response.status, 400);
+    assert.equal(invalid.calls.rpc.length, 0);
+  });
+
+  const foreign = makeStubClient();
+  await withFinancialRoute(SETTLE_ROUTE, foreign, async ({ POST }) => {
+    const response = await POST(settleRequest('won'), settleContext());
+    assert.equal(response.status, 404);
+    assert.equal(foreign.calls.rpc.length, 0);
+  });
+
+  const repeated = makeStubClient({
+    singleRow: { id: SETTLE_BET_ID, status: 'pending' },
+    rpcResults: { settle_bet: { data: null, error: { message: 'already_settled' } } },
+  });
+  await withFinancialRoute(SETTLE_ROUTE, repeated, async ({ POST }) => {
+    const response = await POST(settleRequest('void'), settleContext());
+    const result = await readJsonResponse(response);
+    assert.equal(result.status, 409);
+    assert.equal(result.body.error, 'Bet is already settled');
+  });
+});
+
 // ── Tracker pending cancellation — soft delete + atomic refund ──
 
 const CANCEL_MIGRATION = 'supabase/migrations/20260721152711_cancel_pending_bet.sql';
@@ -2068,9 +2137,9 @@ await testAsync('cancel route: not-owned and settled/conflicting bets return san
   });
 
   for (const [dbMessage, expectedStatus, expectedError] of [
-    ['bet_not_cancellable', 409, 'Only pending bets can be deleted'],
+    ['bet_not_cancellable', 409, 'Only pending bets can be cancelled'],
     ['idempotency_conflict with secret ledger detail', 409, 'Cancellation request conflict'],
-    ['stake_ledger_mismatch row=secret', 500, 'Bet could not be deleted safely'],
+    ['stake_ledger_mismatch row=secret', 500, 'Bet could not be cancelled safely'],
   ]) {
     const stub = makeStubClient({
       maybeSingleRow: { id: CANCEL_BET_ID },
@@ -2139,6 +2208,82 @@ test('cancel: idempotency prevents a double refund even across different retry k
     'cancel RPC must be callable only by authenticated users');
 });
 
+await testAsync('money lifecycle: create and cancel retries never double-debit or double-refund', async () => {
+  const state = {
+    balance: 1452,
+    betId: CANCEL_BET_ID,
+    createKey: null,
+    ledger: [],
+    pnl: null,
+    stake: 0.01,
+    status: null,
+  };
+  const stub = makeStubClient({
+    maybeSingleRow: { id: CANCEL_BET_ID },
+    rpcResults: {
+      create_tracked_bet: async (args) => {
+        if (state.createKey === args.p_idempotency_key) {
+          return { data: { bet_id: state.betId, balance: state.balance, replayed: true }, error: null };
+        }
+        assert.equal(state.createKey, null, 'a second create key must not be accepted in this lifecycle');
+        state.createKey = args.p_idempotency_key;
+        state.balance -= args.p_stake;
+        state.status = 'pending';
+        state.ledger.push({
+          action: 'tracker_create',
+          amount: -args.p_stake,
+          balance_after: state.balance,
+          type: 'stake',
+        });
+        return { data: { bet_id: state.betId, balance: state.balance, replayed: false }, error: null };
+      },
+      cancel_pending_bet: async () => {
+        if (state.status === 'void') {
+          return { data: { bet_id: state.betId, refund_amount: state.stake, balance: state.balance, replayed: true }, error: null };
+        }
+        assert.equal(state.status, 'pending');
+        state.status = 'void';
+        state.pnl = 0;
+        state.balance += state.stake;
+        state.ledger.push({
+          action: 'tracker_cancel',
+          amount: state.stake,
+          balance_after: state.balance,
+          type: 'payout',
+        });
+        return { data: { bet_id: state.betId, refund_amount: state.stake, balance: state.balance, replayed: false }, error: null };
+      },
+    },
+  });
+
+  await withTrackedBetRoute(stub, null, async ({ POST }) => {
+    const first = await readJsonResponse(await POST(jsonRequest(TRACKED_URL, singleLegBody({ stake: state.stake }))));
+    const replay = await readJsonResponse(await POST(jsonRequest(TRACKED_URL, singleLegBody({ stake: state.stake }))));
+    assert.equal(first.body.replayed, false);
+    assert.equal(replay.body.replayed, true);
+  });
+  assert.equal(state.balance, 1451.99);
+  assert.equal(state.ledger.length, 1, 'create replay must not add another debit');
+
+  await withFinancialRoute(CANCEL_ROUTE, stub, async ({ POST }) => {
+    const first = await readJsonResponse(await POST(cancelRequest(), cancelContext()));
+    const replay = await readJsonResponse(await POST(
+      cancelRequest('dddddddd-4444-4444-8444-eeeeeeeeeeee'),
+      cancelContext(),
+    ));
+    assert.equal(first.body.data.replayed, false);
+    assert.equal(replay.body.data.replayed, true);
+  });
+
+  assert.equal(state.status, 'void');
+  assert.equal(state.pnl, 0);
+  assert.equal(state.balance, 1452);
+  assert.deepEqual(state.ledger, [
+    { action: 'tracker_create', amount: -0.01, balance_after: 1451.99, type: 'stake' },
+    { action: 'tracker_cancel', amount: 0.01, balance_after: 1452, type: 'payout' },
+  ]);
+});
+
 test('cancel: route validates UUIDs, verifies ownership and writes only through the RPC', () => {
   const route = readFileSync(path.join(repoRoot, 'app/api/bets/[id]/cancel/route.ts'), 'utf8');
   assert.ok(route.includes("req.headers.get('idempotency-key')"), 'required idempotency header missing');
@@ -2154,13 +2299,17 @@ test('cancel: route validates UUIDs, verifies ownership and writes only through 
 test('cancel: web controls require confirmation and explain the refund/audit behavior', () => {
   const detail = readFileSync(path.join(repoRoot, 'app/(app)/bets/[id]/SettleActions.tsx'), 'utf8');
   const quick = readFileSync(path.join(repoRoot, 'components/bets/QuickSettle.tsx'), 'utf8');
+  const dialog = readFileSync(path.join(repoRoot, 'components/bets/CancelBetDialog.tsx'), 'utf8');
   for (const [name, src] of [['detail', detail], ['list', quick]]) {
-    assert.ok(src.includes('window.confirm('), `${name}: destructive confirmation missing`);
+    assert.ok(!src.includes('window.confirm('), `${name}: native confirm must not block the browser`);
+    assert.ok(src.includes('CancelBetDialog'), `${name}: accessible cancellation dialog missing`);
     assert.ok(src.includes('/cancel`'), `${name}: cancel endpoint missing`);
     assert.ok(src.includes("'Idempotency-Key': crypto.randomUUID()"), `${name}: idempotency key missing`);
-    assert.ok(src.includes('Сумма вернётся в банкролл'), `${name}: refund consequence must be explicit`);
   }
-  assert.ok(detail.includes('Финансовая audit-запись сохраняется.'), 'detail must explain that deletion is a soft delete');
+  assert.ok(dialog.includes('aria-modal="true"') && dialog.includes('role="dialog"'), 'confirmation must expose modal semantics');
+  assert.ok(dialog.includes('Сумма ставки полностью вернётся в банкролл'), 'refund consequence must be explicit');
+  assert.ok(dialog.includes('финансовая история сохранится'), 'retained audit consequence must be explicit');
+  assert.ok(detail.includes('Финансовая запись аудита сохраняется.'), 'detail must explain that cancellation retains audit history');
 });
 
 test('cancel: every product bet read excludes archived cancellations', () => {

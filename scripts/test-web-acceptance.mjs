@@ -18,6 +18,7 @@ const BLOCKED_WEBSOCKET_REASON = 'External WebSocket blocked by Web acceptance'
 const TEST_USER_ID = '00000000-0000-4000-8000-000000000001'
 const TEST_BET_ID = '00000000-0000-4000-8000-000000000005'
 const FOUNDER_FLOW_BET_ID = '00000000-0000-4000-8000-000000000007'
+const PENDING_CANCEL_BET_ID = '00000000-0000-4000-8000-000000000021'
 const TEST_SETTLED_AT = '2026-07-22T23:30:00.000Z'
 const FOUNDER_FLOW_PLACED_AT = '2026-07-27T14:00:00.000Z'
 const TEST_USER = {
@@ -70,6 +71,30 @@ const SETTLED_TEST_BET = {
     selection: 'Home',
     odds: 2.14,
     sport: 'football',
+  }],
+}
+const PENDING_CANCEL_BET = {
+  id: PENDING_CANCEL_BET_ID,
+  user_id: TEST_USER_ID,
+  status: 'pending',
+  stake: 0.01,
+  total_odds: 2,
+  pnl: null,
+  bookmaker: 'Acceptance',
+  source: 'manual',
+  notes: 'Hermetic cancel dialog flow',
+  placed_at: '2026-08-18T17:42:59.000Z',
+  settled_at: null,
+  archived_at: null,
+  legs: [{
+    id: '00000000-0000-4000-8000-000000000022',
+    bet_id: PENDING_CANCEL_BET_ID,
+    leg_index: 0,
+    event_name: 'Hermetic cancellation fixture',
+    market_type: 'Lifecycle',
+    selection: 'Cancel and refund',
+    odds: 2,
+    sport: 'soccer',
   }],
 }
 
@@ -379,6 +404,69 @@ async function assertBetDetailHydration(page) {
 
   assert.equal(timestamps.detail, '22 июл. 2026 г., 23:30', 'Server-rendered settled timestamp must use the UTC release contract')
   assert.equal(timestamps.settlement, timestamps.detail, 'Client settlement timestamp must match the server-rendered value byte-for-byte')
+}
+
+async function assertCancelDialogFlow(page, flow) {
+  const label = 'Cancellation dialog flow at 375px'
+  await page.addInitScript(() => {
+    window.__nativeConfirmCalls = 0
+    window.confirm = () => {
+      window.__nativeConfirmCalls += 1
+      return false
+    }
+  })
+  await page.addInitScript({ content: axe.source })
+
+  const response = await page.goto(
+    `${flow.nextOrigin}/bets/${PENDING_CANCEL_BET_ID}`,
+    { waitUntil: 'networkidle', timeout: 120_000 },
+  )
+  assert.equal(response?.status(), 200, `${label} detail must return 200`)
+  await assertBaseAcceptance(page, `/bets/${PENDING_CANCEL_BET_ID}`, { width: 375, height: 812 })
+
+  const trigger = page.getByRole('button', { name: 'Отменить ставку и вернуть сумму', exact: true })
+  await trigger.click()
+  const dialog = page.getByRole('dialog', { name: 'Отменить открытую ставку?' })
+  await dialog.waitFor()
+  assert.equal(flow.cancelRequests, 0, `${label} opening confirmation must not send a request`)
+  assert.equal(await page.evaluate(() => window.__nativeConfirmCalls), 0, `${label} must not call window.confirm`)
+
+  const keepOpen = dialog.getByRole('button', { name: 'Оставить открытой' })
+  const confirm = dialog.getByRole('button', { name: 'Подтвердить отмену' })
+  assert.equal(await keepOpen.evaluate(element => element === document.activeElement), true, `${label} must focus the safe action first`)
+  await assertInteractiveAcceptance(page, `${label} with confirmation open`)
+
+  await page.keyboard.press('Shift+Tab')
+  assert.equal(await confirm.evaluate(element => element === document.activeElement), true, `${label} Shift+Tab must wrap to confirmation`)
+  await page.keyboard.press('Tab')
+  assert.equal(await keepOpen.evaluate(element => element === document.activeElement), true, `${label} Tab must wrap to the safe action`)
+
+  await page.keyboard.press('Escape')
+  await dialog.waitFor({ state: 'detached' })
+  await page.waitForFunction(() => document.activeElement?.textContent?.includes('Отменить ставку и вернуть сумму'))
+  assert.equal(await trigger.evaluate(element => element === document.activeElement), true, `${label} Escape must restore trigger focus`)
+  assert.equal(flow.cancelRequests, 0, `${label} Escape must not cancel the bet`)
+
+  await trigger.click()
+  await dialog.waitFor()
+  const confirmAgain = dialog.getByRole('button', { name: 'Подтвердить отмену' })
+  await confirmAgain.click()
+  await flow.cancelSeen.promise
+  assert.equal(flow.cancelRequests, 1, `${label} confirmation must send exactly one request`)
+  assert.match(
+    flow.idempotencyKeys[0] ?? '',
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    `${label} must send a UUIDv4 idempotency key`,
+  )
+  const busyConfirm = dialog.getByRole('button', { name: 'Отменяем…' })
+  assert.equal(await busyConfirm.isDisabled(), true, `${label} must lock while cancellation is in flight`)
+  await busyConfirm.evaluate(button => button.click())
+  await page.waitForTimeout(100)
+  assert.equal(flow.cancelRequests, 1, `${label} in-flight double click must not send another request`)
+
+  flow.cancelGate.resolve()
+  await page.waitForURL(`${flow.nextOrigin}/bets`, { timeout: 120_000 })
+  assert.equal(flow.cancelRequests, 1, `${label} completed flow must still contain one cancellation request`)
 }
 
 async function assertAiLabels(page) {
@@ -798,6 +886,10 @@ const supabaseStub = createServer((request, response) => {
       jsonResponse(response, 200, SETTLED_TEST_BET, { 'content-range': '0-0/1' })
       return
     }
+    if (url.searchParams.get('id') === `eq.${PENDING_CANCEL_BET_ID}`) {
+      jsonResponse(response, 200, PENDING_CANCEL_BET, { 'content-range': '0-0/1' })
+      return
+    }
     if (url.searchParams.get('id') === `eq.${FOUNDER_FLOW_BET_ID}` && founderFlowBet) {
       jsonResponse(response, 200, founderFlowBet, { 'content-range': '0-0/1' })
       return
@@ -965,6 +1057,85 @@ try {
     await context.close()
   }
 
+  if (!process.env.MARKET_ACCESS_VISUAL_CAPTURE_DIR) {
+    const cancelFlow = {
+      cancelGate: deferred(),
+      cancelRequests: 0,
+      cancelSeen: deferred(),
+      idempotencyKeys: [],
+      nextOrigin,
+    }
+    const context = await browser.newContext({
+      locale: 'uk-UA',
+      serviceWorkers: 'block',
+      timezoneId: 'Europe/Kyiv',
+      viewport: { width: 375, height: 812 },
+    })
+    await installHermeticContextGuards(context, {
+      externalRequests,
+      feedbackStubs,
+      forbiddenWebSocketAttempts,
+      nextOrigin,
+      localApiHandler: async (route, url) => {
+        const request = route.request()
+        if (
+          url.origin === nextOrigin
+          && url.pathname === `/api/bets/${PENDING_CANCEL_BET_ID}/cancel`
+          && request.method() === 'POST'
+        ) {
+          cancelFlow.cancelRequests += 1
+          cancelFlow.idempotencyKeys.push(request.headers()['idempotency-key'])
+          cancelFlow.cancelSeen.resolve()
+          await cancelFlow.cancelGate.promise
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              success: true,
+              data: {
+                balance: 1000,
+                bet_id: PENDING_CANCEL_BET_ID,
+                refund_amount: 0.01,
+                replayed: false,
+              },
+            }),
+          })
+          return true
+        }
+        return false
+      },
+    })
+    await context.addCookies([{
+      name: 'sb-127-auth-token',
+      value: sessionCookieValue(),
+      domain: '127.0.0.1',
+      path: '/',
+      httpOnly: false,
+      secure: false,
+      sameSite: 'Lax',
+    }])
+
+    const page = await context.newPage()
+    page.on('pageerror', error => browserErrors.push(`Cancellation dialog flow: ${error.message}`))
+    page.on('console', message => {
+      if (message.type() !== 'error') return
+      const location = message.location()
+      const source = location.url ? ` (${location.url}:${location.lineNumber ?? 0}:${location.columnNumber ?? 0})` : ''
+      browserConsoleErrors.push(`Cancellation dialog flow: ${message.text()}${source}`)
+    })
+    page.on('websocket', socket => {
+      if (!isLoopback(socket.url())) observedExternalWebSockets.push(socket.url())
+    })
+
+    try {
+      await assertCancelDialogFlow(page, cancelFlow)
+    } finally {
+      cancelFlow.cancelGate.resolve()
+      await page.close()
+      await context.close()
+    }
+  }
+
   for (const viewport of process.env.MARKET_ACCESS_VISUAL_CAPTURE_DIR ? [] : FOUNDER_FLOW_VIEWPORTS) {
     founderFlowBet = null
     const scannerGate = deferred()
@@ -1073,7 +1244,7 @@ try {
   assert.ok(stubRequests.some(request => request === 'GET /rest/v1/bets'), 'Dashboard acceptance must exercise local data reads')
   assert.ok(stubRequests.some(request => request === 'GET /rest/v1/coaching_sessions'), 'Coach acceptance must exercise local session reads')
   assert.ok(stubRequests.some(request => request === 'GET /rest/v1/bankroll_transactions'), 'Bankroll acceptance must exercise local transaction reads')
-  console.log(`Web acceptance passed: ${VIEWPORTS.length} viewports × (1 public + ${ROUTES.length} authenticated routes) + ${FOUNDER_FLOW_VIEWPORTS.length} hermetic Founder Daily Flows; zero external requests and zero Supabase writes.`)
+  console.log(`Web acceptance passed: ${VIEWPORTS.length} viewports × (1 public + ${ROUTES.length} authenticated routes) + 1 cancellation dialog flow + ${FOUNDER_FLOW_VIEWPORTS.length} hermetic Founder Daily Flows; zero external requests and zero Supabase writes.`)
 } catch (error) {
   console.error(error)
   console.error('\nHermetic Next log tail:\n', nextOutput)

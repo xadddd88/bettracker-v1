@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { trackClientEvent } from '@/lib/analytics/client'
 import { EVENTS } from '@/lib/analytics/events'
 import { BroadcastButton } from '@/components/ui/BroadcastNoir'
+import CancelBetDialog from '@/components/bets/CancelBetDialog'
 
 interface Props {
   betId: string
@@ -12,8 +13,9 @@ interface Props {
 
 export default function QuickSettle({ betId }: Props) {
   const router   = useRouter()
-  const [busy,  setBusy]  = useState<'won' | 'lost' | 'void' | 'delete' | null>(null)
+  const [busy,  setBusy]  = useState<'won' | 'lost' | 'void' | 'cancel' | null>(null)
   const [error, setError] = useState('')
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
   const lockRef = useRef(false)
 
   async function settle(outcome: 'won' | 'lost' | 'void') {
@@ -40,12 +42,11 @@ export default function QuickSettle({ betId }: Props) {
     }
   }
 
-  async function cancelBet() {
+  async function confirmCancelBet() {
     if (lockRef.current) return
-    if (!window.confirm('Удалить эту открытую ставку? Сумма вернётся в банкролл. Действие нельзя отменить.')) return
 
     lockRef.current = true
-    setBusy('delete')
+    setBusy('cancel')
     setError('')
     trackClientEvent(EVENTS.BET_CANCEL_CLICKED, { bet_id: betId, from_page: 'tracker_list' })
     try {
@@ -54,9 +55,15 @@ export default function QuickSettle({ betId }: Props) {
         headers: { 'Idempotency-Key': crypto.randomUUID() },
       })
       const json = await res.json()
-      if (!res.ok || !json.success) { setError(json.error ?? 'Не удалось удалить ставку'); return }
+      if (!res.ok || !json.success) {
+        setCancelDialogOpen(false)
+        setError(json.error ?? 'Не удалось отменить ставку')
+        return
+      }
+      setCancelDialogOpen(false)
       router.refresh()
     } catch {
+      setCancelDialogOpen(false)
       setError('Ошибка сети — попробуйте ещё раз')
     } finally {
       lockRef.current = false
@@ -92,13 +99,19 @@ export default function QuickSettle({ betId }: Props) {
       </BroadcastButton>
       <BroadcastButton
         className="min-h-11 px-3 sm:ml-auto"
-        onClick={cancelBet}
+        onClick={() => setCancelDialogOpen(true)}
         disabled={busy !== null}
         tone="destructive"
       >
-        {busy === 'delete' ? 'Удаляем…' : 'Удалить'}
+        Отменить
       </BroadcastButton>
       {error && <span aria-live="polite" className="basis-full text-[11px] font-semibold text-bn-negative sm:ml-1 sm:basis-auto">{error}</span>}
+      <CancelBetDialog
+        busy={busy === 'cancel'}
+        onClose={() => setCancelDialogOpen(false)}
+        onConfirm={confirmCancelBet}
+        open={cancelDialogOpen}
+      />
     </div>
   )
 }

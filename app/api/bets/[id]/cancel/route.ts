@@ -60,7 +60,7 @@ export async function POST(
     })
 
     if (errorType === 'not_cancellable') {
-      return NextResponse.json({ error: 'Only pending bets can be deleted' }, { status: 409 })
+      return NextResponse.json({ error: 'Only pending bets can be cancelled' }, { status: 409 })
     }
     if (errorType === 'not_found') {
       return NextResponse.json({ error: 'Bet not found' }, { status: 404 })
@@ -69,7 +69,7 @@ export async function POST(
       return NextResponse.json({ error: 'Cancellation request conflict' }, { status: 409 })
     }
 
-    return NextResponse.json({ error: 'Bet could not be deleted safely' }, { status: 500 })
+    return NextResponse.json({ error: 'Bet could not be cancelled safely' }, { status: 500 })
   }
 
   await trackServerEvent(user.id, EVENTS.BET_CANCEL_SUCCEEDED, {
