@@ -234,6 +234,13 @@ async function assertNoDuplicateIds(page, label) {
 }
 
 async function assertAxe(page, label) {
+  // App Router streams head metadata separately from the route body during
+  // client navigation. Wait for the required title instead of auditing the
+  // transient head between those streams; a persistently missing title still
+  // fails closed on this wait and the explicit assertion below.
+  await page.waitForFunction(() => document.title.trim().length > 0)
+  assert.notEqual((await page.title()).trim(), '', `${label} must expose a non-empty document title`)
+
   const result = await page.evaluate(async () => window.axe.run(document))
   assert.deepEqual(
     result.violations.map(violation => ({
