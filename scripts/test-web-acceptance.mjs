@@ -443,7 +443,9 @@ async function assertCancelDialogFlow(page, flow) {
 
   await page.keyboard.press('Escape')
   await dialog.waitFor({ state: 'detached' })
-  await page.waitForFunction(() => document.activeElement?.textContent?.includes('Отменить ставку и вернуть сумму'))
+  const triggerHandle = await trigger.elementHandle()
+  assert.ok(triggerHandle, `${label} trigger must remain mounted after Escape`)
+  await page.waitForFunction(element => element === document.activeElement, triggerHandle)
   assert.equal(await trigger.evaluate(element => element === document.activeElement), true, `${label} Escape must restore trigger focus`)
   assert.equal(flow.cancelRequests, 0, `${label} Escape must not cancel the bet`)
 
